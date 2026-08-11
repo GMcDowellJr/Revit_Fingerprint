@@ -210,7 +210,31 @@ def suggest_params_for_domain(
     # (req + opt + scoped_candidates / req + opt), so their search space needs
     # to be able to represent at least required_count fields simultaneously --
     # the discover-mode budget solve above doesn't know about that baseline.
-    harsh_max_k = max(discover_max_k, required_count + 2) if required_count else discover_max_k
+    # BUT: tools/discover_join_policy.py's actual pareto_search() (the Callable
+    # API it calls, not the separate policy-aware CLI path elsewhere in
+    # pareto_joinkey_search.py) has no required-fields-aware enumeration -- it's
+    # plain itertools.combinations(fields, k) for every k up to max_k, blind to
+    # which fields are "required". Blindly bumping max_k to required_count+N
+    # without checking the resulting combinatorial cost can recommend a command
+    # that would evaluate billions of subsets (e.g. required_count=20 among 30
+    # candidates at max_k=22 is over 1e9) -- exactly the choking this tool
+    # exists to prevent.
+    #
+    # required_count > discover_max_k can only be reached when discover_max_k
+    # was itself capped by the SAME budget (never by candidate-pool size alone:
+    # required fields are necessarily a subset of the pool, so required_count
+    # can never legitimately exceed n_candidates). solve_candidate_fields_and_k
+    # already returns the *largest* k affordable at that pool/budget -- by the
+    # monotonicity of Sum C(pool, i), any k beyond it is provably unaffordable
+    # at the identical pool/budget, with zero exceptions. So there is no
+    # "smaller headroom" to search for: once this branch triggers, bumping
+    # max_k to represent the baseline is unconditionally infeasible within
+    # budget at this candidate pool. Stay at the budget-safe discover_max_k and
+    # flag the domain as needing --search-modes greedy for harsh/validate
+    # instead (discover_greedy() is O(max_k * candidates), not combinatorial,
+    # so it has no such ceiling).
+    harsh_max_k = discover_max_k
+    harsh_pareto_feasible = not (required_count and required_count > discover_max_k)
 
     # Concentration, not just N/F average: file_effective_cluster_count (1/HHI
     # over per-file record-count shares) meaningfully below the actual distinct
@@ -230,11 +254,21 @@ def suggest_params_for_domain(
 
     notes: List[str] = []
     if required_count and required_count > discover_max_k:
-        notes.append(
-            f"existing required_items count ({required_count}) exceeds the discover-mode "
-            f"budget max_k ({discover_max_k}); harsh/validate runs need --max-k >= {harsh_max_k} "
-            "to be able to represent the current baseline plus new candidates."
-        )
+        if harsh_pareto_feasible:
+            notes.append(
+                f"existing required_items count ({required_count}) exceeds the discover-mode "
+                f"budget max_k ({discover_max_k}); harsh/validate runs need --max-k >= {harsh_max_k} "
+                "to be able to represent the current baseline plus new candidates."
+            )
+        else:
+            notes.append(
+                f"existing required_items count ({required_count}) is too large for harsh/validate "
+                f"Pareto search to represent within --subset-budget ({subset_budget}) at "
+                f"--max-candidate-fields {max_candidate_fields} -- pareto_search() has no "
+                "required-fields-aware enumeration, so max_k can't be bumped to fit the baseline "
+                "without a combinatorial blowup. Use --search-modes greedy for harsh/validate on "
+                "this domain instead (discover_greedy() has no such ceiling)."
+            )
     if stratify_recommended:
         notes.append(
             "records concentrated in relatively few files for this population size; "
@@ -254,6 +288,7 @@ def suggest_params_for_domain(
         "suggested_max_candidate_fields": max_candidate_fields,
         "suggested_max_k_discover": discover_max_k,
         "suggested_max_k_harsh_validate": harsh_max_k,
+        "harsh_pareto_feasible": harsh_pareto_feasible,
         "stratify_by_recommended": "file_id" if stratify_recommended else "",
         "notes": "; ".join(notes),
     }
@@ -299,15 +334,22 @@ def _load_required_counts(policy_json: Optional[Path]) -> Dict[str, int]:
 def _emit_command(domain: str, suggestion: Dict[str, object], phase0_dir: str, policy_json: Optional[str]) -> List[str]:
     """Build ready-to-run discover_join_policy.py command(s) for one domain.
 
-    Returns two commands, not one, whenever suggested_max_k_harsh_validate
-    exceeds suggested_max_k_discover (i.e. the domain has an existing
-    required_items baseline the budget-derived discover value can't
-    represent): one scoped to --policy-modes discover at the smaller
-    budget-fit value, one scoped to --policy-modes validate,harsh at the
-    larger baseline-aware value. A single combined command using the smaller
-    discover value while leaving harsh/validate enabled (discover_join_policy.py's
-    own default) would silently under-size harsh mode's search space relative
-    to what the suggestion itself says is needed.
+    Returns two commands, not one, whenever the harsh/validate command needs
+    different treatment than discover: either a different max_k (an existing
+    required_items baseline the budget-derived discover value can't represent
+    -- rare in practice, since suggest_params_for_domain never lets
+    suggested_max_k_harsh_validate exceed suggested_max_k_discover unless
+    that's verified budget-safe), or harsh_pareto_feasible is False (the
+    required baseline is too large for Pareto's blind combinatorial
+    enumeration to represent within budget at ANY max_k -- see
+    suggest_params_for_domain's docstring/notes). In the latter case only the
+    harsh/validate command is forced to --search-modes greedy instead of the
+    CLI default greedy,pareto -- discover/validate's own candidate pools stay
+    small and cheap regardless, so there's no need to give up Pareto there too.
+    A single combined command that left harsh/validate on the CLI's default
+    greedy,pareto in either case would silently under-size its search space,
+    or hand out a Pareto invocation that can only ever explore subsets too
+    small to contain the full required baseline.
     """
     def _base_parts(max_k: object) -> List[str]:
         parts = [
@@ -327,12 +369,22 @@ def _emit_command(domain: str, suggestion: Dict[str, object], phase0_dir: str, p
 
     discover_k = suggestion["suggested_max_k_discover"]
     harsh_k = suggestion["suggested_max_k_harsh_validate"]
+    harsh_feasible = suggestion.get("harsh_pareto_feasible", True)
 
-    if harsh_k == discover_k:
+    # Split whenever harsh/validate needs *different* treatment than discover --
+    # either a different max_k, or (even when the k values match, which is now
+    # the common case: suggest_params_for_domain never lets harsh_k exceed
+    # discover_k unless it's verified budget-safe) because Pareto is infeasible
+    # for the required baseline and only the harsh/validate command should be
+    # forced to greedy, not discover/validate too (their own candidate pools
+    # stay small and cheap regardless).
+    if harsh_k == discover_k and harsh_feasible:
         return [" \\\n    ".join(_base_parts(discover_k))]
 
     discover_cmd = _base_parts(discover_k) + ["--policy-modes discover"]
     harsh_cmd = _base_parts(harsh_k) + ["--policy-modes validate,harsh"]
+    if not harsh_feasible:
+        harsh_cmd.append("--search-modes greedy")
     return [" \\\n    ".join(discover_cmd), " \\\n    ".join(harsh_cmd)]
 
 

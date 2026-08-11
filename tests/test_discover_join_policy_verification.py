@@ -173,6 +173,28 @@ def test_stratified_sample_group_selection_varies_by_seed_when_groups_exceed_cap
     assert files_a != files_b
 
 
+def test_stratified_sample_does_not_starve_records_missing_the_stratifier():
+    # 1000 one-record files (known groups alone already exceed sample_size=500,
+    # so the old top-up-only "ungrouped" handling would never run at all) plus
+    # 200 records with blank file_id. Missing-stratifier records must get a fair
+    # (proportional-to-1/n_groups) chance of survival, not zero representation
+    # just because the known groups alone were enough to fill the cap first.
+    records = [{"record_pk": f"r{i}", "file_id": f"f{i:04d}"} for i in range(1000)]
+    records += [{"record_pk": f"blank{i}", "file_id": ""} for i in range(200)]
+    out = _stratified_sample(records, [], "file_id", sample_size=500, seed=17)
+    assert len(out) == 500
+    blank_count = sum(1 for r in out if not r.get("file_id", "").strip())
+    assert blank_count > 0
+
+
+def test_stratified_sample_ungrouped_stratum_is_deterministic():
+    records = [{"record_pk": f"r{i}", "file_id": f"f{i:04d}"} for i in range(1000)]
+    records += [{"record_pk": f"blank{i}", "file_id": ""} for i in range(200)]
+    out1 = _stratified_sample(records, [], "file_id", sample_size=500, seed=17)
+    out2 = _stratified_sample(records, [], "file_id", sample_size=500, seed=17)
+    assert [r["record_pk"] for r in out1] == [r["record_pk"] for r in out2]
+
+
 # ---------------------------------------------------------------------------
 # CLI integration: new columns/flags on discover_join_policy.py itself
 # ---------------------------------------------------------------------------

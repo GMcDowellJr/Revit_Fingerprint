@@ -110,11 +110,30 @@ def test_solve_candidate_fields_and_k_trims_fields_when_budget_too_small_for_min
     assert _cumulative_subset_count(max_fields, 2) <= 100
 
 
-def test_suggest_params_for_domain_flags_required_count_exceeding_discover_k():
+def test_suggest_params_for_domain_flags_infeasible_required_baseline_stays_budget_safe():
+    # discover_join_policy.py's actual pareto_search() has no required-fields-aware
+    # enumeration (plain itertools.combinations over every candidate up to max_k),
+    # so once required_count exceeds the budget-derived discover_max_k, bumping
+    # max_k to represent it is provably infeasible at the SAME pool/budget --
+    # solve_candidate_fields_and_k already returns the largest affordable k, so
+    # anything beyond it can never fit the identical budget (monotonicity of
+    # Sum C(pool, i)). Must stay at the safe discover_max_k, not silently
+    # recommend a command that would enumerate billions of subsets.
     stats = {"records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5, "candidate_field_count": 40}
     result = suggest_params_for_domain(stats, required_count=8, subset_budget=2000, min_k=2)
-    assert result["suggested_max_k_harsh_validate"] >= 8
-    assert "required_items count" in result["notes"]
+    assert result["suggested_max_k_harsh_validate"] == result["suggested_max_k_discover"]
+    assert result["harsh_pareto_feasible"] is False
+    assert "too large for harsh/validate Pareto search" in result["notes"]
+    assert "--search-modes greedy" in result["notes"]
+
+
+def test_suggest_params_for_domain_harsh_feasible_when_required_count_within_discover_k():
+    # required_count already <= discover_max_k -- no infeasibility, no bump needed.
+    stats = {"records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5, "candidate_field_count": 10}
+    result = suggest_params_for_domain(stats, required_count=2, subset_budget=100000, min_k=2)
+    assert result["harsh_pareto_feasible"] is True
+    assert result["suggested_max_k_harsh_validate"] == result["suggested_max_k_discover"]
+    assert "too large for harsh/validate" not in result["notes"]
 
 
 def test_suggest_params_for_domain_recommends_stratify_by_file_id_on_real_concentration():
@@ -219,3 +238,41 @@ def test_emit_command_splits_into_discover_and_harsh_commands_when_k_differs():
     discover_cmd, harsh_cmd = cmds
     assert "--max-k 3" in discover_cmd and "--policy-modes discover" in discover_cmd
     assert "--max-k 10" in harsh_cmd and "--policy-modes validate,harsh" in harsh_cmd
+
+
+def test_emit_command_forces_greedy_on_harsh_command_when_pareto_infeasible():
+    # suggest_params_for_domain keeps suggested_max_k_harsh_validate ==
+    # suggested_max_k_discover whenever Pareto can't represent the baseline within
+    # budget (harsh_pareto_feasible=False) -- so equal k values alone can't be used
+    # to decide whether a single combined command is safe; harsh_pareto_feasible
+    # must still force a split so only the harsh/validate command (not discover,
+    # which stays cheap regardless) gets --search-modes greedy.
+    suggestion = {
+        "suggested_sample_size": 500, "suggested_max_candidate_fields": 20,
+        "suggested_max_k_discover": 4, "suggested_max_k_harsh_validate": 4,
+        "harsh_pareto_feasible": False,
+        "stratify_by_recommended": "",
+    }
+    cmds = _emit_command("dimension_types_linear", suggestion, "results/records", None)
+    assert len(cmds) == 2
+    discover_cmd, harsh_cmd = cmds
+    assert "--search-modes greedy" not in discover_cmd
+    assert "--policy-modes discover" in discover_cmd
+    assert "--search-modes greedy" in harsh_cmd
+    assert "--policy-modes validate,harsh" in harsh_cmd
+
+
+def test_emit_command_single_command_when_harsh_feasible_and_k_matches():
+    # The realistic case from suggest_params_for_domain now that harsh_max_k is
+    # budget-checked: harsh_k == discover_k AND feasible -> single command, no
+    # unnecessary --policy-modes/--search-modes overrides.
+    suggestion = {
+        "suggested_sample_size": 500, "suggested_max_candidate_fields": 20,
+        "suggested_max_k_discover": 4, "suggested_max_k_harsh_validate": 4,
+        "harsh_pareto_feasible": True,
+        "stratify_by_recommended": "",
+    }
+    cmds = _emit_command("units", suggestion, "results/records", None)
+    assert len(cmds) == 1
+    assert "--policy-modes" not in cmds[0]
+    assert "--search-modes" not in cmds[0]

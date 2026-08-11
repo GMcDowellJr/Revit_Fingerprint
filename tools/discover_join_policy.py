@@ -77,11 +77,19 @@ def _stratified_sample(
         record_pk from ``items`` (e.g. ``lft.family_name``), mirroring the
         domain-attribute grouping tools/discover_hash_policy.py already uses.
 
-    Takes ceil(sample_size / n_groups) records from each group using the same
-    deterministic hash-rank as _sample_domain_records. After the first pass,
-    tops up to sample_size from groups with surplus records, then from
-    ungrouped records, so the total always reaches sample_size when enough
-    records exist. Falls back to flat sampling when the key has no coverage.
+    Records the stratifier has no value for (e.g. blank file_id) get an
+    unconditionally reserved share up front -- not dropped, and not merely
+    given equal-but-unguaranteed odds alongside the real groups -- see the
+    reserved_ungrouped comment below for why a hard guarantee, not just fair
+    treatment, is needed here.
+
+    For the real groups, takes ceil(remaining_sample_size / n_groups) records
+    from each using the same deterministic hash-rank as _sample_domain_records,
+    with which GROUPS survive an eventual out[:sample_size] cap decided by a
+    seeded rank over the group values themselves (see _group_rank below), not
+    group/file name. After the first pass, tops up from groups with surplus
+    records, so the total always reaches sample_size when enough records
+    exist. Falls back to flat sampling when the key has no coverage.
     """
     if not stratify_key or sample_size <= 0 or len(records) <= sample_size:
         return records
@@ -119,6 +127,30 @@ def _stratified_sample(
     if n_groups == 0:
         return _sample_domain_records(records, sample_size, seed)
 
+    # Records the stratifier has no value for (e.g. blank file_id, or a
+    # partially-populated identity-item key) get an UNCONDITIONAL reserved
+    # share -- computed as though "ungrouped" were one more stratum among
+    # n_groups+1 -- rather than being folded into the same seeded
+    # out[:sample_size] truncation the real groups below are subject to.
+    # Treating them as just another group with equal (but not guaranteed) odds
+    # would still let them land at zero purely by chance whenever known groups
+    # alone already exceed sample_size (the common case when there are more
+    # groups than the sample cap: the old top-up-only handling made this a
+    # mathematical certainty, not just a chance outcome, since the top-up pass
+    # never ran at all in that regime). For records the stratifier has no data
+    # on at all, losing that lottery is a worse failure than any single real
+    # group losing it: it can silently drop an entire uncharacterized slice of
+    # the population rather than one specific known file/value, so this slice
+    # gets a hard guarantee instead of just fair-chance treatment.
+    reserved_ungrouped: List[Dict[str, str]] = []
+    if ungrouped:
+        ungrouped_share = max(1, math.ceil(sample_size / (n_groups + 1)))
+        reserved_ungrouped = _sample_domain_records(ungrouped, ungrouped_share, seed)
+
+    sample_size = max(0, sample_size - len(reserved_ungrouped))
+    if sample_size <= 0 or n_groups == 0:
+        return reserved_ungrouped
+
     # Rank GROUPS themselves by the same deterministic hash approach
     # _sample_domain_records uses for records, not alphabetically: when
     # n_groups > sample_size (the common case for --stratify-by file_id on a
@@ -142,17 +174,16 @@ def _stratified_sample(
         first_pass[val] = sampled
         out.extend(sampled)
 
-    # Top up to sample_size: groups with more records than per_group contribute
-    # their surplus first (preserving balanced representation), then ungrouped.
+    # Top up to (the reduced) sample_size: groups with more records than
+    # per_group contribute their surplus.
     if len(out) < sample_size:
         surplus: List[Dict[str, str]] = []
         for val in ranked_group_keys:
             all_ranked = _sample_domain_records(groups[val], len(groups[val]), seed)
             surplus.extend(all_ranked[len(first_pass[val]):])
-        surplus.extend(_sample_domain_records(ungrouped, len(ungrouped), seed))
         out.extend(surplus[: sample_size - len(out)])
 
-    return out[:sample_size]
+    return reserved_ungrouped + out[:sample_size]
 
 
 def _full_population_verify(
