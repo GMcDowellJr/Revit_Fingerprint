@@ -83,15 +83,41 @@ rows:
   missing_required`) supplies the same information under different key names
   (`export_file`→`export_run_id`, `record_id`→ *not* `record_pk` — see below) plus a `status`
   gate PR2 already applies (`status == "ok"`). Structurally compatible after a rename, with
-  one real gap: **`record_pk` is a flatten-time composite (`f"{file_id}|{domain}|{record_ordinal}"`,
-  `tools/extractor.py:1129`), not `record_id`** (record.v2's own `record_id` field, what
-  `apply_name_key_policy.py` emits). Reusing `_load_identity_items_by_record()`'s
-  `phase0_dir`-sourced identity-items table (needed for `pattern_label_human` resolution, see
-  below) for name-target rows requires resolving `record_pk` from `(export_run_id, domain,
-  record_id)` via phase0's own `records.csv` — a real join, not automatic, but the underlying
-  evidence (identity_items keyed by record) is **already computed once at flatten time and is
-  reusable verbatim** — it does not need recomputation for the `name` target, since identity
-  items are a per-record artifact independent of which join_hash scheme clusters them.
+  two real gaps, not one:
+  - **`record_pk` is a flatten-time composite (`f"{file_id}|{domain}|{record_ordinal}"`,
+    `tools/extractor.py:1129`), not `record_id`** (record.v2's own `record_id` field, what
+    `apply_name_key_policy.py` emits) — resolving it requires a join through phase0's own
+    `records.csv` via `(export_run_id, domain, record_id)`.
+  - **`files_total`/`exports` cannot be derived from `apply_name_key_policy.py`'s own output
+    at all.** `_rows_for_export()` only emits a row when `build_name_key_for_record()` returns
+    non-`None` for that record — an export whose records are all out-of-policy-scope for every
+    eligible domain (a summary-only `*.index.json`, or a details file with no eligible-domain
+    records) contributes **zero rows** and disappears from `name_key_results.csv` entirely,
+    silently. `_process_one_domain` needs `files_total`/`exports` to include every file in the
+    corpus scope regardless of whether it contributed any pattern rows (`emit_analysis` derives
+    them from `meta_rows`, not from `records`) — using name-key rows as that source would
+    shrink the presence denominator and could incorrectly flip `is_candidate_standard` to
+    `true` for a pattern that is actually less dominant across the real file population. A
+    unified writer needs a separate, target-independent export-manifest input (phase0's
+    `file_metadata.csv`/`meta_rows`, already produced regardless of `comparison_target`) for
+    this, not something derivable by renaming name-key columns. (Flagged in PR review.)
+- **Identity-items reuse for label resolution is real for only 8 of the 25 eligible domains,
+  not all of them.** `core/name_key_coverage.py`'s own docstring is explicit: for the 18
+  **Widened** domains, "the name key is built from a value pulled from a phase2 bucket or raw
+  `label.display`/`label.components` at the name-key call site only — it is **NOT** a subset of
+  `identity_items`/`identity_basis.items`" the way a Native domain's name key is. The claim that
+  identity_items are "a per-record artifact independent of which join_hash scheme clusters
+  them" only holds for the 7 **Native** domains plus `phases` (8 of 25) — for the other 18,
+  reusing phase0's config-basis `identity_items_by_record` would feed `resolve_pattern_label()`
+  and `find_near_duplicate_merges()` evidence that has no defined relationship to
+  `join_key_name_identity`'s actual clustering basis for that domain. Concretely,
+  `find_near_duplicate_merges()` could merge two name-identity clusters that are genuinely
+  distinct under the name projection (different `label.display`/phase2-bucket values) but
+  happen to share identical `identity_items` under the config projection, silently assigning
+  them the same `pattern_label_human`. A unified writer must either source Widened-domain label
+  evidence from the name-projection-native value the name key was actually built from (not
+  `identity_items`), or explicitly disable near-duplicate merging / fall back to the generic
+  label for Widened domains under `comparison_target=name`. (Flagged in PR review.)
 - **Label resolution (`pattern_label_human`, `semantic_group`)**: both are already optional
   and gracefully degrade to the generic fallback when their backing files
   (`Results_v21/label_synthesis/*`, keyed by domain/join_hash/pattern_id) are absent
@@ -103,7 +129,8 @@ rows:
   `tools/label_synthesis/`) — but the **column and fallback machinery in `domain_patterns.csv`
   itself already supports "no label synthesis has run for this hash space" as a first-class
   state** (`pattern_label_human == pattern_label_fallback`, `pattern_label_source` says so).
-  This is a data-availability gap, not a shape gap.
+  This is a data-availability gap, not a shape gap for the 8 Native/`phases` domains; for the
+  18 Widened domains it is compounded by the evidence-source gap above.
 - **`is_cad_import`**: audit_8 item 5 already correctly flags this as unavailable for
   name-target, but the mechanism is worth restating precisely: it is not that name-projection
   records lack import evidence in general — it's that the *only* domain this flag is computed
@@ -116,10 +143,16 @@ rows:
   different angle.
 
 **Conclusion**: the presence/dominance/deviation/corpus-classification logic in
-`_process_one_domain` is input-shape-agnostic once fed normalized rows. It is not
+`_process_one_domain` is input-shape-agnostic once fed normalized rows *and* a
+target-independent export manifest for `files_total`/`exports` (see the first bullet above —
+`apply_name_key_policy.py`'s own output cannot supply that manifest). It is not
 config-specific business logic — it is a general "cluster records by (domain, schema, hash),
 then compute per-file participation stats" algorithm that happens to only have one caller
-today.
+today. Label resolution (`pattern_label_human`/`semantic_group`) is a separate matter: the
+*mechanism* is shape-agnostic (second/third bullets above), but for the 18 Widened domains the
+*evidence it would be fed* (config-basis `identity_items`) has no defined correspondence to the
+name projection's actual clustering basis, so it cannot simply be reused verbatim the way the
+8 Native/`phases` domains' evidence can.
 
 ## 3. Re-classified audit_8 delta catalog
 
@@ -243,9 +276,20 @@ value is never silently swallowed.
 new mechanism:
 
 1. `compare_cross_segment.py` needs to stamp `comparison_target` (`"config"`/`"name"`) onto
-   every row it emits into its union-inventory / summary / matrix CSVs — the same way
-   `view_scope` is already carried as a column, not derived implicitly from which CLI flags
-   were passed.
+   every row it emits into **every** narrative-consumed output, not just the union-inventory/
+   summary/matrix CSVs named above — the same way `view_scope` is already carried as a column,
+   not derived implicitly from which CLI flags were passed. Concretely this includes
+   `cross_segment_pooled.csv` (`--pooled`, a *required* narrative input): `build_client_summary()`
+   aggregates `pooled_rows` directly, on equal footing with `summary_rows`
+   (`cross_segment_summary.csv`), so if config- and name-target evidence ever coexist on disk
+   without a `comparison_target` column on the pooled rows too, `build_client_summary()` has no
+   way to select one or reject a mix, and per-client counts/summaries could silently blend
+   join-hash evidence from both projections. (Flagged in PR review.) The generalizable rule:
+   audit every CLI input `generate_governance_narrative.py`'s `argparse` surface accepts from
+   `compare_cross_segment.py` (`--summary`, `--pooled`, `--union-inventory`,
+   `--reuse-distribution`, the `--*matrix*` family, etc.) for `comparison_target` coverage
+   before assuming the union-inventory/summary/matrix set is complete — this Step 0 pass did
+   not exhaustively check the remainder.
 2. `generate_governance_narrative.py`'s section builders that currently hard-filter on
    `view_scope == "all"` (or don't filter at all, implicitly assuming a single target) would
    need an equivalent `comparison_target` filter/parameter wherever a section is meant to be
