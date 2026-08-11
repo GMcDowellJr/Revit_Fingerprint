@@ -101,9 +101,11 @@ domains/                One extract(doc, ctx) function per domain (active)
   view_category_overrides_annotation.py Annotation category override partition
   materials.py             Materials domain (identity + graphics state; also populates ctx lookup maps)
   wall_types.py            Compound type family: wall_types partition (active)
-  floor_types.py           Compound type family: floor_types partition (stub; D-018 notes the gap)
-  roof_types.py            Compound type family: roof_types partition (stub; D-018 notes the gap)
-  ceiling_types.py         Compound type family: ceiling_types partition (stub; D-018 notes the gap)
+  floor_types.py           Compound type family: floor_types partition (active)
+  roof_types.py            Compound type family: roof_types partition (active)
+  ceiling_types.py         Compound type family: ceiling_types partition (active). D-018's remaining
+                            compound_types gap is other system-family types (stacked walls, curtain walls,
+                            curtain systems, MEP system types), not these four partitions
   compound_layers.py       Shared compound-structure-layer helpers for wall/floor/roof/ceiling_types;
                             not a domain extractor itself (no extract() entry point)
   loaded_family_types.py  FamilySymbol (loaded family) types, parameter-schema evidence model (lft.*/lftp.*); scoped
@@ -443,7 +445,7 @@ Consolidated extractors route records internally by record class (Revit system f
 | `dimension_types.py` | `dimension_types_linear`, `_angular`, `_radial`, `_diameter`, `_spot_elevation`, `_spot_coordinate`, `_spot_slope` |
 | `view_templates.py` | `view_templates_floor_structural_area_plans`, `_ceiling_plans`, `_elevations_sections_detail`, `_renderings_drafting`, `_schedules` |
 | `view_category_overrides*.py` | Routed via `view_category_overrides.py`; model and annotation in separate files |
-| `wall_types.py` / `floor_types.py` / `roof_types.py` / `ceiling_types.py` (+ shared `compound_layers.py` helpers) | `wall_types` active; `floor_types`/`roof_types`/`ceiling_types` stubs (D-018 notes the coverage gap) |
+| `wall_types.py` / `floor_types.py` / `roof_types.py` / `ceiling_types.py` (+ shared `compound_layers.py` helpers) | All four active. D-018's remaining coverage gap is other system-family types (stacked walls, curtain walls, curtain systems, MEP system types), not these partitions |
 
 For consolidated extractors, `extract()` returns a list of per-partition result dicts, each with its own `domain` key.
 
