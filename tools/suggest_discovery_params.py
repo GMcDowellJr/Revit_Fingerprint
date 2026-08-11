@@ -62,13 +62,14 @@ import argparse
 import csv
 import json
 import math
+import shlex
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
 try:
-    from tools.discover_join_policy import _read_csv, _write_csv
+    from tools.discover_join_policy import _pick_candidate_fields, _read_csv, _write_csv
 except ModuleNotFoundError:
-    from discover_join_policy import _read_csv, _write_csv
+    from discover_join_policy import _pick_candidate_fields, _read_csv, _write_csv
 
 
 # ---------------------------------------------------------------------------
@@ -110,18 +111,24 @@ def compute_domain_stats(
     file_hhi = sum(s * s for s in shares) if shares else 0.0
     file_effective_cluster_count = (1.0 / file_hhi) if file_hhi > 0 else 0.0
 
-    n_candidates = len({
-        it.get("item_key", "").strip()
-        for it in items
-        if it.get("domain", "") == domain and it.get("item_key", "").strip()
-    })
+    # Ranked (not just counted) via _pick_candidate_fields(items, 0): same
+    # frequency-then-alphabetical ranking discover_join_policy.py's actual
+    # scoped_candidates uses, with max_fields=0 (its own "no cap" case) so the
+    # FULL ranked list comes back uncapped -- suggest_params_for_domain slices
+    # the top --max-candidate-fields itself once that value is known, and can
+    # use these actual field NAMES (not just a count) to compute the harsh/
+    # validate pool size as a true deduplicated union against required/
+    # optional field names, instead of a pessimistic arithmetic sum.
+    dom_items = [it for it in items if it.get("domain", "") == domain]
+    candidate_field_names_ranked = _pick_candidate_fields(dom_items, 0)
     return {
         "records_total_domain": n,
         "distinct_sig_hash_groups": g,
         "distinct_file_count": f,
         "file_hhi": file_hhi,
         "file_effective_cluster_count": file_effective_cluster_count,
-        "candidate_field_count": n_candidates,
+        "candidate_field_count": len(candidate_field_names_ranked),
+        "candidate_field_names_ranked": candidate_field_names_ranked,
     }
 
 
@@ -189,6 +196,8 @@ def suggest_params_for_domain(
     *,
     required_count: int = 0,
     optional_count: int = 0,
+    required_field_names: Sequence[str] = (),
+    optional_field_names: Sequence[str] = (),
     k_per_group: int = 15,
     sample_floor: int = 500,
     subset_budget: int = 20000,
@@ -201,6 +210,7 @@ def suggest_params_for_domain(
     f = int(stats["distinct_file_count"])
     file_effective_cluster_count = float(stats.get("file_effective_cluster_count", f))
     n_candidates = int(stats["candidate_field_count"])
+    candidate_field_names_ranked = list(stats.get("candidate_field_names_ranked") or [])
 
     sample_size = suggest_sample_size(n, g, k_per_group=k_per_group, floor=sample_floor)
     max_candidate_fields, discover_max_k = solve_candidate_fields_and_k(
@@ -254,8 +264,32 @@ def suggest_params_for_domain(
     # minimal-but-verified-affordable required_count instead of
     # discover_max_k (which was never checked against the harsh pool size at
     # all).
-    policy_fixed_count = required_count + optional_count  # pool-size inflation only
-    harsh_pool_size = max_candidate_fields + policy_fixed_count
+    policy_fixed_count = required_count + optional_count  # pool-size inflation, upper-bound fallback
+    # discover_join_policy.py's actual work_candidates is a DEDUPLICATED union
+    # (_without_excluded -> _dedupe), not a raw concatenation -- required/
+    # optional policy fields normally overlap the observed candidate pool
+    # (they were presumably discovered as legitimate identity items in the
+    # first place), so summing max_candidate_fields + required_count +
+    # optional_count arithmetically OVER-counts the true pool size whenever
+    # there's overlap, the common case. That over-count can falsely declare
+    # an otherwise-affordable Pareto run infeasible (or force an unnecessarily
+    # small max_k), pushing --emit-commands to --search-modes greedy when
+    # Pareto would actually have fit.
+    #
+    # When the caller supplies the actual field NAMES (candidate_field_names_
+    # ranked from compute_domain_stats, plus required_field_names/
+    # optional_field_names from the policy JSON), compute the TRUE
+    # deduplicated union size instead of the pessimistic arithmetic sum.
+    # Falls back to the arithmetic sum (still a safe, if pessimistic, upper
+    # bound -- never underestimates cost) when names aren't available, e.g.
+    # suggest_params_for_domain's own direct unit tests that only pass counts.
+    if candidate_field_names_ranked and (required_field_names or optional_field_names):
+        capped_candidate_names = set(
+            candidate_field_names_ranked[:max_candidate_fields] if max_candidate_fields > 0 else candidate_field_names_ranked
+        )
+        harsh_pool_size = len(capped_candidate_names | set(required_field_names) | set(optional_field_names))
+    else:
+        harsh_pool_size = max_candidate_fields + policy_fixed_count
     if required_count and _cumulative_subset_count(harsh_pool_size, required_count) > subset_budget:
         # Even the minimum k needed to represent the required baseline is
         # unaffordable at the (optional-inflated) harsh pool -- no larger k
@@ -376,15 +410,18 @@ def _resolve_phase0_dir(path: Path) -> Path:
     return path
 
 
-def _load_policy_field_counts(policy_json: Optional[Path]) -> Dict[str, Dict[str, int]]:
-    """Per-domain (required_count, optional_count) from a join-key policy JSON.
+def _load_policy_fields(policy_json: Optional[Path]) -> Dict[str, Dict[str, object]]:
+    """Per-domain required/optional field NAMES (plus their counts) from a
+    join-key policy JSON.
 
-    Both counts matter for harsh/validate sizing: discover_join_policy.py's
+    Both matter for harsh/validate sizing: discover_join_policy.py's
     work_candidates for those modes is req + opt (+ scoped_candidates for
     harsh) -- optional_items inflates the real Pareto candidate pool exactly
     like required_items does, unconditionally and regardless of
     --max-candidate-fields, including policy field names that aren't even
-    populated anywhere in the domain's data.
+    populated anywhere in the domain's data. The actual NAMES (not just
+    counts) let suggest_params_for_domain compute the true deduplicated pool
+    size instead of a pessimistic arithmetic sum -- see its own docstring.
     """
     if not policy_json or not policy_json.exists():
         return {}
@@ -392,15 +429,19 @@ def _load_policy_field_counts(policy_json: Optional[Path]) -> Dict[str, Dict[str
     cand = loaded.get("domains") if isinstance(loaded, dict) else {}
     if not isinstance(cand, dict):
         return {}
-    out: Dict[str, Dict[str, int]] = {}
+    out: Dict[str, Dict[str, object]] = {}
     for domain, block in cand.items():
         if not isinstance(block, dict):
             continue
         req = block.get("required_items") or block.get("required_fields") or []
         opt = block.get("optional_items") or []
+        req = req if isinstance(req, list) else []
+        opt = opt if isinstance(opt, list) else []
         out[str(domain)] = {
-            "required_count": len(req) if isinstance(req, list) else 0,
-            "optional_count": len(opt) if isinstance(opt, list) else 0,
+            "required_count": len(req),
+            "optional_count": len(opt),
+            "required_fields": [str(x) for x in req],
+            "optional_fields": [str(x) for x in opt],
         }
     return out
 
@@ -426,18 +467,23 @@ def _emit_command(domain: str, suggestion: Dict[str, object], phase0_dir: str, p
     small to contain the full required baseline.
     """
     def _base_parts(max_k: object) -> List[str]:
+        # Dynamic values (paths, domain names) are shell-quoted via shlex.quote:
+        # an otherwise-valid directory like "/tmp/Revit Results/records" would
+        # otherwise split into two arguments when the printed command is
+        # actually run, and discover_join_policy.py would fail to find
+        # records.csv under the truncated first half.
         parts = [
             "python tools/discover_join_policy.py",
-            f"--phase0-dir {phase0_dir}",
-            f"--domains {domain}",
+            f"--phase0-dir {shlex.quote(str(phase0_dir))}",
+            f"--domains {shlex.quote(domain)}",
             f"--sample-size {suggestion['suggested_sample_size']}",
             f"--max-candidate-fields {suggestion['suggested_max_candidate_fields']}",
             f"--max-k {max_k}",
         ]
         if suggestion.get("stratify_by_recommended"):
-            parts.append(f"--stratify-by {suggestion['stratify_by_recommended']}")
+            parts.append(f"--stratify-by {shlex.quote(str(suggestion['stratify_by_recommended']))}")
         if policy_json:
-            parts.append(f"--policy-json {policy_json}")
+            parts.append(f"--policy-json {shlex.quote(str(policy_json))}")
         parts.append("--warn-only")
         return parts
 
@@ -504,16 +550,18 @@ def main() -> None:
         allow = {d.strip() for d in str(args.domains).split(",") if d.strip()}
         domains = [d for d in domains if d in allow]
 
-    policy_field_counts = _load_policy_field_counts(Path(args.policy_json)) if args.policy_json else {}
+    policy_fields = _load_policy_fields(Path(args.policy_json)) if args.policy_json else {}
 
     rows: List[Dict[str, object]] = []
     for domain in domains:
         stats = compute_domain_stats(records, items, domain)
-        domain_counts = policy_field_counts.get(domain, {})
+        domain_fields = policy_fields.get(domain, {})
         suggestion = suggest_params_for_domain(
             stats,
-            required_count=domain_counts.get("required_count", 0),
-            optional_count=domain_counts.get("optional_count", 0),
+            required_count=domain_fields.get("required_count", 0),
+            optional_count=domain_fields.get("optional_count", 0),
+            required_field_names=domain_fields.get("required_fields", []),
+            optional_field_names=domain_fields.get("optional_fields", []),
             k_per_group=int(args.sample_k_per_group),
             sample_floor=int(args.sample_floor),
             subset_budget=int(args.subset_budget),

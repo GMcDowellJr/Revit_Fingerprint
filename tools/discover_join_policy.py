@@ -601,24 +601,39 @@ def main() -> None:
                 # Without this, a sample-only "fragmentation=0" could be pinned as
                 # policy despite fragmenting on records the sample never saw.
                 #
-                # Uses verify_cfg, NOT the original cfg: cfg's gates.required_fields
-                # (set for validate/harsh modes) would make score_candidate silently
-                # fall back to req alone regardless of `selected` -- exactly the
-                # override discover_greedy() now strips for its OWN scoring once
-                # `selected` is required-inclusive (see
-                # tools/join_key_discovery/greedy.py), so verifying with the
-                # unstripped cfg here would compare sample metrics computed against
-                # the real `selected` (e.g. req + a challenger field) against full
-                # metrics computed against req alone -- an apples-to-oranges mismatch
-                # that can manufacture a false coverage/collision divergence (or mask
-                # a real one) whenever `selected` differs from req. `selected` is
-                # already the authoritative, required-inclusive field list by this
-                # point (via greedy's seeding, Pareto's validate-mode frontier filter,
-                # or the required_set_fallback path), so scoring it directly -- gates
-                # .required_fields stripped, shape-gating gates left intact -- is
-                # correct regardless of which search_mode produced it.
-                verify_gates = {k: v for k, v in (cfg.get("gates") or {}).items() if k != "required_fields"}
-                verify_cfg = {**cfg, "gates": verify_gates}
+                # Uses verify_cfg, built to match whichever effective gates
+                # ACTUALLY produced `metrics` (the sample metrics) for this
+                # search_mode -- not always the same gates:
+                #
+                # - greedy: discover_greedy() strips gates.required_fields from its
+                #   OWN scoring once `selected` is required-inclusive (see
+                #   tools/join_key_discovery/greedy.py), so `metrics` already
+                #   reflects the real `selected` (e.g. req + a challenger field).
+                #   Verifying with the unstripped cfg here would compare that
+                #   against full metrics computed with req alone (base_required =
+                #   gates.required_fields, ignoring `selected` entirely) -- an
+                #   apples-to-oranges mismatch that can manufacture a false
+                #   divergence (or mask a real one). So verification strips the
+                #   same gate, matching greedy's own scoring.
+                # - pareto: _pareto_search_adapter()/pareto_search() still scores
+                #   every sample candidate with the ORIGINAL (unstripped) cfg, so
+                #   `metrics` reflects gates.required_fields (i.e. req alone),
+                #   regardless of which literal subset `selected` names (Pareto's
+                #   own known, separate gap -- see the comment above the cfg
+                #   construction, not something this verification step should try
+                #   to paper over on its own). Stripping the gate for verification
+                #   here while the sample scoring stayed unstripped would
+                #   reintroduce the exact same kind of mismatch this fix exists to
+                #   prevent, just in the opposite direction (comparing a
+                #   required-only sample against a selected-subset full score). So
+                #   pareto verification keeps the original, unstripped cfg,
+                #   preserving the same effective candidate semantics the sample
+                #   metrics were computed with.
+                if search_mode == "greedy":
+                    verify_gates = {k: v for k, v in (cfg.get("gates") or {}).items() if k != "required_fields"}
+                    verify_cfg = {**cfg, "gates": verify_gates}
+                else:
+                    verify_cfg = cfg
                 full_verify_status = "skipped_no_full_verify_flag"
                 metrics_full: Dict[str, object] = {}
                 diverges = False

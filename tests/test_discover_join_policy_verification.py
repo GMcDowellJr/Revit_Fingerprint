@@ -374,6 +374,50 @@ def test_full_population_verify_uses_same_effective_gates_as_greedy_search(tmp_p
     assert row["sample_vs_full_diverges"] == "false"
 
 
+def test_full_population_verify_preserves_pareto_effective_gates(tmp_path: Path):
+    # Codex 6th-round finding: fixing verification's gate-consistency for greedy
+    # (the test above) by unconditionally stripping gates.required_fields would
+    # reintroduce the SAME kind of mismatch for Pareto, just in the opposite
+    # direction -- _pareto_search_adapter()/pareto_search() still scores every
+    # sample candidate with the ORIGINAL (unstripped) cfg (a separate, known gap
+    # in Pareto's own enumeration, not fixed here), so `metrics` (sample) always
+    # reflects gates.required_fields regardless of the literal selected subset.
+    # Stripping the gate only for verification while sample scoring stayed
+    # unstripped would compare a required-only sample against a selected-subset
+    # full score -- a false divergence. Verification for search_mode=="pareto"
+    # must keep the original (unstripped) cfg, preserving the same effective
+    # candidate semantics the sample metrics were actually computed with.
+    phase0 = tmp_path / "results" / "records"
+    _write_csv(phase0 / "records.csv", ["file_id", "domain", "record_pk", "sig_hash"], [
+        {"file_id": "f1", "domain": "units", "record_pk": "1", "sig_hash": "sigA"},
+        {"file_id": "f1", "domain": "units", "record_pk": "2", "sig_hash": "sigB"},
+    ])
+    _write_csv(phase0 / "identity_items.csv", ["domain", "record_pk", "item_key", "item_value_type", "item_value"], [
+        {"domain": "units", "record_pk": "1", "item_key": "units.req1", "item_value_type": "str", "item_value": "X"},
+        {"domain": "units", "record_pk": "2", "item_key": "units.req1", "item_value_type": "str", "item_value": "X"},
+        {"domain": "units", "record_pk": "1", "item_key": "units.extra1", "item_value_type": "str", "item_value": "A"},
+        {"domain": "units", "record_pk": "2", "item_key": "units.extra1", "item_value_type": "str", "item_value": "B"},
+    ])
+    policy_json = tmp_path / "policy.json"
+    policy_json.write_text('{"domains": {"units": {"required_items": ["units.req1"]}}}', encoding="utf-8")
+
+    subprocess.run([
+        sys.executable, "tools/discover_join_policy.py",
+        "--phase0-dir", str(phase0), "--domains", "units",
+        "--policy-json", str(policy_json),
+        "--search-modes", "pareto", "--policy-modes", "harsh",
+    ], cwd=Path(__file__).resolve().parents[1], check=True)
+
+    with (phase0.parent / "diagnostics" / "join_key_harsh__units__harsh.csv").open(encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows
+    row = rows[0]
+    # Sample and full population are the same data at this size -- whatever the
+    # sample metrics say, the full re-score must agree, not diverge.
+    assert row["collision_rate"] == row["collision_rate_full"]
+    assert row["sample_vs_full_diverges"] == "false"
+
+
 def test_out_policy_excludes_candidate_that_diverges_on_full_population(tmp_path: Path):
     # Codex 5th-round finding: --out-policy previously accepted any status=="ok"
     # row regardless of sample_vs_full_diverges, so a candidate the full-population

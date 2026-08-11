@@ -41,6 +41,7 @@ def test_compute_domain_stats_counts_n_g_f_and_candidates():
     assert stats["distinct_sig_hash_groups"] == 2
     assert stats["distinct_file_count"] == 2
     assert stats["candidate_field_count"] == 2
+    assert set(stats["candidate_field_names_ranked"]) == {"units.spec", "units.accuracy"}
     # f1 carries 2/3 records, f2 carries 1/3: HHI = (2/3)^2 + (1/3)^2 = 5/9
     assert stats["file_hhi"] == pytest.approx(5.0 / 9.0)
     assert stats["file_effective_cluster_count"] == pytest.approx(9.0 / 5.0)
@@ -168,6 +169,38 @@ def test_suggest_params_for_domain_required_items_alone_bump_harsh_max_k_indepen
     assert result["suggested_max_k_harsh_validate"] == 8
     assert result["suggested_max_k_harsh_validate"] > result["suggested_max_k_discover"]
     assert "exceeds the discover-mode budget max_k" in result["notes"]
+
+
+def test_suggest_params_for_domain_dedupes_pool_size_when_required_fields_overlap_candidates():
+    # Codex finding: harsh_pool_size was computed as a pessimistic arithmetic sum
+    # (max_candidate_fields + required_count + optional_count), but
+    # discover_join_policy.py's actual work_candidates is a DEDUPLICATED union --
+    # required fields normally overlap the observed candidate pool (they were
+    # presumably discovered as legitimate identity items). Codex's own example:
+    # 10 observed candidates, 7 required fields drawn FROM those same 10 -- the
+    # real pool is 10 (967 subsets through k=7), not the arithmetic 17 (41,225
+    # subsets), which would falsely exceed a --subset-budget of 2000. Supplying
+    # the actual field names must recover feasibility that count-only sizing
+    # missed.
+    candidate_names = [f"field{i}" for i in range(10)]
+    required_names = candidate_names[:7]
+    stats = {
+        "records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5,
+        "candidate_field_count": 10, "candidate_field_names_ranked": candidate_names,
+    }
+    with_names = suggest_params_for_domain(
+        stats, required_count=7, optional_count=0, required_field_names=required_names,
+        subset_budget=2000, min_k=2,
+    )
+    assert with_names["harsh_pareto_feasible"] is True
+    assert with_names["suggested_max_k_harsh_validate"] == with_names["suggested_max_k_discover"]
+
+    # Without names (count-only, the fallback every existing caller/test uses),
+    # the pessimistic arithmetic sum still marks this infeasible -- confirms the
+    # fix is specifically about using names when available, not a budget change.
+    stats_no_names = {k: v for k, v in stats.items() if k != "candidate_field_names_ranked"}
+    without_names = suggest_params_for_domain(stats_no_names, required_count=7, optional_count=0, subset_budget=2000, min_k=2)
+    assert without_names["harsh_pareto_feasible"] is False
 
 
 def test_suggest_params_for_domain_recommends_stratify_by_file_id_on_real_concentration():
@@ -335,3 +368,26 @@ def test_emit_command_single_command_when_harsh_feasible_and_k_matches():
     assert len(cmds) == 1
     assert "--policy-modes" not in cmds[0]
     assert "--search-modes" not in cmds[0]
+
+
+def test_emit_command_quotes_paths_containing_spaces():
+    # Codex finding: dynamic values (phase0_dir, policy_json, domain,
+    # stratify_by_recommended) were interpolated into the printed command
+    # without shell quoting -- a valid directory like "/tmp/Revit Results/records"
+    # would split into two shell arguments when the emitted command is actually
+    # run, and discover_join_policy.py would fail to find records.csv.
+    suggestion = {
+        "suggested_sample_size": 500, "suggested_max_candidate_fields": 20,
+        "suggested_max_k_discover": 4, "suggested_max_k_harsh_validate": 4,
+        "harsh_pareto_feasible": True,
+        "stratify_by_recommended": "",
+    }
+    cmds = _emit_command("units", suggestion, "/tmp/Revit Results/records", "/tmp/My Policies/policy.json")
+    assert len(cmds) == 1
+    assert "'/tmp/Revit Results/records'" in cmds[0]
+    assert "'/tmp/My Policies/policy.json'" in cmds[0]
+    # Plain paths/names with no shell metacharacters must NOT gain quotes they
+    # didn't need -- shlex.quote() only quotes when actually required.
+    plain_cmds = _emit_command("units", suggestion, "results/records", None)
+    assert "results/records" in plain_cmds[0]
+    assert "'results/records'" not in plain_cmds[0]
