@@ -136,34 +136,37 @@ def test_suggest_params_for_domain_harsh_feasible_when_required_count_within_dis
     assert "too large for harsh/validate" not in result["notes"]
 
 
-def test_suggest_params_for_domain_optional_items_inflate_harsh_pool_and_can_make_it_infeasible():
-    # Codex finding: discover_join_policy.py's harsh/validate work_candidates is
-    # req + opt (+ scoped_candidates for harsh) -- optional_items inflates the real
-    # Pareto pool exactly like required_items does, unconditionally, regardless of
-    # --max-candidate-fields. required_count alone (2) is small/feasible here, but
-    # optional_count (50) pushes the TRUE combined baseline (52) far past what the
-    # harsh/validate pool can represent within budget -- must be recognized as
-    # infeasible, not silently treated as feasible just because required_count alone
-    # was small.
+def test_suggest_params_for_domain_optional_items_inflate_pool_but_do_not_require_a_single_subset():
+    # Codex finding (corrects an earlier over-conservative version of this logic):
+    # optional_items enlarge the harsh/validate candidate POOL discover_join_policy.py
+    # searches over (unconditionally, like required_items), but -- unlike required
+    # fields -- nothing forces them to all co-occur together in one selected subset:
+    # validate mode's post-hoc filter only demands required fields be a subset of
+    # `selected` (harsh imposes no such constraint on selected at all). So a domain
+    # with NO required fields and a large optional_items list (Codex's own example:
+    # 10 data candidates, 0 required, 20 optional) must still be FEASIBLE -- Pareto
+    # can validly explore small subsets from the larger pool -- even though the
+    # larger pool means harsh/validate's affordable max_k ends up smaller than
+    # discover mode's (2 vs 10 here), not infeasible.
     stats = {"records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5, "candidate_field_count": 10}
-    result = suggest_params_for_domain(stats, required_count=2, optional_count=50, subset_budget=2000, min_k=2)
-    assert result["harsh_pareto_feasible"] is False
-    assert result["suggested_max_k_harsh_validate"] == result["suggested_max_k_discover"]
-    assert "too large for harsh/validate Pareto search" in result["notes"]
-    assert "52: 2 required + 50 optional" in result["notes"]
-
-
-def test_suggest_params_for_domain_optional_items_bump_harsh_max_k_when_still_feasible():
-    # Same inflation, but with enough budget headroom that the combined
-    # required+optional baseline (15) still fits within the harsh/validate pool
-    # (max_candidate_fields + policy_fixed_count) -- harsh_max_k must be bumped
-    # above discover_max_k to actually represent it, not silently left at the
-    # (too-small) discover-mode value.
-    stats = {"records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5, "candidate_field_count": 10}
-    result = suggest_params_for_domain(stats, required_count=5, optional_count=10, subset_budget=10**9, min_k=1)
+    result = suggest_params_for_domain(stats, required_count=0, optional_count=20, subset_budget=2000, min_k=2)
     assert result["harsh_pareto_feasible"] is True
+    assert result["suggested_max_k_harsh_validate"] < result["suggested_max_k_discover"]
+    assert result["suggested_max_k_harsh_validate"] > 0
+    assert "enlarges the harsh/validate candidate pool" in result["notes"]
+
+
+def test_suggest_params_for_domain_required_items_alone_bump_harsh_max_k_independent_of_optional():
+    # required_count (8) exceeds discover_max_k (5, capped by the tiny data
+    # candidate pool here) and must be bumped, independent of optional_count
+    # (0) -- the minimum k that can represent selecting the full required
+    # baseline as one subset is required_count alone, never required_count +
+    # optional_count (see the finding test above).
+    stats = {"records_total_domain": 500, "distinct_sig_hash_groups": 20, "distinct_file_count": 5, "candidate_field_count": 5}
+    result = suggest_params_for_domain(stats, required_count=8, optional_count=0, subset_budget=10**9, min_k=1)
+    assert result["harsh_pareto_feasible"] is True
+    assert result["suggested_max_k_harsh_validate"] == 8
     assert result["suggested_max_k_harsh_validate"] > result["suggested_max_k_discover"]
-    assert result["suggested_max_k_harsh_validate"] >= 15
     assert "exceeds the discover-mode budget max_k" in result["notes"]
 
 

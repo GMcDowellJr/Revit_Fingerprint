@@ -1,5 +1,5 @@
 from __future__ import annotations
-import csv, subprocess, sys
+import csv, json, subprocess, sys
 from pathlib import Path
 
 import pytest
@@ -216,7 +216,7 @@ def test_full_verify_columns_present_by_default(tmp_path: Path):
         "--search-modes", "greedy", "--policy-modes", "discover",
     ], cwd=Path(__file__).resolve().parents[1], check=True)
 
-    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units.csv").open(encoding="utf-8", newline="") as f:
+    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units__discover.csv").open(encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
     assert rows
     row = rows[0]
@@ -240,7 +240,7 @@ def test_no_full_verify_flag_skips_verification(tmp_path: Path):
         "--search-modes", "greedy", "--policy-modes", "discover", "--no-full-verify",
     ], cwd=Path(__file__).resolve().parents[1], check=True)
 
-    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units.csv").open(encoding="utf-8", newline="") as f:
+    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units__discover.csv").open(encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
     assert rows
     assert rows[0]["full_verify_status"] == "skipped_no_full_verify_flag"
@@ -261,7 +261,7 @@ def test_stratify_by_file_id_end_to_end(tmp_path: Path):
         "--sample-size", "4", "--stratify-by", "file_id",
     ], cwd=Path(__file__).resolve().parents[1], check=True)
 
-    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units.csv").open(encoding="utf-8", newline="") as f:
+    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units__discover.csv").open(encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
     assert rows
     assert rows[0]["stratify_by"] == "file_id"
@@ -331,6 +331,87 @@ def test_discover_greedy_required_seed_still_scores_challengers():
     assert result["metrics"]["collision_rate"] == 0.0
 
 
+def test_full_population_verify_uses_same_effective_gates_as_greedy_search(tmp_path: Path):
+    # Codex 5th-round finding: discover_greedy() now strips gates.required_fields
+    # from its OWN scoring calls once `selected` is required-inclusive (see the
+    # test above), but the CLI's full-population verification call was still
+    # passing the original cfg (gates.required_fields still set) -- so
+    # score_candidate's full-population re-score would silently fall back to
+    # scoring req1 alone, ignoring the challenger field greedy actually picked.
+    # Here req1 alone collides (both records share the same value); the
+    # challenger extra1 resolves it. Sample and full population are the SAME
+    # data (no sampling truncation at this size), so if verification used
+    # consistent gates, collision_rate and collision_rate_full MUST agree --
+    # any mismatch here is unambiguous evidence of the gates inconsistency.
+    phase0 = tmp_path / "results" / "records"
+    _write_csv(phase0 / "records.csv", ["file_id", "domain", "record_pk", "sig_hash"], [
+        {"file_id": "f1", "domain": "units", "record_pk": "1", "sig_hash": "sigA"},
+        {"file_id": "f1", "domain": "units", "record_pk": "2", "sig_hash": "sigB"},
+    ])
+    _write_csv(phase0 / "identity_items.csv", ["domain", "record_pk", "item_key", "item_value_type", "item_value"], [
+        {"domain": "units", "record_pk": "1", "item_key": "units.req1", "item_value_type": "str", "item_value": "X"},
+        {"domain": "units", "record_pk": "2", "item_key": "units.req1", "item_value_type": "str", "item_value": "X"},
+        {"domain": "units", "record_pk": "1", "item_key": "units.extra1", "item_value_type": "str", "item_value": "A"},
+        {"domain": "units", "record_pk": "2", "item_key": "units.extra1", "item_value_type": "str", "item_value": "B"},
+    ])
+    policy_json = tmp_path / "policy.json"
+    policy_json.write_text('{"domains": {"units": {"required_items": ["units.req1"]}}}', encoding="utf-8")
+
+    subprocess.run([
+        sys.executable, "tools/discover_join_policy.py",
+        "--phase0-dir", str(phase0), "--domains", "units",
+        "--policy-json", str(policy_json),
+        "--search-modes", "greedy", "--policy-modes", "harsh",
+    ], cwd=Path(__file__).resolve().parents[1], check=True)
+
+    with (phase0.parent / "diagnostics" / "join_key_harsh__units__harsh.csv").open(encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows
+    row = rows[0]
+    assert "units.extra1" in row["selected_fields"]
+    assert row["collision_rate"] == "0.000000"
+    assert row["collision_rate_full"] == "0.000000"
+    assert row["sample_vs_full_diverges"] == "false"
+
+
+def test_out_policy_excludes_candidate_that_diverges_on_full_population(tmp_path: Path):
+    # Codex 5th-round finding: --out-policy previously accepted any status=="ok"
+    # row regardless of sample_vs_full_diverges, so a candidate the full-population
+    # verification pass explicitly warns not to pin (printed as a [discover]
+    # WARNING) would still get written out as the domain's required policy. Here
+    # a sample of 1 record misses a genuine fragmentation (two records share a
+    # sig_hash but the candidate field's values differ) that only the full
+    # population reveals -- status is "ok" but sample_vs_full_diverges is "true",
+    # so the domain must be excluded from --out-policy entirely (no non-diverging
+    # fallback exists in this fixture).
+    phase0 = tmp_path / "results" / "records"
+    _write_csv(phase0 / "records.csv", ["file_id", "domain", "record_pk", "sig_hash"], [
+        {"file_id": "f1", "domain": "units", "record_pk": "1", "sig_hash": "sigA"},
+        {"file_id": "f1", "domain": "units", "record_pk": "2", "sig_hash": "sigA"},
+    ])
+    _write_csv(phase0 / "identity_items.csv", ["domain", "record_pk", "item_key", "item_value_type", "item_value"], [
+        {"domain": "units", "record_pk": "1", "item_key": "units.spec", "item_value_type": "str", "item_value": "A"},
+        {"domain": "units", "record_pk": "2", "item_key": "units.spec", "item_value_type": "str", "item_value": "B"},
+    ])
+    out_policy = tmp_path / "out_policy.json"
+
+    subprocess.run([
+        sys.executable, "tools/discover_join_policy.py",
+        "--phase0-dir", str(phase0), "--domains", "units", "--out-policy", str(out_policy),
+        "--search-modes", "greedy", "--policy-modes", "discover",
+        "--sample-size", "1", "--sample-seed", "17",
+    ], cwd=Path(__file__).resolve().parents[1], check=True)
+
+    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units__discover.csv").open(encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    row = rows[0]
+    assert row["status"] == "ok"
+    assert row["sample_vs_full_diverges"] == "true"
+
+    out = json.loads(out_policy.read_text(encoding="utf-8"))
+    assert "units" not in out.get("domains", {})
+
+
 # ---------------------------------------------------------------------------
 # blocked_missing_required must still fire for a required field genuinely
 # absent from the data, even though discover_greedy now always echoes the
@@ -360,7 +441,7 @@ def test_validate_mode_blocked_when_required_field_absent_from_data(tmp_path: Pa
         "--search-modes", "greedy", "--policy-modes", "validate", "--no-full-verify",
     ], cwd=Path(__file__).resolve().parents[1], check=True)
 
-    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units.csv").open(encoding="utf-8", newline="") as f:
+    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units__validate.csv").open(encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
     assert rows
     row = rows[0]
@@ -402,7 +483,7 @@ def test_validate_mode_not_blocked_when_required_field_ranked_below_candidate_ca
         "--search-modes", "greedy", "--policy-modes", "validate", "--no-full-verify",
     ], cwd=Path(__file__).resolve().parents[1], check=True)
 
-    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units.csv").open(encoding="utf-8", newline="") as f:
+    with (phase0.parent / "diagnostics" / "join_key_discovery_exploration__units__validate.csv").open(encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
     assert rows
     row = rows[0]
@@ -454,6 +535,19 @@ def test_diagnostics_domain_suffix_falls_back_to_hash_for_long_lists():
     assert len(suffix) < 40
 
 
+def test_diagnostics_domain_suffix_includes_policy_modes_to_avoid_split_run_collisions():
+    # Codex 5th-round finding: tools/suggest_discovery_params.py's --emit-commands
+    # splits one domain into a discover-only command and a validate,harsh command,
+    # both scoped to the SAME --domains -- domain alone isn't enough to keep their
+    # diagnostics apart, since the second run's _write_csv would silently overwrite
+    # the first run's aggregate exploration file.
+    assert _diagnostics_domain_suffix({"units"}, ["discover"]) == "__units__discover"
+    assert _diagnostics_domain_suffix({"units"}, ["validate", "harsh"]) == "__units__harsh_validate"
+    assert _diagnostics_domain_suffix({"units"}, ["discover"]) != _diagnostics_domain_suffix({"units"}, ["validate", "harsh"])
+    # No policy_modes given -> unchanged (backward compatible default).
+    assert _diagnostics_domain_suffix({"units"}) == "__units"
+
+
 def test_discover_join_policy_scoped_run_does_not_clobber_unscoped_filenames(tmp_path: Path):
     phase0 = tmp_path / "results" / "records"
     _write_csv(phase0 / "records.csv", ["file_id", "domain", "record_pk", "sig_hash"], [
@@ -479,5 +573,5 @@ def test_discover_join_policy_scoped_run_does_not_clobber_unscoped_filenames(tmp
         "--phase0-dir", str(phase0), "--domains", "units",
         "--search-modes", "greedy", "--policy-modes", "discover", "--no-full-verify",
     ], cwd=Path(__file__).resolve().parents[1], check=True)
-    assert (diagnostics_dir / "join_key_discovery_exploration__units.csv").exists()
+    assert (diagnostics_dir / "join_key_discovery_exploration__units__discover.csv").exists()
     assert (diagnostics_dir / "join_key_discovery_exploration.csv").exists()

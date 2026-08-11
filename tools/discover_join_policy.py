@@ -33,7 +33,7 @@ def _pareto_search_adapter(domain_records, identity_index, candidate_fields, cfg
         return {"frontier": [], "chosen": None, "error": "pareto_dependency_missing"}
 
 
-def _diagnostics_domain_suffix(allow: set) -> str:
+def _diagnostics_domain_suffix(allow: set, policy_modes: Sequence[str] = ()) -> str:
     """Filename suffix for diagnostics CSVs when a run is scoped to specific --domains.
 
     Sequential --emit-commands invocations of discover_join_policy.py (one per
@@ -43,15 +43,24 @@ def _diagnostics_domain_suffix(allow: set) -> str:
     anyone reads it. Suffixing by the scoped domain set keeps per-domain runs'
     diagnostics side by side. Unscoped (whole-corpus) runs keep the original,
     unsuffixed filenames -- this only changes behavior when --domains is passed.
+
+    Also incorporates policy_modes: tools/suggest_discovery_params.py's
+    --emit-commands splits a single domain into TWO commands (discover-only,
+    then validate,harsh) whenever the harsh/validate baseline needs a
+    different --max-k or --search-modes than discover -- both scoped to the
+    SAME --domains, so domain alone isn't enough to keep their diagnostics
+    apart: without the policy-modes component, the second (validate,harsh)
+    run's _write_csv call would silently overwrite the first (discover) run's
+    aggregate exploration file, losing its discover-mode rows entirely.
     """
     if not allow:
         return ""
     scoped = sorted(allow, key=str.lower)
     joined = "_".join(scoped)
-    if len(joined) <= 60:
-        return "__" + joined
-    digest = hashlib.sha1("|".join(scoped).encode("utf-8")).hexdigest()[:10]
-    return f"__{len(scoped)}domains_{digest}"
+    domain_part = ("__" + joined) if len(joined) <= 60 else f"__{len(scoped)}domains_{hashlib.sha1('|'.join(scoped).encode('utf-8')).hexdigest()[:10]}"
+    modes = sorted({str(m).strip() for m in policy_modes if str(m).strip()})
+    mode_part = ("__" + "_".join(modes)) if modes else ""
+    return domain_part + mode_part
 
 
 def _write_csv(path: Path, fields: List[str], rows: List[Dict[str, str]]) -> None:
@@ -397,14 +406,14 @@ def main() -> None:
     items = _read_csv(items_path)
 
     domains = sorted({r.get("domain", "").strip() for r in records if r.get("domain", "").strip()}, key=str.lower)
+    search_modes = [m.strip() for m in str(args.search_modes).split(",") if m.strip()]
+    policy_modes = [m.strip() for m in str(args.policy_modes).split(",") if m.strip()]
+
     domain_suffix = ""
     if args.domains:
         allow = {d.strip() for d in str(args.domains).split(",") if d.strip()}
         domains = [d for d in domains if d in allow]
-        domain_suffix = _diagnostics_domain_suffix(allow)
-
-    search_modes = [m.strip() for m in str(args.search_modes).split(",") if m.strip()]
-    policy_modes = [m.strip() for m in str(args.policy_modes).split(",") if m.strip()]
+        domain_suffix = _diagnostics_domain_suffix(allow, policy_modes)
 
     source_policy = Path(args.policy_json) if args.policy_json else None
     base_policy = Path(args.base_policy) if args.base_policy else None
@@ -586,17 +595,36 @@ def main() -> None:
                         reason = "required_fields_absent_from_data:" + ",".join(sorted(req_missing_from_data))
 
                 # Full-population verification: re-score whatever was selected against
-                # dom_records_all (not the sample) with the same cfg/gates. This is a
-                # single O(records_total_domain) pass, not a combinatorial search, so it
-                # stays cheap even though the search itself ran on a sample for
-                # tractability. Without this, a sample-only "fragmentation=0" could be
-                # pinned as policy despite fragmenting on records the sample never saw.
+                # dom_records_all (not the sample). This is a single
+                # O(records_total_domain) pass, not a combinatorial search, so it stays
+                # cheap even though the search itself ran on a sample for tractability.
+                # Without this, a sample-only "fragmentation=0" could be pinned as
+                # policy despite fragmenting on records the sample never saw.
+                #
+                # Uses verify_cfg, NOT the original cfg: cfg's gates.required_fields
+                # (set for validate/harsh modes) would make score_candidate silently
+                # fall back to req alone regardless of `selected` -- exactly the
+                # override discover_greedy() now strips for its OWN scoring once
+                # `selected` is required-inclusive (see
+                # tools/join_key_discovery/greedy.py), so verifying with the
+                # unstripped cfg here would compare sample metrics computed against
+                # the real `selected` (e.g. req + a challenger field) against full
+                # metrics computed against req alone -- an apples-to-oranges mismatch
+                # that can manufacture a false coverage/collision divergence (or mask
+                # a real one) whenever `selected` differs from req. `selected` is
+                # already the authoritative, required-inclusive field list by this
+                # point (via greedy's seeding, Pareto's validate-mode frontier filter,
+                # or the required_set_fallback path), so scoring it directly -- gates
+                # .required_fields stripped, shape-gating gates left intact -- is
+                # correct regardless of which search_mode produced it.
+                verify_gates = {k: v for k, v in (cfg.get("gates") or {}).items() if k != "required_fields"}
+                verify_cfg = {**cfg, "gates": verify_gates}
                 full_verify_status = "skipped_no_full_verify_flag"
                 metrics_full: Dict[str, object] = {}
                 diverges = False
                 if selected and full_verify:
                     metrics_full, diverges = _full_population_verify(
-                        dom_records_all, identity_index, selected, cfg, metrics, divergence_delta,
+                        dom_records_all, identity_index, selected, verify_cfg, metrics, divergence_delta,
                         coverage_drop_threshold=coverage_drop_threshold,
                     )
                     full_verify_status = "ok"
@@ -667,10 +695,31 @@ def main() -> None:
                     "sample_vs_full_diverges": "true" if diverges else "false",
                 })
 
-        # optional compatibility policy JSON generation
-        row_for_policy = next((r for r in report_rows if r.get("domain") == domain and r.get("policy_mode") == "validate" and r.get("search_mode") == "pareto" and r.get("status") == "ok"), None)
+        # optional compatibility policy JSON generation. Requires a non-diverging
+        # full-population verification (sample_vs_full_diverges != "true") -- a
+        # candidate the verification pass explicitly warns not to pin (see
+        # _full_population_verify) must not be written out as the domain's
+        # required policy just because its sample-based status was "ok". When
+        # --no-full-verify was used, sample_vs_full_diverges is always "false"
+        # (verification never ran to flag anything), so this doesn't block
+        # emission in that mode.
+        row_for_policy = next(
+            (
+                r for r in report_rows
+                if r.get("domain") == domain and r.get("policy_mode") == "validate" and r.get("search_mode") == "pareto"
+                and r.get("status") == "ok" and r.get("sample_vs_full_diverges") != "true"
+            ),
+            None,
+        )
         if row_for_policy is None:
-            row_for_policy = next((r for r in report_rows if r.get("domain") == domain and r.get("policy_mode") == "discover" and r.get("search_mode") == "greedy" and r.get("status") == "ok"), None)
+            row_for_policy = next(
+                (
+                    r for r in report_rows
+                    if r.get("domain") == domain and r.get("policy_mode") == "discover" and r.get("search_mode") == "greedy"
+                    and r.get("status") == "ok" and r.get("sample_vs_full_diverges") != "true"
+                ),
+                None,
+            )
         sel_for_policy = [x for x in (row_for_policy.get("selected_fields", "") if row_for_policy else "").split("|") if x]
         if sel_for_policy:
             policy_row = {

@@ -214,47 +214,79 @@ def suggest_params_for_domain(
     # data-observed scoped_candidates pool, not req/opt, which can include
     # policy field names that aren't even among the domain's populated
     # candidates at all (stale/unpopulated names still count toward the pool
-    # Pareto enumerates over). So the real harsh/validate candidate pool size
-    # is max_candidate_fields + policy_fixed_count, not just
-    # max_candidate_fields -- and the search space needs max_k large enough to
-    # represent selecting the whole req+opt baseline (policy_fixed_count) as a
-    # single candidate. The discover-mode budget solve above knows about
+    # Pareto enumerates over). So the real harsh/validate candidate POOL SIZE
+    # is max_candidate_fields + required_count + optional_count, not just
+    # max_candidate_fields. The discover-mode budget solve above knows about
     # neither.
+    #
+    # required_count and optional_count matter DIFFERENTLY here, though:
+    # optional fields never need to co-occur together in one selected subset
+    # -- they're just additional pool members Pareto may combine in at any k
+    # -- while required fields do, because discover_join_policy.py's
+    # validate-mode frontier filter demands `set(req).issubset(selected)`
+    # (harsh mode imposes no such constraint on selected at all). So the
+    # minimum k that can represent a USEFUL harsh/validate search is
+    # required_count alone, never required_count + optional_count -- treating
+    # optional_count as part of that floor (an earlier version of this logic
+    # did) incorrectly declared runs infeasible whenever a domain simply had a
+    # large optional_items list, even with zero or few required fields, where
+    # Pareto could still validly explore small subsets from the larger pool.
     #
     # tools/discover_join_policy.py's actual pareto_search() (the Callable API
     # it calls, not the separate policy-aware CLI path elsewhere in
     # pareto_joinkey_search.py) has no required-fields-aware enumeration --
     # it's plain itertools.combinations(fields, k) for every k up to max_k,
     # blind to which fields are "required"/"optional". Blindly bumping max_k
-    # to represent the baseline without checking the resulting combinatorial
-    # cost AT THE LARGER POOL can recommend a command that would evaluate
-    # billions of subsets.
+    # to represent the required baseline without checking the resulting
+    # combinatorial cost AT THE LARGER (optional-inflated) POOL can recommend
+    # a command that would evaluate billions of subsets.
     #
-    # policy_fixed_count is the absolute minimum k that can represent
-    # selecting the whole baseline as one candidate -- no smaller k can, so
+    # required_count is the absolute minimum k that can represent selecting
+    # the whole required baseline as one candidate -- no smaller k can, so
     # checking cost at exactly that k (against the harsh pool size) is the
     # tightest possible feasibility check: if even that's unaffordable, no
     # larger k is either (monotonicity of Sum C(pool, i)), so there's no
-    # "smaller headroom" to search for. When it IS affordable, max_k is set to
-    # max(discover_max_k, policy_fixed_count) for a bit of exploration room
-    # beyond the bare minimum, re-checked against the same budget since cost
-    # still grows with k; if that larger value doesn't fit, it falls back to
-    # the minimal-but-verified-affordable policy_fixed_count instead of
+    # "smaller headroom" to search for. When it IS affordable (including the
+    # required_count == 0 case, which always is), max_k is set to
+    # max(discover_max_k, required_count) for a bit of exploration room beyond
+    # the bare minimum, re-checked against the same budget since cost still
+    # grows with k; if that larger value doesn't fit, it falls back to the
+    # minimal-but-verified-affordable required_count instead of
     # discover_max_k (which was never checked against the harsh pool size at
     # all).
-    policy_fixed_count = required_count + optional_count
+    policy_fixed_count = required_count + optional_count  # pool-size inflation only
     harsh_pool_size = max_candidate_fields + policy_fixed_count
-    if not policy_fixed_count:
-        harsh_max_k = discover_max_k
-        harsh_pareto_feasible = True
-    elif _cumulative_subset_count(harsh_pool_size, policy_fixed_count) > subset_budget:
+    if required_count and _cumulative_subset_count(harsh_pool_size, required_count) > subset_budget:
+        # Even the minimum k needed to represent the required baseline is
+        # unaffordable at the (optional-inflated) harsh pool -- no larger k
+        # works either (monotonicity of Sum C(pool, i)).
         harsh_max_k = discover_max_k
         harsh_pareto_feasible = False
     else:
-        harsh_max_k = max(discover_max_k, policy_fixed_count)
-        if _cumulative_subset_count(harsh_pool_size, harsh_max_k) > subset_budget:
-            harsh_max_k = policy_fixed_count
-        harsh_pareto_feasible = True
+        candidate_k = max(discover_max_k, required_count)
+        if _cumulative_subset_count(harsh_pool_size, candidate_k) <= subset_budget:
+            harsh_max_k = candidate_k
+        elif required_count:
+            # candidate_k (anchored at discover_max_k, which was only ever
+            # verified against the smaller discover pool) doesn't fit the
+            # larger harsh pool, but the true required-only floor -- already
+            # confirmed affordable above -- does. Fall back to it rather than
+            # an unverified discover_max_k.
+            harsh_max_k = required_count
+        else:
+            # No required baseline to fall back to (required_count == 0) and
+            # discover_max_k itself doesn't fit the optional-inflated pool --
+            # shrink k from scratch until it does. Optional-only inflation
+            # must still be feasible at SOME (possibly small) k, since
+            # optional fields never need to co-occur together in one subset
+            # -- only the pool got bigger, not the minimum useful k.
+            harsh_max_k = 0
+            for k in range(1, min(harsh_pool_size, 64) + 1):
+                if _cumulative_subset_count(harsh_pool_size, k) <= subset_budget:
+                    harsh_max_k = k
+                else:
+                    break
+        harsh_pareto_feasible = harsh_max_k > 0
 
     # Concentration, not just N/F average: file_effective_cluster_count (1/HHI
     # over per-file record-count shares) meaningfully below the actual distinct
@@ -273,22 +305,30 @@ def suggest_params_for_domain(
     )
 
     notes: List[str] = []
-    if policy_fixed_count and not harsh_pareto_feasible:
+    if not harsh_pareto_feasible:
         notes.append(
-            f"existing required+optional items count ({policy_fixed_count}: {required_count} "
-            f"required + {optional_count} optional) is too large for harsh/validate Pareto search "
+            f"required_items count ({required_count}) is too large for harsh/validate Pareto search "
             f"to represent within --subset-budget ({subset_budget}) at the harsh/validate pool size "
-            f"(--max-candidate-fields {max_candidate_fields} + {policy_fixed_count}) -- pareto_search() "
-            "has no required/optional-fields-aware enumeration, so max_k can't be bumped to fit the "
-            "baseline without a combinatorial blowup. Use --search-modes greedy for harsh/validate on "
-            "this domain instead (discover_greedy() has no such ceiling)."
+            f"(--max-candidate-fields {max_candidate_fields} + {required_count} required + {optional_count} "
+            f"optional = {harsh_pool_size}) -- pareto_search() has no required/optional-fields-aware "
+            "enumeration, so max_k can't be bumped to fit the baseline without a combinatorial blowup. "
+            "Use --search-modes greedy for harsh/validate on this domain instead (discover_greedy() has "
+            "no such ceiling)."
         )
-    elif policy_fixed_count and harsh_max_k > discover_max_k:
+    elif harsh_max_k > discover_max_k:
         notes.append(
-            f"existing required+optional items count ({policy_fixed_count}: {required_count} "
-            f"required + {optional_count} optional) exceeds the discover-mode budget max_k "
+            f"required_items count ({required_count}) exceeds the discover-mode budget max_k "
             f"({discover_max_k}); harsh/validate runs need --max-k >= {harsh_max_k} to be able to "
             "represent the current baseline plus new candidates."
+        )
+    elif optional_count and harsh_max_k < discover_max_k:
+        notes.append(
+            f"existing optional_items count ({optional_count}) enlarges the harsh/validate candidate "
+            f"pool to {harsh_pool_size} (--max-candidate-fields {max_candidate_fields} + {required_count} "
+            f"required + {optional_count} optional); harsh/validate --max-k is capped lower than "
+            f"discover's ({harsh_max_k} vs {discover_max_k}) to stay within --subset-budget "
+            f"({subset_budget}) at that larger pool -- Pareto can still validly explore subsets up to "
+            "that size, just not as large as discover mode's."
         )
     if stratify_recommended:
         notes.append(
