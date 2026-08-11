@@ -43,14 +43,51 @@ def pareto_search(
     """Callable API for v2.1 discovery orchestration."""
     cfg = cfg or {}
     max_k = int(cfg.get("max_k", 4))
+    gates = dict(cfg.get("gates") or {})
     fields = sorted({str(f).strip() for f in candidate_fields if str(f).strip()}, key=lambda s: s.lower())
+
+    # When gates["required_fields"] is set (validate/harsh modes via
+    # discover_join_policy.py), score_candidate() -> build_candidate_join_key_with_details()
+    # composes the actual join key from gates["required_fields"] regardless of the
+    # subset passed in (`base_required = gates.get("required_fields") or selected_fields`,
+    # an OR not a union) -- so scoring every subset with the original cfg would make
+    # every subset evaluate identically to the required-only key, never reflecting
+    # whichever extra fields this search is actually trying. This mirrors the identical
+    # fix in tools/join_key_discovery/greedy.py's discover_greedy(): strip the gate for
+    # scoring, and guarantee required-field inclusion STRUCTURALLY instead -- every
+    # subset tried is built as required_fields + a combination drawn only from the
+    # remaining (non-required) fields, so required fields are always present without
+    # needing the override, and the search can actually discover whether an additional
+    # field improves on the required baseline (harsh mode) or explore freely when no
+    # required baseline is set (discover mode: required_fields is empty, so this
+    # degrades to the original combinations-over-the-whole-pool behavior exactly).
+    required_fields = sorted(
+        {str(f).strip() for f in (gates.get("required_fields") or []) if str(f).strip()},
+        key=lambda s: s.lower(),
+    )
+    required_set = set(required_fields)
+    # Only fields the required baseline names AND that are actually present in the
+    # candidate pool can be structurally guaranteed here; a required field genuinely
+    # absent from the pool (never populated in the domain's data) is a separate,
+    # already-handled case -- discover_join_policy.py's req_missing_from_data check
+    # flags "blocked_missing_required" independent of whatever this search returns.
+    required_present = [f for f in fields if f in required_set]
+    remaining = [f for f in fields if f not in required_set]
+    max_extra_k = max(0, max_k - len(required_present))
+
+    scoring_gates = {k: v for k, v in gates.items() if k != "required_fields"}
+    scoring_cfg = {**cfg, "gates": scoring_gates}
+
     rows: List[dict] = []
-    for k in range(1, min(max_k, len(fields)) + 1):
-        for subset in itertools.combinations(fields, k):
-            metrics = score_candidate(domain_records, domain_identity_items, list(subset), cfg)
+    for extra_k in range(0, max_extra_k + 1):
+        for extra in itertools.combinations(remaining, extra_k):
+            subset = tuple(sorted(required_present + list(extra), key=lambda s: s.lower()))
+            if not subset:
+                continue
+            metrics = score_candidate(domain_records, domain_identity_items, list(subset), scoring_cfg)
             rows.append({
                 "keys": "|".join(subset),
-                "k_count": k,
+                "k_count": len(subset),
                 "collision_rate": float(metrics.get("collision_rate", 1.0)),
                 "coverage_gap": 1.0 - float(metrics.get("coverage", 0.0)),
                 "fragmentation_rate": float(metrics.get("fragmentation_rate", 1.0)),
