@@ -79,12 +79,37 @@ def compute_domain_stats(
     records: Sequence[Dict[str, str]],
     items: Sequence[Dict[str, str]],
     domain: str,
-) -> Dict[str, int]:
-    """N/G/F/n_candidates for one domain from already-loaded records/items rows."""
+) -> Dict[str, object]:
+    """N/G/F/n_candidates plus a real file-concentration measure for one domain
+    from already-loaded records/items rows.
+
+    File concentration is computed as HHI over per-file record-count shares,
+    following this repo's own established HHI convention (docs/METRICS.md):
+    closed universe (shares sum to 1.0) with an explicit "unknown" bucket for
+    blank file_id, rather than silently excluding those records. A plain
+    N/F average would be blind to concentration -- 6000 records in 1 file and
+    6000 records spread evenly across 6000 files both average to the same
+    N/F, but only the former is a real sampling-imbalance risk.
+    """
     dom_records = [r for r in records if r.get("domain", "") == domain]
     n = len(dom_records)
     g = len({r.get("sig_hash", "").strip() for r in dom_records if r.get("sig_hash", "").strip()})
-    f = len({r.get("file_id", "").strip() for r in dom_records if r.get("file_id", "").strip()})
+
+    file_counts: Dict[str, int] = {}
+    unknown_file_count = 0
+    for r in dom_records:
+        fid = r.get("file_id", "").strip()
+        if fid:
+            file_counts[fid] = file_counts.get(fid, 0) + 1
+        else:
+            unknown_file_count += 1
+    f = len(file_counts)
+    shares = [c / n for c in file_counts.values()] if n else []
+    if unknown_file_count:
+        shares.append(unknown_file_count / n)
+    file_hhi = sum(s * s for s in shares) if shares else 0.0
+    file_effective_cluster_count = (1.0 / file_hhi) if file_hhi > 0 else 0.0
+
     n_candidates = len({
         it.get("item_key", "").strip()
         for it in items
@@ -94,6 +119,8 @@ def compute_domain_stats(
         "records_total_domain": n,
         "distinct_sig_hash_groups": g,
         "distinct_file_count": f,
+        "file_hhi": file_hhi,
+        "file_effective_cluster_count": file_effective_cluster_count,
         "candidate_field_count": n_candidates,
     }
 
@@ -158,19 +185,21 @@ def solve_candidate_fields_and_k(n_candidates: int, budget: int = 20000, min_k: 
 
 
 def suggest_params_for_domain(
-    stats: Dict[str, int],
+    stats: Dict[str, object],
     *,
     required_count: int = 0,
     k_per_group: int = 15,
     sample_floor: int = 500,
     subset_budget: int = 20000,
     min_k: int = 2,
+    concentration_ratio_threshold: float = 0.5,
 ) -> Dict[str, object]:
     """Combine the sizing functions above into one suggestion dict for a domain."""
-    n = stats["records_total_domain"]
-    g = stats["distinct_sig_hash_groups"]
-    f = stats["distinct_file_count"]
-    n_candidates = stats["candidate_field_count"]
+    n = int(stats["records_total_domain"])
+    g = int(stats["distinct_sig_hash_groups"])
+    f = int(stats["distinct_file_count"])
+    file_effective_cluster_count = float(stats.get("file_effective_cluster_count", f))
+    n_candidates = int(stats["candidate_field_count"])
 
     sample_size = suggest_sample_size(n, g, k_per_group=k_per_group, floor=sample_floor)
     max_candidate_fields, discover_max_k = solve_candidate_fields_and_k(
@@ -183,12 +212,21 @@ def suggest_params_for_domain(
     # the discover-mode budget solve above doesn't know about that baseline.
     harsh_max_k = max(discover_max_k, required_count + 2) if required_count else discover_max_k
 
-    # Files carrying materially more than an even N/F share of this domain's
-    # records are exactly the volume-imbalance risk --stratify-by file_id
-    # guards against (see module docstring); flag it whenever any file could
-    # plausibly account for a large chunk of a sample-sized draw.
-    avg_per_file = (float(n) / float(f)) if f else 0.0
-    stratify_recommended = bool(f) and bool(sample_size) and avg_per_file > (sample_size / max(f, 1)) * 2.0
+    # Concentration, not just N/F average: file_effective_cluster_count (1/HHI
+    # over per-file record-count shares) meaningfully below the actual distinct
+    # file count f means a handful of files carry a disproportionate share of
+    # this domain's records (e.g. Template/Container files) -- exactly the
+    # volume-imbalance risk --stratify-by file_id guards against. An N/F
+    # average alone can't distinguish this from perfectly even distribution
+    # (6000 records in 1 file and 6000 spread evenly across 6000 files both
+    # average to the same N/F). Only relevant when sampling actually happens
+    # (sample_size < n) -- with no cap, imbalance can't bias anything.
+    sampling_applies = bool(sample_size) and sample_size < n
+    stratify_recommended = (
+        sampling_applies
+        and f > 1
+        and file_effective_cluster_count < (f * concentration_ratio_threshold)
+    )
 
     notes: List[str] = []
     if required_count and required_count > discover_max_k:
@@ -258,21 +296,44 @@ def _load_required_counts(policy_json: Optional[Path]) -> Dict[str, int]:
     return out
 
 
-def _emit_command(domain: str, suggestion: Dict[str, object], phase0_dir: str, policy_json: Optional[str]) -> str:
-    parts = [
-        "python tools/discover_join_policy.py",
-        f"--phase0-dir {phase0_dir}",
-        f"--domains {domain}",
-        f"--sample-size {suggestion['suggested_sample_size']}",
-        f"--max-candidate-fields {suggestion['suggested_max_candidate_fields']}",
-        f"--max-k {suggestion['suggested_max_k_discover']}",
-    ]
-    if suggestion.get("stratify_by_recommended"):
-        parts.append(f"--stratify-by {suggestion['stratify_by_recommended']}")
-    if policy_json:
-        parts.append(f"--policy-json {policy_json}")
-    parts.append("--warn-only")
-    return " \\\n    ".join(parts)
+def _emit_command(domain: str, suggestion: Dict[str, object], phase0_dir: str, policy_json: Optional[str]) -> List[str]:
+    """Build ready-to-run discover_join_policy.py command(s) for one domain.
+
+    Returns two commands, not one, whenever suggested_max_k_harsh_validate
+    exceeds suggested_max_k_discover (i.e. the domain has an existing
+    required_items baseline the budget-derived discover value can't
+    represent): one scoped to --policy-modes discover at the smaller
+    budget-fit value, one scoped to --policy-modes validate,harsh at the
+    larger baseline-aware value. A single combined command using the smaller
+    discover value while leaving harsh/validate enabled (discover_join_policy.py's
+    own default) would silently under-size harsh mode's search space relative
+    to what the suggestion itself says is needed.
+    """
+    def _base_parts(max_k: object) -> List[str]:
+        parts = [
+            "python tools/discover_join_policy.py",
+            f"--phase0-dir {phase0_dir}",
+            f"--domains {domain}",
+            f"--sample-size {suggestion['suggested_sample_size']}",
+            f"--max-candidate-fields {suggestion['suggested_max_candidate_fields']}",
+            f"--max-k {max_k}",
+        ]
+        if suggestion.get("stratify_by_recommended"):
+            parts.append(f"--stratify-by {suggestion['stratify_by_recommended']}")
+        if policy_json:
+            parts.append(f"--policy-json {policy_json}")
+        parts.append("--warn-only")
+        return parts
+
+    discover_k = suggestion["suggested_max_k_discover"]
+    harsh_k = suggestion["suggested_max_k_harsh_validate"]
+
+    if harsh_k == discover_k:
+        return [" \\\n    ".join(_base_parts(discover_k))]
+
+    discover_cmd = _base_parts(discover_k) + ["--policy-modes discover"]
+    harsh_cmd = _base_parts(harsh_k) + ["--policy-modes validate,harsh"]
+    return [" \\\n    ".join(discover_cmd), " \\\n    ".join(harsh_cmd)]
 
 
 def main() -> None:
@@ -358,8 +419,9 @@ def main() -> None:
     if args.emit_commands:
         print("\n[suggest] ready-to-run commands:\n", flush=True)
         for row in rows:
-            print(_emit_command(str(row["domain"]), row, args.phase0_dir, args.policy_json))
-            print()
+            for cmd in _emit_command(str(row["domain"]), row, args.phase0_dir, args.policy_json):
+                print(cmd)
+                print()
 
 
 if __name__ == "__main__":

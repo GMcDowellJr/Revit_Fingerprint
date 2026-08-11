@@ -119,10 +119,25 @@ def _stratified_sample(
     if n_groups == 0:
         return _sample_domain_records(records, sample_size, seed)
 
+    # Rank GROUPS themselves by the same deterministic hash approach
+    # _sample_domain_records uses for records, not alphabetically: when
+    # n_groups > sample_size (the common case for --stratify-by file_id on a
+    # corpus with more files than the sample cap), the final out[:sample_size]
+    # truncation below keeps only the groups iterated first. Sorting by group
+    # name would make that truncation silently keep only the
+    # lexicographically-first groups regardless of seed (e.g. always f0000..
+    # f0009 out of 1000 single-record files) -- ranking by seed instead makes
+    # which groups survive the cap an actual deterministic-but-unbiased
+    # (seeded) choice, not an artifact of naming.
+    def _group_rank(val: str) -> str:
+        return hashlib.sha1(f"{seed}|group|{val}".encode("utf-8")).hexdigest()
+
+    ranked_group_keys = sorted(groups.keys(), key=_group_rank)
+
     per_group = max(1, math.ceil(sample_size / n_groups))
     first_pass: Dict[str, List[Dict[str, str]]] = {}
     out: List[Dict[str, str]] = []
-    for val in sorted(groups.keys()):
+    for val in ranked_group_keys:
         sampled = _sample_domain_records(groups[val], per_group, seed)
         first_pass[val] = sampled
         out.extend(sampled)
@@ -131,7 +146,7 @@ def _stratified_sample(
     # their surplus first (preserving balanced representation), then ungrouped.
     if len(out) < sample_size:
         surplus: List[Dict[str, str]] = []
-        for val in sorted(groups.keys()):
+        for val in ranked_group_keys:
             all_ranked = _sample_domain_records(groups[val], len(groups[val]), seed)
             surplus.extend(all_ranked[len(first_pass[val]):])
         surplus.extend(_sample_domain_records(ungrouped, len(ungrouped), seed))
@@ -147,6 +162,7 @@ def _full_population_verify(
     cfg: Dict[str, object],
     metrics_sample: Dict[str, object],
     divergence_delta: float,
+    coverage_drop_threshold: float = 0.05,
 ):
     """Re-score `selected` against the FULL (unsampled) population and flag divergence
     from the sample-based `metrics_sample`.
@@ -157,12 +173,20 @@ def _full_population_verify(
     fragmentation-free on the sample could be pinned as policy despite fragmenting on
     records the sample never saw.
 
-    Divergence is flagged when either:
+    Divergence is flagged when any of:
       - the full population shows fragmentation (fragmentation_rate > 0) while the
         sample showed none (fragmentation_rate == 0) -- exactly the "sample said 0,
-        population disagrees" failure mode this exists to catch, or
+        population disagrees" failure mode this exists to catch;
       - collision_rate on the full population exceeds the sample's by more than
-        `divergence_delta` (absolute).
+        `divergence_delta` (absolute);
+      - coverage on the full population drops from the sample's by more than
+        `coverage_drop_threshold` (absolute) -- a candidate selected because it
+        happened to cover every sampled record but is largely absent from the rest
+        of the population is not globally applicable (Phase-2's own "Global
+        Consistency" principle, docs/phase_2_join-key_discovery.md), even though
+        collision/fragmentation alone wouldn't catch it: those metrics are only
+        computed over *covered* records, so a coverage collapse can leave both
+        unchanged while most of the population silently gets no join key at all.
 
     Returns (metrics_full, diverges).
     """
@@ -170,7 +194,12 @@ def _full_population_verify(
     collision_delta = float(metrics_full.get("collision_rate", 1.0)) - float(metrics_sample.get("collision_rate", 1.0))
     frag_sample = float(metrics_sample.get("fragmentation_rate", 1.0))
     frag_full = float(metrics_full.get("fragmentation_rate", 1.0))
-    diverges = (frag_full > 0.0 and frag_sample == 0.0) or (collision_delta > divergence_delta)
+    coverage_delta = float(metrics_sample.get("coverage", 0.0)) - float(metrics_full.get("coverage", 0.0))
+    diverges = (
+        (frag_full > 0.0 and frag_sample == 0.0)
+        or (collision_delta > divergence_delta)
+        or (coverage_delta > coverage_drop_threshold)
+    )
     return metrics_full, diverges
 
 
@@ -261,6 +290,17 @@ def main() -> None:
         default=0.01,
         help="Absolute collision_rate_full - collision_rate threshold above which a [discover] WARNING is printed for that row (default 0.01).",
     )
+    ap.add_argument(
+        "--coverage-drop-threshold",
+        type=float,
+        default=0.05,
+        help=(
+            "Absolute coverage - coverage_full drop threshold above which a [discover] WARNING is "
+            "printed (default 0.05). Catches a candidate that happened to cover every sampled record "
+            "but is largely absent from the rest of the population -- collision_rate/fragmentation_rate "
+            "alone won't catch this since both are only computed over covered records."
+        ),
+    )
     args = ap.parse_args()
 
     phase0_dir = Path(args.phase0_dir)
@@ -304,6 +344,7 @@ def main() -> None:
     stratify_key = str(args.stratify_by or "").strip()
     full_verify = not bool(args.no_full_verify)
     divergence_delta = float(args.divergence_collision_delta)
+    coverage_drop_threshold = float(args.coverage_drop_threshold)
 
     for i, domain in enumerate(domains, start=1):
         dom_records_all = [r for r in records if r.get("domain") == domain]
@@ -449,6 +490,7 @@ def main() -> None:
                 if selected and full_verify:
                     metrics_full, diverges = _full_population_verify(
                         dom_records_all, identity_index, selected, cfg, metrics, divergence_delta,
+                        coverage_drop_threshold=coverage_drop_threshold,
                     )
                     full_verify_status = "ok"
                     if diverges:
@@ -456,7 +498,8 @@ def main() -> None:
                             f"[discover] WARNING domain={domain} policy_mode={policy_mode} search_mode={search_mode} "
                             f"sample-based metrics diverge from full population: "
                             f"fragmentation_rate sample={float(metrics.get('fragmentation_rate', 1.0)):.6f} full={float(metrics_full.get('fragmentation_rate', 1.0)):.6f}, "
-                            f"collision_rate sample={float(metrics.get('collision_rate', 1.0)):.6f} full={float(metrics_full.get('collision_rate', 1.0)):.6f} "
+                            f"collision_rate sample={float(metrics.get('collision_rate', 1.0)):.6f} full={float(metrics_full.get('collision_rate', 1.0)):.6f}, "
+                            f"coverage sample={float(metrics.get('coverage', 0.0)):.6f} full={float(metrics_full.get('coverage', 0.0)):.6f} "
                             f"-- do not pin this candidate without review.",
                             flush=True,
                         )

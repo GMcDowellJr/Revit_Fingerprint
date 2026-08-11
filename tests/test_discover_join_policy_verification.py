@@ -2,6 +2,8 @@ from __future__ import annotations
 import csv, subprocess, sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.discover_join_policy import _full_population_verify, _stratified_sample
 from tools.join_key_discovery.eval import build_identity_index, score_candidate
@@ -79,6 +81,46 @@ def test_full_population_verify_flags_collision_rate_delta_above_threshold():
     assert diverges is True
 
 
+def test_full_population_verify_flags_coverage_collapse_even_with_zero_collision_and_fragmentation():
+    # Only 1 of 5 full-population records has the candidate field populated at
+    # all -- the other 4 fail the implicit required-field gate and are simply
+    # uncovered, not colliding or fragmenting. collision_rate/fragmentation_rate
+    # are computed only over *covered* records, so both stay 0 even though this
+    # candidate is only applicable to 20% of the population -- a candidate that
+    # "looked" globally applicable on a sample where it happened to cover 100%.
+    full_records = [{"record_pk": str(i), "sig_hash": f"sig{i}"} for i in range(5)]
+    items = [_items_row("0", "field", "A")]  # only record_pk "0" has the field
+    identity_index = build_identity_index(items)
+    cfg = {"gates": {}}
+
+    metrics_sample = {"coverage": 1.0, "fragmentation_rate": 0.0, "collision_rate": 0.0}
+    metrics_full, diverges = _full_population_verify(
+        full_records, identity_index, ["field"], cfg, metrics_sample, divergence_delta=0.01, coverage_drop_threshold=0.05,
+    )
+
+    assert metrics_full["coverage"] == pytest.approx(0.2)
+    assert metrics_full["collision_rate"] == 0.0
+    assert metrics_full["fragmentation_rate"] == 0.0
+    assert diverges is True  # caught by the coverage check even though collision/fragmentation look clean
+
+
+def test_full_population_verify_no_divergence_for_coverage_drop_within_threshold():
+    # A small, expected coverage dip (well under the 0.05 default threshold)
+    # must not trigger a false-positive warning. Distinct field values per
+    # record (not a shared constant) so covered records don't collide.
+    full_records = [{"record_pk": str(i), "sig_hash": f"sig{i}"} for i in range(100)]
+    items = [_items_row(str(i), "field", f"v{i}") for i in range(98)]  # 2/100 missing -> coverage 0.98
+    identity_index = build_identity_index(items)
+    cfg = {"gates": {}}
+
+    metrics_sample = {"coverage": 1.0, "fragmentation_rate": 0.0, "collision_rate": 0.0}
+    metrics_full, diverges = _full_population_verify(
+        full_records, identity_index, ["field"], cfg, metrics_sample, divergence_delta=0.01, coverage_drop_threshold=0.05,
+    )
+    assert metrics_full["coverage"] == pytest.approx(0.98)
+    assert diverges is False
+
+
 # ---------------------------------------------------------------------------
 # _stratified_sample: file_id special case (new -- discover_hash_policy.py's
 # original only supported identity-item-key stratification)
@@ -107,6 +149,28 @@ def test_stratified_sample_falls_back_to_flat_when_key_uncovered():
     # stratify by an item_key that doesn't exist anywhere -> no coverage -> flat sample
     out = _stratified_sample(records, [], "no_such_item_key", sample_size=3, seed=17)
     assert len(out) == 3
+
+
+def test_stratified_sample_survivors_are_not_lexicographically_first_group_when_groups_exceed_cap():
+    # 1000 single-record files, sample_size=10: per_group = ceil(10/1000) = 1, so
+    # every group contributes exactly one record before the out[:sample_size]
+    # truncation decides which 10 of the 1000 groups survive. Iterating groups
+    # in sorted() order would always keep f0000..f0009 regardless of seed --
+    # the seed must actually determine which groups survive.
+    records = [{"record_pk": f"r{i}", "file_id": f"f{i:04d}"} for i in range(1000)]
+    out = _stratified_sample(records, [], "file_id", sample_size=10, seed=17)
+    file_ids = sorted(r["file_id"] for r in out)
+    lexicographically_first_ten = [f"f{i:04d}" for i in range(10)]
+    assert file_ids != lexicographically_first_ten
+
+
+def test_stratified_sample_group_selection_varies_by_seed_when_groups_exceed_cap():
+    records = [{"record_pk": f"r{i}", "file_id": f"f{i:04d}"} for i in range(1000)]
+    out_a = _stratified_sample(records, [], "file_id", sample_size=10, seed=17)
+    out_b = _stratified_sample(records, [], "file_id", sample_size=10, seed=99)
+    files_a = {r["file_id"] for r in out_a}
+    files_b = {r["file_id"] for r in out_b}
+    assert files_a != files_b
 
 
 # ---------------------------------------------------------------------------

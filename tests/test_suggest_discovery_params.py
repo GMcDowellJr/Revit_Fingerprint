@@ -2,6 +2,8 @@ from __future__ import annotations
 import csv, subprocess, sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.suggest_discovery_params import (
     compute_domain_stats,
@@ -9,6 +11,7 @@ from tools.suggest_discovery_params import (
     _cumulative_subset_count,
     solve_candidate_fields_and_k,
     suggest_params_for_domain,
+    _emit_command,
 )
 
 
@@ -34,12 +37,42 @@ def test_compute_domain_stats_counts_n_g_f_and_candidates():
         {"domain": "other", "record_pk": "4", "item_key": "other.k"},
     ]
     stats = compute_domain_stats(records, items, "units")
-    assert stats == {
-        "records_total_domain": 3,
-        "distinct_sig_hash_groups": 2,
-        "distinct_file_count": 2,
-        "candidate_field_count": 2,
-    }
+    assert stats["records_total_domain"] == 3
+    assert stats["distinct_sig_hash_groups"] == 2
+    assert stats["distinct_file_count"] == 2
+    assert stats["candidate_field_count"] == 2
+    # f1 carries 2/3 records, f2 carries 1/3: HHI = (2/3)^2 + (1/3)^2 = 5/9
+    assert stats["file_hhi"] == pytest.approx(5.0 / 9.0)
+    assert stats["file_effective_cluster_count"] == pytest.approx(9.0 / 5.0)
+
+
+def test_compute_domain_stats_file_hhi_treats_blank_file_id_as_unknown_bucket():
+    # docs/METRICS.md convention: closed universe, explicit unknown bucket for
+    # blank/missing file_id rather than silently excluding those records.
+    records = [
+        {"domain": "units", "record_pk": "1", "sig_hash": "s1", "file_id": "f1"},
+        {"domain": "units", "record_pk": "2", "sig_hash": "s1", "file_id": ""},
+    ]
+    stats = compute_domain_stats(records, [], "units")
+    assert stats["distinct_file_count"] == 1
+    # f1: 1/2, unknown bucket: 1/2 -> HHI = 0.25+0.25 = 0.5
+    assert stats["file_hhi"] == pytest.approx(0.5)
+
+
+def test_compute_domain_stats_file_hhi_perfectly_even_distribution():
+    records = [{"domain": "units", "record_pk": str(i), "sig_hash": "s1", "file_id": f"f{i}"} for i in range(10)]
+    stats = compute_domain_stats(records, [], "units")
+    assert stats["distinct_file_count"] == 10
+    # Perfectly even: HHI = 10 * (1/10)^2 = 0.1 -> effective_cluster_count = 10 (no concentration)
+    assert stats["file_hhi"] == pytest.approx(0.1)
+    assert stats["file_effective_cluster_count"] == pytest.approx(10.0)
+
+
+def test_compute_domain_stats_file_hhi_fully_concentrated_in_one_file():
+    records = [{"domain": "units", "record_pk": str(i), "sig_hash": "s1", "file_id": "big"} for i in range(10)]
+    stats = compute_domain_stats(records, [], "units")
+    assert stats["file_hhi"] == pytest.approx(1.0)
+    assert stats["file_effective_cluster_count"] == pytest.approx(1.0)
 
 
 def test_suggest_sample_size_scales_with_diversity_not_just_population():
@@ -84,18 +117,35 @@ def test_suggest_params_for_domain_flags_required_count_exceeding_discover_k():
     assert "required_items count" in result["notes"]
 
 
-def test_suggest_params_for_domain_recommends_stratify_by_file_id_on_imbalance():
-    # 6000 records, 40 groups -> sample_size well under population, and 201 files
-    # where one contributes the overwhelming majority (mirrors the CLI smoke test).
-    stats = {"records_total_domain": 6000, "distinct_sig_hash_groups": 40, "distinct_file_count": 201, "candidate_field_count": 1}
+def test_suggest_params_for_domain_recommends_stratify_by_file_id_on_real_concentration():
+    # One file with 5000 of 6000 records, 200 files with 5 each (mirrors the CLI
+    # smoke test) -- built via compute_domain_stats so file_hhi reflects the
+    # actual concentration, not a hand-picked stats dict.
+    records = [{"domain": "d", "record_pk": f"tpl_{i}", "sig_hash": f"g{i % 40}", "file_id": "f_template"} for i in range(5000)]
+    for fi in range(200):
+        for j in range(5):
+            records.append({"domain": "d", "record_pk": f"proj_{fi}_{j}", "sig_hash": f"g{(fi + j) % 8}", "file_id": f"f{fi}"})
+    stats = compute_domain_stats(records, [], "d")
     result = suggest_params_for_domain(stats)
     assert result["stratify_by_recommended"] == "file_id"
 
 
+def test_suggest_params_for_domain_no_stratify_recommendation_when_records_evenly_spread():
+    # Same N/F average as the concentrated case above (30/1 avg either way is not
+    # what matters) but genuinely even distribution across files -- must NOT
+    # recommend stratification just because N is large relative to sample size.
+    records = [{"domain": "d", "record_pk": f"r{i}", "sig_hash": f"g{i % 40}", "file_id": f"f{i}"} for i in range(6000)]
+    stats = compute_domain_stats(records, [], "d")
+    result = suggest_params_for_domain(stats)
+    assert result["stratify_by_recommended"] == ""
+
+
 def test_suggest_params_for_domain_no_stratify_recommendation_when_no_sampling_needed():
     # Population already small enough that suggested_sample_size == N -- no cap, so
-    # imbalance across files doesn't matter (nothing gets excluded from the "sample").
-    stats = {"records_total_domain": 50, "distinct_sig_hash_groups": 30, "distinct_file_count": 5, "candidate_field_count": 3}
+    # imbalance across files doesn't matter (nothing gets excluded from the "sample"),
+    # even though this population IS concentrated in one file.
+    records = [{"domain": "d", "record_pk": f"r{i}", "sig_hash": f"g{i % 30}", "file_id": "only_file"} for i in range(50)]
+    stats = compute_domain_stats(records, [], "d")
     result = suggest_params_for_domain(stats)
     assert result["suggested_sample_size"] == 50
     assert result["stratify_by_recommended"] == ""
@@ -142,3 +192,30 @@ def test_cli_emit_commands_prints_ready_to_run_invocations(tmp_path: Path):
     ], cwd=Path(__file__).resolve().parents[1], check=True, capture_output=True, text=True)
     assert "tools/discover_join_policy.py" in r.stdout
     assert "--domains units" in r.stdout
+
+
+def test_emit_command_single_command_when_discover_and_harsh_k_match():
+    suggestion = {
+        "suggested_sample_size": 500, "suggested_max_candidate_fields": 20,
+        "suggested_max_k_discover": 3, "suggested_max_k_harsh_validate": 3,
+        "stratify_by_recommended": "",
+    }
+    cmds = _emit_command("units", suggestion, "results/records", None)
+    assert len(cmds) == 1
+    assert "--max-k 3" in cmds[0]
+    assert "--policy-modes" not in cmds[0]  # single command: leave default discover,validate,harsh
+
+
+def test_emit_command_splits_into_discover_and_harsh_commands_when_k_differs():
+    # Mirrors a domain whose existing required_items baseline pushes harsh/validate's
+    # needed max_k above what the discover-mode budget solve produced.
+    suggestion = {
+        "suggested_sample_size": 500, "suggested_max_candidate_fields": 20,
+        "suggested_max_k_discover": 3, "suggested_max_k_harsh_validate": 10,
+        "stratify_by_recommended": "",
+    }
+    cmds = _emit_command("dimension_types_linear", suggestion, "results/records", None)
+    assert len(cmds) == 2
+    discover_cmd, harsh_cmd = cmds
+    assert "--max-k 3" in discover_cmd and "--policy-modes discover" in discover_cmd
+    assert "--max-k 10" in harsh_cmd and "--policy-modes validate,harsh" in harsh_cmd
