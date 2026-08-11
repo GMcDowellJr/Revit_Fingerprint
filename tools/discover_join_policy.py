@@ -5,6 +5,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Dict, List, Sequence
 
@@ -51,6 +52,126 @@ def _sample_domain_records(records: List[Dict[str, str]], sample_size: int, seed
 
     ranked = sorted(records, key=lambda r: (_rank(r), r.get("record_pk", "")))
     return ranked[:sample_size]
+
+
+def _stratified_sample(
+    records: List[Dict[str, str]],
+    items: List[Dict[str, str]],
+    stratify_key: str,
+    sample_size: int,
+    seed: int,
+) -> List[Dict[str, str]]:
+    """Sample records giving equal representation to each unique value of stratify_key.
+
+    Guards against a pooled/unweighted sample being dominated by whichever group
+    happens to have the most records (e.g. a handful of Template/Container files
+    carrying a much larger configured vocabulary than typical Project files) --
+    rare-but-real configurations in small groups are exactly the cases most likely
+    to expose a candidate join key's collisions/fragmentation, so they need
+    guaranteed representation, not proportional-to-population representation.
+
+    ``stratify_key`` is resolved two ways:
+      - ``"file_id"`` (or ``"record_id"``): read directly off each record row
+        (these live in records.csv, not identity_items.csv).
+      - anything else: treated as an identity-item key and looked up per
+        record_pk from ``items`` (e.g. ``lft.family_name``), mirroring the
+        domain-attribute grouping tools/discover_hash_policy.py already uses.
+
+    Takes ceil(sample_size / n_groups) records from each group using the same
+    deterministic hash-rank as _sample_domain_records. After the first pass,
+    tops up to sample_size from groups with surplus records, then from
+    ungrouped records, so the total always reaches sample_size when enough
+    records exist. Falls back to flat sampling when the key has no coverage.
+    """
+    if not stratify_key or sample_size <= 0 or len(records) <= sample_size:
+        return records
+
+    if stratify_key in ("file_id", "record_id"):
+        pk_to_val = {
+            r.get("record_pk", "").strip(): r.get(stratify_key, "").strip()
+            for r in records
+            if r.get("record_pk", "").strip() and r.get(stratify_key, "").strip()
+        }
+    else:
+        pk_to_val = {}
+        for it in items:
+            if it.get("item_key", "").strip() != stratify_key:
+                continue
+            pk = it.get("record_pk", "").strip()
+            val = it.get("item_value", "").strip()
+            if pk and val:
+                pk_to_val[pk] = val
+
+    if not pk_to_val:
+        return _sample_domain_records(records, sample_size, seed)
+
+    groups: Dict[str, List[Dict[str, str]]] = {}
+    ungrouped: List[Dict[str, str]] = []
+    for r in records:
+        pk = r.get("record_pk", "").strip()
+        val = pk_to_val.get(pk)
+        if val:
+            groups.setdefault(val, []).append(r)
+        else:
+            ungrouped.append(r)
+
+    n_groups = len(groups)
+    if n_groups == 0:
+        return _sample_domain_records(records, sample_size, seed)
+
+    per_group = max(1, math.ceil(sample_size / n_groups))
+    first_pass: Dict[str, List[Dict[str, str]]] = {}
+    out: List[Dict[str, str]] = []
+    for val in sorted(groups.keys()):
+        sampled = _sample_domain_records(groups[val], per_group, seed)
+        first_pass[val] = sampled
+        out.extend(sampled)
+
+    # Top up to sample_size: groups with more records than per_group contribute
+    # their surplus first (preserving balanced representation), then ungrouped.
+    if len(out) < sample_size:
+        surplus: List[Dict[str, str]] = []
+        for val in sorted(groups.keys()):
+            all_ranked = _sample_domain_records(groups[val], len(groups[val]), seed)
+            surplus.extend(all_ranked[len(first_pass[val]):])
+        surplus.extend(_sample_domain_records(ungrouped, len(ungrouped), seed))
+        out.extend(surplus[: sample_size - len(out)])
+
+    return out[:sample_size]
+
+
+def _full_population_verify(
+    dom_records_all: List[Dict[str, str]],
+    identity_index,
+    selected: List[str],
+    cfg: Dict[str, object],
+    metrics_sample: Dict[str, object],
+    divergence_delta: float,
+):
+    """Re-score `selected` against the FULL (unsampled) population and flag divergence
+    from the sample-based `metrics_sample`.
+
+    This is a single O(len(dom_records_all)) pass via score_candidate() -- not a
+    combinatorial search -- so it stays cheap even though the search that produced
+    `selected` ran on a sample for tractability. Without this, a candidate that looks
+    fragmentation-free on the sample could be pinned as policy despite fragmenting on
+    records the sample never saw.
+
+    Divergence is flagged when either:
+      - the full population shows fragmentation (fragmentation_rate > 0) while the
+        sample showed none (fragmentation_rate == 0) -- exactly the "sample said 0,
+        population disagrees" failure mode this exists to catch, or
+      - collision_rate on the full population exceeds the sample's by more than
+        `divergence_delta` (absolute).
+
+    Returns (metrics_full, diverges).
+    """
+    metrics_full = score_candidate(dom_records_all, identity_index, selected, cfg)
+    collision_delta = float(metrics_full.get("collision_rate", 1.0)) - float(metrics_sample.get("collision_rate", 1.0))
+    frag_sample = float(metrics_sample.get("fragmentation_rate", 1.0))
+    frag_full = float(metrics_full.get("fragmentation_rate", 1.0))
+    diverges = (frag_full > 0.0 and frag_sample == 0.0) or (collision_delta > divergence_delta)
+    return metrics_full, diverges
 
 
 def _pick_candidate_fields(items: List[Dict[str, str]], max_fields: int) -> List[str]:
@@ -105,10 +226,41 @@ def main() -> None:
     ap.add_argument("--policy-modes", default="discover,validate,harsh", help="Comma-separated policy strictness modes: discover,validate,harsh")
     ap.add_argument("--sample-size", type=int, default=5000)
     ap.add_argument("--sample-seed", type=int, default=17)
+    ap.add_argument(
+        "--stratify-by",
+        default="",
+        help=(
+            "Field to stratify sampling by so each unique value gets equal representation "
+            "regardless of group size, instead of a pooled/unweighted sample that a few "
+            "high-volume groups (e.g. Template/Container files with a much larger configured "
+            "vocabulary than typical Project files) can dominate. Use 'file_id' for per-file "
+            "balance, or a populated identity-item key (e.g. 'lft.family_name') for a "
+            "domain-attribute grouping. Falls back to flat sampling when the key has no coverage."
+        ),
+    )
     ap.add_argument("--max-candidate-fields", type=int, default=64)
     ap.add_argument("--max-k", type=int, default=4, help="Max subset size for Pareto search (validate mode auto-bumps to required count).")
     ap.add_argument("--base-policy", default=None, help="Optional policy to preserve metadata/shape gates when writing out-policy.")
     ap.add_argument("--warn-only", action="store_true")
+    ap.add_argument(
+        "--no-full-verify",
+        action="store_true",
+        help=(
+            "Skip re-scoring each selected candidate against the FULL (unsampled) domain "
+            "population. By default, every selected candidate is re-scored against the full "
+            "population (coverage_full/collision_rate_full/fragmentation_rate_full columns) "
+            "so a sample-only 'fragmentation=0' finding can't be pinned as policy without ever "
+            "being checked against the real corpus -- this re-score is a single O(records) pass "
+            "per row, not a combinatorial search, so it's cheap even when the search itself was "
+            "sampled for tractability."
+        ),
+    )
+    ap.add_argument(
+        "--divergence-collision-delta",
+        type=float,
+        default=0.01,
+        help="Absolute collision_rate_full - collision_rate threshold above which a [discover] WARNING is printed for that row (default 0.01).",
+    )
     args = ap.parse_args()
 
     phase0_dir = Path(args.phase0_dir)
@@ -149,20 +301,33 @@ def main() -> None:
 
     print(f"[discover] loaded records={len(records)} identity_items={len(items)} domains={len(domains)} policy_modes={policy_modes} search_modes={search_modes}", flush=True)
 
+    stratify_key = str(args.stratify_by or "").strip()
+    full_verify = not bool(args.no_full_verify)
+    divergence_delta = float(args.divergence_collision_delta)
+
     for i, domain in enumerate(domains, start=1):
         dom_records_all = [r for r in records if r.get("domain") == domain]
-        dom_records = _sample_domain_records(dom_records_all, int(args.sample_size), int(args.sample_seed))
+        dom_items_all = [it for it in items if it.get("domain") == domain]
+        if stratify_key:
+            dom_records = _stratified_sample(dom_records_all, dom_items_all, stratify_key, int(args.sample_size), int(args.sample_seed))
+        else:
+            dom_records = _sample_domain_records(dom_records_all, int(args.sample_size), int(args.sample_seed))
         records_total_domain = len(dom_records_all)
         records_sampled_domain = len(dom_records)
         sample_rate = (float(records_sampled_domain) / float(records_total_domain)) if records_total_domain else 0.0
         sampled_pks = {r.get("record_pk", "").strip() for r in dom_records if r.get("record_pk", "").strip()}
-        dom_items = [it for it in items if it.get("domain") == domain and (not sampled_pks or it.get("record_pk", "").strip() in sampled_pks)]
-        candidate_fields = _pick_candidate_fields(dom_items, int(args.max_candidate_fields))
+        dom_items_sampled = [it for it in dom_items_all if not sampled_pks or it.get("record_pk", "").strip() in sampled_pks]
+        candidate_fields = _pick_candidate_fields(dom_items_sampled, int(args.max_candidate_fields))
         if not candidate_fields:
             failures.append(domain)
             continue
 
-        identity_index = build_identity_index(dom_items)
+        # Built from the FULL (unsampled) item set, not just the sampled subset: a
+        # record_pk absent from the sample is simply never looked up when scoring
+        # against dom_records (the sample), so this is strictly more complete for
+        # the sampled pass too, and is what the full-population verification pass
+        # below needs (dom_records_all references record_pks outside the sample).
+        identity_index = build_identity_index(dom_items_all)
         existing = base_domains.get(domain, {}) if isinstance(base_domains.get(domain, {}), dict) else {}
         normalized = normalize_policy_block(existing)
         req = normalized["required_fields"]
@@ -219,6 +384,19 @@ def main() -> None:
                     "optional_items": "|".join(opt),
                     "excluded_count": str(len(excluded)),
                     "excluded_items": "|".join(sorted(excluded)),
+                    "stratify_by": stratify_key,
+                    "coverage_full": "0",
+                    "collision_rate_full": "1",
+                    "fragmentation_rate_full": "1",
+                    "records_total_full": str(records_total_domain),
+                    "records_covered_full": "0",
+                    "collision_records_full": "0",
+                    "fragmented_sig_count_full": "0",
+                    "join_group_count_full": "0",
+                    "hhi_full": "0.000000",
+                    "effective_cluster_count_full": "0.000000",
+                    "full_verify_status": "skipped_no_selection",
+                    "sample_vs_full_diverges": "false",
                 })
                 continue
 
@@ -259,6 +437,32 @@ def main() -> None:
                 if policy_mode == "validate" and req and not set(req).issubset(set(selected)):
                     status = "blocked_missing_required"
 
+                # Full-population verification: re-score whatever was selected against
+                # dom_records_all (not the sample) with the same cfg/gates. This is a
+                # single O(records_total_domain) pass, not a combinatorial search, so it
+                # stays cheap even though the search itself ran on a sample for
+                # tractability. Without this, a sample-only "fragmentation=0" could be
+                # pinned as policy despite fragmenting on records the sample never saw.
+                full_verify_status = "skipped_no_full_verify_flag"
+                metrics_full: Dict[str, object] = {}
+                diverges = False
+                if selected and full_verify:
+                    metrics_full, diverges = _full_population_verify(
+                        dom_records_all, identity_index, selected, cfg, metrics, divergence_delta,
+                    )
+                    full_verify_status = "ok"
+                    if diverges:
+                        print(
+                            f"[discover] WARNING domain={domain} policy_mode={policy_mode} search_mode={search_mode} "
+                            f"sample-based metrics diverge from full population: "
+                            f"fragmentation_rate sample={float(metrics.get('fragmentation_rate', 1.0)):.6f} full={float(metrics_full.get('fragmentation_rate', 1.0)):.6f}, "
+                            f"collision_rate sample={float(metrics.get('collision_rate', 1.0)):.6f} full={float(metrics_full.get('collision_rate', 1.0)):.6f} "
+                            f"-- do not pin this candidate without review.",
+                            flush=True,
+                        )
+                elif not selected:
+                    full_verify_status = "skipped_no_selection"
+
                 report_rows.append({
                     "domain": domain,
                     "policy_mode": policy_mode,
@@ -298,12 +502,26 @@ def main() -> None:
                     "optional_items": "|".join(opt),
                     "excluded_count": str(len(excluded)),
                     "excluded_items": "|".join(sorted(excluded)),
+                    "stratify_by": stratify_key,
+                    "coverage_full": f"{float(metrics_full.get('coverage', 0.0)):.6f}",
+                    "collision_rate_full": f"{float(metrics_full.get('collision_rate', 1.0)):.6f}",
+                    "fragmentation_rate_full": f"{float(metrics_full.get('fragmentation_rate', 1.0)):.6f}",
+                    "records_total_full": str(int(metrics_full.get("records_total", records_total_domain)) if metrics_full else records_total_domain),
+                    "records_covered_full": str(int(metrics_full.get("records_covered", 0) or 0)),
+                    "collision_records_full": str(int(metrics_full.get("collision_records", 0) or 0)),
+                    "fragmented_sig_count_full": str(int(metrics_full.get("fragmented_sig_count", 0) or 0)),
+                    "join_group_count_full": str(int(metrics_full.get("join_group_count", 0) or 0)),
+                    "hhi_full": f"{float(metrics_full.get('hhi', 0.0)):.6f}",
+                    "effective_cluster_count_full": f"{float(metrics_full.get('effective_cluster_count', 0.0)):.6f}",
+                    "full_verify_status": full_verify_status,
+                    "sample_vs_full_diverges": "true" if diverges else "false",
                 })
 
         # optional compatibility policy JSON generation
-        sel_for_policy = [x for x in (next((r.get("selected_fields", "") for r in report_rows if r.get("domain") == domain and r.get("policy_mode") == "validate" and r.get("search_mode") == "pareto" and r.get("status") == "ok"), "") or "").split("|") if x]
-        if not sel_for_policy:
-            sel_for_policy = [x for x in (next((r.get("selected_fields", "") for r in report_rows if r.get("domain") == domain and r.get("policy_mode") == "discover" and r.get("search_mode") == "greedy" and r.get("status") == "ok"), "") or "").split("|") if x]
+        row_for_policy = next((r for r in report_rows if r.get("domain") == domain and r.get("policy_mode") == "validate" and r.get("search_mode") == "pareto" and r.get("status") == "ok"), None)
+        if row_for_policy is None:
+            row_for_policy = next((r for r in report_rows if r.get("domain") == domain and r.get("policy_mode") == "discover" and r.get("search_mode") == "greedy" and r.get("status") == "ok"), None)
+        sel_for_policy = [x for x in (row_for_policy.get("selected_fields", "") if row_for_policy else "").split("|") if x]
         if sel_for_policy:
             policy_row = {
                 "policy_id": f"{domain}.join_key.v21",
@@ -324,6 +542,14 @@ def main() -> None:
                     "sample_size_arg": int(args.sample_size),
                     "sample_seed_arg": int(args.sample_seed),
                     "max_candidate_fields_arg": int(args.max_candidate_fields),
+                    "stratify_by": stratify_key,
+                    "full_verification": {
+                        "status": row_for_policy.get("full_verify_status", "") if row_for_policy else "",
+                        "coverage_full": row_for_policy.get("coverage_full", "") if row_for_policy else "",
+                        "collision_rate_full": row_for_policy.get("collision_rate_full", "") if row_for_policy else "",
+                        "fragmentation_rate_full": row_for_policy.get("fragmentation_rate_full", "") if row_for_policy else "",
+                        "sample_vs_full_diverges": row_for_policy.get("sample_vs_full_diverges", "") if row_for_policy else "",
+                    },
                 },
             }
             legacy_shape_gating = _to_legacy_shape_gating(gates)
@@ -343,6 +569,10 @@ def main() -> None:
         "selected_fields", "coverage", "collision_rate", "fragmentation_rate",
         "records_total", "records_covered", "collision_records", "fragmented_sig_count", "join_group_count", "hhi", "effective_cluster_count", "failures_json", "frontier_size", "fallback_used",
         "required_count", "required_fields", "optional_count", "optional_items", "excluded_count", "excluded_items",
+        "stratify_by",
+        "coverage_full", "collision_rate_full", "fragmentation_rate_full", "records_total_full", "records_covered_full",
+        "collision_records_full", "fragmented_sig_count_full", "join_group_count_full", "hhi_full", "effective_cluster_count_full",
+        "full_verify_status", "sample_vs_full_diverges",
     ]
     _write_csv(diagnostics_dir / "join_key_discovery_exploration.csv", fields, sorted(report_rows, key=lambda r: (r.get("domain", ""), r.get("policy_mode", ""), r.get("search_mode", ""))))
     for mode in policy_modes:

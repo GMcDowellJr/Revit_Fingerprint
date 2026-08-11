@@ -49,3 +49,41 @@ For `loaded_family_types`, discovery is partitioned by `shape_gate.category`; ca
 - a results root containing `records/records.csv` (e.g., `.../compact/results`),
 - the `Results_v21` root (tool will resolve `phase0_v21/` automatically when present).
 - a repo/workspace root where pipeline outputs are under `results/records/` (tool resolves that automatically).
+
+## `--stratify-by` (both `tools/discover_join_policy.py` and `tools/discover_hash_policy.py`)
+
+`_stratified_sample()` lives in `tools/discover_join_policy.py` (imported by `discover_hash_policy.py`, which shares most of its I/O/sampling/candidate-selection primitives with it — see that module's own import block). Without it, sampling pools every record for a domain and draws an unweighted sample from the pool, which a few high-volume groups can dominate (e.g. a handful of Template/Container files, which this project's own governance model expects to carry a much larger configured vocabulary than typical Project files — see `corpus_update_runbook.ps1`'s "All view = full configured vocabulary" framing). `--stratify-by` gives every unique value of the chosen key roughly equal representation in the sample instead.
+
+Two kinds of stratify key are supported:
+- `file_id` (or `record_id`): read directly off `records.csv` — use this for per-file balance.
+- any other value: treated as an identity-item key and looked up per `record_pk` from the items table (e.g. `lft.family_name` for `loaded_family_types` — its original use case). Falls back to flat sampling when the key has no coverage in the data.
+
+`tools/suggest_discovery_params.py` (below) will recommend `--stratify-by file_id` automatically when a domain's population looks concentrated in relatively few files.
+
+## Full-population verification (`tools/discover_join_policy.py` only)
+
+Discovery search (`--search-modes pareto` especially) always runs against the *sampled* record set for tractability — sampling exists specifically so combinatorial search stays cheap. That means the `coverage`/`collision_rate`/`fragmentation_rate` columns in the exploration CSVs, on their own, only certify a candidate against the sample, never against the domain's actual full population. By default, `discover_join_policy.py` now also re-scores whatever candidate was selected against the FULL (unsampled) domain population — a single `O(records_total_domain)` pass via `score_candidate()`, not a combinatorial search, so it stays cheap even when the search itself was sampled — and emits parallel `_full`-suffixed columns: `coverage_full`, `collision_rate_full`, `fragmentation_rate_full`, `records_total_full`, `records_covered_full`, `collision_records_full`, `fragmented_sig_count_full`, `join_group_count_full`, `hhi_full`, `effective_cluster_count_full`, plus `full_verify_status` (`ok` / `skipped_no_full_verify_flag` / `skipped_no_selection`) and `sample_vs_full_diverges` (`true` when the full population shows fragmentation the sample reported as zero, or when `collision_rate_full` exceeds the sample's collision rate by more than `--divergence-collision-delta`, default `0.01`). A `[discover] WARNING ...` line is also printed to stdout for any diverging row, so it's visible without opening a CSV.
+
+This closes the gap without requiring a separate `apply_join_policy.py` + split-detection run just to find out whether a sample-derived candidate actually holds up on the real corpus. Disable with `--no-full-verify` if a domain's full population is itself too large to re-score cheaply.
+
+- `--no-full-verify`: skip the full-population re-score (verification runs by default).
+- `--divergence-collision-delta`: absolute `collision_rate_full - collision_rate` threshold above which a row is flagged/warned (default `0.01`).
+
+This does **not** apply to `discover_hash_policy.py` — its exploration CSVs remain sample-only.
+
+## Sizing `--sample-size`/`--max-candidate-fields`/`--max-k`/`--stratify-by` (`tools/suggest_discovery_params.py`)
+
+These four knobs are constants on the CLI, but the right value for each is a function of the domain's actual data, not a flat number applied uniformly to every domain (e.g. `units` with ~11 candidate fields vs. `dimension_types_linear` with 30+). `tools/suggest_discovery_params.py` reads the same `records.csv`/`identity_items.csv` `discover_join_policy.py` reads (no discovery run required) and computes, per domain:
+
+- `--sample-size`: sized off *diversity* (distinct `sig_hash` groups), not just population size — the project's own acceptance criterion is `fragmentation == 0` (`docs/phase_2_join-key_discovery.md`), and fragmentation is only detectable when the sample contains multiple records of the *same* group. `--sample-k-per-group` (default 15) sets the target representatives-per-group; `--sample-floor` (default 500) keeps small domains fully covered.
+- `--max-candidate-fields` / `--max-k`: solved *jointly* against a Pareto subset-count compute budget (`--subset-budget`, default 20000; `tools/pareto_joinkey_search.py`'s cost is `Σ C(n, i)` for `i=1..max_k`) — prefers keeping every candidate field and growing `max_k` as far as the budget allows, only trimming the field pool (keeping the highest-frequency fields, same ranking `_pick_candidate_fields` already uses) if even `--min-k` (default 2) doesn't fit the budget at the domain's full field count. Reports both a `discover`-mode suggestion and a (generally larger) `harsh`/`validate`-mode suggestion, since those modes fold the domain's existing `required_items` baseline into the search space and need `max_k` large enough to represent it.
+- `--stratify-by`: recommends `file_id` whenever a domain's records look concentrated in relatively few files for its population size.
+
+```bash
+python tools/suggest_discovery_params.py \
+  --phase0-dir results/records \
+  --policy-json policies/domain_join_key_policies.json \
+  --emit-commands
+```
+
+`--emit-commands` prints ready-to-run `discover_join_policy.py` invocations per domain using the suggested values. Output also always writes `<phase0-dir>/../diagnostics/discovery_param_suggestions.csv` (override with `--out`).
