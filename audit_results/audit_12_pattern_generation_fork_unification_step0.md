@@ -83,11 +83,26 @@ rows:
   missing_required`) supplies the same information under different key names
   (`export_file`→`export_run_id`, `record_id`→ *not* `record_pk` — see below) plus a `status`
   gate PR2 already applies (`status == "ok"`). Structurally compatible after a rename, with
-  two real gaps, not one:
+  three real gaps, not one:
   - **`record_pk` is a flatten-time composite (`f"{file_id}|{domain}|{record_ordinal}"`,
     `tools/extractor.py:1129`), not `record_id`** (record.v2's own `record_id` field, what
     `apply_name_key_policy.py` emits) — resolving it requires a join through phase0's own
     `records.csv` via `(export_run_id, domain, record_id)`.
+  - **`export_file`→`export_run_id` is not a bare rename for split-export pairs.**
+    `apply_name_key_policy.py` records `export_path.name` — for a details-preferred read
+    (CLAUDE.md's input-format priority) that is the `*.details.json` filename. The extractor's
+    own manifest (`meta_rows`/`emit_records`) stamps the canonical `export_run_id` for a
+    split-export pair as the paired `*.index.json` filename instead (`_iter_export_files()`:
+    `primary` is always the index file when one exists, never its details sibling). Feeding
+    `apply_name_key_policy.py`'s raw `export_file` value into `_process_one_domain`'s
+    manifest-driven per-export loop unrenamed would make it look up an `export_run_id` the
+    manifest never issued, silently dropping that file's presence rows and breaking `--roles`
+    filtering and cross-target file alignment — the exact failure mode
+    `tools/bundle_analysis/name_projection_adapter.py`'s `normalize_export_run_id()` already
+    exists to prevent (PR #389/#390 review history, per its own docstring). A unified writer
+    must carry that normalization step (or equivalent manifest-based resolution against real
+    `export_run_id`s) forward rather than treating the column as a same-value rename. (Flagged
+    in PR review.)
   - **`files_total`/`exports` cannot be derived from `apply_name_key_policy.py`'s own output
     at all.** `_rows_for_export()` only emits a row when `build_name_key_for_record()` returns
     non-`None` for that record — an export whose records are all out-of-policy-scope for every
