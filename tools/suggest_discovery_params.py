@@ -68,8 +68,10 @@ from typing import Dict, List, Optional, Sequence
 
 try:
     from tools.discover_join_policy import _pick_candidate_fields, _read_csv, _write_csv
+    from tools.join_key_discovery.eval import normalize_policy_block
 except ModuleNotFoundError:
     from discover_join_policy import _pick_candidate_fields, _read_csv, _write_csv
+    from join_key_discovery.eval import normalize_policy_block
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +424,19 @@ def _load_policy_fields(policy_json: Optional[Path]) -> Dict[str, Dict[str, obje
     populated anywhere in the domain's data. The actual NAMES (not just
     counts) let suggest_params_for_domain compute the true deduplicated pool
     size instead of a pessimistic arithmetic sum -- see its own docstring.
+
+    Uses normalize_policy_block() -- the SAME parsing discover_join_policy.py
+    itself applies to every policy block before running -- rather than
+    reimplementing the alias/precedence rules by hand. A hand-rolled
+    `required_items or required_fields` here previously disagreed with
+    normalize_policy_block()'s actual precedence (required_fields checked
+    FIRST there, required_items here) whenever a policy set both, and had no
+    fallback at all for a policy that only specifies `selected_fields` (a
+    supported legacy shape normalize_policy_block() falls back to as the
+    required baseline). Both mismatches meant a policy could be sized as
+    budget-safe here while the emitted command's actual required baseline --
+    and therefore its real Pareto search space -- was larger than what was
+    ever checked against --subset-budget.
     """
     if not policy_json or not policy_json.exists():
         return {}
@@ -433,15 +448,14 @@ def _load_policy_fields(policy_json: Optional[Path]) -> Dict[str, Dict[str, obje
     for domain, block in cand.items():
         if not isinstance(block, dict):
             continue
-        req = block.get("required_items") or block.get("required_fields") or []
-        opt = block.get("optional_items") or []
-        req = req if isinstance(req, list) else []
-        opt = opt if isinstance(opt, list) else []
+        normalized = normalize_policy_block(block)
+        req = normalized["required_fields"]
+        opt = normalized["optional_items"]
         out[str(domain)] = {
             "required_count": len(req),
             "optional_count": len(opt),
-            "required_fields": [str(x) for x in req],
-            "optional_fields": [str(x) for x in opt],
+            "required_fields": list(req),
+            "optional_fields": list(opt),
         }
     return out
 

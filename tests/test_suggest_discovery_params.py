@@ -12,6 +12,7 @@ from tools.suggest_discovery_params import (
     solve_candidate_fields_and_k,
     suggest_params_for_domain,
     _emit_command,
+    _load_policy_fields,
 )
 
 
@@ -262,6 +263,35 @@ def test_cli_writes_suggestions_csv_and_reads_required_counts_from_policy(tmp_pa
     assert len(rows) == 1
     assert rows[0]["domain"] == "dimension_types_linear"
     assert rows[0]["required_items_count"] == "1"
+
+
+def test_load_policy_fields_falls_back_to_selected_fields_like_normalize_policy_block(tmp_path: Path):
+    # Codex finding: _load_policy_fields previously reimplemented alias
+    # resolution by hand (required_items or required_fields, no selected_fields
+    # fallback), disagreeing with normalize_policy_block() -- the SAME parsing
+    # discover_join_policy.py actually runs with. A policy that only specifies
+    # selected_fields (a supported legacy shape) would size as required_count=0
+    # here while actually running with the full selected_fields list as its
+    # required baseline -- e.g. 20 selected fields, sized as budget-safe at
+    # max_k=0-ish, but the emitted validate run auto-bumps to 20.
+    policy = tmp_path / "policy.json"
+    selected = [f"f{i}" for i in range(20)]
+    policy.write_text('{"domains": {"d1": {"selected_fields": ' + repr(selected).replace("'", '"') + '}}}', encoding="utf-8")
+    out = _load_policy_fields(policy)
+    assert out["d1"]["required_count"] == 20
+    assert out["d1"]["required_fields"] == selected
+
+
+def test_load_policy_fields_prefers_required_fields_over_required_items_like_normalize_policy_block(tmp_path: Path):
+    # Codex finding: precedence disagreed between the two loaders when a policy
+    # sets BOTH required_fields and required_items -- normalize_policy_block()
+    # checks required_fields FIRST, but _load_policy_fields checked
+    # required_items first.
+    policy = tmp_path / "policy.json"
+    policy.write_text('{"domains": {"d1": {"required_fields": ["a", "b"], "required_items": ["x", "y", "z"]}}}', encoding="utf-8")
+    out = _load_policy_fields(policy)
+    assert out["d1"]["required_fields"] == ["a", "b"]
+    assert out["d1"]["required_count"] == 2
 
 
 def test_cli_emit_commands_prints_ready_to_run_invocations(tmp_path: Path):
