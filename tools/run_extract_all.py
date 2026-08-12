@@ -38,32 +38,15 @@ _LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.(?:seg|segment)\[(\d{3})\]\.(ki
 _LP_SEGMENT_COUNT_KEY = "line_pattern.segment_count"
 
 
-def _rebuild_monolithic_identity_items(items_csv: Path, shard_dir: Path) -> None:
-    """Rebuild identity_items.csv by streaming all domain shards in sorted order and refresh sentinel."""
-    fieldnames: Optional[List[str]] = None
-    with items_csv.open("w", encoding="utf-8", newline="") as mono_f:
-        mono_writer: Optional[csv.DictWriter] = None
-        for shard in sorted(shard_dir.glob("*.csv")):
-            with shard.open("r", encoding="utf-8-sig", newline="") as sf:
-                reader = csv.DictReader(sf)
-                if fieldnames is None:
-                    fieldnames = list(reader.fieldnames or [])
-                    mono_writer = csv.DictWriter(mono_f, fieldnames=fieldnames)
-                    mono_writer.writeheader()
-                if mono_writer is not None:
-                    for row in reader:
-                        mono_writer.writerow({k: row.get(k, "") for k in fieldnames})
-    (shard_dir / ".complete").write_text(str(items_csv.stat().st_mtime), encoding="utf-8")
-
-
 def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
-    """Append synthetic line_pattern.segments_norm_hash rows to identity_items.csv."""
-    if not items_csv.is_file():
-        return {"total": 0, "ok": 0, "missing": 0}
-
+    """Append synthetic line_pattern.segments_norm_hash rows to the line_patterns shard
+    (or, for a legacy monolithic-only phase0 dir with no shards, to identity_items.csv)."""
     shard_dir = items_csv.parent / "identity_items_by_domain"
     lp_shard = shard_dir / "line_patterns.csv"
     use_shard = (shard_dir / ".complete").is_file() and lp_shard.is_file()
+
+    if not use_shard and not items_csv.is_file():
+        return {"total": 0, "ok": 0, "missing": 0}
 
     if use_shard:
         with lp_shard.open("r", encoding="utf-8-sig", newline="") as f:
@@ -194,7 +177,6 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
                 w.writeheader()
                 for r in rows:
                     w.writerow({k: r.get(k, "") for k in fieldnames})
-            _rebuild_monolithic_identity_items(items_csv, shard_dir)
         else:
             with items_csv.open("w", encoding="utf-8", newline="") as f:
                 w = csv.DictWriter(f, fieldnames=fieldnames)
@@ -282,10 +264,19 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
     domains_without = set()
     records_csv = phase0_dir / "records.csv"
     items_csv = phase0_dir / "identity_items.csv"
-    if not records_csv.is_file() or not items_csv.is_file():
+    native_shard_dir = phase0_dir / "identity_items_by_domain"
+    if not records_csv.is_file():
+        return diag
+    if (native_shard_dir / ".complete").is_file():
+        shard_dir: Optional[Path] = native_shard_dir
+    elif items_csv.is_file():
+        # Legacy fallback for a phase0 dir produced before native shard writing
+        # existed (no identity_items_by_domain/.complete): derive shards from the
+        # monolithic file, refreshing them only if stale.
+        shard_dir = _ensure_domain_scoped_identity_items(phase0_dir)
+    else:
         return diag
     records = _read_csv_rows(records_csv)
-    shard_dir = _ensure_domain_scoped_identity_items(phase0_dir)
     grouped_cache: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
 
     def _load_items_for_domain(domain: str) -> Dict[str, List[Dict[str, Any]]]:
@@ -492,9 +483,16 @@ def _ensure_domain_scoped_identity_items(phase0_dir: Path) -> Optional[Path]:
 
 def _validate_line_pattern_synthetic_norm_hash(phase0_dir: Path) -> None:
     records_csv = phase0_dir / "records.csv"
+    shard_dir = phase0_dir / "identity_items_by_domain"
+    lp_shard = shard_dir / "line_patterns.csv"
+    # A complete shard set is sufficient on its own -- a corpus with zero line_patterns
+    # records legitimately has no line_patterns.csv shard at all (extractor.py only
+    # creates a domain's shard file lazily, on its first item row), so requiring
+    # lp_shard to exist here would wrongly abort a perfectly valid apply run.
+    use_shard = (shard_dir / ".complete").is_file()
     items_csv = phase0_dir / "identity_items.csv"
-    if not records_csv.is_file() or not items_csv.is_file():
-        raise SystemExit("flatten/enrichment stage did not produce records.csv and identity_items.csv before apply")
+    if not records_csv.is_file() or not (use_shard or items_csv.is_file()):
+        raise SystemExit("flatten/enrichment stage did not produce records.csv and identity_items (shards or identity_items.csv) before apply")
     line_pattern_pks: List[str] = []
     for r in _iter_csv_rows(records_csv):
         if str(r.get("domain", "")) == "line_patterns":
@@ -502,7 +500,14 @@ def _validate_line_pattern_synthetic_norm_hash(phase0_dir: Path) -> None:
     if not line_pattern_pks:
         return
     pks_with_norm: set = set()
-    for r in _iter_csv_rows(items_csv):
+    if use_shard:
+        # line_pattern_pks is non-empty here, so a complete shard set genuinely missing
+        # lp_shard is a real inconsistency -- fall through with pks_with_norm empty so
+        # every pk is reported "missing" below, rather than crashing on a FileNotFoundError.
+        items_rows = _iter_csv_rows(lp_shard) if lp_shard.is_file() else []
+    else:
+        items_rows = _iter_csv_rows(items_csv)
+    for r in items_rows:
         key = str(r.get("item_key", "") or r.get("k", ""))
         if str(r.get("domain", "")) == "line_patterns" and key == "line_pattern.segments_norm_hash":
             pks_with_norm.add(str(r.get("record_pk", "")))
@@ -845,10 +850,12 @@ def main() -> None:
     if "sig_hash" in selected_stages:
         _records_csv = effective_phase0_dir / "records.csv"
         _items_csv = effective_phase0_dir / "identity_items.csv"
-        if not _records_csv.is_file() or not _items_csv.is_file():
+        _native_shard_complete = effective_phase0_dir / "identity_items_by_domain" / ".complete"
+        if not _records_csv.is_file() or not (_native_shard_complete.is_file() or _items_csv.is_file()):
             raise SystemExit(
-                "sig_hash stage requires records.csv and identity_items.csv to exist. "
-                "Run the flatten stage first, or include flatten in --stages."
+                "sig_hash stage requires records.csv and identity_items (shards or "
+                "identity_items.csv) to exist. Run the flatten stage first, or include "
+                "flatten in --stages."
             )
         sig_pol = _resolve_sig_hash_policy_path(args.sig_hash_policy, out_root)
         if sig_pol is None:
@@ -969,9 +976,15 @@ def main() -> None:
             _enforce_policy_gate(record_rows, v21_root / "diagnostics", active_domains, allow_sig_hash_join_key)
 
         if meta_rows and record_rows:
-            shard_dir = _ensure_domain_scoped_identity_items(v21_phase0_dir)
-            if shard_dir is not None:
-                report["notes"].append(f"identity_items_shards={shard_dir}")
+            _native_shard_dir = v21_phase0_dir / "identity_items_by_domain"
+            if (_native_shard_dir / ".complete").is_file():
+                report["notes"].append(f"identity_items_shards={_native_shard_dir}")
+            else:
+                # Legacy fallback for a phase0 dir produced before native shard
+                # writing existed: derive shards from the monolithic file, if present.
+                _legacy_shard_dir = _ensure_domain_scoped_identity_items(v21_phase0_dir)
+                if _legacy_shard_dir is not None:
+                    report["notes"].append(f"identity_items_shards={_legacy_shard_dir}")
 
             # Ensure modal label population artifacts exist for the active v2.1 emit path.
             cmd_label_pop = [

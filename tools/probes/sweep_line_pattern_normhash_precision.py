@@ -6,7 +6,10 @@ from collections import defaultdict, Counter
 from pathlib import Path
 
 # ---- EDIT THIS ----
-PHASE0_ITEMS = Path(r"C:\Users\gmcdowell\Documents\Fingerprint_Out\domain_families\results_allpairs\Results_v21\phase0_v21\phase0_identity_items.csv")
+# line_patterns is a single domain, so the shard is a straight drop-in for the
+# old monolithic identity_items.csv this probe used to read (never actually
+# produced by the current pipeline, which writes identity_items_by_domain/ shards).
+PHASE0_ITEMS = Path(r"C:\Users\gmcdowell\Documents\Fingerprint_Out\domain_families\results_allpairs\Results_v21\phase0_v21\identity_items_by_domain\line_patterns.csv")
 PRECISIONS = [9, 8, 7, 6, 5, 4]
 # -------------------
 

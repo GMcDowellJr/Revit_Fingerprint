@@ -8,7 +8,10 @@ OUT_ROOT = Path(r"C:\Users\gmcdowell\Documents\Fingerprint_Out\domain_families\r
 # ---------------
 
 phase0_dir = OUT_ROOT / "Results_v21" / "phase0_v21"
-items_csv = phase0_dir / "phase0_identity_items.csv"
+# line_patterns is a single domain, so the shard is a straight drop-in for the
+# old monolithic identity_items.csv this probe used to read (never actually
+# produced by the current pipeline, which writes identity_items_by_domain/ shards).
+items_csv = phase0_dir / "identity_items_by_domain" / "line_patterns.csv"
 records_csv = phase0_dir / "phase0_records.csv"
 
 if not items_csv.exists():
