@@ -193,8 +193,20 @@ def build_lookup(records_dir: Path, out_dir: Path) -> Path:
     kept_item_rows = 0
     _sniffed: Optional[Tuple[str, str, Optional[str]]] = None
 
+    _REQUIRED_JOIN_COLUMNS = ("export_run_id", "domain", "record_pk")
+
     def _process_item_rows(rows_iter, fieldnames: List[str], source_name: str) -> None:
         nonlocal total_item_rows, kept_item_rows, _sniffed
+        # _sniff_item_columns() only identifies the k/v/q columns -- a shard
+        # missing or renaming a join column (domain/export_run_id/record_pk)
+        # would sniff identically but then silently fail pk_key lookups below,
+        # dropping that shard's rows without any error. Require them explicitly.
+        missing_join_cols = [c for c in _REQUIRED_JOIN_COLUMNS if c not in fieldnames]
+        if missing_join_cols:
+            raise ValueError(
+                f"{source_name}: missing required join column(s) {missing_join_cols} "
+                f"in header {fieldnames}. Refusing to guess."
+            )
         cols = _sniff_item_columns(fieldnames)
         if _sniffed is None:
             _sniffed = cols
