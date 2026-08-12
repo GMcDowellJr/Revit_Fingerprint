@@ -33,6 +33,13 @@ Notes:
   - Falls back to phase0_records.csv / phase0_identity_items.csv if the
     canonical names are not found.
   - join_hash column sourced from records.csv; skips rows where it is blank.
+  - Prefers streaming identity_items_by_domain/*.csv shards (gated on the
+    .complete sentinel, same convention as apply_join_policy.py) over the
+    monolithic identity_items.csv. Shards are read in sorted glob order,
+    the same order extractor.py concatenates them into the monolithic file,
+    so total_item_rows/kept_item_rows and the (already-sorted) output are
+    identical either way. Falls back to the monolithic file when the
+    sentinel is absent or the shard directory doesn't exist.
 """
 
 from __future__ import annotations
@@ -87,24 +94,46 @@ def build_lookup(records_dir: Path, out_dir: Path) -> Path:
     # 1. Find input files                                                  #
     # ------------------------------------------------------------------ #
     records_csv = _find_file(records_dir, "records.csv", "phase0_records.csv")
-    items_csv = _find_file(
-        records_dir,
-        "identity_items.csv",
-        "phase0_identity_items.csv",
-    )
-
     if records_csv is None:
         sys.exit(
             f"[ERROR] Could not find records.csv or phase0_records.csv in: {records_dir}"
         )
-    if items_csv is None:
-        sys.exit(
-            f"[ERROR] Could not find identity_items.csv or phase0_identity_items.csv in: {records_dir}"
+
+    # Prefer per-domain shards when a complete set is present (same gating
+    # convention as apply_join_policy.py / compute_latent_purgeable.py). A
+    # partial/interrupted flatten run leaves shard CSVs without the sentinel;
+    # treating those as authoritative could silently drop domain items, so
+    # fall back to the monolithic file in that case.
+    shard_dir = records_dir / "identity_items_by_domain"
+    _use_shards = (shard_dir / ".complete").is_file()
+    if not _use_shards and shard_dir.is_dir() and any(shard_dir.glob("*.csv")):
+        print(
+            "[WARN build_identity_items_lookup] identity_items_by_domain/ contains CSV "
+            "files but .complete sentinel is absent -- possible interrupted flatten run. "
+            "Falling back to monolithic identity_items.csv to avoid silently missing "
+            "domain items.",
+            file=sys.stderr,
         )
+
+    items_csv: Optional[Path] = None
+    if not _use_shards:
+        items_csv = _find_file(
+            records_dir,
+            "identity_items.csv",
+            "phase0_identity_items.csv",
+        )
+        if items_csv is None:
+            sys.exit(
+                f"[ERROR] No complete shard set ({shard_dir / '.complete'} absent) and no "
+                f"identity_items.csv or phase0_identity_items.csv in: {records_dir}"
+            )
 
     print(f"[build_identity_items_lookup]")
     print(f"  records:        {records_csv}")
-    print(f"  identity_items: {items_csv}")
+    if _use_shards:
+        print(f"  identity_items: {shard_dir} (shard-based)")
+    else:
+        print(f"  identity_items: {items_csv}")
 
     # ------------------------------------------------------------------ #
     # 2. Build (export_run_id, domain, record_pk) → join_hash             #
@@ -155,20 +184,44 @@ def build_lookup(records_dir: Path, out_dir: Path) -> Path:
         rep_pk_set.add((export_run_id, domain, record_pk))
 
     # ------------------------------------------------------------------ #
-    # 3. Stream identity_items.csv, keep only representative rows         #
+    # 3. Stream identity items, keep only representative rows             #
     # ------------------------------------------------------------------ #
     # Output: list of (domain, join_hash, k, v, q)
     out_rows: List[Dict] = []
 
-    print(f"  Reading identity_items.csv ...", flush=True)
     total_item_rows = 0
     kept_item_rows = 0
+    _sniffed: Optional[Tuple[str, str, Optional[str]]] = None
 
-    with items_csv.open("r", encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        key_col, val_col, q_col = _sniff_item_columns(reader.fieldnames or [])
+    _REQUIRED_JOIN_COLUMNS = ("export_run_id", "domain", "record_pk")
 
-        for row in reader:
+    def _process_item_rows(rows_iter, fieldnames: List[str], source_name: str) -> None:
+        nonlocal total_item_rows, kept_item_rows, _sniffed
+        # _sniff_item_columns() only identifies the k/v/q columns -- a shard
+        # missing or renaming a join column (domain/export_run_id/record_pk)
+        # would sniff identically but then silently fail pk_key lookups below,
+        # dropping that shard's rows without any error. Require them explicitly.
+        missing_join_cols = [c for c in _REQUIRED_JOIN_COLUMNS if c not in fieldnames]
+        if missing_join_cols:
+            raise ValueError(
+                f"{source_name}: missing required join column(s) {missing_join_cols} "
+                f"in header {fieldnames}. Refusing to guess."
+            )
+        cols = _sniff_item_columns(fieldnames)
+        if _sniffed is None:
+            _sniffed = cols
+        elif cols != _sniffed:
+            # Schema is expected to be uniform across all shards written by a
+            # single flatten run (extractor.py uses one fixed field list for
+            # every shard). Flag it loudly rather than silently mis-reading
+            # a shard if that ever stops being true.
+            raise ValueError(
+                f"Inconsistent identity_items schema: {source_name} sniffed as {cols}, "
+                f"expected {_sniffed} (from an earlier shard). Refusing to guess."
+            )
+        key_col, val_col, q_col = cols
+
+        for row in rows_iter:
             total_item_rows += 1
             export_run_id = (row.get("export_run_id") or "").strip()
             domain = (row.get("domain") or "").strip()
@@ -199,6 +252,22 @@ def build_lookup(records_dir: Path, out_dir: Path) -> Path:
                 "q": q,
             })
             kept_item_rows += 1
+
+    if _use_shards:
+        shard_files = sorted(shard_dir.glob("*.csv"))
+        print(
+            f"  Reading identity_items_by_domain/*.csv ({len(shard_files)} shards) ...",
+            flush=True,
+        )
+        for shard_path in shard_files:
+            with shard_path.open("r", encoding="utf-8-sig", newline="") as f:
+                reader = csv.DictReader(f)
+                _process_item_rows(reader, reader.fieldnames or [], shard_path.name)
+    else:
+        print(f"  Reading identity_items.csv ...", flush=True)
+        with items_csv.open("r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            _process_item_rows(reader, reader.fieldnames or [], items_csv.name)
 
     print(
         f"  Item rows read: {total_item_rows:,} | "
