@@ -21,6 +21,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
+import csv
+
 from compare_cross_segment import (  # noqa: E402
     _build_ancestor_map,
     _compute_containment_thresholds,
@@ -29,6 +31,7 @@ from compare_cross_segment import (  # noqa: E402
     _population_containment_map,
     detect_stale_ancestor_encoding,
     discover_sibling_segments,
+    main as compare_main,
     validate_membership_against_manifest,
 )
 
@@ -509,3 +512,57 @@ def test_validate_membership_against_manifest_completely_empty_sidecar():
     assert len(errors) == 2
     assert any("a" in e for e in errors)
     assert any("b" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# Stale population_containment_thresholds.csv cleanup (PR #423 review
+# finding: a prior run's thresholds file must not be left in --out-dir
+# looking current when THIS run has population_containment disabled)
+# ---------------------------------------------------------------------------
+
+def _write_csv(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def test_main_removes_stale_thresholds_when_containment_disabled(tmp_path, monkeypatch):
+    records_dir = tmp_path / "records"
+    segments_root = tmp_path / "segments"
+    out_dir = tmp_path / "out"
+    records_dir.mkdir()
+
+    _write_csv(records_dir / "segment_manifest.csv", [{
+        "segment_id": "proj_a", "segment_label": "Project A", "governance_role": "Project",
+        "client_label": "Acme", "discipline_label": "Arch", "unit_system": "imperial",
+        "run_type": "bundle", "segment_level": "2", "parent_segment_id": "imperial",
+    }])
+    _write_csv(records_dir / "run_registry.csv", [
+        {"segment_id": "proj_a", "output_folder": "proj_a", "run_type": "bundle"},
+    ])
+    _write_csv(records_dir / "file_metadata.csv", [{"export_run_id": "fa1", "project_label": ""}])
+    # Deliberately no segment_membership.csv -- population_containment must
+    # be disabled for this run.
+
+    out_dir.mkdir(parents=True)
+    stale_path = out_dir / "population_containment_thresholds.csv"
+    stale_path.write_text("stage,algorithm\nsize_noise_filter,jenks_breaks\n", encoding="utf-8")
+    assert stale_path.exists()
+
+    monkeypatch.setattr(
+        sys, "argv",
+        [
+            "compare_cross_segment.py",
+            "--segments-root", str(segments_root),
+            "--records-dir", str(records_dir),
+            "--out-dir", str(out_dir),
+            "--sibling-segments",
+            "--workers", "1",
+            "--no-delta",
+        ],
+    )
+
+    assert compare_main() == 0
+    assert not stale_path.exists(), "stale thresholds file from a prior run must be removed when containment is disabled"

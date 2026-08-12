@@ -4846,6 +4846,23 @@ def main() -> int:
         if not args.dry_run:
             thresholds_path = write_population_containment_thresholds(out_dir, containment_thresholds)
             print(f"[compare] population_containment thresholds written to {thresholds_path}")
+    elif not args.dry_run:
+        # A prior run in this same --out-dir may have written population_
+        # containment_thresholds.csv when containment was available; this
+        # run has it disabled (no segment_membership.csv, or it failed
+        # validation above). Leaving that stale file in place would make
+        # this run's output directory misrepresent a THIS-run artifact as
+        # still describing THIS run's data, when population_containment
+        # wasn't actually computed here at all (Codex review finding on
+        # PR #423).
+        stale_thresholds_path = out_dir / "population_containment_thresholds.csv"
+        if stale_thresholds_path.exists():
+            stale_thresholds_path.unlink()
+            print(
+                f"[warn] removed stale {stale_thresholds_path} from a prior run -- "
+                f"population_containment is disabled for this run",
+                file=sys.stderr,
+            )
 
     # Discover pairs
     pairs: List[ComparisonPair] = []
