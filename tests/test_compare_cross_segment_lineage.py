@@ -27,6 +27,7 @@ from compare_cross_segment import (  # noqa: E402
     _is_lineage_related,
     _is_population_contained,
     _population_containment_map,
+    detect_stale_ancestor_encoding,
     discover_sibling_segments,
     validate_membership_against_manifest,
 )
@@ -432,3 +433,61 @@ def test_validate_membership_against_manifest_unknown_segment_ignored():
     manifest = {}
     membership = {"ghost": {"e1"}}
     assert validate_membership_against_manifest(manifest, membership) == []
+
+
+def test_validate_membership_against_manifest_entirely_missing_segment():
+    # PR #423 review finding: a truncated/partially-written segment_
+    # membership.csv that omits an entire manifest segment (not just
+    # under-counts it) must also be flagged -- the first pass alone (looping
+    # over membership.items()) can never see an omission, since there's no
+    # entry to iterate.
+    manifest = {
+        "a": {"file_count": "3", "population_hash": _pop_hash({"e1", "e2", "e3"})},
+        "b": {"file_count": "2", "population_hash": _pop_hash({"e4", "e5"})},
+    }
+    membership = {"a": {"e1", "e2", "e3"}}  # "b" entirely absent from the sidecar
+    errors = validate_membership_against_manifest(manifest, membership)
+    assert len(errors) == 1
+    assert "b" in errors[0] and "no export_run_id rows" in errors[0]
+
+
+def test_validate_membership_against_manifest_zero_file_count_segment_not_flagged():
+    # A manifest segment with file_count=0 (or blank) legitimately has no
+    # membership rows -- not a truncation signal.
+    manifest = {"a": {"file_count": "0", "population_hash": ""}}
+    membership = {}
+    assert validate_membership_against_manifest(manifest, membership) == []
+
+
+# ---------------------------------------------------------------------------
+# detect_stale_ancestor_encoding (PR #423 review finding: a pre-D-028
+# pipe-joined ancestor_segment_ids value should be flagged, not silently
+# degrade lineage exclusion back to the parent_segment_id-only fallback)
+# ---------------------------------------------------------------------------
+
+def test_detect_stale_ancestor_encoding_flags_pipe_joined_blob():
+    manifest = {
+        "imperial|Container|Stantec|0000": {
+            "governance_role": "Container", "client_label": "Stantec", "business_center_label": "0000",
+            # pre-D-028 shape: "|".join(["imperial|0000", "imperial|Container|Stantec"])
+            "ancestor_segment_ids": "imperial|0000|imperial|Container|Stantec",
+        },
+    }
+    warnings = detect_stale_ancestor_encoding(manifest)
+    assert len(warnings) == 1
+    assert "imperial|Container|Stantec|0000" in warnings[0]
+
+
+def test_detect_stale_ancestor_encoding_does_not_flag_wellformed_semicolon_data():
+    manifest = _lattice_manifest()
+    assert detect_stale_ancestor_encoding(manifest) == []
+
+
+def test_detect_stale_ancestor_encoding_does_not_flag_genuine_single_ancestor():
+    # Only one non-root field present -> at most one immediate ancestor is
+    # possible at all; a single, unremarkable segment_id (few "|"s) here is
+    # normal, not a stale-format signal.
+    manifest = {
+        "imperial|Container": {"governance_role": "Container", "ancestor_segment_ids": "imperial"},
+    }
+    assert detect_stale_ancestor_encoding(manifest) == []

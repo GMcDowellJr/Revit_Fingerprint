@@ -1548,6 +1548,28 @@ def test_required_field_na_sentinel_blocks_entire_build(tmp_path, capsys, field)
     assert "reason=not_applicable_sentinel" in captured.err
 
 
+@pytest.mark.parametrize("field", ["export_run_id", "unit_system", "governance_role", "client_label", "discipline_label", "business_center_label"])
+def test_required_field_semicolon_blocks_entire_build(tmp_path, capsys, field):
+    # D-028 review finding (PR #423): a dimension value containing ";" would
+    # silently reintroduce the exact delimiter-collision bug ";" was chosen
+    # to fix, since _build_segments() now joins ancestor_segment_ids with
+    # ";". Reject it at the metadata-validation source instead.
+    rows = [dict(r) for r in VALID_ROWS]
+    rows[0][field] = "Acme;West"
+    meta = tmp_path / "file_metadata.csv"
+    _write_metadata_csv(meta, rows)
+    out_dir = tmp_path / "out"
+
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+
+    assert rc == 1, f"';' in {field} must block the build"
+    assert not (out_dir / "segment_manifest.csv").exists()
+    captured = capsys.readouterr()
+    assert "BLOCKED" in captured.err
+    assert f"field={field}" in captured.err
+    assert "reason=semicolon_not_allowed" in captured.err
+
+
 def test_validate_required_metadata_reports_row_and_field_directly():
     rows = [dict(r) for r in VALID_ROWS[:2]]
     rows[1]["business_center_label"] = ""

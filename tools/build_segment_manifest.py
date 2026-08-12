@@ -154,12 +154,21 @@ def _invalid_required_value_reason(value: str) -> "str | None":
     explicit N/A-style spelling means "reviewed, does not apply" — both are
     invalid for a required segment dimension under the current metadata
     contract (only project_label, which this file does not use, is allowed
-    to carry a not-applicable sentinel)."""
+    to carry a not-applicable sentinel). A literal ";" is also rejected
+    (D-028): _build_segments() serializes ancestor_segment_ids by joining
+    per-segment ancestor ids with ";", relying on ";" never appearing inside
+    a segment_id itself (segment_id is built by "|"-joining these same
+    dimension values). A dimension value containing ";" would silently
+    reintroduce the exact delimiter-collision class of bug ";" was chosen
+    to fix in the first place -- reject it at the source instead of trying
+    to detect/repair a corrupted ancestor_segment_ids field downstream."""
     stripped = (value or "").strip()
     if not stripped:
         return "missing_value"
     if is_na_token(stripped):
         return "not_applicable_sentinel"
+    if ";" in stripped:
+        return "semicolon_not_allowed"
     return None
 
 
@@ -179,6 +188,7 @@ def _validate_required_metadata(rows: List[Dict[str, str]]) -> List[Dict[str, st
                        duplicate-row conflict).
       raw_value     — the offending raw value.
       reason        — "missing_value" | "not_applicable_sentinel" |
+                       "semicolon_not_allowed" |
                        "duplicate_row_conflict:first_seen_row=<N>".
 
     export_run_id is meant to be a unique join key into file_metadata.csv —

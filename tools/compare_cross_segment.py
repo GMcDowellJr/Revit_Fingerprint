@@ -677,12 +677,12 @@ def validate_membership_against_manifest(
     membership: Dict[str, Set[str]],
 ) -> List[str]:
     """Return one error string per segment_id where segment_membership.csv
-    disagrees with segment_manifest.csv's file_count/population_hash.
+    disagrees with segment_manifest.csv's file_count/population_hash, OR
+    where a manifest segment expected to have members has none at all.
 
     Same check tools/run_segment_orchestrator.py's own
     validate_membership_against_manifest() performs (adapted here for
-    segment_id -> Set[str] membership instead of List[str], and only checked
-    for segment_ids membership.py actually has data for). Guards against a
+    segment_id -> Set[str] membership instead of List[str]). Guards against a
     stale or mismatched segment_membership.csv — e.g. build_segment_
     manifest.py interrupted after replacing segment_manifest.csv but before
     replacing segment_membership.csv — silently driving population_
@@ -690,6 +690,19 @@ def validate_membership_against_manifest(
     longer matches what segment_manifest.csv itself describes for that
     segment_id, which could either wrongly suppress a valid comparison pair
     or wrongly retain one that should have been excluded.
+
+    Two passes: the first (over `membership`) catches count/hash mismatches
+    for segments the sidecar DOES have rows for; the second (over
+    `manifest`) catches a segment build_segment_manifest.py's own
+    _build_membership_rows() guarantees a membership row for (file_count > 0)
+    but that's entirely ABSENT from `membership` — a truncated/partially
+    written sidecar, not just a stale one. Missing this second pass would
+    silently exclude that segment from every population_containment check
+    instead of flagging the sidecar as untrustworthy (Codex review finding
+    on PR #423): _population_containment_map()/_compute_containment_
+    thresholds() only iterate segment_ids present in `membership`, so an
+    entirely-missing entry doesn't raise a count/hash mismatch on its own --
+    it just silently drops out of consideration.
     """
     errors: List[str] = []
     for sid, eids in membership.items():
@@ -711,6 +724,16 @@ def validate_membership_against_manifest(
                     f"segment={sid}: segment_membership.csv population_hash={actual_hash} "
                     f"does not match segment_manifest.csv population_hash={expected_hash}"
                 )
+
+    for sid, mrow in manifest.items():
+        if sid in membership:
+            continue
+        expected_count = (mrow.get("file_count") or "").strip()
+        if expected_count and expected_count != "0":
+            errors.append(
+                f"segment={sid}: segment_manifest.csv file_count={expected_count} but "
+                f"segment_membership.csv has no export_run_id rows for this segment at all"
+            )
     return errors
 
 
@@ -1998,6 +2021,60 @@ def _is_standard_role(role_key: str) -> bool:
     # generic_ids loop below (no client/bc scoping at all today), so it has
     # no separate scope-scoped edge to add here.
     return role_key in ("template", "container")
+
+
+# Non-root DIMENSION_CONFIG fields (build_segment_manifest.py), duplicated
+# here rather than imported since this module has no dependency on that
+# one -- used only by detect_stale_ancestor_encoding()'s heuristic below.
+_NON_ROOT_DIMENSION_FIELDS = ("governance_role", "client_label", "discipline_label", "business_center_label")
+
+
+def detect_stale_ancestor_encoding(manifest: Dict[str, Dict[str, str]]) -> List[str]:
+    """Return one warning string per segment whose ancestor_segment_ids value
+    looks like it was written before D-028 (pipe-joined instead of
+    semicolon-joined) rather than genuinely having only one immediate
+    structural ancestor.
+
+    Heuristic, not a proof: a segment with N non-root dimension fields
+    present has up to N one-field-drop immediate ancestors (see
+    build_segment_manifest.py's _build_segments()), but can legitimately
+    have fewer if not every dropped-field variant exists as its own row in a
+    sparse corpus -- so "fewer ancestors than fields present" is not itself
+    abnormal. What IS a strong, low-false-positive signal: N >= 2 non-root
+    fields present, a non-empty ancestor_segment_ids value, ";" not present
+    in it at all (splitting on ";" yields exactly one token), AND that one
+    token itself contains more than one "|" -- pointing at a single
+    multi-part string that looks like more than one concatenated segment_id
+    with no way to tell them apart. A well-formed post-D-028 field would
+    either have used ";" to separate multiple real ancestors, or have
+    exactly one real ancestor whose own segment_id naturally contains at
+    most a few "|" characters for a low non-root-field-count segment -- the
+    combination of "many fields present, one blob, multiple internal
+    pipes" is what the pre-D-028 "|".join(ancestor_ids) bug produces on any
+    segment with more than one real ancestor.
+
+    Warning-only (not blocking): a false positive here would incorrectly
+    accuse a legitimately sparse, single-ancestor segment of being stale,
+    and _build_ancestor_map()'s parent_segment_id fallback already keeps
+    lineage exclusion from silently disappearing entirely even in the worst
+    case -- this is a diagnostic aid pointed at DECISIONS.md D-028's
+    documented "requires a full manifest regeneration" guidance, not a new
+    trust gate like the cyclic-ancestry guard below.
+    """
+    warnings: List[str] = []
+    for sid, row in manifest.items():
+        raw = (row.get("ancestor_segment_ids") or "").strip()
+        if not raw or ";" in raw:
+            continue
+        fields_present = sum(1 for f in _NON_ROOT_DIMENSION_FIELDS if (row.get(f) or "").strip())
+        if fields_present >= 2 and raw.count("|") >= 2:
+            warnings.append(
+                f"segment={sid}: ancestor_segment_ids={raw!r} has no ';' but {fields_present} "
+                f"non-root dimension fields are present and the value contains multiple '|' -- "
+                f"this looks like a pre-D-028 pipe-joined manifest (stale/unparseable ancestor "
+                f"data). Re-run build_segment_manifest.py to regenerate segment_manifest.csv."
+            )
+    return warnings
 
 
 def _build_ancestor_map(manifest: Dict[str, Dict[str, str]]) -> Dict[str, Set[str]]:
@@ -4718,6 +4795,17 @@ def main() -> int:
     registry = load_registry(records_dir)
     file_metadata = load_file_metadata(records_dir)
     membership = load_membership(records_dir)
+
+    stale_ancestor_warnings = detect_stale_ancestor_encoding(manifest)
+    if stale_ancestor_warnings:
+        print(
+            f"[warn] {len(stale_ancestor_warnings)} segment(s) look like they carry "
+            f"pre-D-028 ancestor_segment_ids data -- structural_ancestor lineage "
+            f"exclusion may be incomplete until segment_manifest.csv is regenerated:",
+            file=sys.stderr,
+        )
+        for w in stale_ancestor_warnings[:20]:
+            print(f"[warn]   {w}", file=sys.stderr)
     if membership:
         membership_errors = validate_membership_against_manifest(manifest, membership)
         if membership_errors:
