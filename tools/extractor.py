@@ -1239,17 +1239,11 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
         _fp.close()
     _item_shard_handles.clear()
     _item_shard_writers.clear()
-    _monolithic_items_path = out_dir / "identity_items.csv"
-    with _monolithic_items_path.open("w", newline="", encoding="utf-8") as _mono_f:
-        _mono_w = csv.DictWriter(_mono_f, fieldnames=_ITEM_FIELDS)
-        _mono_w.writeheader()
-        for _shard_path in sorted(shard_dir.glob("*.csv")):
-            with _shard_path.open("r", encoding="utf-8-sig", newline="") as _sf:
-                for _srow in csv.DictReader(_sf):
-                    _mono_w.writerow({k: _srow.get(k, "") for k in _ITEM_FIELDS})
-    (shard_dir / ".complete").write_text(
-        str(_monolithic_items_path.stat().st_mtime), encoding="utf-8"
-    )
+    # Shards are the sole identity_items output -- no monolithic identity_items.csv
+    # rebuild (see audit_results/audit_15_identity_items_monolithic_removal_pr4.md).
+    # Sentinel content is never parsed by any reader (existence-only gate), so a
+    # wall-clock timestamp is sufficient.
+    (shard_dir / ".complete").write_text(str(time.time()), encoding="utf-8")
 
     sys.stderr.write(
         "[INFO extractor] governance_role inference summary: "
