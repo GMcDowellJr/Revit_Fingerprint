@@ -305,6 +305,51 @@ def test_fill_pattern_ctx_missing_is_evaluated_per_record(monkeypatch):
     assert "fill_pattern_ctx_missing" not in by_id["uid:uid-b"]["status_reasons"]
 
 
+def test_keynote_populated_emits_ok_item(monkeypatch):
+    m = importlib.import_module("domains.materials")
+    monkeypatch.setattr(m, "Material", object)
+    mat = _Mat()
+    mat._params["Keynote"] = _Param("KN-100")
+    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [mat])
+
+    result = m.extract(doc=_Doc({11: _FillPatternElem("fp-11", "FG")}), ctx=_make_ctx_with_fill_patterns(m))
+    items = (((result["records"][0] or {}).get("identity_basis", {}) or {}).get("items", [])) or []
+    by_key = {it["k"]: it for it in items}
+    assert "material.keynote" in by_key
+    assert by_key["material.keynote"]["v"] == "KN-100"
+    assert by_key["material.keynote"]["q"] == "ok"
+
+
+def test_keynote_blank_emits_missing_item_not_omitted(monkeypatch):
+    m = importlib.import_module("domains.materials")
+    monkeypatch.setattr(m, "Material", object)
+    mat = _Mat()
+    mat._params["Keynote"] = _Param("")
+    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [mat])
+
+    result = m.extract(doc=_Doc({11: _FillPatternElem("fp-11", "FG")}), ctx=_make_ctx_with_fill_patterns(m))
+    items = (((result["records"][0] or {}).get("identity_basis", {}) or {}).get("items", [])) or []
+    by_key = {it["k"]: it for it in items}
+    assert "material.keynote" in by_key
+    assert by_key["material.keynote"]["v"] is None
+    assert by_key["material.keynote"]["q"] == "missing"
+
+
+def test_keynote_unset_param_emits_missing_item_not_omitted(monkeypatch):
+    m = importlib.import_module("domains.materials")
+    monkeypatch.setattr(m, "Material", object)
+    mat = _Mat()
+    del mat._params["Keynote"]
+    monkeypatch.setattr(m, "collect_instances", lambda *a, **k: [mat])
+
+    result = m.extract(doc=_Doc({11: _FillPatternElem("fp-11", "FG")}), ctx=_make_ctx_with_fill_patterns(m))
+    items = (((result["records"][0] or {}).get("identity_basis", {}) or {}).get("items", [])) or []
+    by_key = {it["k"]: it for it in items}
+    assert "material.keynote" in by_key
+    assert by_key["material.keynote"]["v"] is None
+    assert by_key["material.keynote"]["q"] == "missing"
+
+
 def test_blocked_when_api_unavailable(monkeypatch):
     m = importlib.import_module("domains.materials")
     monkeypatch.setattr(m, "Material", None)

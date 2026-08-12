@@ -162,7 +162,7 @@ def main() -> None:
                     "default_shape_behavior": normalized["gates"].get("default_shape_behavior"),
                 },
             )
-            policy_id = str(p.get("policy_id") or f"{domain}.join_key.v21")
+            policy_id = str(p.get("policy_id") or p.get("join_key_schema") or f"{domain}.join_key.v21")
             policy_version = str(p.get("policy_version") or "1")
             join_key_schema = str(p.get("join_key_schema") or f"policy.{policy_id}.v{policy_version}")
             r["join_key_policy_id"] = policy_id

@@ -11,6 +11,42 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Fixed
+- **`materials`: `material.keynote` no longer silently omitted from `identity_basis.items` when blank.**
+  `domains/materials.py`'s keynote emission previously used a truthy guard
+  (`if keynote and keynote[0]:`) with no `else` branch, so materials with a blank
+  or unset Keynote parameter had the `material.keynote` identity item omitted
+  entirely instead of present with `q: "missing"`. Since `materials.join_key.v3`
+  lists `material.keynote` as `required_items`, and join-key building treats
+  required-key *presence* independently of value completeness (see
+  `tools/join_key_discovery/eval.py`'s `build_identity_index`/
+  `build_candidate_join_key_with_details`), this caused the join-policy gate to
+  fail with `reason=missing_required, missing_keys=material.keynote` for every
+  blank-keynote material, blocking `join_hash` computation for those records
+  entirely. Fixed by always appending the item via the existing `_mk_item()`
+  helper (`identity_items.append(_mk_item("material.keynote", keynote))`), which
+  already produces `v: null, q: "missing"` for blank/unset values via
+  `_read_param_as_string`'s `canonicalize_str`. This is join-key/hash-affecting
+  for previously-blank-keynote materials (they now clear the gate and receive a
+  real `join_hash` instead of being excluded from comparison), but does not
+  change `sig_hash` (computed separately from `name`/`class` only). No other
+  domain fields are affected by this change; `material.manufacturer`/
+  `material.model` are read but were never emitted as identity items at all
+  (not merely guarded) -- flagged as a separate follow-up, not addressed here.
+- **`tools/apply_join_policy.py`: diagnostics `policy_id` fallback now reflects
+  the actual policy schema instead of a hardcoded `.v21` literal.** Line ~165's
+  `policy_id = str(p.get("policy_id") or f"{domain}.join_key.v21")` fell back
+  straight to a hardcoded `{domain}.join_key.v21` whenever a domain's policy
+  block had no explicit `policy_id` key -- true for every domain in
+  `policies/domain_join_key_policies.json`, which key off `join_key_schema`
+  instead (e.g. `materials.join_key.v3`). This made `join_key_policy_id` (and
+  the `policy_id` column in `join_policy_gate_diagnostics.csv`/
+  `join_policy_failures.csv`) cosmetically wrong -- reporting-only, since
+  `join_key_schema` itself (line ~167) already read `p.get("join_key_schema")`
+  first and was unaffected. Fixed by falling back to `p.get("join_key_schema")`
+  before the hardcoded literal. Does not change gate evaluation, `join_hash`,
+  or any hash semantics -- diagnostics/reporting output only.
+
 ### Added
 - **`dimension_types` domain family: field expansion across all 7 partitions (Area 7):**
   Adds ~25 new identity items across `dimension_types_linear`/`_angular`/`_radial`/

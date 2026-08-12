@@ -469,10 +469,7 @@ def extract(doc, ctx=None):
             identity_items.append(
                 make_identity_item("material.name_class_hash", name_class_hash, ITEM_Q_OK)
             )
-        if keynote and keynote[0]:
-            identity_items.append(
-                make_identity_item("material.keynote", keynote[0], ITEM_Q_OK)
-            )
+        identity_items.append(_mk_item("material.keynote", keynote))
         identity_items_sorted = sorted(identity_items, key=lambda it: safe_str(it.get("k", "")))
 
         status_v2 = STATUS_OK
