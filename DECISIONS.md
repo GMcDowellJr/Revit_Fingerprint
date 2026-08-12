@@ -1187,6 +1187,169 @@ To limit the blast radius of that call:
 
 ---
 
+## D-026 — Backfill: segment lattice is a dimensional powerset, not a single-parent tree
+
+### Status
+Accepted (retroactive backfill — already-shipped, load-bearing architecture;
+documented now as part of D-027's lineage-model audit)
+
+### Context
+`tools/build_segment_manifest.py`'s `DIMENSION_CONFIG` (currently 5 entries:
+`unit_system` as the root dimension, `governance_role` as the governance
+dimension, `client_label`/`discipline_label`/`business_center_label` as cut
+dimensions) and `_build_segments()` construct every segment as a subset —
+via `itertools.combinations` over a `frozenset` key — of the declared
+dimension values present on a row: the full powerset of non-root dimensions,
+not a single-parent classification tree. Every segment carries one recorded
+primary `parent_segment_id` (derived by dropping the last-declared present
+field) for folder/registry bookkeeping, but a segment's true position in the
+hierarchy is a lattice — it can have as many immediate structural parents as
+it has non-root dimensions present, one per dropped field. This architecture
+underlies every downstream segment/governance tool (`run_segment_
+orchestrator.py`, `compare_cross_segment.py`, `governance_manifest.py`,
+`compare_governance_populations.py`, etc.) and predates this decision-log
+entry, which had no record of it.
+
+### Decision
+Accepted as-is; this entry backfills documentation only; the architecture
+itself is not being changed here (out of scope for this session — see
+D-027). Recording it because D-027's lineage-completeness fix depends
+directly on this shape: `parent_segment_id` is a single bookkeeping pointer,
+not the segment's full ancestor set, which is exactly why a tree-walk over
+it under-reports ancestors.
+
+### Consequences
+- Any tool reasoning about segment hierarchy must treat `parent_segment_id`
+  as one designated primary parent, not the segment's complete set of
+  structural ancestors.
+- `ancestor_segment_ids` (see D-027, D-028) is the field that actually
+  carries the lattice's multi-parent structure.
+
+---
+
+## D-027 — `structural_ancestor` and `population_containment`: two independent lineage relations for comparison-discovery validity
+
+### Status
+Accepted (2026-08-12)
+
+### Context
+`tools/compare_cross_segment.py`'s `discover_*` functions generate segment
+pairs for cross-segment comparison. A pair is invalid whenever one
+segment's real file population contains the other's — comparing a segment
+against data that already contains some or all of its own. Before this
+decision, the only guard was `_is_lineage_related()`/`_build_ancestor_map()`,
+which walked `parent_segment_id` as a single-parent chain — under-reporting
+ancestors whenever a segment had more than one non-root dimension present
+(D-026) — and had no empirical, non-dimensional counterpart at all.
+
+A live audit against the real corpus (481 segments, `segment_manifest.csv` +
+`segment_membership.csv`) found: (1) the dimension-lattice ("structural")
+ancestor relation, once corrected to a full transitive closure, never
+produces a false population-superset claim — 0 counterexamples across all
+115,440 segment pairs checked — but is incomplete: 1,806 of 4,080 real
+population-subset pairs in the corpus have no dimensional explanation at
+all; (2) `discover_sibling_segments()` carried no lineage guard of any kind
+and emitted 101 real population-containment violations (`sibling_templates`/
+`sibling_containers`/`sibling_projects`), via its `redundant_single_child`
+resolution mechanism bucketing a structural ancestor and its own descendant
+as if they were unrelated peers.
+
+### Decision
+Lineage/containment is split into two explicitly separate,
+independently-computed relations:
+
+- **`structural_ancestor`** — the dimension-lattice relation
+  (`_build_ancestor_map()`/`_is_lineage_related()`), now a full transitive
+  closure computed by walking each segment's `ancestor_segment_ids` (D-028)
+  as a multi-parent adjacency list, rather than a single
+  `parent_segment_id` chain. Reliable (no known false positives on the
+  audited corpus) but incomplete. Governs authority/provision semantics
+  (e.g. `discover_governance_chain()`'s Template/Container→Project fan-out).
+- **`population_containment`** — a new, empirically-derived relation
+  computed directly from real `export_run_id` membership
+  (`segment_membership.csv`), independent of any dimensional relationship.
+  Threshold-gated by two Jenks-natural-breaks passes (`tools/jenks_utils.
+  jenks_breaks()`, `n_classes=2` — the more general of the two independent
+  Jenks implementations in this repo, reused rather than duplicated a
+  third time) fit on real *non-structural* population-subset pairs: a
+  size-noise floor (`min_population_for_containment`) and a
+  containment-ratio floor (`min_containment_ratio`), so a
+  materially-insignificant coincidental subset (e.g. a 1-file segment
+  trivially "contained" in almost anything) is not mistaken for real
+  inheritance. Computed thresholds and resulting candidate pairs are
+  written to `population_containment_thresholds.csv` for human review, not
+  silently baked into code — a first pass, not a locked policy.
+
+`discover_sibling_segments()` checks BOTH relations before finalizing a
+pair. On the audited corpus, `structural_ancestor`'s completeness fix alone
+already resolves all 101 known violations — `population_containment` did
+not independently flag any of them, since every one of the 101 turned out
+to be dimensionally explained once the lattice closure was corrected.
+`population_containment` is retained there anyway as a second, independent
+guard against non-structural coincidental containment (which the corpus
+audit shows exists as a general phenomenon in this data, distinct from and
+not corpus-verified as an active `discover_sibling_segments` defect).
+`discover_governance_chain()` keeps `structural_ancestor` only — it had
+zero real violations both before and after the completeness fix, so layering
+`population_containment` there too is deferred rather than speculative.
+`discover_within_segment()`, `discover_cross_client()`,
+`discover_client_cross_bc()`, and `discover_parent_siblings()` currently
+carry neither guard; the audit found zero real violations from any of them
+on the current corpus, but this is flagged as a known, currently-latent gap
+(see the "Lineage/containment guard audit" comment in
+`compare_cross_segment.py`) rather than fixed in this pass.
+
+### Consequences
+- `discover_sibling_segments()`'s emitted pair count drops on any corpus
+  where the defect fires (699 → 598 pairs on the audited corpus).
+- A new output file, `population_containment_thresholds.csv`, is written by
+  `compare_cross_segment.py` runs whenever `segment_membership.csv` is
+  present.
+- The Jenks-derived thresholds are a first-pass default, not a locked
+  governance decision — the specific pairs they surface should get a human
+  sanity check before being treated as final policy.
+- Revisiting `discover_within_segment()` / `discover_cross_client()` /
+  `discover_client_cross_bc()` / `discover_parent_siblings()` for the same
+  guard is left open for a future session if corpus growth ever produces a
+  real violation there.
+
+---
+
+## D-028 — `ancestor_segment_ids` serialization fix: `;`-joined, not `|`-joined
+
+### Status
+Accepted (2026-08-12)
+
+### Context
+`tools/build_segment_manifest.py`'s `segment_manifest.csv` column
+`ancestor_segment_ids` joined a segment's list of ancestor segment_ids with
+`"|"` — the same character `segment_id` itself uses internally to delimit
+dimension values (e.g. `"imperial|Container|0000"`). Since each list
+element is itself `"|"`-delimited, the outer `"|".join()` collided with the
+inner delimiters: the resulting string cannot be losslessly split back into
+the original ancestor-id list (two different real ancestor-id lists can
+produce the identical serialized string). A repo-wide grep found exactly
+one other reference to the column (`tools/extract_segment_subtree.py`,
+which excludes the column *name* from a segment_id-endpoint heuristic — it
+never reads the column's *values*) — the field was write-only, and its
+serialized form had never actually been consumed by any code path.
+
+### Decision
+Re-serialize `ancestor_segment_ids` with `";"` instead of `"|"` (`";"` does
+not otherwise occur in a segment_id, since dimension values are themselves
+only `"|"`-delimited into segment_id — one level up). `compare_cross_
+segment.py`'s `_build_ancestor_map()` (D-027) is the first real consumer of
+this field's values, and parses on `";"`.
+
+### Consequences
+- Any `segment_manifest.csv` already on disk carries the old, unparseable
+  `"|"`-joined `ancestor_segment_ids` values; these are stale and require a
+  full manifest regeneration (rerunning `build_segment_manifest.py`) to
+  pick up the corrected encoding. There is no migration path for old
+  values, because they were never losslessly parseable in the first place.
+
+---
+
 ## Notes
 
 - This document is **append-only**.

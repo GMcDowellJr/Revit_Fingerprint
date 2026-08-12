@@ -161,6 +161,7 @@ if _TOOLS_DIR not in sys.path:
     sys.path.insert(0, _TOOLS_DIR)
 
 from na_token import is_blank_or_na, ENTERPRISE_BC_BOOKKEEPING_TOKENS as _ENTERPRISE_BC_BOOKKEEPING_TOKENS
+from jenks_utils import jenks_breaks
 
 
 # ---------------------------------------------------------------------------
@@ -644,6 +645,96 @@ def load_file_metadata(records_dir: Path) -> Dict[str, Dict[str, str]]:
         print(f"[warn] file_metadata.csv not found at {path}", file=sys.stderr)
         return {}
     return {row["export_run_id"]: row for row in read_csv_rows(path)}
+
+
+def load_membership(records_dir: Path) -> Dict[str, Set[str]]:
+    """Load segment_membership.csv into segment_id -> real export_run_id set.
+
+    This is the ground-truth population source for `population_containment`
+    (see _population_containment_map()) -- unlike segment_manifest.csv's
+    file_count/population_hash columns, membership rows carry the actual
+    member export_run_ids, which is what a subset-or-equal check needs.
+    Optional: absent on older/partial output directories, in which case
+    population_containment is simply unavailable (callers treat an empty
+    map as "no containment data", not an error) — the structural_ancestor
+    guard still functions independently.
+    """
+    path = records_dir / "segment_membership.csv"
+    if not path.exists():
+        print(f"[warn] segment_membership.csv not found at {path}", file=sys.stderr)
+        return {}
+    membership: Dict[str, Set[str]] = defaultdict(set)
+    for row in read_csv_rows(path):
+        sid = row.get("segment_id", "").strip()
+        eid = row.get("export_run_id", "").strip()
+        if sid and eid:
+            membership[sid].add(eid)
+    return dict(membership)
+
+
+def validate_membership_against_manifest(
+    manifest: Dict[str, Dict[str, str]],
+    membership: Dict[str, Set[str]],
+) -> List[str]:
+    """Return one error string per segment_id where segment_membership.csv
+    disagrees with segment_manifest.csv's file_count/population_hash, OR
+    where a manifest segment expected to have members has none at all.
+
+    Same check tools/run_segment_orchestrator.py's own
+    validate_membership_against_manifest() performs (adapted here for
+    segment_id -> Set[str] membership instead of List[str]). Guards against a
+    stale or mismatched segment_membership.csv — e.g. build_segment_
+    manifest.py interrupted after replacing segment_manifest.csv but before
+    replacing segment_membership.csv — silently driving population_
+    containment()'s subset/materiality checks off a population that no
+    longer matches what segment_manifest.csv itself describes for that
+    segment_id, which could either wrongly suppress a valid comparison pair
+    or wrongly retain one that should have been excluded.
+
+    Two passes: the first (over `membership`) catches count/hash mismatches
+    for segments the sidecar DOES have rows for; the second (over
+    `manifest`) catches a segment build_segment_manifest.py's own
+    _build_membership_rows() guarantees a membership row for (file_count > 0)
+    but that's entirely ABSENT from `membership` — a truncated/partially
+    written sidecar, not just a stale one. Missing this second pass would
+    silently exclude that segment from every population_containment check
+    instead of flagging the sidecar as untrustworthy (Codex review finding
+    on PR #423): _population_containment_map()/_compute_containment_
+    thresholds() only iterate segment_ids present in `membership`, so an
+    entirely-missing entry doesn't raise a count/hash mismatch on its own --
+    it just silently drops out of consideration.
+    """
+    errors: List[str] = []
+    for sid, eids in membership.items():
+        mrow = manifest.get(sid)
+        if mrow is None:
+            continue
+        expected_count = (mrow.get("file_count") or "").strip()
+        if expected_count and str(len(eids)) != expected_count:
+            errors.append(
+                f"segment={sid}: segment_membership.csv has {len(eids)} export_run_id(s) "
+                f"but segment_manifest.csv file_count={expected_count}"
+            )
+            continue
+        expected_hash = (mrow.get("population_hash") or "").strip()
+        if expected_hash:
+            actual_hash = hashlib.sha1("|".join(sorted(eids)).encode()).hexdigest()
+            if actual_hash != expected_hash:
+                errors.append(
+                    f"segment={sid}: segment_membership.csv population_hash={actual_hash} "
+                    f"does not match segment_manifest.csv population_hash={expected_hash}"
+                )
+
+    for sid, mrow in manifest.items():
+        if sid in membership:
+            continue
+        expected_count = (mrow.get("file_count") or "").strip()
+        if expected_count and expected_count != "0":
+            errors.append(
+                f"segment={sid}: segment_manifest.csv file_count={expected_count} but "
+                f"segment_membership.csv has no export_run_id rows for this segment at all"
+            )
+    return errors
 
 
 # ---------------------------------------------------------------------------
@@ -1932,8 +2023,65 @@ def _is_standard_role(role_key: str) -> bool:
     return role_key in ("template", "container")
 
 
+# Non-root DIMENSION_CONFIG fields (build_segment_manifest.py), duplicated
+# here rather than imported since this module has no dependency on that
+# one -- used only by detect_stale_ancestor_encoding()'s heuristic below.
+_NON_ROOT_DIMENSION_FIELDS = ("governance_role", "client_label", "discipline_label", "business_center_label")
+
+
+def detect_stale_ancestor_encoding(manifest: Dict[str, Dict[str, str]]) -> List[str]:
+    """Return one warning string per segment whose ancestor_segment_ids value
+    looks like it was written before D-028 (pipe-joined instead of
+    semicolon-joined) rather than genuinely having only one immediate
+    structural ancestor.
+
+    Heuristic, not a proof: a segment with N non-root dimension fields
+    present has up to N one-field-drop immediate ancestors (see
+    build_segment_manifest.py's _build_segments()), but can legitimately
+    have fewer if not every dropped-field variant exists as its own row in a
+    sparse corpus -- so "fewer ancestors than fields present" is not itself
+    abnormal. What IS a strong, low-false-positive signal: N >= 2 non-root
+    fields present, a non-empty ancestor_segment_ids value, ";" not present
+    in it at all (splitting on ";" yields exactly one token), AND that one
+    token itself contains more than one "|" -- pointing at a single
+    multi-part string that looks like more than one concatenated segment_id
+    with no way to tell them apart. A well-formed post-D-028 field would
+    either have used ";" to separate multiple real ancestors, or have
+    exactly one real ancestor whose own segment_id naturally contains at
+    most a few "|" characters for a low non-root-field-count segment -- the
+    combination of "many fields present, one blob, multiple internal
+    pipes" is what the pre-D-028 "|".join(ancestor_ids) bug produces on any
+    segment with more than one real ancestor.
+
+    Warning-only (not blocking): a false positive here would incorrectly
+    accuse a legitimately sparse, single-ancestor segment of being stale,
+    and _build_ancestor_map()'s parent_segment_id fallback already keeps
+    lineage exclusion from silently disappearing entirely even in the worst
+    case -- this is a diagnostic aid pointed at DECISIONS.md D-028's
+    documented "requires a full manifest regeneration" guidance, not a new
+    trust gate like the cyclic-ancestry guard below.
+    """
+    warnings: List[str] = []
+    for sid, row in manifest.items():
+        raw = (row.get("ancestor_segment_ids") or "").strip()
+        if not raw or ";" in raw:
+            continue
+        fields_present = sum(1 for f in _NON_ROOT_DIMENSION_FIELDS if (row.get(f) or "").strip())
+        if fields_present >= 2 and raw.count("|") >= 2:
+            warnings.append(
+                f"segment={sid}: ancestor_segment_ids={raw!r} has no ';' but {fields_present} "
+                f"non-root dimension fields are present and the value contains multiple '|' -- "
+                f"this looks like a pre-D-028 pipe-joined manifest (stale/unparseable ancestor "
+                f"data). Re-run build_segment_manifest.py to regenerate segment_manifest.csv."
+            )
+    return warnings
+
+
 def _build_ancestor_map(manifest: Dict[str, Dict[str, str]]) -> Dict[str, Set[str]]:
-    """Map each segment_id to the set of its parent_segment_id ancestors.
+    """Map each segment_id to the full transitive closure of its structural
+    ancestors (the `structural_ancestor` relation, D-027) — every segment
+    whose dimension key is a proper subset of this one's, at any lattice
+    depth, not just the single primary parent_segment_id chain.
 
     Segments are hierarchical cuts of the same underlying file population —
     build_segment_manifest.py derives each child as its parent's population
@@ -1944,21 +2092,51 @@ def _build_ancestor_map(manifest: Dict[str, Dict[str, str]]) -> Dict[str, Set[st
     _is_collection_rollup). Treating an ancestor and its own descendant as
     independent peers — whether pooled together or paired directly — compares
     a segment against data that already contains (some or all of) its own.
+
+    Source: `ancestor_segment_ids` (";"-delimited — see
+    build_segment_manifest.py's _build_segments() comment on the encoding),
+    which for each segment lists its immediate structural parents — one per
+    dropped non-root dimension field, so a segment with N non-root fields
+    present can have up to N distinct immediate parents. This is a
+    multi-parent adjacency list, not itself the full closure; the walk below
+    recursively unions each immediate parent's own ancestor set to complete
+    it.
+
+    `parent_segment_id` (the single primary parent) is folded in as an
+    additional immediate parent alongside whatever `ancestor_segment_ids`
+    lists, rather than replaced outright — this is what actually guarantees
+    the "never removes a previously-detected ancestor" superset property:
+    `ancestor_segment_ids` may be blank/absent on a manifest a caller built
+    by hand (every pre-D-027 test fixture in this repo populates only
+    `parent_segment_id`), and treating that as "no ancestors" would silently
+    regress exactly the lineage exclusion this function exists to provide.
+    On a real, freshly-built segment_manifest.csv the two sources agree
+    (`parent_segment_id` is always itself one of `ancestor_segment_ids`'
+    entries — see build_segment_manifest.py's _build_segments()), so this
+    union changes nothing there; it only matters as a fallback.
     """
     ancestors: Dict[str, Set[str]] = {}
+
+    def _immediate_parents(sid: str) -> Set[str]:
+        row = manifest.get(sid, {})
+        raw = row.get("ancestor_segment_ids", "")
+        parents = {p for p in raw.split(";") if p}
+        primary_parent = row.get("parent_segment_id", "").strip()
+        if primary_parent:
+            parents.add(primary_parent)
+        return parents
 
     def _walk(sid: str, seen: Set[str]) -> Set[str]:
         if sid in ancestors:
             return ancestors[sid]
-        parent = manifest.get(sid, {}).get("parent_segment_id", "").strip()
         result: Set[str] = set()
-        if parent:
+        for parent in _immediate_parents(sid):
             if parent == sid or parent in seen:
                 sys.exit(
                     "[error] Blocked: cyclic segment ancestry detected — "
                     f"{sid!r} revisits already-seen segment {parent!r} while "
-                    "walking parent_segment_id; segment_manifest.csv cannot be "
-                    "trusted for lineage exclusion until this is fixed"
+                    "walking ancestor_segment_ids; segment_manifest.csv cannot "
+                    "be trusted for lineage exclusion until this is fixed"
                 )
             result.add(parent)
             result |= _walk(parent, seen | {sid})
@@ -1974,11 +2152,234 @@ def _is_lineage_related(ancestor_map: Dict[str, Set[str]], sid_a: str, sid_b: st
     return sid_b in ancestor_map.get(sid_a, set()) or sid_a in ancestor_map.get(sid_b, set())
 
 
+# ---------------------------------------------------------------------------
+# population_containment — empirical containment relation (D-027)
+#
+# structural_ancestor (_build_ancestor_map/_is_lineage_related above) is
+# derived from the dimension lattice and is reliable but incomplete — many
+# real population-subset relationships in the corpus have no dimensional
+# explanation at all (e.g. a segment whose files all happen to also belong
+# to another segment with no shared cut dimension). population_containment
+# is computed directly from real export_run_id membership instead, so it
+# does not require or assume a dimensional relationship exists, and can
+# catch a materially-significant containment coincidence whether or not
+# structural_ancestor also explains it.
+#
+# Materiality-gated: an exact population-subset relationship between two
+# very small or very lopsided segments is common by pure chance (a 1-file
+# segment is trivially "contained" in nearly anything) and is not evidence
+# of real inheritance. Two Jenks-natural-breaks (tools/jenks_utils.py —
+# the general-purpose implementation reused here; tools/compute_governance_
+# thresholds.py carries its own near-duplicate jenks_natural_breaks() for a
+# narrower use, not consolidated here to avoid an unrelated behavior change)
+# passes gate this:
+#   1. size-noise filter: drop pairs whose smaller side is strictly below the
+#      break in min(|pop_a|, |pop_b|) across all non-structural subset pairs
+#      (the break value itself belongs to the upper/signal class, per
+#      jenks_breaks()'s own documented "values below break_0 are class 1
+#      (lowest)" contract — a pair sitting exactly at the break clears the
+#      floor, it isn't treated as noise).
+#   2. containment-ratio filter, among size survivors only: drop pairs whose
+#      min/max size ratio is below the break (same convention: at-the-break
+#      clears the floor).
+# Both thresholds are fit ONLY on non-structural subset pairs (pairs
+# structural_ancestor does not already explain), so the fit isn't diluted by
+# structural's own well-behaved signal — but the resulting containment MAP is
+# evaluated over every population pair with membership data, structural or
+# not, so a guard using it catches both kinds uniformly (this is what lets
+# discover_sibling_segments() rely on it alone rather than needing a second,
+# separate structural check — see its docstring). Byte-identical populations
+# (pa == pb) bypass both thresholds entirely and are always treated as
+# contained — equality is the strongest possible form of the subset
+# relationship this guard exists to catch, so there is no "how much overlap"
+# materiality question left to ask.
+# ---------------------------------------------------------------------------
+
+POPULATION_CONTAINMENT_THRESHOLDS_FIELDS: List[str] = [
+    "stage", "algorithm", "n_classes", "break_value",
+    "source_value_min", "source_value_max",
+    "pairs_before", "pairs_after",
+]
+
+
+def _compute_containment_thresholds(
+    manifest: Dict[str, Dict[str, str]],
+    membership: Dict[str, Set[str]],
+    ancestor_map: Dict[str, Set[str]],
+) -> Dict[str, object]:
+    """Derive population_containment's two materiality thresholds
+    (min_population_for_containment, min_containment_ratio) via Jenks
+    natural breaks (n_classes=2) over real, non-structural population-subset
+    pairs. See the module-level population_containment comment block above
+    for the two-stage method and why the fit is restricted to non-structural
+    pairs. Returns a dict with both thresholds plus the audit trail consumed
+    by write_population_containment_thresholds().
+    """
+    sids = sorted(sid for sid in manifest if membership.get(sid))
+    non_structural_pairs: List[Tuple[str, str]] = []
+    for i in range(len(sids)):
+        pa = membership[sids[i]]
+        for j in range(i + 1, len(sids)):
+            b = sids[j]
+            pb = membership[b]
+            if pa == pb:
+                continue
+            if not (pa <= pb or pb <= pa):
+                continue
+            if _is_lineage_related(ancestor_map, sids[i], b):
+                continue
+            non_structural_pairs.append((sids[i], b))
+
+    sizes = [min(len(membership[a]), len(membership[b])) for a, b in non_structural_pairs]
+    size_breaks = jenks_breaks(sizes, n_classes=2)
+    min_population_for_containment = float(size_breaks[0]) if size_breaks else 0.0
+
+    size_survivors = [
+        (a, b) for a, b in non_structural_pairs
+        if min(len(membership[a]), len(membership[b])) >= min_population_for_containment
+    ]
+    ratios = [
+        min(len(membership[a]), len(membership[b])) / max(len(membership[a]), len(membership[b]))
+        for a, b in size_survivors
+    ]
+    ratio_breaks = jenks_breaks(ratios, n_classes=2)
+    min_containment_ratio = float(ratio_breaks[0]) if ratio_breaks else 0.0
+
+    ratio_survivors = [
+        (a, b) for a, b in size_survivors
+        if (min(len(membership[a]), len(membership[b])) / max(len(membership[a]), len(membership[b])))
+        >= min_containment_ratio
+    ]
+
+    return {
+        "min_population_for_containment": min_population_for_containment,
+        "min_containment_ratio": min_containment_ratio,
+        "size_stage": {
+            "source_value_min": min(sizes) if sizes else None,
+            "source_value_max": max(sizes) if sizes else None,
+            "pairs_before": len(non_structural_pairs),
+            "pairs_after": len(size_survivors),
+        },
+        "ratio_stage": {
+            "source_value_min": round(min(ratios), 4) if ratios else None,
+            "source_value_max": round(max(ratios), 4) if ratios else None,
+            "pairs_before": len(size_survivors),
+            "pairs_after": len(ratio_survivors),
+        },
+    }
+
+
+def write_population_containment_thresholds(out_dir: Path, thresholds: Dict[str, object]) -> Path:
+    """Write the Jenks-derived population_containment thresholds to
+    population_containment_thresholds.csv, following the same
+    break-value/n_classes/algorithm/source-range/pair-count audit pattern as
+    tools/compute_governance_thresholds.py's thresholds.csv — a first-pass,
+    inspectable output for human sanity-check, not silently baked into code.
+    """
+    size_stage = thresholds["size_stage"]
+    ratio_stage = thresholds["ratio_stage"]
+    rows = [
+        {
+            "stage": "size_noise_filter",
+            "algorithm": "jenks_breaks",
+            "n_classes": "2",
+            "break_value": str(thresholds["min_population_for_containment"]),
+            "source_value_min": str(size_stage["source_value_min"]),
+            "source_value_max": str(size_stage["source_value_max"]),
+            "pairs_before": str(size_stage["pairs_before"]),
+            "pairs_after": str(size_stage["pairs_after"]),
+        },
+        {
+            "stage": "containment_ratio_filter",
+            "algorithm": "jenks_breaks",
+            "n_classes": "2",
+            "break_value": str(thresholds["min_containment_ratio"]),
+            "source_value_min": str(ratio_stage["source_value_min"]),
+            "source_value_max": str(ratio_stage["source_value_max"]),
+            "pairs_before": str(ratio_stage["pairs_before"]),
+            "pairs_after": str(ratio_stage["pairs_after"]),
+        },
+    ]
+    path = out_dir / "population_containment_thresholds.csv"
+    atomic_write_csv(path, POPULATION_CONTAINMENT_THRESHOLDS_FIELDS, rows)
+    return path
+
+
+def _population_containment_map(
+    manifest: Dict[str, Dict[str, str]],
+    membership: Dict[str, Set[str]],
+    thresholds: Dict[str, object],
+) -> Dict[str, Set[str]]:
+    """Map each segment_id to the set of other segment_ids it has a
+    materially-significant, empirically-real population containment
+    relationship with (either direction — the map is symmetric, same
+    convention as _build_ancestor_map's per-segment sets).
+
+    Evaluated over every segment pair with real membership data (not
+    restricted to non-structural pairs, unlike the threshold fit in
+    _compute_containment_thresholds() — see the module-level comment above).
+    """
+    min_pop = thresholds["min_population_for_containment"]
+    min_ratio = thresholds["min_containment_ratio"]
+    contains: Dict[str, Set[str]] = defaultdict(set)
+    sids = sorted(sid for sid in manifest if membership.get(sid))
+    for i in range(len(sids)):
+        pa = membership[sids[i]]
+        for j in range(i + 1, len(sids)):
+            b = sids[j]
+            pb = membership[b]
+            if pa == pb:
+                # Byte-identical populations are the strongest possible form
+                # of the subset relationship this guard exists to catch --
+                # unconditionally contained, no materiality threshold needed
+                # (there's no "how much overlap" question when it's total).
+                # A real, if currently unobserved, case: build_segment_
+                # manifest.py only WARNS on duplicate bundle population_hash
+                # values, it doesn't block the build, so two distinct
+                # segment_ids with identical populations are a possible live
+                # state, not just a hypothetical one.
+                contains[sids[i]].add(b)
+                contains[b].add(sids[i])
+                continue
+            if not (pa <= pb or pb <= pa):
+                continue
+            smin, smax = sorted((len(pa), len(pb)))
+            if smin < min_pop:
+                continue
+            if smax and (smin / smax) < min_ratio:
+                continue
+            contains[sids[i]].add(b)
+            contains[b].add(sids[i])
+    return dict(contains)
+
+
+def _is_population_contained(
+    containment_map: Dict[str, Set[str]], sid_a: str, sid_b: str,
+) -> bool:
+    return sid_b in containment_map.get(sid_a, set())
+
+
 ComparisonPair = Tuple[str, str, str]  # (seg_a, seg_b, comparison_type)
 
 
 # ---------------------------------------------------------------------------
 # Pair discovery
+#
+# Lineage/containment guard audit (D-027): of the pair-emitting functions
+# below, discover_sibling_segments() carries both the structural_ancestor
+# and population_containment guards (the corpus-verified 101-violation
+# defect lived there). discover_governance_chain() carries structural_ancestor
+# only, via its own internal _build_ancestor_map() call (see that function's
+# decision note). discover_within_segment(), discover_cross_client(),
+# discover_client_cross_bc(), and discover_parent_siblings() carry NEITHER
+# guard as of this audit — re-running the corpus-level violation check
+# (pa <= pb or pb <= pa on real export_run_id sets) against each of their
+# emitted pairs found zero real violations on the current corpus, so they
+# are flagged here as a known, currently-latent gap rather than fixed
+# outright (same posture discover_governance_chain itself was in before this
+# session — see finding 5 in the D-027 write-up). discover_within_project()
+# is exempt by construction: both sides of every pair it emits are the same
+# segment_id, so there is no cross-segment lineage question to guard.
 # ---------------------------------------------------------------------------
 
 def _same_unit(
@@ -2162,6 +2563,8 @@ _SIBLING_CTYPE_BY_ROLE = {
 
 def discover_sibling_segments(
     manifest: Dict[str, Dict[str, str]],
+    ancestor_map: Optional[Dict[str, Set[str]]] = None,
+    containment_map: Optional[Dict[str, Set[str]]] = None,
 ) -> List[ComparisonPair]:
     # Group by (parent_segment_id, governance_role, unit_system). A segment
     # demoted to run_type="registration" by build_segment_manifest.py's
@@ -2171,6 +2574,35 @@ def discover_sibling_segments(
     # the descendant's parent_segment_id is one or more levels deeper (e.g.
     # this client's own Project node) and would not be shared with sibling
     # clients' equivalent substitutes.
+    #
+    # That resolution is also the mechanism behind a real, corpus-verified
+    # defect (D-027): resolving a demoted segment to its population-identical
+    # runnable descendant and then bucketing that descendant under the
+    # DEMOTED row's own (parent, role, unit) key can land two segments in the
+    # same sibling group even though one is a genuine structural or empirical
+    # ancestor/descendant of the other (e.g. a client-wide Container rollup
+    # and that same client's discipline-scoped Container child, both folded
+    # into "sibling_containers" once the discipline child's own parent chain
+    # resolves through a redundant intermediate). Both guards below are
+    # checked -- not just population_containment -- because on the real
+    # corpus every verified violation of this kind turned out to be a
+    # structural_ancestor relation once _build_ancestor_map() was made
+    # complete (D-027); population_containment's Jenks materiality
+    # thresholds, fit deliberately only on non-structural pairs, did not
+    # independently flag any of them (several are small-population pairs
+    # that the materiality filter is designed to treat as noise). It is kept
+    # as a second, independent guard for the non-structural coincidental-
+    # containment case findings showed exists elsewhere in the corpus (see
+    # docs/... population_containment write-up) even though it was not what
+    # fixed today's known violations.
+    #
+    # Both maps are optional and default to "no exclusion" when omitted, so
+    # a caller (or test fixture) with no ancestor_segment_ids data and no
+    # membership data gets the pre-D-027 behavior unchanged; ancestor_map
+    # itself is cheap to derive from the manifest alone when not supplied.
+    if ancestor_map is None:
+        ancestor_map = _build_ancestor_map(manifest)
+
     groups: Dict[Tuple[str, str, str], List[str]] = defaultdict(list)
     for sid, row in manifest.items():
         parent = row.get("parent_segment_id", "").strip()
@@ -2197,6 +2629,10 @@ def discover_sibling_segments(
             continue
         ctype = _SIBLING_CTYPE_BY_ROLE.get(role, "sibling_segments")
         for a, b in combinations(members, 2):
+            if _is_lineage_related(ancestor_map, a, b):
+                continue
+            if containment_map is not None and _is_population_contained(containment_map, a, b):
+                continue
             pairs.append((a, b, ctype))
     return pairs
 
@@ -2624,6 +3060,19 @@ def discover_governance_chain(
     # (a descendant's data is always a subset of its ancestor's). Pairing
     # them as independent standards would compare a segment against data
     # that already contains its own.
+    #
+    # structural_ancestor only (D-027 decision): this function's guard stays
+    # on _build_ancestor_map()/_is_lineage_related() alone, now upgraded for
+    # free to the complete transitive-closure lattice (previously a single
+    # parent_segment_id chain, which could under-report ancestors whenever a
+    # segment had more than one non-root dimension present). Re-running the
+    # corpus-level violation check against this function found zero real
+    # population-subset violations both before and after that completeness
+    # fix, so layering population_containment here too — as
+    # discover_sibling_segments() does, where a corpus-verified defect
+    # justified it — is deferred rather than spent speculatively. Revisit if
+    # a future corpus run surfaces a governance_chain violation
+    # structural_ancestor alone doesn't catch.
     ancestor_map = _build_ancestor_map(manifest)
 
     for e_sid, e_row in enterprise_standards:
@@ -4345,13 +4794,82 @@ def main() -> int:
     manifest = load_manifest(records_dir)
     registry = load_registry(records_dir)
     file_metadata = load_file_metadata(records_dir)
+    membership_path_exists = (records_dir / "segment_membership.csv").exists()
+    membership = load_membership(records_dir)
+
+    stale_ancestor_warnings = detect_stale_ancestor_encoding(manifest)
+    if stale_ancestor_warnings:
+        print(
+            f"[warn] {len(stale_ancestor_warnings)} segment(s) look like they carry "
+            f"pre-D-028 ancestor_segment_ids data -- structural_ancestor lineage "
+            f"exclusion may be incomplete until segment_manifest.csv is regenerated:",
+            file=sys.stderr,
+        )
+        for w in stale_ancestor_warnings[:20]:
+            print(f"[warn]   {w}", file=sys.stderr)
+    # Validated on file EXISTENCE, not on `membership` being non-empty --
+    # segment_membership.csv present but header-only/all-invalid-rows (e.g.
+    # a write interrupted right after the header line) loads as an empty
+    # dict indistinguishable from "file absent" otherwise, which would skip
+    # this check entirely and silently disable population_containment with
+    # no warning at all (Codex review finding on PR #423). validate_
+    # membership_against_manifest()'s second pass (every non-zero-file_count
+    # manifest segment must appear in membership) naturally catches this
+    # case once actually invoked -- an empty membership dict fails that
+    # check for every eligible segment.
+    if membership_path_exists:
+        membership_errors = validate_membership_against_manifest(manifest, membership)
+        if membership_errors:
+            print(
+                f"[warn] segment_membership.csv disagrees with segment_manifest.csv for "
+                f"{len(membership_errors)} segment(s) -- population_containment disabled "
+                f"for this run (structural_ancestor guard still applies). Re-run "
+                f"build_segment_manifest.py to regenerate a consistent set:",
+                file=sys.stderr,
+            )
+            for err in membership_errors:
+                print(f"[warn]   {err}", file=sys.stderr)
+            membership = {}
+
+    # structural_ancestor / population_containment (D-027): computed once up
+    # front and threaded into discover_sibling_segments() below. ancestor_map
+    # is cheap and always available (derived purely from manifest); the
+    # containment_map additionally needs real population data (membership) --
+    # when segment_membership.csv is absent (or fails validation above),
+    # containment_map stays None and discover_sibling_segments() falls back
+    # to the structural guard alone.
+    ancestor_map = _build_ancestor_map(manifest)
+    containment_map: Optional[Dict[str, Set[str]]] = None
+    if membership:
+        containment_thresholds = _compute_containment_thresholds(manifest, membership, ancestor_map)
+        containment_map = _population_containment_map(manifest, membership, containment_thresholds)
+        if not args.dry_run:
+            thresholds_path = write_population_containment_thresholds(out_dir, containment_thresholds)
+            print(f"[compare] population_containment thresholds written to {thresholds_path}")
+    elif not args.dry_run:
+        # A prior run in this same --out-dir may have written population_
+        # containment_thresholds.csv when containment was available; this
+        # run has it disabled (no segment_membership.csv, or it failed
+        # validation above). Leaving that stale file in place would make
+        # this run's output directory misrepresent a THIS-run artifact as
+        # still describing THIS run's data, when population_containment
+        # wasn't actually computed here at all (Codex review finding on
+        # PR #423).
+        stale_thresholds_path = out_dir / "population_containment_thresholds.csv"
+        if stale_thresholds_path.exists():
+            stale_thresholds_path.unlink()
+            print(
+                f"[warn] removed stale {stale_thresholds_path} from a prior run -- "
+                f"population_containment is disabled for this run",
+                file=sys.stderr,
+            )
 
     # Discover pairs
     pairs: List[ComparisonPair] = []
     if args.within_segment:
         pairs.extend(discover_within_segment(manifest))
     if args.sibling_segments:
-        pairs.extend(discover_sibling_segments(manifest))
+        pairs.extend(discover_sibling_segments(manifest, ancestor_map, containment_map))
     if args.parent_siblings:
         pairs.extend(discover_parent_siblings(manifest))
     if args.governance_chain:

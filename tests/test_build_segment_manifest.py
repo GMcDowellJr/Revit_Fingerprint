@@ -1548,6 +1548,48 @@ def test_required_field_na_sentinel_blocks_entire_build(tmp_path, capsys, field)
     assert "reason=not_applicable_sentinel" in captured.err
 
 
+@pytest.mark.parametrize("field", ["unit_system", "governance_role", "client_label", "discipline_label", "business_center_label"])
+def test_required_field_semicolon_blocks_entire_build(tmp_path, capsys, field):
+    # D-028 review finding (PR #423): a dimension value containing ";" would
+    # silently reintroduce the exact delimiter-collision bug ";" was chosen
+    # to fix, since _build_segments() now joins ancestor_segment_ids with
+    # ";". Reject it at the metadata-validation source instead. Only the 5
+    # DIMENSION_CONFIG fields are checked -- export_run_id is a separate
+    # case, see test_export_run_id_semicolon_does_not_block_build below.
+    rows = [dict(r) for r in VALID_ROWS]
+    rows[0][field] = "Acme;West"
+    meta = tmp_path / "file_metadata.csv"
+    _write_metadata_csv(meta, rows)
+    out_dir = tmp_path / "out"
+
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+
+    assert rc == 1, f"';' in {field} must block the build"
+    assert not (out_dir / "segment_manifest.csv").exists()
+    captured = capsys.readouterr()
+    assert "BLOCKED" in captured.err
+    assert f"field={field}" in captured.err
+    assert "reason=semicolon_not_allowed" in captured.err
+
+
+def test_export_run_id_semicolon_does_not_block_build(tmp_path, capsys):
+    # PR #423 review finding: export_run_id is never embedded in segment_id
+    # or ancestor_segment_ids, so it can't collide with the ";" delimiter --
+    # the semicolon restriction only applies to DIMENSION_CONFIG fields.
+    rows = [dict(r) for r in VALID_ROWS]
+    rows[0]["export_run_id"] = "r99;odd_but_valid"
+    meta = tmp_path / "file_metadata.csv"
+    _write_metadata_csv(meta, rows)
+    out_dir = tmp_path / "out"
+
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
+
+    assert rc == 0
+    assert (out_dir / "segment_manifest.csv").exists()
+    captured = capsys.readouterr()
+    assert "semicolon_not_allowed" not in captured.err
+
+
 def test_validate_required_metadata_reports_row_and_field_directly():
     rows = [dict(r) for r in VALID_ROWS[:2]]
     rows[1]["business_center_label"] = ""
@@ -1730,3 +1772,46 @@ def test_former_collection_specific_rows_collapse_with_union_membership():
     leaf_membership = [m for m in membership if m["segment_id"] == "imperial|Template|Sutter|architectural|1450"]
     assert {m["export_run_id"] for m in leaf_membership} == expected_eids
     assert len(leaf_membership) == len(expected_eids), "each file appears exactly once in segment_membership rows"
+
+
+# ---------------------------------------------------------------------------
+# ancestor_segment_ids serialization (D-028)
+# ---------------------------------------------------------------------------
+
+def test_ancestor_segment_ids_semicolon_joined_not_pipe():
+    # imperial|Container|Kaiser|Architectural has 3 non-root fields present
+    # (governance, client, discipline), so it has 3 immediate one-field-drop
+    # ancestors -- a genuine multi-ancestor case, not a degenerate 1-element one.
+    segs = _build_segments(_disc_rows(), min_files=3)
+    leaf = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    raw = leaf["ancestor_segment_ids"]
+
+    expected_ancestor_ids = [
+        "imperial|Container|Architectural",
+        "imperial|Container|Kaiser",
+        "imperial|Kaiser|Architectural",
+    ]
+    assert raw == ";".join(expected_ancestor_ids)
+
+    # Round trip: splitting on ";" recovers the exact original list, with each
+    # element's own internal "|" delimiters untouched.
+    recovered = raw.split(";")
+    assert recovered == expected_ancestor_ids
+    for ancestor_id in recovered:
+        assert "|" in ancestor_id, "each ancestor id keeps its own internal pipe delimiters intact"
+
+    # Contrast: the prior "|".join(ancestor_ids) encoding collapsed the outer
+    # and inner delimiters into one ambiguous string that could not be split
+    # back into the original list (D-028) -- demonstrate the old encoding is
+    # indeed lossy for this same fixture, as the reason the fix was needed.
+    lossy_old_encoding = "|".join(expected_ancestor_ids)
+    assert lossy_old_encoding.split("|") != expected_ancestor_ids
+
+
+def test_ancestor_segment_ids_two_element_roundtrip():
+    # A simpler 2-ancestor case (2 non-root fields present).
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser")
+    expected = ["imperial|Container", "imperial|Kaiser"]
+    assert seg["ancestor_segment_ids"] == ";".join(expected)
+    assert seg["ancestor_segment_ids"].split(";") == expected
