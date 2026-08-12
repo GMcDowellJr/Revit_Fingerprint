@@ -1241,6 +1241,12 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
     _item_shard_writers.clear()
     # Shards are the sole identity_items output -- no monolithic identity_items.csv
     # rebuild (see audit_results/audit_15_identity_items_monolithic_removal_pr4.md).
+    # Remove any stale monolithic file left behind by an older extractor.py version
+    # rerun into this same out_dir, so legacy-fallback readers can't silently read
+    # rows from a previous corpus alongside the freshly-written shards. Only done
+    # after the new shards are confirmed fully written and closed above, matching
+    # this function's existing promote-only-after-success convention.
+    (out_dir / "identity_items.csv").unlink(missing_ok=True)
     # Sentinel content is never parsed by any reader (existence-only gate), so a
     # wall-clock timestamp is sufficient.
     (shard_dir / ".complete").write_text(str(time.time()), encoding="utf-8")

@@ -485,7 +485,11 @@ def _validate_line_pattern_synthetic_norm_hash(phase0_dir: Path) -> None:
     records_csv = phase0_dir / "records.csv"
     shard_dir = phase0_dir / "identity_items_by_domain"
     lp_shard = shard_dir / "line_patterns.csv"
-    use_shard = (shard_dir / ".complete").is_file() and lp_shard.is_file()
+    # A complete shard set is sufficient on its own -- a corpus with zero line_patterns
+    # records legitimately has no line_patterns.csv shard at all (extractor.py only
+    # creates a domain's shard file lazily, on its first item row), so requiring
+    # lp_shard to exist here would wrongly abort a perfectly valid apply run.
+    use_shard = (shard_dir / ".complete").is_file()
     items_csv = phase0_dir / "identity_items.csv"
     if not records_csv.is_file() or not (use_shard or items_csv.is_file()):
         raise SystemExit("flatten/enrichment stage did not produce records.csv and identity_items (shards or identity_items.csv) before apply")
@@ -495,9 +499,15 @@ def _validate_line_pattern_synthetic_norm_hash(phase0_dir: Path) -> None:
             line_pattern_pks.append(r.get("record_pk", ""))
     if not line_pattern_pks:
         return
-    items_source = lp_shard if use_shard else items_csv
     pks_with_norm: set = set()
-    for r in _iter_csv_rows(items_source):
+    if use_shard:
+        # line_pattern_pks is non-empty here, so a complete shard set genuinely missing
+        # lp_shard is a real inconsistency -- fall through with pks_with_norm empty so
+        # every pk is reported "missing" below, rather than crashing on a FileNotFoundError.
+        items_rows = _iter_csv_rows(lp_shard) if lp_shard.is_file() else []
+    else:
+        items_rows = _iter_csv_rows(items_csv)
+    for r in items_rows:
         key = str(r.get("item_key", "") or r.get("k", ""))
         if str(r.get("domain", "")) == "line_patterns" and key == "line_pattern.segments_norm_hash":
             pks_with_norm.add(str(r.get("record_pk", "")))
@@ -840,10 +850,12 @@ def main() -> None:
     if "sig_hash" in selected_stages:
         _records_csv = effective_phase0_dir / "records.csv"
         _items_csv = effective_phase0_dir / "identity_items.csv"
-        if not _records_csv.is_file() or not _items_csv.is_file():
+        _native_shard_complete = effective_phase0_dir / "identity_items_by_domain" / ".complete"
+        if not _records_csv.is_file() or not (_native_shard_complete.is_file() or _items_csv.is_file()):
             raise SystemExit(
-                "sig_hash stage requires records.csv and identity_items.csv to exist. "
-                "Run the flatten stage first, or include flatten in --stages."
+                "sig_hash stage requires records.csv and identity_items (shards or "
+                "identity_items.csv) to exist. Run the flatten stage first, or include "
+                "flatten in --stages."
             )
         sig_pol = _resolve_sig_hash_policy_path(args.sig_hash_policy, out_root)
         if sig_pol is None:
