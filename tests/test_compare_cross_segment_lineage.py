@@ -491,3 +491,21 @@ def test_detect_stale_ancestor_encoding_does_not_flag_genuine_single_ancestor():
         "imperial|Container": {"governance_role": "Container", "ancestor_segment_ids": "imperial"},
     }
     assert detect_stale_ancestor_encoding(manifest) == []
+
+
+def test_validate_membership_against_manifest_completely_empty_sidecar():
+    # PR #423 review finding: segment_membership.csv present on disk but
+    # header-only/all-invalid-rows loads as membership={} -- indistinguishable
+    # from "file absent" by dict truthiness alone. The second pass over
+    # manifest.items() must still flag every eligible segment against a
+    # totally empty membership dict (main()'s fix is to call this function
+    # whenever the file EXISTS, not only when the loaded dict is non-empty --
+    # this test proves the function itself behaves correctly once called).
+    manifest = {
+        "a": {"file_count": "3", "population_hash": _pop_hash({"e1", "e2", "e3"})},
+        "b": {"file_count": "2", "population_hash": _pop_hash({"e4", "e5"})},
+    }
+    errors = validate_membership_against_manifest(manifest, {})
+    assert len(errors) == 2
+    assert any("a" in e for e in errors)
+    assert any("b" in e for e in errors)

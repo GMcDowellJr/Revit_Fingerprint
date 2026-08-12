@@ -154,20 +154,35 @@ def _invalid_required_value_reason(value: str) -> "str | None":
     explicit N/A-style spelling means "reviewed, does not apply" — both are
     invalid for a required segment dimension under the current metadata
     contract (only project_label, which this file does not use, is allowed
-    to carry a not-applicable sentinel). A literal ";" is also rejected
-    (D-028): _build_segments() serializes ancestor_segment_ids by joining
-    per-segment ancestor ids with ";", relying on ";" never appearing inside
-    a segment_id itself (segment_id is built by "|"-joining these same
-    dimension values). A dimension value containing ";" would silently
-    reintroduce the exact delimiter-collision class of bug ";" was chosen
-    to fix in the first place -- reject it at the source instead of trying
-    to detect/repair a corrupted ancestor_segment_ids field downstream."""
+    to carry a not-applicable sentinel)."""
     stripped = (value or "").strip()
     if not stripped:
         return "missing_value"
     if is_na_token(stripped):
         return "not_applicable_sentinel"
-    if ";" in stripped:
+    return None
+
+
+# Fields whose values feed segment_id/ancestor_segment_ids construction
+# (DIMENSION_CONFIG's own field set) -- export_run_id is REQUIRED_ROW_FIELDS'
+# other member, but is never embedded in a segment_id or ancestor_segment_ids
+# value, so it doesn't need the extra ";" restriction below (Codex review
+# finding on PR #423: scoping this too broadly would block an otherwise-valid
+# export_run_id for no functional reason).
+_DIMENSION_FIELD_NAMES = {d["field"] for d in DIMENSION_CONFIG}
+
+
+def _invalid_dimension_value_reason(value: str) -> "str | None":
+    """Additional check for DIMENSION_CONFIG fields only: a literal ";" is
+    rejected (D-028). _build_segments() serializes ancestor_segment_ids by
+    joining per-segment ancestor ids with ";", relying on ";" never
+    appearing inside a segment_id itself (segment_id is built by
+    "|"-joining these same dimension values). A dimension value containing
+    ";" would silently reintroduce the exact delimiter-collision class of
+    bug ";" was chosen to fix in the first place -- reject it at the source
+    instead of trying to detect/repair a corrupted ancestor_segment_ids
+    field downstream."""
+    if ";" in (value or ""):
         return "semicolon_not_allowed"
     return None
 
@@ -188,7 +203,7 @@ def _validate_required_metadata(rows: List[Dict[str, str]]) -> List[Dict[str, st
                        duplicate-row conflict).
       raw_value     — the offending raw value.
       reason        — "missing_value" | "not_applicable_sentinel" |
-                       "semicolon_not_allowed" |
+                       "semicolon_not_allowed" (DIMENSION_CONFIG fields only) |
                        "duplicate_row_conflict:first_seen_row=<N>".
 
     export_run_id is meant to be a unique join key into file_metadata.csv —
@@ -201,13 +216,16 @@ def _validate_required_metadata(rows: List[Dict[str, str]]) -> List[Dict[str, st
     for row_number, row in enumerate(rows, start=2):
         eid = (row.get("export_run_id") or "").strip()
         for field in REQUIRED_ROW_FIELDS:
-            reason = _invalid_required_value_reason(row.get(field, ""))
+            raw = row.get(field, "")
+            reason = _invalid_required_value_reason(raw)
+            if not reason and field in _DIMENSION_FIELD_NAMES:
+                reason = _invalid_dimension_value_reason(raw)
             if reason:
                 diagnostics.append({
                     "row_number": str(row_number),
                     "export_run_id": eid,
                     "field": field,
-                    "raw_value": row.get(field, "") or "",
+                    "raw_value": raw or "",
                     "reason": reason,
                 })
         if eid:

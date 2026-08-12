@@ -4794,6 +4794,7 @@ def main() -> int:
     manifest = load_manifest(records_dir)
     registry = load_registry(records_dir)
     file_metadata = load_file_metadata(records_dir)
+    membership_path_exists = (records_dir / "segment_membership.csv").exists()
     membership = load_membership(records_dir)
 
     stale_ancestor_warnings = detect_stale_ancestor_encoding(manifest)
@@ -4806,7 +4807,17 @@ def main() -> int:
         )
         for w in stale_ancestor_warnings[:20]:
             print(f"[warn]   {w}", file=sys.stderr)
-    if membership:
+    # Validated on file EXISTENCE, not on `membership` being non-empty --
+    # segment_membership.csv present but header-only/all-invalid-rows (e.g.
+    # a write interrupted right after the header line) loads as an empty
+    # dict indistinguishable from "file absent" otherwise, which would skip
+    # this check entirely and silently disable population_containment with
+    # no warning at all (Codex review finding on PR #423). validate_
+    # membership_against_manifest()'s second pass (every non-zero-file_count
+    # manifest segment must appear in membership) naturally catches this
+    # case once actually invoked -- an empty membership dict fails that
+    # check for every eligible segment.
+    if membership_path_exists:
         membership_errors = validate_membership_against_manifest(manifest, membership)
         if membership_errors:
             print(
