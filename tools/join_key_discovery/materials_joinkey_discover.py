@@ -141,7 +141,7 @@ def _build_key(parts: List[str]) -> str:
 # ---------------------------------------------------------------------------
 
 def _load_class_map(phase0_dir: Path) -> Dict[str, str]:
-    shard = phase0_dir / "phase0_identity_items_by_domain" / "materials.csv"
+    shard = phase0_dir / "identity_items_by_domain" / "materials.csv"
     if not shard.is_file():
         mono = phase0_dir / "phase0_identity_items.csv"
         if not mono.is_file():

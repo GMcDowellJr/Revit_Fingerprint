@@ -914,9 +914,7 @@ def build_semantic_groups(
         results_v21 = out_root / "Results_v21"
     analysis_dir = results_v21 / "analysis_v21"
     phase0_dir = results_v21 / "phase0_v21"
-    shards_dir = phase0_dir / "identity_items_shards"
-    if not shards_dir.is_dir():
-        shards_dir = phase0_dir / "phase0_identity_items_by_domain"
+    shards_dir = phase0_dir / "identity_items_by_domain"
     cache_path = results_v21 / "label_synthesis" / "label_semantic_groups.json"
     export_progress_path = results_v21 / "label_synthesis" / "prompt_export_progress.json"
     print(f"[build_semantic_groups] results_v21={results_v21}")
