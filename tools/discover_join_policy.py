@@ -6,6 +6,7 @@ import csv
 import hashlib
 import json
 import math
+import sys
 from pathlib import Path
 from typing import Dict, List, Sequence
 
@@ -403,7 +404,42 @@ def main() -> None:
         legacy_items_path = phase0_dir / "phase0_identity_items.csv"
         if legacy_items_path.exists():
             items_path = legacy_items_path
-    items = _read_csv(items_path)
+
+    # Load items domain-by-domain from per-domain shards when available.
+    # Falls back to one monolithic load + in-memory partition when shards
+    # don't exist (e.g. a flatten output produced before shard-preferred
+    # readers existed). Shard mode requires the .complete sentinel -- a
+    # sentinel written only after all shard handles are closed. Partial/
+    # interrupted flatten runs leave CSVs without a sentinel; treating those
+    # as authoritative would return empty items for missing domain shards
+    # and silently score a candidate as fragmentation/collision-free simply
+    # because most of its data was never read. Mirrors
+    # tools/apply_join_policy.py's _get_domain_items() closure.
+    shard_dir = phase0_dir / "identity_items_by_domain"
+    _use_shards = (shard_dir / ".complete").is_file()
+    if not _use_shards and shard_dir.is_dir() and any(shard_dir.glob("*.csv")):
+        sys.stderr.write(
+            "[WARN discover] identity_items_by_domain/ contains CSV files but .complete sentinel "
+            "is absent -- possible interrupted flatten run. Falling back to monolithic "
+            "identity_items.csv to avoid silently missing domain items.\n"
+        )
+    _monolithic_by_domain: Dict[str, List[Dict[str, str]]] = {}
+    if not _use_shards:
+        if not items_path.exists():
+            raise SystemExit(
+                f"[discover] No complete shard set ({shard_dir / '.complete'} absent) and no "
+                f"monolithic identity_items.csv at {items_path}. "
+                "Run the flatten stage before discover."
+            )
+        for _row in _read_csv(items_path):
+            _d = str(_row.get("domain", "")).strip()
+            _monolithic_by_domain.setdefault(_d, []).append(_row)
+
+    def _get_domain_items(domain: str) -> List[Dict[str, str]]:
+        if _use_shards:
+            _shard = shard_dir / f"{domain}.csv"
+            return _read_csv(_shard) if _shard.is_file() else []
+        return _monolithic_by_domain.get(domain, [])
 
     domains = sorted({r.get("domain", "").strip() for r in records if r.get("domain", "").strip()}, key=str.lower)
     search_modes = [m.strip() for m in str(args.search_modes).split(",") if m.strip()]
@@ -429,7 +465,11 @@ def main() -> None:
     report_rows: List[Dict[str, str]] = []
     failures: List[str] = []
 
-    print(f"[discover] loaded records={len(records)} identity_items={len(items)} domains={len(domains)} policy_modes={policy_modes} search_modes={search_modes}", flush=True)
+    print(
+        f"[discover] loaded records={len(records)} item_source={'shards' if _use_shards else 'monolithic'} "
+        f"domains={len(domains)} policy_modes={policy_modes} search_modes={search_modes}",
+        flush=True,
+    )
 
     stratify_key = str(args.stratify_by or "").strip()
     full_verify = not bool(args.no_full_verify)
@@ -438,7 +478,7 @@ def main() -> None:
 
     for i, domain in enumerate(domains, start=1):
         dom_records_all = [r for r in records if r.get("domain") == domain]
-        dom_items_all = [it for it in items if it.get("domain") == domain]
+        dom_items_all = _get_domain_items(domain)
         if stratify_key:
             dom_records = _stratified_sample(dom_records_all, dom_items_all, stratify_key, int(args.sample_size), int(args.sample_seed))
         else:

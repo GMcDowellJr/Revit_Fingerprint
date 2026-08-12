@@ -80,6 +80,7 @@ import csv
 import json
 import math
 import shlex
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
@@ -542,7 +543,35 @@ def main() -> None:
         legacy_items = phase0_dir / "phase0_identity_items.csv"
         if legacy_items.exists():
             items_path = legacy_items
-    items = _read_csv(items_path) if items_path.exists() else []
+
+    # Load items domain-by-domain from per-domain shards when available.
+    # Falls back to one monolithic load + in-memory partition when shards
+    # don't exist. Mirrors tools/apply_join_policy.py's _get_domain_items()
+    # closure (see tools/discover_join_policy.py's identical port for the
+    # full rationale on the .complete-sentinel gating and the warning below).
+    # Unlike discover_join_policy.py, a missing monolithic file here is not
+    # fatal -- compute_domain_stats() degrades gracefully to
+    # candidate_field_count=0 for the affected domain(s), same as the
+    # pre-port behavior when identity_items.csv was simply absent.
+    shard_dir = phase0_dir / "identity_items_by_domain"
+    _use_shards = (shard_dir / ".complete").is_file()
+    if not _use_shards and shard_dir.is_dir() and any(shard_dir.glob("*.csv")):
+        sys.stderr.write(
+            "[WARN suggest] identity_items_by_domain/ contains CSV files but .complete sentinel "
+            "is absent -- possible interrupted flatten run. Falling back to monolithic "
+            "identity_items.csv to avoid silently missing domain items.\n"
+        )
+    _monolithic_by_domain: Dict[str, List[Dict[str, str]]] = {}
+    if not _use_shards and items_path.exists():
+        for _row in _read_csv(items_path):
+            _d = str(_row.get("domain", "")).strip()
+            _monolithic_by_domain.setdefault(_d, []).append(_row)
+
+    def _get_domain_items(domain: str) -> List[Dict[str, str]]:
+        if _use_shards:
+            _shard = shard_dir / f"{domain}.csv"
+            return _read_csv(_shard) if _shard.is_file() else []
+        return _monolithic_by_domain.get(domain, [])
 
     domains = sorted({r.get("domain", "").strip() for r in records if r.get("domain", "").strip()}, key=str.lower)
     if args.domains:
@@ -553,7 +582,7 @@ def main() -> None:
 
     rows: List[Dict[str, object]] = []
     for domain in domains:
-        stats = compute_domain_stats(records, items, domain)
+        stats = compute_domain_stats(records, _get_domain_items(domain), domain)
         domain_fields = policy_fields.get(domain, {})
         suggestion = suggest_params_for_domain(
             stats,
