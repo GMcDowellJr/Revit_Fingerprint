@@ -730,13 +730,14 @@ def _load_pattern_to_record_pk(analysis_dir: Path, domain: str) -> Dict[str, str
 
 
 def _resolve_identity_items_source(phase0_dir: Path, shards_dir: Path, domain: str) -> Optional[Path]:
-    shard_candidates = [
-        shards_dir / f"{domain}.identity_items.csv",
-        shards_dir / f"{domain}.csv",
-    ]
-    for candidate in shard_candidates:
-        if candidate.is_file():
-            return candidate
+    if (shards_dir / ".complete").is_file():
+        shard_candidates = [
+            shards_dir / f"{domain}.identity_items.csv",
+            shards_dir / f"{domain}.csv",
+        ]
+        for candidate in shard_candidates:
+            if candidate.is_file():
+                return candidate
     fallback = phase0_dir / "phase0_identity_items.csv"
     if fallback.is_file():
         return fallback
