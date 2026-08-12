@@ -277,15 +277,23 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
     else:
         return diag
     records = _read_csv_rows(records_csv)
-    grouped_cache: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+
+    # Group record indices by domain so each domain's identity_items shard is
+    # loaded once, fully processed, and released before moving to the next
+    # domain -- holding every domain's items in memory simultaneously (the
+    # previous unbounded grouped_cache) is what exhausted memory on large
+    # corpora (millions of records across hundreds of files).
+    indices_by_domain: Dict[str, List[int]] = {}
+    for idx, row in enumerate(records):
+        dom = str(row.get("domain", "")).strip()
+        if dom_filter and dom not in dom_filter:
+            continue
+        indices_by_domain.setdefault(dom, []).append(idx)
 
     def _load_items_for_domain(domain: str) -> Dict[str, List[Dict[str, Any]]]:
-        if domain in grouped_cache:
-            return grouped_cache[domain]
         out: Dict[str, List[Dict[str, Any]]] = {}
         src = (shard_dir / f"{domain}.csv") if shard_dir is not None else items_csv
         if not src.is_file():
-            grouped_cache[domain] = out
             return out
         for r in _iter_csv_rows(src):
             if str(r.get("domain", "")).strip() != domain:
@@ -295,58 +303,70 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
             if not pk or not k:
                 continue
             out.setdefault(pk, []).append({"k": k, "v": r.get("v", r.get("item_value")), "q": r.get("q", r.get("item_value_type"))})
-        grouped_cache[domain] = out
         return out
-    basis_item_rows: List[Dict[str, str]] = []
-    for row in records:
-        dom = str(row.get("domain", "")).strip()
-        if dom_filter and dom not in dom_filter:
-            continue
-        pol = get_domain_sig_hash_policy(policies, dom)
-        if not isinstance(pol, dict):
-            domains_without.add(dom)
-            continue
-        pk = str(row.get("record_pk", ""))
-        rec_items = _load_items_for_domain(dom).get(pk, [])
-        diag["records_processed"] += 1
-        sig_hash, status, reasons, hash_items = build_sig_hash_from_policy(
-            domain_policy=pol,
-            items=rec_items,
-            status_reasons=[],
-        )
-        row["sig_hash"] = "" if sig_hash is None else str(sig_hash)
-        if str(row.get("join_key_schema", "")) == "sig_hash_as_join_key.v1":
-            row["join_hash"] = row["sig_hash"]
-        prior_status = str(row.get("status", "")).strip()
-        if prior_status == "blocked":
-            # Extractor-blocked records are sticky — the sig_hash stage cannot upgrade them.
-            # Exception: records blocked by a *prior apply run* must be re-evaluated so that
-            # policy corrections or updated identity_items can take effect.
-            # Distinguisher: the apply stage writes "identity.incomplete:required_not_ok:<k>";
-            # extractors write "identity.incomplete:<q>:<k>" (e.g. "identity.incomplete:missing:…").
-            # Matching on the apply-specific "required_not_ok" middle segment avoids
-            # misclassifying genuine extractor blocks as apply-stage blocks.
-            prior_reasons = [r for r in str(row.get("status_reasons", "")).split("|") if r]
-            apply_stage_blocked = any(r.startswith("identity.incomplete:required_not_ok:") for r in prior_reasons)
-            if not apply_stage_blocked:
-                pass  # genuine extractor block — preserve it
-            else:
-                row["status"] = str(status)
-                row["status_reasons"] = "|".join(reasons)
-        else:
-            row["status"] = str(status)
-            row["status_reasons"] = "|".join(reasons)
-        row["sig_basis_schema"] = str(pol.get("sig_hash_schema") or "")
-        for ordinal, it in enumerate(hash_items):
-            k = it.get("k")
-            if isinstance(k, str) and k:
-                basis_item_rows.append({"record_pk": pk, "domain": dom, "item_key": k, "ordinal": str(ordinal)})
-        if sig_hash is not None:
-            diag["records_hashed"] += 1
-        if status == "blocked":
-            diag["records_blocked"] += 1
-        elif status == "degraded":
-            diag["records_degraded"] += 1
+
+    # Stream sig_basis_items.csv rows straight to disk instead of accumulating
+    # them in a single list -- across a large corpus the basis-item count is a
+    # multiple of the record count and the accumulated list was the other
+    # major contributor to the MemoryError.
+    basis_csv = phase0_dir / "sig_basis_items.csv"
+    basis_tmp_csv = phase0_dir / "sig_basis_items.csv.tmp"
+    basis_fields = ["record_pk", "domain", "item_key", "ordinal"]
+    basis_rows_written = 0
+    with basis_tmp_csv.open("w", encoding="utf-8", newline="") as bf:
+        bw = csv.DictWriter(bf, fieldnames=basis_fields)
+        bw.writeheader()
+        for dom, idx_list in indices_by_domain.items():
+            pol = get_domain_sig_hash_policy(policies, dom)
+            if not isinstance(pol, dict):
+                domains_without.add(dom)
+                continue
+            dom_items = _load_items_for_domain(dom)
+            for idx in idx_list:
+                row = records[idx]
+                pk = str(row.get("record_pk", ""))
+                rec_items = dom_items.get(pk, [])
+                diag["records_processed"] += 1
+                sig_hash, status, reasons, hash_items = build_sig_hash_from_policy(
+                    domain_policy=pol,
+                    items=rec_items,
+                    status_reasons=[],
+                )
+                row["sig_hash"] = "" if sig_hash is None else str(sig_hash)
+                if str(row.get("join_key_schema", "")) == "sig_hash_as_join_key.v1":
+                    row["join_hash"] = row["sig_hash"]
+                prior_status = str(row.get("status", "")).strip()
+                if prior_status == "blocked":
+                    # Extractor-blocked records are sticky — the sig_hash stage cannot upgrade them.
+                    # Exception: records blocked by a *prior apply run* must be re-evaluated so that
+                    # policy corrections or updated identity_items can take effect.
+                    # Distinguisher: the apply stage writes "identity.incomplete:required_not_ok:<k>";
+                    # extractors write "identity.incomplete:<q>:<k>" (e.g. "identity.incomplete:missing:…").
+                    # Matching on the apply-specific "required_not_ok" middle segment avoids
+                    # misclassifying genuine extractor blocks as apply-stage blocks.
+                    prior_reasons = [r for r in str(row.get("status_reasons", "")).split("|") if r]
+                    apply_stage_blocked = any(r.startswith("identity.incomplete:required_not_ok:") for r in prior_reasons)
+                    if not apply_stage_blocked:
+                        pass  # genuine extractor block — preserve it
+                    else:
+                        row["status"] = str(status)
+                        row["status_reasons"] = "|".join(reasons)
+                else:
+                    row["status"] = str(status)
+                    row["status_reasons"] = "|".join(reasons)
+                row["sig_basis_schema"] = str(pol.get("sig_hash_schema") or "")
+                for ordinal, it in enumerate(hash_items):
+                    k = it.get("k")
+                    if isinstance(k, str) and k:
+                        bw.writerow({"record_pk": pk, "domain": dom, "item_key": k, "ordinal": str(ordinal)})
+                        basis_rows_written += 1
+                if sig_hash is not None:
+                    diag["records_hashed"] += 1
+                if status == "blocked":
+                    diag["records_blocked"] += 1
+                elif status == "degraded":
+                    diag["records_degraded"] += 1
+            del dom_items
     if records:
         fieldnames = list(records[0].keys())
         for extra in ("sig_hash", "sig_basis_schema", "status", "status_reasons"):
@@ -360,15 +380,11 @@ def _apply_sig_hash_to_phase0(phase0_dir: Path, policy_path: Path, domains: Opti
             w.writeheader()
             for r in records:
                 w.writerow({k: r.get(k, "") for k in fieldnames})
-    if basis_item_rows:
-        basis_csv = phase0_dir / "sig_basis_items.csv"
-        basis_fields = ["record_pk", "domain", "item_key", "ordinal"]
-        with basis_csv.open("w", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=basis_fields)
-            w.writeheader()
-            for r in basis_item_rows:
-                w.writerow(r)
-        diag["sig_basis_items_written"] = len(basis_item_rows)
+    if basis_rows_written:
+        basis_tmp_csv.replace(basis_csv)
+        diag["sig_basis_items_written"] = basis_rows_written
+    else:
+        basis_tmp_csv.unlink(missing_ok=True)
     diag["files_processed"] = 1
     diag["domains_without_policy"] = sorted(domains_without)
     if domains_without:
