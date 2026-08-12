@@ -15,6 +15,7 @@ unrelated siblings. See DECISIONS.md D-026/D-027/D-028.
 """
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import sys
 
@@ -27,6 +28,7 @@ from compare_cross_segment import (  # noqa: E402
     _is_population_contained,
     _population_containment_map,
     discover_sibling_segments,
+    validate_membership_against_manifest,
 )
 
 
@@ -124,6 +126,10 @@ def _pop(prefix, n):
     return {f"{prefix}{i:03d}" for i in range(n)}
 
 
+def _pop_hash(eids):
+    return hashlib.sha1("|".join(sorted(eids)).encode()).hexdigest()
+
+
 def test_population_containment_above_and_below_materiality_bar():
     # No structural relationships in this fixture -- containment must be
     # derived purely from real membership. A handful of tiny noise pairs are
@@ -199,6 +205,57 @@ def test_population_containment_excludes_structural_pairs_from_threshold_fit_but
 
     assert _is_population_contained(containment, "parent", "child")
     assert _is_population_contained(containment, "peer_a", "peer_b_190")
+
+
+def test_population_containment_identical_populations_always_contained():
+    # Byte-identical populations are the strongest possible form of the
+    # subset relationship population_containment exists to catch -- must be
+    # unconditionally flagged, bypassing both materiality thresholds
+    # entirely (build_segment_manifest.py only warns, never blocks, on a
+    # duplicate bundle population_hash, so this is a real possible state,
+    # not just a hypothetical one -- PR #423 review finding).
+    manifest = {"a": {}, "b": {}, "noise0": {}, "noise1": {}, "big": {}, "small": {}}
+    ancestor_map = {}
+    shared_pop = _pop("f", 50)
+    membership = {
+        "a": shared_pop, "b": set(shared_pop),  # identical, not the same object
+        "noise0": set(list(shared_pop)[:1]), "noise1": set(list(shared_pop)[:2]),
+        "big": _pop("g", 100), "small": set(list(_pop("g", 100))[:90]),
+    }
+    thresholds = _compute_containment_thresholds(manifest, membership, ancestor_map)
+    containment = _population_containment_map(manifest, membership, thresholds)
+    assert _is_population_contained(containment, "a", "b")
+
+
+def test_population_containment_boundary_value_included_not_excluded():
+    # A pair sitting exactly AT the Jenks break must clear the size floor
+    # (jenks_breaks()'s own docstring: "values below break_0 are class 1
+    # (lowest)" -- the break itself belongs to the upper/signal class), not
+    # be treated as noise by a stray strict "greater than" (PR #423 review
+    # finding -- confirmed against the real corpus, where 21 of 1,806
+    # non-structural pairs sit exactly at the size break).
+    manifest = {f"s{i}": {} for i in range(8)}
+    ancestor_map = {}
+    # Two pairs share the exact same (smaller) size -- both should become
+    # class-2 members once jenks correctly separates {noise} from {signal},
+    # and the break itself (== that shared size) must not exclude them.
+    big_pop = _pop("f", 200)
+    signal_a_pop = set(list(big_pop)[:150])
+    signal_b_pop = set(list(_pop("g", 200))[:150])
+    noise_pops = [set(list(big_pop)[:n]) for n in (1, 2, 3, 2, 1)]
+    membership = {
+        "big": big_pop, "other": _pop("g", 200),
+        "signal_a": signal_a_pop, "signal_b": signal_b_pop,
+    }
+    for i, pop in enumerate(noise_pops):
+        membership[f"noise{i}"] = pop
+    full_manifest = manifest | {k: {} for k in membership}
+
+    thresholds = _compute_containment_thresholds(full_manifest, membership, ancestor_map)
+    assert thresholds["min_population_for_containment"] == 150.0
+    containment = _population_containment_map(full_manifest, membership, thresholds)
+    assert _is_population_contained(containment, "big", "signal_a")
+    assert _is_population_contained(containment, "other", "signal_b")
 
 
 # ---------------------------------------------------------------------------
@@ -338,3 +395,40 @@ def test_discover_sibling_segments_backward_compatible_without_ancestor_data():
     }
     pairs = discover_sibling_segments(manifest)
     assert ("a", "b", "sibling_containers") in pairs
+
+
+# ---------------------------------------------------------------------------
+# validate_membership_against_manifest (PR #423 review finding: guard against
+# a stale/mismatched segment_membership.csv silently driving
+# population_containment off a population that disagrees with what
+# segment_manifest.csv itself records for that segment_id)
+# ---------------------------------------------------------------------------
+
+def test_validate_membership_against_manifest_agreement_no_errors():
+    manifest = {"a": {"file_count": "3", "population_hash": _pop_hash({"e1", "e2", "e3"})}}
+    membership = {"a": {"e1", "e2", "e3"}}
+    assert validate_membership_against_manifest(manifest, membership) == []
+
+
+def test_validate_membership_against_manifest_file_count_mismatch():
+    manifest = {"a": {"file_count": "3", "population_hash": _pop_hash({"e1", "e2", "e3"})}}
+    membership = {"a": {"e1", "e2"}}  # stale: only 2, manifest says 3
+    errors = validate_membership_against_manifest(manifest, membership)
+    assert len(errors) == 1
+    assert "a" in errors[0] and "file_count" in errors[0]
+
+
+def test_validate_membership_against_manifest_population_hash_mismatch():
+    manifest = {"a": {"file_count": "3", "population_hash": _pop_hash({"e1", "e2", "e3"})}}
+    membership = {"a": {"e1", "e2", "e4"}}  # same count, different actual members
+    errors = validate_membership_against_manifest(manifest, membership)
+    assert len(errors) == 1
+    assert "population_hash" in errors[0]
+
+
+def test_validate_membership_against_manifest_unknown_segment_ignored():
+    # A membership segment_id absent from manifest is out of scope for this
+    # check (nothing to compare against) -- not itself an error here.
+    manifest = {}
+    membership = {"ghost": {"e1"}}
+    assert validate_membership_against_manifest(manifest, membership) == []

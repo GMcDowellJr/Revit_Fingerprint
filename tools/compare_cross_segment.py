@@ -672,6 +672,48 @@ def load_membership(records_dir: Path) -> Dict[str, Set[str]]:
     return dict(membership)
 
 
+def validate_membership_against_manifest(
+    manifest: Dict[str, Dict[str, str]],
+    membership: Dict[str, Set[str]],
+) -> List[str]:
+    """Return one error string per segment_id where segment_membership.csv
+    disagrees with segment_manifest.csv's file_count/population_hash.
+
+    Same check tools/run_segment_orchestrator.py's own
+    validate_membership_against_manifest() performs (adapted here for
+    segment_id -> Set[str] membership instead of List[str], and only checked
+    for segment_ids membership.py actually has data for). Guards against a
+    stale or mismatched segment_membership.csv — e.g. build_segment_
+    manifest.py interrupted after replacing segment_manifest.csv but before
+    replacing segment_membership.csv — silently driving population_
+    containment()'s subset/materiality checks off a population that no
+    longer matches what segment_manifest.csv itself describes for that
+    segment_id, which could either wrongly suppress a valid comparison pair
+    or wrongly retain one that should have been excluded.
+    """
+    errors: List[str] = []
+    for sid, eids in membership.items():
+        mrow = manifest.get(sid)
+        if mrow is None:
+            continue
+        expected_count = (mrow.get("file_count") or "").strip()
+        if expected_count and str(len(eids)) != expected_count:
+            errors.append(
+                f"segment={sid}: segment_membership.csv has {len(eids)} export_run_id(s) "
+                f"but segment_manifest.csv file_count={expected_count}"
+            )
+            continue
+        expected_hash = (mrow.get("population_hash") or "").strip()
+        if expected_hash:
+            actual_hash = hashlib.sha1("|".join(sorted(eids)).encode()).hexdigest()
+            if actual_hash != expected_hash:
+                errors.append(
+                    f"segment={sid}: segment_membership.csv population_hash={actual_hash} "
+                    f"does not match segment_manifest.csv population_hash={expected_hash}"
+                )
+    return errors
+
+
 # ---------------------------------------------------------------------------
 # Comparison staleness registry
 #
@@ -2054,17 +2096,26 @@ def _is_lineage_related(ancestor_map: Dict[str, Set[str]], sid_a: str, sid_b: st
 # thresholds.py carries its own near-duplicate jenks_natural_breaks() for a
 # narrower use, not consolidated here to avoid an unrelated behavior change)
 # passes gate this:
-#   1. size-noise filter: drop pairs whose smaller side is at/below the
-#      break in min(|pop_a|, |pop_b|) across all non-structural subset pairs.
+#   1. size-noise filter: drop pairs whose smaller side is strictly below the
+#      break in min(|pop_a|, |pop_b|) across all non-structural subset pairs
+#      (the break value itself belongs to the upper/signal class, per
+#      jenks_breaks()'s own documented "values below break_0 are class 1
+#      (lowest)" contract — a pair sitting exactly at the break clears the
+#      floor, it isn't treated as noise).
 #   2. containment-ratio filter, among size survivors only: drop pairs whose
-#      min/max size ratio is below the break.
+#      min/max size ratio is below the break (same convention: at-the-break
+#      clears the floor).
 # Both thresholds are fit ONLY on non-structural subset pairs (pairs
 # structural_ancestor does not already explain), so the fit isn't diluted by
 # structural's own well-behaved signal — but the resulting containment MAP is
 # evaluated over every population pair with membership data, structural or
 # not, so a guard using it catches both kinds uniformly (this is what lets
 # discover_sibling_segments() rely on it alone rather than needing a second,
-# separate structural check — see its docstring).
+# separate structural check — see its docstring). Byte-identical populations
+# (pa == pb) bypass both thresholds entirely and are always treated as
+# contained — equality is the strongest possible form of the subset
+# relationship this guard exists to catch, so there is no "how much overlap"
+# materiality question left to ask.
 # ---------------------------------------------------------------------------
 
 POPULATION_CONTAINMENT_THRESHOLDS_FIELDS: List[str] = [
@@ -2108,7 +2159,7 @@ def _compute_containment_thresholds(
 
     size_survivors = [
         (a, b) for a, b in non_structural_pairs
-        if min(len(membership[a]), len(membership[b])) > min_population_for_containment
+        if min(len(membership[a]), len(membership[b])) >= min_population_for_containment
     ]
     ratios = [
         min(len(membership[a]), len(membership[b])) / max(len(membership[a]), len(membership[b]))
@@ -2201,11 +2252,22 @@ def _population_containment_map(
             b = sids[j]
             pb = membership[b]
             if pa == pb:
+                # Byte-identical populations are the strongest possible form
+                # of the subset relationship this guard exists to catch --
+                # unconditionally contained, no materiality threshold needed
+                # (there's no "how much overlap" question when it's total).
+                # A real, if currently unobserved, case: build_segment_
+                # manifest.py only WARNS on duplicate bundle population_hash
+                # values, it doesn't block the build, so two distinct
+                # segment_ids with identical populations are a possible live
+                # state, not just a hypothetical one.
+                contains[sids[i]].add(b)
+                contains[b].add(sids[i])
                 continue
             if not (pa <= pb or pb <= pa):
                 continue
             smin, smax = sorted((len(pa), len(pb)))
-            if smin <= min_pop:
+            if smin < min_pop:
                 continue
             if smax and (smin / smax) < min_ratio:
                 continue
@@ -4656,13 +4718,27 @@ def main() -> int:
     registry = load_registry(records_dir)
     file_metadata = load_file_metadata(records_dir)
     membership = load_membership(records_dir)
+    if membership:
+        membership_errors = validate_membership_against_manifest(manifest, membership)
+        if membership_errors:
+            print(
+                f"[warn] segment_membership.csv disagrees with segment_manifest.csv for "
+                f"{len(membership_errors)} segment(s) -- population_containment disabled "
+                f"for this run (structural_ancestor guard still applies). Re-run "
+                f"build_segment_manifest.py to regenerate a consistent set:",
+                file=sys.stderr,
+            )
+            for err in membership_errors:
+                print(f"[warn]   {err}", file=sys.stderr)
+            membership = {}
 
     # structural_ancestor / population_containment (D-027): computed once up
     # front and threaded into discover_sibling_segments() below. ancestor_map
     # is cheap and always available (derived purely from manifest); the
     # containment_map additionally needs real population data (membership) --
-    # when segment_membership.csv is absent, containment_map stays None and
-    # discover_sibling_segments() falls back to the structural guard alone.
+    # when segment_membership.csv is absent (or fails validation above),
+    # containment_map stays None and discover_sibling_segments() falls back
+    # to the structural guard alone.
     ancestor_map = _build_ancestor_map(manifest)
     containment_map: Optional[Dict[str, Set[str]]] = None
     if membership:
