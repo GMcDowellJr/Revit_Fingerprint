@@ -1730,3 +1730,46 @@ def test_former_collection_specific_rows_collapse_with_union_membership():
     leaf_membership = [m for m in membership if m["segment_id"] == "imperial|Template|Sutter|architectural|1450"]
     assert {m["export_run_id"] for m in leaf_membership} == expected_eids
     assert len(leaf_membership) == len(expected_eids), "each file appears exactly once in segment_membership rows"
+
+
+# ---------------------------------------------------------------------------
+# ancestor_segment_ids serialization (D-028)
+# ---------------------------------------------------------------------------
+
+def test_ancestor_segment_ids_semicolon_joined_not_pipe():
+    # imperial|Container|Kaiser|Architectural has 3 non-root fields present
+    # (governance, client, discipline), so it has 3 immediate one-field-drop
+    # ancestors -- a genuine multi-ancestor case, not a degenerate 1-element one.
+    segs = _build_segments(_disc_rows(), min_files=3)
+    leaf = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    raw = leaf["ancestor_segment_ids"]
+
+    expected_ancestor_ids = [
+        "imperial|Container|Architectural",
+        "imperial|Container|Kaiser",
+        "imperial|Kaiser|Architectural",
+    ]
+    assert raw == ";".join(expected_ancestor_ids)
+
+    # Round trip: splitting on ";" recovers the exact original list, with each
+    # element's own internal "|" delimiters untouched.
+    recovered = raw.split(";")
+    assert recovered == expected_ancestor_ids
+    for ancestor_id in recovered:
+        assert "|" in ancestor_id, "each ancestor id keeps its own internal pipe delimiters intact"
+
+    # Contrast: the prior "|".join(ancestor_ids) encoding collapsed the outer
+    # and inner delimiters into one ambiguous string that could not be split
+    # back into the original list (D-028) -- demonstrate the old encoding is
+    # indeed lossy for this same fixture, as the reason the fix was needed.
+    lossy_old_encoding = "|".join(expected_ancestor_ids)
+    assert lossy_old_encoding.split("|") != expected_ancestor_ids
+
+
+def test_ancestor_segment_ids_two_element_roundtrip():
+    # A simpler 2-ancestor case (2 non-root fields present).
+    segs = _build_segments(_disc_rows(), min_files=3)
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser")
+    expected = ["imperial|Container", "imperial|Kaiser"]
+    assert seg["ancestor_segment_ids"] == ";".join(expected)
+    assert seg["ancestor_segment_ids"].split(";") == expected

@@ -340,6 +340,13 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         else:
             parent_key = frozenset((f, v) for f, v in key if f != non_root_fields_present[-1])
             parent_id = _subset_to_id(parent_key)
+        # Each entry here is this segment's own immediate structural parent
+        # for one dropped non-root field (there can be more than one, since
+        # multiple non-root fields may be present) -- NOT the full transitive
+        # ancestor closure. Full closure (structural_ancestor, D-027) is
+        # computed downstream by compare_cross_segment.py's
+        # _build_ancestor_map(), which walks this field as a multi-parent
+        # adjacency list and recursively unions each parent's own ancestors.
         ancestor_ids = []
         for field in non_root_fields_present:
             anc_key = frozenset((f, v) for f, v in key if f != field)
@@ -368,7 +375,17 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
             # segmentation dimension, see DIMENSION_CONFIG.
             "collection_label": "",
             "extra_dimensions": "|".join(extra),
-            "ancestor_segment_ids": "|".join(ancestor_ids),
+            # ";"-joined, NOT "|"-joined (D-028): each element of ancestor_ids is
+            # itself a segment_id, which is internally "|"-delimited (see
+            # _subset_to_id()). Joining a list of already-"|"-delimited
+            # strings with "|" collides the outer and inner delimiters and
+            # cannot be losslessly split back into the original ancestor-id
+            # list (e.g. ["imperial|0000", "imperial|Container"] and
+            # ["imperial", "0000|imperial|Container"] both serialize to the
+            # same "|".join result). ";" does not otherwise occur in a
+            # segment_id (dimension values are themselves "|"-delimited into
+            # segment_id, so a ";" separator one level up is unambiguous).
+            "ancestor_segment_ids": ";".join(ancestor_ids),
             "run_type": "",
             "file_count": str(len(eids)),
             "export_run_ids": "|".join(eids),
