@@ -46,6 +46,23 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   first and was unaffected. Fixed by falling back to `p.get("join_key_schema")`
   before the hardcoded literal. Does not change gate evaluation, `join_hash`,
   or any hash semantics -- diagnostics/reporting output only.
+- **`tools/build_segment_manifest.py`: `business_center_label` values shorter
+  than 4 digits are now zero-padded before segment_id construction.** A
+  purely-numeric `business_center_label` (e.g. `"0"`, `"796"`) is left-padded
+  to 4 digits (`"0000"`, `"0796"`) in `_normalize_rows()`, ahead of the
+  existing first-seen-casing fold, so it merges with any correctly-formatted
+  occurrence of the same code instead of fragmenting into a spurious second
+  segment. Fixes a real operator-workflow failure mode: opening
+  `file_metadata.csv` in Excel without explicitly importing the
+  `business_center_label` column as Text causes Excel to reinterpret `"0000"`
+  as the number `0` and silently drop the leading zeros on save -- every real
+  business_center_label value in this corpus (the `"0000"` enterprise
+  bookkeeping token included) is exactly 4 digits, so padding up is safe. A
+  value already at 4+ digits, or containing any non-digit character (e.g.
+  `"BC_1234"`, `"Page"`), is left untouched. Segment-id/hash-affecting for any
+  corpus that was already carrying a collapsed short-digit
+  `business_center_label` value (that value now folds into the padded
+  segment instead of its own).
 
 ### Added
 - **`dimension_types` domain family: field expansion across all 7 partitions (Area 7):**

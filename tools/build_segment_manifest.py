@@ -267,6 +267,19 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
         enum. Case-insensitive fold to the casing of the first occurrence in
         row order. `rows` is a list, not a set/dict, so "first occurrence" is
         deterministic regardless of any hash/iteration order.
+      - business_center_label additionally: a purely-numeric value shorter
+        than 4 digits is left-zero-padded to 4 digits (e.g. "0" -> "0000",
+        "796" -> "0796") BEFORE the case-fold above, so it folds together
+        with any correctly-formatted 4-digit occurrence of the same code
+        instead of fragmenting into a second, spurious segment. This is a
+        defensive fix for a real operator-workflow failure mode: opening
+        file_metadata.csv in Excel without importing the business_center_
+        label column as Text causes Excel to reinterpret "0000" as the
+        number 0 and silently drop the leading zeros on save. Every real
+        business_center_label value observed in this corpus (enterprise
+        "0000" included) is exactly 4 digits, so padding up is safe; a
+        value already at or above 4 digits, or containing any non-digit
+        character (e.g. "BC_1234", "Page"), is left untouched.
 
     Sentinel handling (N/A-style spellings, enterprise-bookkeeping-token
     folding) does not apply to any DIMENSION_CONFIG field — they are the
@@ -291,9 +304,12 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
     for row in rows:
         new_row = dict(row)
         for field in fields:
-            raw = (row.get(field) or "").strip()
-            if not raw:
+            original_raw = (row.get(field) or "").strip()
+            if not original_raw:
                 continue
+            raw = original_raw
+            if field == "business_center_label" and raw.isdigit() and len(raw) < 4:
+                raw = raw.zfill(4)
             if field == "unit_system":
                 canon = raw.lower()
             elif field == "governance_role":
@@ -302,8 +318,8 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
                     canon = first_seen[field].setdefault(raw.lower(), raw)
             else:
                 canon = first_seen[field].setdefault(raw.lower(), raw)
-            if canon != raw:
-                changes.append((field, raw, canon))
+            if canon != original_raw:
+                changes.append((field, original_raw, canon))
             new_row[field] = canon
         normalized_rows.append(new_row)
 

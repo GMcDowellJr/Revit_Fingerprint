@@ -1093,6 +1093,77 @@ def test_client_label_first_seen_casing_is_canonical():
     assert set(merged["export_run_ids"].split("|")) == {"s01", "s02", "s03"}
 
 
+def test_business_center_label_zero_padded_short_digit_values():
+    # Excel-open-without-Text-import gotcha: "0000" silently becomes "0" (or
+    # "0796" becomes "796") if the column isn't imported as Text. A
+    # purely-numeric business_center_label shorter than 4 digits must
+    # zero-pad up to 4, matching every real 4-digit code in this corpus.
+    _, changes = _normalize_rows([
+        _meta_row("r01", "imperial", "Acme", "Container", business_center_label="0"),
+        _meta_row("r02", "imperial", "Acme", "Container", business_center_label="796"),
+        _meta_row("r03", "imperial", "Acme", "Container", business_center_label="14"),
+    ])
+    by_field = {(c[0], c[1]): c[2] for c in changes}
+    assert by_field[("business_center_label", "0")] == "0000"
+    assert by_field[("business_center_label", "796")] == "0796"
+    assert by_field[("business_center_label", "14")] == "0014"
+
+
+def test_business_center_label_already_four_digits_unaffected():
+    _, changes = _normalize_rows([
+        _meta_row("r01", "imperial", "Acme", "Container", business_center_label="0000"),
+        _meta_row("r02", "imperial", "Acme", "Container", business_center_label="2014"),
+    ])
+    assert changes == []
+
+
+def test_business_center_label_non_numeric_unaffected():
+    # "BC_1234" / "Page" contain non-digit characters -- left untouched,
+    # not padded or otherwise reinterpreted.
+    _, changes = _normalize_rows([
+        _meta_row("r01", "imperial", "Acme", "Container", business_center_label="BC_1234"),
+        _meta_row("r02", "imperial", "Acme", "Container", business_center_label="Page"),
+    ])
+    assert changes == []
+
+
+def test_business_center_label_zero_pad_merges_with_correctly_formatted_rows():
+    # The real-world failure mode: some rows still say "0000" (never opened
+    # in Excel), others got collapsed to "0" -- both must fold into the SAME
+    # segment rather than fragmenting into two shadow enterprise segments.
+    rows = (
+        [_meta_row(f"a{i:02d}", "imperial", "Acme", "Container", business_center_label="0000") for i in range(3)]
+        + [_meta_row(f"b{i:02d}", "imperial", "Acme", "Container", business_center_label="0") for i in range(3)]
+    )
+    segs = _build_segments(rows, min_files=1)
+    seg_ids = {r["segment_id"] for r in segs}
+    assert "imperial|Container|Acme|0000" in seg_ids
+    assert "imperial|Container|Acme|0" not in seg_ids
+    merged = next(r for r in segs if r["segment_id"] == "imperial|Container|Acme|0000")
+    assert set(merged["export_run_ids"].split("|")) == {f"a{i:02d}" for i in range(3)} | {f"b{i:02d}" for i in range(3)}
+
+
+def test_business_center_label_zero_pad_warning_emitted(tmp_path, capsys):
+    meta = tmp_path / "file_metadata.csv"
+    with meta.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=VALID_FIELDNAMES)
+        w.writeheader()
+        for i in range(5):
+            w.writerow({
+                "export_run_id": f"r{i:02d}", "unit_system": "imperial",
+                "client_label": "Acme", "governance_role": "Project",
+                "discipline_label": "architectural", "business_center_label": "0",
+            })
+
+    rc = main(["--metadata-file", str(meta), "--out-dir", str(tmp_path / "out"), "--min-files", "1"])
+    assert rc == 0
+    captured = capsys.readouterr()
+    warn_lines = [ln for ln in captured.err.splitlines() if "Normalized business_center_label" in ln]
+    assert len(warn_lines) == 1, f"Expected one aggregated warning line, got: {warn_lines}"
+    assert "'0' -> '0000'" in warn_lines[0]
+    assert "(5 row(s))" in warn_lines[0]
+
+
 def test_normalization_warning_emitted_with_aggregate_count(tmp_path, capsys):
     meta = tmp_path / "file_metadata.csv"
     with meta.open("w", newline="") as f:
