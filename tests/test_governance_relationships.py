@@ -84,6 +84,21 @@ def test_bc_prefix_variant_folds_to_same_bc_identity():
     assert out[0]["project_file_count"] == "2"
 
 
+def test_excel_collapsed_bc_folds_to_same_bc_identity():
+    # PR #425 follow-up: "796" (Excel-collapsed from "0796") must fold
+    # together with correctly-formatted "0796" rows via governance_manifest.
+    # py's shared normalize_business_center_label(), the same as the
+    # existing BC_-prefix case above.
+    rows = [
+        _row("f1", "Sutter", "0796", "Alpha", role="Project"),
+        _row("f2", "Sutter", "796", "Alpha", role="Project"),
+    ]
+    out, _ = build_relationships_rows(rows)
+    assert len(out) == 1
+    assert out[0]["business_center_label"] == "0796"
+    assert out[0]["project_file_count"] == "2"
+
+
 def test_same_project_label_different_client_stays_distinct():
     # Real production case: "MPMC" appears under two unrelated clients in the
     # same BC. Identity must be (client, bc, project_label), not project_label
