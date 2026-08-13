@@ -58,6 +58,30 @@ def test_normalize_recognizes_enterprise_tokens_before_prefix_strip():
     assert normalize_business_center_label("bc_0000") == ("bc_0000", True)
 
 
+def test_normalize_zero_pads_short_numeric_values():
+    # PR #425 review finding: this module reads file_metadata.csv directly
+    # and independently of build_segment_manifest.py's own zero-pad fix, so
+    # it needs the same fix applied here too -- otherwise a business_center_
+    # label Excel collapsed from "0000"/"0796" to "0"/"796" (column not
+    # imported as Text) fragments governance populations that
+    # build_segment_manifest.py's segment lattice would already have merged.
+    assert normalize_business_center_label("796") == ("0796", False)
+    assert normalize_business_center_label("14") == ("0014", False)
+    assert normalize_business_center_label("0796") == ("0796", False)
+
+
+def test_normalize_zero_pad_recognizes_collapsed_enterprise_token():
+    # A collapsed "0" must still be recognized as the "0000" enterprise
+    # token, not treated as a real 1-digit business center.
+    assert normalize_business_center_label("0") == ("0000", True)
+
+
+def test_normalize_zero_pad_does_not_affect_bc_prefixed_values():
+    # "BC_14" is not purely numeric (contains letters) -- zero-padding must
+    # not fire here; only the existing BC_-prefix-strip behavior applies.
+    assert normalize_business_center_label("BC_14") == ("14", False)
+
+
 def test_scope_key_requires_both_conditions_for_enterprise():
     # Internal client but real bc -> bc scope, not enterprise.
     key, level, _, bc = compute_scope_key("Stantec", "2014")
@@ -100,6 +124,24 @@ def test_legacy_bc_prefixed_and_bare_numeric_collapse_to_one_population():
     pop = manifest_rows[0]
     assert pop["scope_key"] == "bc:2014"
     assert pop["business_center_label"] == "2014"
+    assert _members(pop["governance_id"], membership_rows) == ["e1", "e2"]
+
+
+def test_excel_collapsed_and_correctly_formatted_bc_collapse_to_one_population():
+    # PR #425 review finding, integration-level: some rows still say "0796"
+    # (never opened in Excel without a Text-typed column import), others got
+    # collapsed to "796" -- both must fold into the SAME governance
+    # population rather than fragmenting into two.
+    rows = [
+        _row("e1", "Container", "Stantec", "0796"),
+        _row("e2", "Container", "Stantec", "796"),
+    ]
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    assert not excluded
+    assert len(manifest_rows) == 1
+    pop = manifest_rows[0]
+    assert pop["scope_key"] == "bc:0796"
+    assert pop["business_center_label"] == "0796"
     assert _members(pop["governance_id"], membership_rows) == ["e1", "e2"]
 
 

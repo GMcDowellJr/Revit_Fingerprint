@@ -63,6 +63,18 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   corpus that was already carrying a collapsed short-digit
   `business_center_label` value (that value now folds into the padded
   segment instead of its own).
+- **`tools/governance_manifest.py`: `normalize_business_center_label()` gets
+  the same zero-padding fix (PR #425 review follow-up).** This module reads
+  `file_metadata.csv` directly and independently of `build_segment_
+  manifest.py` (see the module's own docstring — disjoint governance
+  populations are deliberately not built on the segment lattice), so the
+  fix above did not reach it. A purely-numeric value shorter than 4 digits
+  is now zero-padded before the enterprise-bookkeeping-token check and the
+  `BC_`-prefix strip, so a collapsed `"0"`/`"796"` is recognized correctly
+  (`"0"` as the `"0000"` enterprise token, `"796"` merging with `"0796"`)
+  instead of fragmenting a governance population or spawning a fake
+  business center. `governance_relationships.py` imports and reuses this
+  same function, so it inherits the fix without a separate change.
 
 ### Added
 - **`dimension_types` domain family: field expansion across all 7 partitions (Area 7):**

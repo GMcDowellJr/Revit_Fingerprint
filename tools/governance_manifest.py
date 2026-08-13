@@ -87,8 +87,20 @@ EXCLUDED_FIELDNAMES = ["export_run_id", "governance_role", "client_label", "busi
 # fragmenting into two. It is intentionally narrow — "strip BC_ prefix if
 # present," nothing more; it is not a general-purpose format detector.
 #
+# A purely-numeric value shorter than 4 digits (e.g. "0" or "796") is
+# zero-padded to 4 digits before anything else -- the same fix
+# build_segment_manifest.py's _normalize_rows() applies (see CHANGELOG.md),
+# for the same reason: opening file_metadata.csv in Excel without importing
+# business_center_label as Text collapses "0000" to "0" on save. This
+# module reads file_metadata.csv directly and independently of build_
+# segment_manifest.py (see this file's own module docstring -- disjoint
+# governance populations are deliberately NOT built on the segment lattice),
+# so it needs its own copy of the same padding fix rather than inheriting it.
+#
 # The enterprise-bookkeeping check ("0000"/"BC_0000") is evaluated BEFORE any
-# prefix stripping and reuses the shared ENTERPRISE_BC_BOOKKEEPING_TOKENS set
+# prefix stripping (but AFTER zero-padding, so a collapsed "0" is correctly
+# recognized as the "0000" enterprise token, not treated as a real 1-digit
+# business center) and reuses the shared ENTERPRISE_BC_BOOKKEEPING_TOKENS set
 # from na_token.py (the same set compare_cross_segment.py's _normalize_bc_
 # label() and build_segment_manifest.py's normalization already use) rather
 # than reimplementing it. It is a separate concept from BC-prefix stripping:
@@ -98,6 +110,8 @@ EXCLUDED_FIELDNAMES = ["export_run_id", "governance_role", "client_label", "busi
 def normalize_business_center_label(raw: str) -> Tuple[str, bool]:
     """Returns (normalized_value, is_enterprise_bookkeeping)."""
     value = (raw or "").strip()
+    if value.isdigit() and len(value) < 4:
+        value = value.zfill(4)
     if value.lower() in ENTERPRISE_BC_BOOKKEEPING_TOKENS:
         return value, True
     if value[:3].lower() == "bc_":
