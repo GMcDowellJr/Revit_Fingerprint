@@ -23,9 +23,14 @@ param(
 $ErrorActionPreference = "Stop"
 
 $REPO         = "C:\Users\gmcdowell\Documents\Revit_Fingerprint"
-$EXPORTS      = $ExportsRoot
-$RESULTS      = "$EXPORTS\results"
-$SEGMENTS     = "$EXPORTS\segments"
+$EXPORTS      = "$ExportsRoot\exports"
+# $RESULTS is now an alias for $ExportsRoot itself, not a "results\" subfolder
+# -- every $RESULTS-derived path below (name_key\, records\, and whatever
+# run_extract_all.py/patch_all_domain_patterns.py write under --out-root/
+# --results-root) now lands directly under $ExportsRoot, alongside exports\
+# and segments\, instead of nested one level deeper under a "results\" folder.
+$RESULTS      = $ExportsRoot
+$SEGMENTS     = "$ExportsRoot\segments"
 $RECORDS      = "$RESULTS\records"
 $SIG_POL      = "$REPO\policies\domain_sig_hash_policies.json"
 $JOIN_POL     = "$REPO\policies\domain_join_key_policies.json"
@@ -98,7 +103,7 @@ if ($Run -eq "A") {
     Write-Host "=== RUN A: Flatten / Apply / Placeholders ===" -ForegroundColor Green
 
     python tools/run_extract_all.py $EXPORTS `
-        --out-root $EXPORTS `
+        --out-root $RESULTS `
         --stages sig_hash,flatten,apply,placeholders `
         --sig-hash-policy $SIG_POL `
         --join-policy $JOIN_POL
