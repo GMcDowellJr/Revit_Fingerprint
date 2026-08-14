@@ -52,7 +52,13 @@ _FILL_PATTERN_IMPORT_CATEGORY_MARKERS = ("IMPORT", "IMPORTED")
 
 
 def _phase2_fill_pattern_is_import(elem, name):
-    """Best-effort PAT-import flag for FillPatternElement extraction."""
+    """Best-effort PAT-import flag for FillPatternElement extraction.
+
+    Returns (v, q) matching the IdentityItem.v contract: v is "true"/"false"/None
+    (never a raw bool), q is an ITEM_Q_* quality flag. Every success path routes
+    through canonicalize_bool() so callers can pass the result straight into the
+    identity-item constructor without an extra coercion step.
+    """
     direct_attrs = (
         "IsImported",
         "IsImport",
@@ -68,7 +74,7 @@ def _phase2_fill_pattern_is_import(elem, name):
                 v = getattr(elem, attr)
                 if callable(v):
                     v = v()
-                return bool(v), ITEM_Q_OK
+                return canonicalize_bool(bool(v))
         except Exception:
             continue
 
@@ -76,14 +82,14 @@ def _phase2_fill_pattern_is_import(elem, name):
         cat = getattr(elem, "Category", None)
         cat_name = safe_str(getattr(cat, "Name", "")).upper() if cat is not None else ""
         if any(marker in cat_name for marker in _FILL_PATTERN_IMPORT_CATEGORY_MARKERS):
-            return True, ITEM_Q_OK
+            return canonicalize_bool(True)
     except Exception:
         pass
 
     try:
         nm = safe_str(name).strip()
         if nm:
-            return bool(_FILL_PATTERN_IMPORT_NAME_RE.match(nm)), ITEM_Q_OK
+            return canonicalize_bool(bool(_FILL_PATTERN_IMPORT_NAME_RE.match(nm)))
         return None, ITEM_Q_MISSING
     except Exception:
         return None, ITEM_Q_UNREADABLE
