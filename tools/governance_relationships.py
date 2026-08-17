@@ -20,7 +20,7 @@ as the project roster source: its rows are governance POPULATIONS grouped by
 scope_key="project:{client}:{bc}" row pools every project sharing that
 client+bc+discipline+unit combination into one file_count, with no
 project-identity column at all (project_label is explicitly not read by
-build_segment_manifest.py/governance_manifest.py -- see CLAUDE.md).
+build_segment_manifest.py/governance_manifest.py).
 
 The only field in the pipeline that actually identifies one physical project
 is file_metadata.csv's `project_label` column, already used for exactly this

@@ -661,7 +661,7 @@ def _build_registry(
                 # (tools/compare_cross_segment.py) always resolve reference segments
                 # dynamically against current output. A pinned/snapshot mode is
                 # deferred until Phase-2 baseline authority is established (see
-                # CLAUDE.md "current operating mode").
+                # "current operating mode").
                 "conformance_reference_mode": old.get("conformance_reference_mode", "") or "latest",
                 "output_folder": folder,
                 "status": old.get("status", "pending"),

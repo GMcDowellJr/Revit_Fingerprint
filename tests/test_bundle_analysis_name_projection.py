@@ -235,7 +235,7 @@ class TestPurgeViewDefaultIsTargetAware:
 
 class TestSplitExportFileIdNormalization:
     """PR #389 review: tools/apply_name_key_policy.py records `export_file` as the
-    *.details.json name (CLAUDE.md's input-format priority), while tools/extractor.py's
+    *.details.json name (input-format priority), while tools/extractor.py's
     emit_records() stamps export_run_id/file_metadata.csv from the *.index.json name for a
     split-export pair (_iter_export_files(): the index file is always `primary` when one
     exists). Copying export_file verbatim would silently break --roles filtering and

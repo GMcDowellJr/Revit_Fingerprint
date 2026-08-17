@@ -7,9 +7,9 @@ after that allowlist work shipped.
 
 ## Step 0 — what actually landed, and an important correction to the task's premise
 
-**The allowlist PR was not `claude/probe-method-invocation-allowlist`.** No
+**The allowlist PR was not `probe-method-invocation-allowlist`.** No
 branch of that name exists. The actual work is on
-`claude/method-invocation-candidates-jctnxe`, merged as **PR #395**
+`method-invocation-candidates-jctnxe`, merged as **PR #395**
 (merge commit `b44a4fc`), already on `main` and already included in this
 branch (`git log` shows `b44a4fc` is the current HEAD). The commit chain,
 in order:

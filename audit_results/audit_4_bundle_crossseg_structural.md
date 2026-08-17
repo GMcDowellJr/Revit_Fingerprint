@@ -278,7 +278,7 @@ Imported and genuinely used to parallelize (segment-pair × domain) work items, 
 
 **Status: MIXED**, as detailed in the file-structure section above:
 - `fill_patterns`, `dimension_types`, `object_styles` — fully consolidated into single files with internal partition-routing logic (verified via dispatch constants/frozensets, not just naming coincidence).
-- `view_category_overrides` — intentionally kept split into `_model`/`_annotation` partition files behind a thin coordinator, consistent with the CLAUDE.md description of this domain's architecture. This is the one domain family that has *not* been collapsed into a single file, by design.
+- `view_category_overrides` — intentionally kept split into `_model`/`_annotation` partition files behind a thin coordinator, consistent with the description of this domain's architecture. This is the one domain family that has *not* been collapsed into a single file, by design.
 
 ### I2-bonus — Run manifest / results registry
 

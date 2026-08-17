@@ -54,7 +54,7 @@ DOMAIN_COVERAGE_FIELDS = ["domain", "coverage_class", "included", "reason"]
 
 def normalize_export_run_id(export_file: str, known_ids: Optional[Set[str]] = None) -> str:
     """Normalize PR2's `export_file` (`tools/apply_name_key_policy.py`, which prefers
-    `*.details.json` per CLAUDE.md's input-format priority) back to the canonical
+    `*.details.json` per input-format priority) back to the canonical
     `export_run_id` `tools/extractor.py`'s `emit_records()` actually stamps -- the file
     `_iter_export_files()` picks as `primary`. For a split-export pair, `primary` is
     always the `*.index.json` file when one exists (`_iter_export_files()`: `if idx is
@@ -70,7 +70,7 @@ def normalize_export_run_id(export_file: str, known_ids: Optional[Set[str]] = No
     Blindly rewriting every `*.details.json` suffix is only correct for a *complete*
     split-export pair; a details-only export (no sibling `*.index.json` at all -- a
     legitimate, `_iter_export_files()`-supported case, not an out-of-contract one, per
-    CLAUDE.md's own details-preferred priority) keeps the `*.details.json` name itself as
+    details-preferred priority) keeps the `*.details.json` name itself as
     its canonical `export_run_id`, and blindly rewriting it produces an id that never
     matches anything real (PR #390 review). Pass `known_ids` (e.g. `file_metadata.csv`'s
     real `export_run_id` set) whenever available to resolve this correctly: the normalized

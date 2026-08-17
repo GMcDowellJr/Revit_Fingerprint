@@ -85,7 +85,7 @@ def _has_detail_data(record: Dict[str, Any]) -> bool:
     """True if record carries record-level detail (identity_basis, phase2, or canonical
     flat items), as opposed to summary-only/index-level data.
 
-    Per CLAUDE.md's input-format-priority rule, summary-only exports are degraded and
+    Per input-format-priority rule, summary-only exports are degraded and
     "records without [identity_basis/phase2] are skipped, not silently treated as
     complete." A label-only domain's name value lives in label.*, which a summary-only
     record could still carry -- without this gate, such a record would synthesize a

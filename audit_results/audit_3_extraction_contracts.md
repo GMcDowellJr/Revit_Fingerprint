@@ -2,7 +2,7 @@
 Date: 2026-06-17
 
 Note on file locations: the task brief assumed extractors live under
-`extractors/domains/`. Per this repo's actual layout (and CLAUDE.md),
+`extractors/domains/`. Per this repo's actual layout,
 domain extractors live at the repo root under `domains/`. Wall types are a
 partition inside the consolidated `domains/compound_types.py` extractor
 (per D-015 domain family architecture), not a standalone `wall_types.py`

@@ -15,7 +15,7 @@ were renamed (`phase1_domain_authority.py` → `domain_authority.py`,
 for exactly which parts. Paths below have been updated to match; the phase concepts
 and recommendations (baseline-free vs. baseline-anchored, current operating mode)
 are otherwise unchanged. For the current segment/governance comparison layer that
-has grown up alongside this Phase-0/1/2 model, see `CLAUDE.md`'s "Segment & governance
+has grown up alongside this Phase-0/1/2 model, see "Segment & governance
 comparison" section and `docs/cross_segment_comparison.md`.
 
 Assumed exporter behavior:

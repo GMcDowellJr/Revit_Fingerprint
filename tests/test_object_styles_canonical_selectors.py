@@ -98,7 +98,7 @@ def test_object_styles_model_area9_fields_pass_contract_validation_for_subcatego
 
 def test_object_styles_model_parent_name_missing_and_none_for_top_level_category():
     # A genuinely top-level category (no parent) is None/unset -- per the record.v2 sentinel
-    # policy (CLAUDE.md: "Identity values (v) MUST NOT contain sentinel literals -- use
+    # policy ("Identity values (v) MUST NOT contain sentinel literals -- use
     # v: null + q: 'missing' instead"), that's q=missing, not q=ok and not q=unreadable
     # (unreadable is reserved for actual read failures/exceptions). Matches the probe's own
     # classification (audit_results/audit_11_domain_extractor_delta_step0_findings.md §9.3:

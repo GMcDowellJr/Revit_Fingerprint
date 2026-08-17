@@ -642,7 +642,7 @@ user/project attribution        — client onboarding/coherence
 ## Not yet covered (candidates for future capture, not yet routes)
 
 - Before/after comparison across two runs (no accepted Phase-2 baseline yet
-  per `CLAUDE.md`'s "Current operating mode" — out of scope until authority
+  per "Current operating mode" — out of scope until authority
   is established).
 - Business-center-level **project-composition** rollups are now covered —
   see the three routes above (`governance_bc_client_matrix.csv`,

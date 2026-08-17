@@ -38,8 +38,8 @@ touched by this cleanup despite the name: most of it is live, invoked directly b
 (`run_change_type.py`, `run_attribute_stress.py`, `run_attribute_stress_all_joinable.py`,
 and the rest of the `run_dimension_types_by_family.py` cluster, plus
 `annotate_cluster_labels.py`, `backfill_cluster_label_inputs.py`, `pareto_with_splits.py`)
-are intentionally-paused Phase-2 tooling gated on Phase-2 baseline authority (see
-`CLAUDE.md`'s "Two distinct baseline concepts" / "Current operating mode"), not abandoned
+are intentionally-paused Phase-2 tooling gated on Phase-2 baseline authority (see 
+"Two distinct baseline concepts" / "Current operating mode"), not abandoned
 code — left in place on purpose.
 
 ---

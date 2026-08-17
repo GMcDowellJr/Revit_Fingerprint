@@ -4610,7 +4610,7 @@ def render_client_bc_distribution_section(client_bc_rows: list, bc_client_rows: 
 # build_client_summary() -- duplicated here as in those places rather than
 # centralized, matching this generator's current state (policy/threshold
 # externalization is deferred to a later PR; see docs/governance_evidence_package.md
-# and CLAUDE.md's Sig-Hash/Shape-Gating precedent for the externalization pattern
+# and Sig-Hash/Shape-Gating precedent for the externalization pattern
 # this will eventually follow).
 
 _RULE_STRONG_BASELINE = "GOV-TIER-STRONG-BASELINE"

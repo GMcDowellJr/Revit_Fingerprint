@@ -22,7 +22,7 @@ object_styles_annotation / ...):
   captured as identity evidence (present, contributing to a degraded status
   if unreadable, but not required/blocking) and are deliberately excluded
   from `sig_basis.keys_used` so the hash stays "stable across sessions" per
-  CLAUDE.md's hash-semantics rules.
+  hash-semantics rules.
 - extract_worksets_doc() -> domain="worksets_doc": a single synthetic
   document-level record (`record_id="worksets:_doc"`) summarizing
   `doc.IsWorkshared`, the active workset's name, and a population count per
@@ -517,8 +517,7 @@ def extract_worksets(doc, ctx=None):
         doc: Revit Document
         ctx: Context dictionary (unused for cross-domain reads; reserved for
             future consumers, e.g. Area 4's browser_organization resolving
-            WorksetId through these records -- see CLAUDE.md's Out of scope
-            note for this area)
+            WorksetId through these records -- Out of scope for this area)
 
     Returns:
         Dictionary with count, hash_v2, records, record_rows.

@@ -8,7 +8,7 @@ phase2 bucket items, label.display) is already present in existing exports. Mirr
 core/sig_hash_builder.py's role for sig_hash (a policy-driven, read-only reconstruction path
 alongside the inline extractor computation), via core/name_key_builder.py.
 
-Input format priority (per CLAUDE.md): *.details.json preferred; *.index.json is
+Input format priority: *.details.json preferred; *.index.json is
 summary-only (no identity_basis/phase2, degraded semantics -- records without them are
 skipped, not silently treated as complete); never *.legacy.json.
 

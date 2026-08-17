@@ -90,7 +90,7 @@ rows:
     `records.csv` via `(export_run_id, domain, record_id)`.
   - **`export_file`→`export_run_id` is not a bare rename for split-export pairs.**
     `apply_name_key_policy.py` records `export_path.name` — for a details-preferred read
-    (CLAUDE.md's input-format priority) that is the `*.details.json` filename. The extractor's
+    (input-format priority) that is the `*.details.json` filename. The extractor's
     own manifest (`meta_rows`/`emit_records`) stamps the canonical `export_run_id` for a
     split-export pair as the paired `*.index.json` filename instead (`_iter_export_files()`:
     `primary` is always the index file when one exists, never its details sibling). Feeding

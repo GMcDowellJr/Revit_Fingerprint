@@ -443,7 +443,7 @@ def extract(doc, ctx=None):
     # off this record's own label.display-backing item (identity.project_title). Unlike
     # is_workshared/revit_version_*/revit_build above, project_title is not a member of
     # identity_items today -- it lives only in phase2.unknown_items (file-local noise,
-    # excluded from join-keys by CLAUDE.md's Phase-2 bucket contract). This call therefore
+    # excluded from join-keys by Phase-2 bucket contract). This call therefore
     # uses a LOCAL widened items list (identity_items + one freshly-wrapped item) for the
     # name-key projection only; identity_basis.items/sig_hash/join_key above are computed
     # from the original, unwidened identity_items list and are unaffected.

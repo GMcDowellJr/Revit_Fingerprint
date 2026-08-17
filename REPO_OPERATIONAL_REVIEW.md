@@ -203,7 +203,7 @@ Layer 3 — Runner (run_dynamo.py, 1301 lines)
 
 **Risk:** One developer holds all domain knowledge, operational procedures, and Revit environment context. AI-assisted commits (10%) supplement but do not replace this.
 
-**Evidence:** 90/100 commits by one author. `tools/Powershell Commands.txt` contains hardcoded paths specific to one workstation. No onboarding documentation beyond `CLAUDE.md` (which targets AI assistants, not human developers). PR templates reference verification steps that assume Revit access.
+**Evidence:** 90/100 commits by one author. `tools/Powershell Commands.txt` contains hardcoded paths specific to one workstation. PR templates reference verification steps that assume Revit access.
 
 ### 2. No Automated Quality Gate
 
@@ -282,4 +282,4 @@ Layer 3 — Runner (run_dynamo.py, 1301 lines)
 
 **Justification:** The dual hash computation increases code complexity and maintenance burden in every domain. `docs/phase2-identity-and-semantic-plan.md` describes the migration path but sets no timeline. A decision — even "not yet, because X" — would prevent indefinite drift. This need not be a code change; a dated entry in `DECISIONS.md` would suffice.
 
-**Evidence:** All 14 active domains compute both hashes. Legacy remains default. No evidence of systematic comparison between the two modes. The semantic mode is described as "preferred for new integrations" in `CLAUDE.md`.
+**Evidence:** All 14 active domains compute both hashes. Legacy remains default. No evidence of systematic comparison between the two modes. The semantic mode is described as "preferred for new integrations".

@@ -58,7 +58,7 @@ tree walk (bounded by the probe's own `max_items_per_level`/`max_tree_depth`
 inputs) -- not a deterministic property of the `BrowserOrganization` element
 itself, and therefore not eligible for a fingerprint that must be
 "deterministic, stable across sessions, independent of element creation
-order" (CLAUDE.md). Carrying a probe-run-parameter-dependent count into a
+order". Carrying a probe-run-parameter-dependent count into a
 governed field would violate that invariant, so both are dropped rather than
 replicated.
 
