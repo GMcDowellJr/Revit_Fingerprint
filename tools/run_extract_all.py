@@ -231,11 +231,11 @@ def _ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
 
-def _resolve_sig_hash_policy_path(explicit: Optional[str], out_root: Path) -> Optional[Path]:
+def _resolve_sig_hash_policy_path(explicit: Optional[str], results_root: Path) -> Optional[Path]:
     if explicit:
         p = Path(explicit).resolve()
         return p if p.is_file() else None
-    candidate1 = (out_root / "results" / "policies" / "domain_sig_hash_policies.json").resolve()
+    candidate1 = (results_root / "policies" / "domain_sig_hash_policies.json").resolve()
     if candidate1.is_file():
         return candidate1
     # CWD-relative (works when invoked from repo root)
@@ -745,6 +745,16 @@ def main() -> None:
     )
     ap.add_argument("exports_dir", help="Folder containing fingerprint exports (*__fingerprint.json, or legacy *.details.json / *.index.json).")
     ap.add_argument("--out-root", required=True, help="Output root folder.")
+    ap.add_argument(
+        "--out-root-is-results-root",
+        action="store_true",
+        help="Treat --out-root itself as the results root: records/, analysis/, policies/, "
+             "label_synthesis/, etc. land directly under it instead of under {out-root}/results/. "
+             "Use this when --out-root already names a dedicated results directory (e.g. "
+             "corpus_update_runbook.ps1's $RESULTS, sibling to exports/ and segments/). Leave "
+             "unset for per-segment callers (run_segment_orchestrator.py) that want results/ "
+             "nested under --out-root to stay separate from segment-level log files."
+    )
     ap.add_argument("--seed", default=None, help="Path to a seed fingerprint JSON. When provided, emits a seed-comparison sidecar for the seed-baseline BI dashboard (project drift vs template). Not part of standard segment runs.")
     ap.add_argument("--domains", default=None, help="Comma list of domains; if omitted, infer from exports.")
     ap.add_argument("--stages", default="flatten,sig_hash,discover", help="Comma-separated stages to run. Default: flatten,sig_hash,discover.")
@@ -771,16 +781,19 @@ def main() -> None:
         "--records-dir",
         default=None,
         help="Path to directory containing records.csv and file_metadata.csv. "
-             "Overrides the default {out-root}/results/records/ for authority/patterns stages. "
-             "Use when running per-segment analysis where records live at corpus level."
+             "Overrides the default {results-root}/records/ for authority/patterns stages "
+             "(results-root is --out-root itself with --out-root-is-results-root, else "
+             "{out-root}/results/). Use when running per-segment analysis where records "
+             "live at corpus level."
     )
     ap.add_argument(
         "--label-synth-dir",
         default=None,
         help="Path to a label_synthesis/ directory to use as the read source for label "
              "population, LLM cache, and curator annotations. Overrides the default "
-             "{out-root}/results/label_synthesis/ for the read path only — analysis outputs "
-             "still write to {out-root}/results/. Use when running per-segment analysis so "
+             "{results-root}/label_synthesis/ for the read path only — analysis outputs "
+             "still write to {results-root}/ (see --out-root-is-results-root for what "
+             "results-root resolves to). Use when running per-segment analysis so "
              "that corpus-level LLM improvements are picked up without rebuilding per segment."
     )
     ap.add_argument(
@@ -820,7 +833,19 @@ def main() -> None:
 
     exports_dir = Path(args.exports_dir).resolve()
     out_root = Path(args.out_root).resolve()
-    v21_root = out_root / "results"
+    # Two callers disagree about what --out-root names, so the "results/" nesting
+    # level is explicit rather than hardcoded either way:
+    #  - run_segment_orchestrator.py passes a per-segment folder as --out-root and
+    #    wants results/ nested under it, to separate this script's output from the
+    #    segment-level run.log/patterns.log/bundle.log/export_run_ids.txt siblings
+    #    it writes itself (default behaviour here, --out-root-is-results-root unset).
+    #  - corpus_update_runbook.ps1 passes its corpus-level $RESULTS root (itself
+    #    already a dedicated results directory, sibling to exports/ and segments/)
+    #    and wants records/analysis/policies/etc. directly under it -- no extra
+    #    nesting -- matching patch_all_domain_patterns.py's --results-root and the
+    #    runbook's $RECORDS ($RESULTS\records, not $RESULTS\results\records).
+    #    Pass --out-root-is-results-root to select this layout.
+    v21_root = out_root if args.out_root_is_results_root else out_root / "results"
     v21_phase0_dir = v21_root / "records"
     effective_phase0_dir = v21_phase0_dir
     v21_analysis_dir = v21_root / "analysis"
@@ -873,7 +898,7 @@ def main() -> None:
                 "identity_items.csv) to exist. Run the flatten stage first, or include "
                 "flatten in --stages."
             )
-        sig_pol = _resolve_sig_hash_policy_path(args.sig_hash_policy, out_root)
+        sig_pol = _resolve_sig_hash_policy_path(args.sig_hash_policy, v21_root)
         if sig_pol is None:
             if args.skip_sig_hash_missing_policy:
                 sys.stderr.write(

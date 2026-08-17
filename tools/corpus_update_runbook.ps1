@@ -104,6 +104,7 @@ if ($Run -eq "A") {
 
     python tools/run_extract_all.py $EXPORTS `
         --out-root $RESULTS `
+        --out-root-is-results-root `
         --stages sig_hash,flatten,apply,placeholders `
         --sig-hash-policy $SIG_POL `
         --join-policy $JOIN_POL
@@ -139,7 +140,8 @@ if ($Run -eq "B") {
 
     Write-Host "--- B1: authority + patterns ---" -ForegroundColor Cyan
     python tools/run_extract_all.py $EXPORTS `
-        --out-root $EXPORTS `
+        --out-root $RESULTS `
+        --out-root-is-results-root `
         --stages authority,patterns
     Invoke-Checked -StepName "Run B1: authority/patterns"
 
