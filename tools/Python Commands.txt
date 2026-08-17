@@ -63,9 +63,9 @@ cd "C:\Users\gmcdowell\Documents\Revit_Fingerprint"
 
 cd "C:\Users\gmcdowell\Documents\Revit_Fingerprint"
 python tools/compare_cross_segment.py `
-	--segments-root C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\segments `
-	--records-dir C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\results\records `
-	--out-dir C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment
+	--segments-root "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\segments" `
+	--records-dir "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\records" `
+	--out-dir "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment"
 
 
 python "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\generate_governance_narrative.py" `
@@ -74,12 +74,12 @@ python "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\generate_governance
 	--governance-states "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\cross_segment_governance_states.csv" `
 	--governance-state-summary "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\cross_segment_governance_state_summary.csv" `
 	--delta "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\cross_segment_delta.csv" `
-	--file-meta "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\results\records\file_metadata.csv" `
+	--file-meta "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\records\file_metadata.csv" `
 	--union-inventory "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\cross_segment_union_inventory.csv" `
 	--reuse-distribution "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\pattern_reuse_distribution.csv" `
 	--matrix-manifest "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\matrix_output_manifest.csv" `
 	--package-schema-version 3.0 `
-	--segment-manifest "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\results\records\segment_manifest.csv" `
+	--segment-manifest "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\records\segment_manifest.csv" `
 	--reuse-by-client                    "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\pattern_reuse_summary_by_client.csv" `
 	--project-union-jaccard-matrix       "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\project_union_jaccard_matrix.csv" `
 	--project-density-similarity-matrix  "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\project_density_similarity_matrix.csv" `
