@@ -34,7 +34,11 @@ from pathlib import Path
 from typing import Dict, Set, Tuple
 
 
-def build_label_population(out_root: Path, records_dir: Path | None = None) -> None:
+def build_label_population(
+    out_root: Path,
+    records_dir: Path | None = None,
+    label_synth_dir: Path | None = None,
+) -> None:
     if records_dir is not None:
         records_csv = records_dir / "records.csv"
     else:
@@ -46,7 +50,8 @@ def build_label_population(out_root: Path, records_dir: Path | None = None) -> N
             f"        Run flatten stage first: --stages flatten (or flatten,apply)"
         )
 
-    label_synth_dir = out_root / "results" / "label_synthesis"
+    if label_synth_dir is None:
+        label_synth_dir = out_root / "results" / "label_synthesis"
     label_synth_dir.mkdir(parents=True, exist_ok=True)
 
     # Group by (domain, join_hash, label_v) -> set of file (export_run_id) that have it
@@ -154,9 +159,23 @@ def main() -> None:
              "Overrides the default {out-root}/results/records/ derivation. "
              "Use when running per-segment analysis where records live at corpus level.",
     )
+    ap.add_argument(
+        "--label-synth-dir",
+        default=None,
+        help="Output directory for the per-domain label population CSVs. "
+             "Overrides the default {out-root}/results/label_synthesis/ derivation. "
+             "Use alongside --records-dir when --out-root does not use the nested "
+             "{out-root}/results/ layout (e.g. run_extract_all.py's "
+             "--out-root-is-results-root).",
+    )
     args = ap.parse_args()
     records_dir = Path(args.records_dir).resolve() if args.records_dir else None
-    build_label_population(Path(args.out_root).resolve(), records_dir=records_dir)
+    label_synth_dir = Path(args.label_synth_dir).resolve() if args.label_synth_dir else None
+    build_label_population(
+        Path(args.out_root).resolve(),
+        records_dir=records_dir,
+        label_synth_dir=label_synth_dir,
+    )
 
 
 if __name__ == "__main__":

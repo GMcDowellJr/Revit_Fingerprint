@@ -1028,14 +1028,20 @@ def main() -> None:
                     report["notes"].append(f"identity_items_shards={_legacy_shard_dir}")
 
             # Ensure modal label population artifacts exist for the active v2.1 emit path.
+            # records_source_dir and v21_root are already resolved against the chosen
+            # --out-root-is-results-root layout above -- pass them explicitly rather than
+            # letting build_label_population.py re-derive its own {out-root}/results/...
+            # paths, which would only match the nested (default) layout.
             cmd_label_pop = [
                 sys.executable,
                 "tools/label_synthesis/build_label_population.py",
                 "--out-root",
                 str(out_root),
+                "--records-dir",
+                str(records_source_dir),
+                "--label-synth-dir",
+                str(v21_root / "label_synthesis"),
             ]
-            if args.records_dir:
-                cmd_label_pop += ["--records-dir", str(records_source_dir)]
             report["commands"].append({"stage": "analyze", "cmd": cmd_label_pop})
             _run(cmd_label_pop, env=env)
 
