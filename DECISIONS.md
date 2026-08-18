@@ -1386,3 +1386,94 @@ Out of scope: `build_segment_manifest.py` and `compare_cross_segment.py` remain 
 - `render_header()` shrinks and `docs/governance_interpretation_guide.md` becomes the sole source for metric/reading definitions — requires confirming the guide's existing "Metric semantics" section actually covers every concept currently explained inline (containment, cross-client similarity, all-view/used-view, score-range interpretation) before the inline text is removed; any gap found gets added to the guide, not left unexplained.
 - `docs/governance_classification_rules.md` is a new hand-maintained artifact describing Python control flow in prose. It is not mechanically verified against the functions it describes — a future code change to `assign_tier()`'s branch order could make this document stale without anything failing. This is a known limitation, not resolved in this phase; a future phase could add a regression test that asserts specific documented example inputs produce the documented example outputs, catching drift without executing the whole file line-by-line as a spec.
 - `governance_evidence_map.json` grows by one artifact (`docs/governance_classification_rules.md`), following the same `Path.exists()`-based presence check as the two existing static docs.
+- `docs/governance_evidence_package.md`'s "Policy profiles and threshold profiles" table gains a fifth row for `anomaly_thresholds.json`, and its phase-log intro paragraph gains a "Phase 6 (D-029)" sentence, matching the existing Phase 1–5 narration pattern.
+- `CHANGELOG.md`'s `[Unreleased]` section gains an entry, matching every prior phase's changelog discipline.
+
+## D-030 — Governance narrative evidence-package layer (Phase 7: reading-order artifact and completeness gate)
+
+### Status
+Accepted (2026-08-18)
+
+### Context
+The package has an authority hierarchy (which artifact wins on disagreement — `render_evidence_authority_header()`) and a topic index (`docs/governance_question_routes.md` — where to look for a recurring question), but nothing states a reading *sequence* for a cold-start reader, human or LLM. `governance_evidence_map.json`'s per-artifact fields (`context_role`, `can_answer`/`cannot_answer`, related-artifact lists) have no ordering or completeness signal at all — a reader can open any artifact first and has no structural cue about what else it depends on.
+
+An ordinal field (e.g. `read_priority: 1, 2, 3...`) was considered and rejected: an ordinal invites an LLM to sort, read the top few, and reason from a partial picture while still technically "following the order." The failure mode this package needs to guard against is a reader stopping partway through a required set, not a reader reading things in a suboptimal sequence. Given D-023's confirmed finding that this package has, and will continue to have, no query/tool-calling path — a reader cannot fetch more context once reasoning starts, only work from what's already in front of it — the only available guardrail is a structural, self-checkable completeness signal in the artifacts themselves.
+
+### Decision
+Two additions:
+
+1. **`docs/governance_reading_order.md`** — a new, stable, non-regenerated, package-type-level doc (versioned via its own header, following the `governance_interpretation_guide.md`/`governance_question_routes.md` precedent). States, at the top, this package's intended audience and purpose in the terms the package was actually designed for: a leadership reader who does not know Revit, who understands operational tradeoffs, and who is meant to ask governance convergence/fragmentation questions — not decide standards unassisted. Below that, an explicit ordered path through the package (health check → evidence map/interpretation guide orientation → brief → domain/client rollups → narrative prose → question routes if a specific question → file inventory if deeper drill-down is needed), and a short "read this before drawing conclusions" callout pointing at the two known-bad-inference additions from D-031.
+2. **Evidence-map completeness fields**, not an ordinal. `governance_evidence_package.py`'s `_artifact()` gains a `required_before_conclusions: bool` field (which artifacts must be incorporated before a governance conclusion is stated), and `build_evidence_map()`'s top-level output gains a `reasoning_prerequisites: [artifact_id, ...]` list — the full set of `required_before_conclusions=true` artifact_ids, exposed once at the manifest level so a reader can check it as a set to exhaust, not a sequence to sample from. `render_evidence_authority_header()` gains one line naming this field and pointing at `docs/governance_reading_order.md`.
+
+### Consequences
+- No existing classification, CSV column, or finding changes — this phase adds a new static doc and two new descriptive fields to already-generated JSON; nothing recomputes.
+- `governance_package_manifest.json` and `governance_evidence_map.json` schema versions bump to reflect the new field (per the existing `package_schema_version` override mechanism).
+- A future artifact added to the package must have an explicit `required_before_conclusions` value at the point it's added to `build_evidence_map()` — there is no default that silently opts an artifact in or out, since either default is a real content decision about that specific artifact.
+- This is a convention, not an enforcement mechanism — nothing in this package can stop a reader from ignoring `reasoning_prerequisites` and stating a conclusion anyway. The gate only works if a reader (human or LLM) actually checks it, consistent with every other guardrail in this package being self-checkable rather than enforced.
+
+---
+
+## D-031 — Governance narrative evidence-package layer (Phase 8: insufficient-evidence and single-region known-bad-inference clarifications)
+
+### Status
+Accepted (2026-08-18)
+
+### Context
+`docs/governance_interpretation_guide.md`'s "Known bad inferences" section (eight entries) does not address two recurring misreadings, both confirmed live in the current corpus rather than hypothetical:
+
+1. Every domain in the current corpus sits at `TIER_INSUFFICIENT` or `TIER_INSUFFICIENT_ENTERPRISE_BC_EVIDENCE` for its *enterprise-scoped* reading, because only business center 2014 currently has Project-role files. The tier names and intro text (`render_domain_tiers()`, ~3239) already distinguish "no enterprise evidence, but BC-level pooled evidence exists" from "no evidence at all," but nothing states that this is a *scope-specific* gap — a domain lacking enterprise-scoped evidence can still have solid client-level, discipline-level, or cross-client-convergence evidence for that same domain sitting in a different summary CSV. Left unstated, this reads as "the package has no evidence," when the accurate statement is "the package has no evidence *at the enterprise scope*."
+2. The corpus currently contains files from a single region. `render_header()` already notes region is an "unavailable... future segment dimension" (~3038), but that's a "we don't have this yet" statement, not a "and here is what will happen once we do" statement — specifically, that a future region column will read identically to the existing enterprise-level rollup until a second region's data actually exists in the corpus. This is a fact about current data coverage, not a methodology gap to be fixed.
+
+### Decision
+Add two entries to `docs/governance_interpretation_guide.md`'s "Known bad inferences" section:
+
+- *"Insufficient Evidence" is scope-specific, not package-wide.* A domain's enterprise-scoped tier being `Insufficient Evidence` does not mean the domain has no usable evidence anywhere in the package — check `governance_client_summary.csv`, `governance_bc_summary.csv`, and the domain's `cross_client_convergence` field before concluding nothing is known about it.
+- *"Region" and "Enterprise" currently read identically, and will continue to until the corpus changes.* All corpus files currently come from one region. If/when a `region` segmentation dimension is added, region-level and enterprise-level results will be identical by construction until a second region's data exists — this reflects current data coverage, not completed cross-region standardization.
+
+Both entries get first-class placement (not buried at entry 9/10) in `docs/governance_reading_order.md`'s "read this before drawing conclusions" callout, per D-030.
+
+Separately, add an explicit audience/intent statement to `docs/governance_interpretation_guide.md`'s existing "What this package is for" section (which currently states subject matter but not audience): this package is written for a reader who does not need Revit domain knowledge, who is expected to ask governance convergence/fragmentation questions rather than resolve them unassisted, and for whom "what to do about it" is explicitly out of this package's scope. `docs/governance_reading_order.md` references this statement rather than restating it, per the same "point, don't duplicate" discipline used for `render_header()`'s trim in D-029.
+
+### Consequences
+- Docs-only change — no code, no schema, no classification output affected.
+- The next corpus expansion that adds a second business center's Project-role files or a second region should prompt revisiting whether these two known-bad-inference entries are still accurate as written, since both describe a *current* corpus-composition fact, not a permanent structural one.
+
+---
+
+## D-032 — Governance narrative evidence-package layer (Phase 9a: comparison-registry input-completeness note)
+
+### Status
+Accepted (2026-08-18)
+
+### Context
+`docs/governance_generator_cross_compare_coverage.md` recommended `comparison_registry.csv` be wired in as an optional input to distinguish "this domain's evidence is thin because the comparison wasn't run or is stale" from "this domain's evidence is thin because convergence is actually weak" — currently both look identical (a missing or low row) to a reader of `governance_domain_summary.csv`. At 5.5MB, the file is small enough to read once at generation time without a package-size concern; the earlier assumption that this was excluded for the same size reasons as `cross_segment_file_pairs.csv` (9.8GB) does not hold once the two are considered separately — `cross_segment_file_pairs.csv` should never be read by the generator at all (D-023's file-inventory scan already handles it via header/row-count only, never content), while `comparison_registry.csv` is a normal-sized optional input, structurally identical to `--governance-state-summary` or `--reuse-by-client`.
+
+### Decision
+Add an optional `--comparison-registry` CLI argument, following the existing optional-input pattern (present-or-absent, degrades gracefully, reported in `governance_package_health.json`'s `required_inputs`/`optional_inputs` when absent). When supplied, render a small **Input Completeness / Staleness** note near Analytical Notes, per-domain, stating the count of expected segment/domain comparison pairs present vs. missing vs. stale (per the registry's own recency/run-id fields). The registry file itself is never embedded or reproduced in the output package — only the derived counts are — and its own path is exposed as a drill-down source via `governance_file_inventory.json`/`governance_evidence_map.json`, the same treatment `cross_segment_file_pairs.csv` already gets.
+
+Implemented in the same PR as D-033 (shared optional-input plumbing and shared touch points in `main()`/`governance_package_health.json`), but tracked as a separate decision since the two serve different governance questions (completeness vs. reuse-breadth confidence) and could ship independently if one were descoped.
+
+### Consequences
+- `governance_package_health.json` gains a new optional-input entry and, when the registry is supplied, a `comparison_completeness` field.
+- No existing classification or tier output changes when the flag is absent — this is strictly additive, matching every prior optional-input phase's discipline.
+- A domain currently reading `Insufficient Evidence` due to a not-run/stale comparison (rather than genuinely weak convergence) becomes distinguishable from the outside for the first time — directly closing part of the D-031 "insufficient evidence is scope-specific" caveat with an actual mechanism, not just a documented caveat.
+
+---
+
+## D-033 — Governance narrative evidence-package layer (Phase 9b: union-inventory-derived domain confidence enrichment)
+
+### Status
+Accepted (2026-08-18)
+
+### Context
+`docs/governance_generator_cross_compare_coverage.md` marks this item "(Still open.)" in its own implementation sequence (step 3, "Domain confidence enrichment"): `cross_segment_union_inventory.csv` is currently only partially consumed (to count blocked project domains when manifest metadata exists), and its corpus-wide/project/client/file pattern-prevalence signal — which pairwise Jaccard cannot express — is not yet surfaced per domain. The doc's own framing: this identifies domains with broad natural reuse but weak formal cascade (a natural-standard candidate the cascade metrics alone would miss), or the reverse (narrow reuse despite strong formal cascade, worth flagging as fragile).
+
+### Decision
+Extend `governance_domain_summary.csv` with breadth columns derived from `cross_segment_union_inventory.csv` (corpus-wide/project-wide/client-wide/file-level reuse counts per domain, following the same naming convention as existing `_by_scope` fields). Render only the strongest narrative exceptions per the coverage doc's own guardrail — broad reuse with weak cascade, or narrow reuse with strong cascade — as a new anomaly-note category in `detect_anomalies()`, using the same policy-externalized-threshold discipline established in D-029 (thresholds for "broad," "weak," "narrow," "strong" in this context go into `anomaly_thresholds.json` alongside D-029's other additions, not as new bare literals).
+
+Implemented in the same PR as D-032 (shared optional-input plumbing), tracked separately per the reasoning in D-032's Context.
+
+### Consequences
+- `governance_domain_summary.csv` gains new columns; existing columns and their values are unaffected.
+- New anomaly-note category is gated by the same "only render the strongest exceptions" discipline the coverage doc specifies — this is a deliberate scope limit to avoid restating every domain's raw breadth numbers as narrative prose, matching the "consume, not recompute, and don't over-render" discipline established across D-020/D-022.
+- Closes the last open item in `docs/governance_generator_cross_compare_coverage.md`'s implementation sequence — that doc's table should be updated to mark this row "Done" once shipped, matching its own existing convention for the other now-complete rows.
