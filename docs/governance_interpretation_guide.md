@@ -26,6 +26,11 @@ enterprise/generic baselines, through templates and coordination
 project-level practice diverges from that baseline. It supports **evidence
 discovery and classification for governance review**.
 
+This package is written for a reader who does not need Revit domain
+knowledge. It is written for someone who is expected to ask governance
+convergence/fragmentation questions, not resolve them unassisted — "what to
+do about it" is explicitly out of this package's scope.
+
 ## What this package is *not* for
 
 - It does not approve standards, assign domain ownership, or certify a team
@@ -359,6 +364,19 @@ surfacing to a human, not silently resolved in the LLM's favor.
   pattern) is easy to clear and can saturate across all clients while actual
   adoption depth varies widely; cross-check the pattern-instance count or
   the distinct-pattern table before making a convergence claim.
+- Do not treat `Insufficient Evidence` at the enterprise scope as evidence a
+  domain has no usable data anywhere in the package — it is scope-specific:
+  a domain's enterprise-scoped tier reading `Insufficient Evidence` does not
+  mean the domain has no usable evidence anywhere in the package; check
+  `governance_client_summary.csv`, `governance_bc_summary.csv`, and the
+  domain's `cross_client_convergence` field before concluding nothing is
+  known about it.
+- Do not treat "Region" and "Enterprise" reading identically as completed
+  cross-region standardization — all corpus files currently come from one
+  region, so a future `region` segmentation dimension will produce results
+  identical to the existing enterprise-level rollup until a second region's
+  data actually exists; this reflects current data coverage, not
+  standardization.
 
 ## Policy profiles (where the thresholds live)
 
