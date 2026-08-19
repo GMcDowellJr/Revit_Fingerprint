@@ -264,6 +264,7 @@ def build_package_health(
     matrix_names_seen: list,
     policy_load_status: Optional[dict] = None,  # tools/governance_policy.py's load_status
     comparison_completeness: Optional[dict] = None,  # D-032: build_comparison_completeness()'s result
+    interpretation_guide_present: Optional[bool] = None,  # D-030/D-034: INTERPRETATION_GUIDE_PATH.exists()
 ) -> dict:
     """All text below is mechanical/factual only -- see module docstring.
 
@@ -281,6 +282,17 @@ def build_package_health(
     comparison_completeness key to the returned dict at all -- matching
     every other optional-input field's "omit rather than blank-render"
     convention in this module.
+
+    interpretation_guide_present: optional bool, whether the checked-in
+    docs/governance/governance_interpretation_guide.md was found on disk for
+    this run. PR review finding: this artifact's evidence-map entry carries
+    required_before_conclusions=True (D-030), but its presence is not
+    otherwise tracked anywhere health inspects -- in a stripped deployment
+    missing docs/, the prerequisite gate becomes unsatisfiable with no
+    signal in the package's own health-first flow. Omitted (None, the
+    default) adds no warning, so a caller that hasn't threaded this through
+    gets identical health output to before this parameter existed; pass
+    False explicitly to surface the gap.
     """
     blocking_conditions = []
     missing_required = sorted(k for k, present in required_inputs.items() if not present)
@@ -345,6 +357,20 @@ def build_package_health(
                 f"{policy_profiles_defaulted}. See governance_package_manifest.json's "
                 "policy_profiles.profiles for the resolved profile_id/schema_version "
                 "of each profile actually applied."
+            ),
+        })
+
+    # PR review finding: governance_interpretation_guide carries
+    # required_before_conclusions=True, but nothing in health tracked its
+    # actual presence -- a stripped deployment missing docs/ could report
+    # overall_status "complete" while the prerequisite gate is unsatisfiable.
+    if interpretation_guide_present is False:
+        warnings.append({
+            "condition": "reasoning_prerequisite_absent",
+            "detail": (
+                "governance_interpretation_guide (required_before_conclusions=true) "
+                "was not found on disk for this run -- reasoning_prerequisites in "
+                "governance_evidence_map.json cannot be satisfied."
             ),
         })
 

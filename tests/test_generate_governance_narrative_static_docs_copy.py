@@ -120,6 +120,20 @@ def test_narrative_pointer_matches_actual_guide_presence_end_to_end(tmp_path, mo
     assert not (tmp_path / g.INTERPRETATION_GUIDE_PATH.name).exists()
 
 
+def test_health_degrades_end_to_end_when_interpretation_guide_source_absent(tmp_path, monkeypatch):
+    """PR review finding: health had no signal for a missing
+    required_before_conclusions artifact. Wired through main()'s
+    build_package_health() call via INTERPRETATION_GUIDE_PATH.exists()."""
+    missing_src = tmp_path / "does_not_exist" / "governance_interpretation_guide.md"
+    monkeypatch.setattr(g, "INTERPRETATION_GUIDE_PATH", missing_src)
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    import json
+    health = json.loads((tmp_path / "governance_package_health.json").read_text(encoding="utf-8"))
+    assert health["overall_status"] == "degraded"
+    assert any(w["condition"] == "reasoning_prerequisite_absent" for w in health["warnings"])
+
+
 def test_no_emit_evidence_package_removes_previously_copied_docs(tmp_path, monkeypatch):
     """A prior run (default flags) copies the four docs in; a later run over
     the same --out with --no-emit-evidence-package must not leave them

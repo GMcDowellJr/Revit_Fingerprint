@@ -243,6 +243,22 @@ def test_completeness_state_only_key_with_no_registry_or_summary_row_is_counted_
     assert completeness["line_styles"] == {"total": 1, "present": 0, "missing": 1, "stale": 0}
 
 
+def test_completeness_summary_row_stale_check_also_considers_newer_state_evidence():
+    """PR review finding: when a key has BOTH a summary row and state
+    evidence from a different run, only the summary row's executed_utc was
+    compared against the registry stamp. Newer state evidence postdating
+    the registry stamp must also make the entry stale."""
+    registry_rows = [_registry_row(segment_id_a="a", segment_id_b="b", comparison_type="template_to_project",
+                                    domain="line_styles", computed_utc="2026-08-05T00:00:00Z")]
+    summary_rows = [_summary_row(segment_id_a="a", segment_id_b="b", comparison_type="template_to_project",
+                                  domain="line_styles", executed_utc="2026-08-01T00:00:00Z")]
+    state_summary_rows = [_gov_state_summary_row(segment_id_reference="a", segment_id_target="b",
+                                                  comparison_type="template_to_project", domain="line_styles",
+                                                  executed_utc="2026-08-10T00:00:00Z")]
+    completeness = g.build_comparison_completeness(summary_rows, registry_rows, None, state_summary_rows)
+    assert completeness["line_styles"] == {"total": 1, "present": 1, "missing": 0, "stale": 1}
+
+
 def test_completeness_ignores_rows_with_no_domain():
     summary_rows = [_summary_row(segment_id_a="a", segment_id_b="b", comparison_type="template_to_project", domain="")]
     completeness = g.build_comparison_completeness(summary_rows, [])

@@ -4230,16 +4230,28 @@ def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
     build_union_inventory_rows() in compare_cross_segment.py emits one row
     per (client_label, ..., join_hash) grain -- the same (domain, join_hash)
     pattern recurs once per client that carries it. pct_clients_present/
-    n_clients_present are corpus-wide there (identical across every such
-    row), but n_files_present/n_projects_present are computed per-client
-    (that client's own files/projects only) -- so a naive last-row-wins
-    classification would make a pattern's tier depend on row/client
-    iteration order. Each pattern (join_hash, within a domain) is instead
-    classified into exactly one, highest-qualifying tier across ALL of its
-    rows -- corpus_wide > client_wide > project_wide > file_level >
-    unclassified -- mirroring the bucket_priority pattern already used
-    above for pattern_reuse_distribution.csv rows (PR review finding,
-    D-033).
+    n_clients_present are identical across every row sharing the same
+    (view_scope, governance_role, discipline_label, unit_system, domain)
+    group -- NOT corpus-wide across the whole domain; a pattern's presence
+    percentage is computed independently per discipline/unit_system grain
+    (compare_cross_segment.py's build_union_inventory_rows(), the
+    clients_by_group/clients_by_pattern grouping keyed on discipline_label/
+    unit_system). n_files_present/n_projects_present are computed per-client
+    (that client's own files/projects only) on top of that. A naive
+    last-row-wins classification would make a pattern's tier depend on
+    row/client iteration order, and merging rows across different
+    discipline/unit_system grains under one key would combine
+    percentages computed against different denominators (PR review
+    findings). Each pattern -- (join_hash, discipline_label, unit_system,
+    within a domain) -- is instead classified into exactly one,
+    highest-qualifying tier across ALL of its same-scope rows -- corpus_wide
+    > client_wide > project_wide > file_level > unclassified -- mirroring
+    the bucket_priority pattern already used above for pattern_reuse_
+    distribution.csv rows (D-033). This means the same conceptual pattern
+    reused identically across multiple disciplines is counted once per
+    discipline, not once per domain -- a direct consequence of the
+    denominators themselves being discipline/unit_system-scoped upstream,
+    not an independent design choice here.
 
     corpus_wide/client_wide additionally require n_clients_denominator > 1,
     mirroring the identical guard compare_cross_segment.py's own
@@ -4284,13 +4296,25 @@ def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
                 tier = "file_level"
             else:
                 tier = "unclassified"
-        pattern_key = (domain, join_hash)
+        # PR review finding: compare_cross_segment.py's own pct_clients_present/
+        # n_clients_denominator computation (build_union_inventory_rows(),
+        # ~line 1413-1437) groups by (view_scope, governance_role,
+        # discipline_label, unit_system, domain), NOT corpus-wide across the
+        # whole domain -- the earlier docstring claim that these fields are
+        # "corpus-wide there (identical across every such row)" only holds
+        # WITHIN one discipline/unit_system grain, not across them. Keying
+        # this classifier's pattern_tier by (domain, join_hash) alone merged
+        # rows from incompatible denominator scopes, so a pattern present in
+        # every client of one small discipline could be misreported as
+        # corpus-wide for the entire domain. Include discipline_label/
+        # unit_system in the key so only same-scope rows are ever compared.
+        pattern_key = (domain, row.get("discipline_label", ""), row.get("unit_system", ""), join_hash)
         existing = pattern_tier.get(pattern_key)
         if existing is None or tier_rank[tier] < tier_rank[existing]:
             pattern_tier[pattern_key] = tier
 
     by_domain: dict = defaultdict(lambda: {t: 0 for t in _UNION_BREADTH_TIERS} | {"total": 0})
-    for (domain, _join_hash), tier in pattern_tier.items():
+    for (domain, _discipline, _unit_system, _join_hash), tier in pattern_tier.items():
         by_domain[domain][tier] += 1
         by_domain[domain]["total"] += 1
     return dict(by_domain)
@@ -5489,8 +5513,13 @@ def build_comparison_completeness(
             # broader prior run did).
             counts["stale"] += 1
             continue
+        # PR review finding: a key can have BOTH a summary row and state
+        # evidence (from a different run) -- comparing only against the
+        # summary row's executed_utc missed a registry stamp that was stale
+        # relative to newer state evidence. Compare against whichever
+        # evidence timestamp is newest.
         computed_utc = registry_row.get("computed_utc", "")
-        executed_utc = summary_row.get("executed_utc", "")
+        executed_utc = max(summary_row.get("executed_utc", ""), state_executed_utc.get(key, ""))
         if computed_utc and executed_utc and computed_utc < executed_utc:
             counts["stale"] += 1
     return dict(by_domain)
@@ -6489,6 +6518,7 @@ def main():
             matrix_names_seen=matrix_names_seen,
             policy_load_status=governance_policy["load_status"],
             comparison_completeness=comparison_completeness,
+            interpretation_guide_present=INTERPRETATION_GUIDE_PATH.exists(),
         )
         write_json(out_dir / "governance_package_health.json", health)
 

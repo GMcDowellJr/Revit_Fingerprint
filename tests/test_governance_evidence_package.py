@@ -269,6 +269,31 @@ def test_health_all_policy_profiles_from_file_adds_no_warning():
     assert h["fallbacks_used"] == []
 
 
+def test_health_omitted_interpretation_guide_present_adds_no_warning():
+    """A caller that hasn't threaded this through (interpretation_guide_present
+    omitted) must get identical health output to before this parameter
+    existed."""
+    h = _health()
+    assert h["overall_status"] == "complete"
+    assert not any(w["condition"] == "reasoning_prerequisite_absent" for w in h["warnings"])
+
+
+def test_health_degrades_when_interpretation_guide_absent():
+    """PR review finding: governance_interpretation_guide carries
+    required_before_conclusions=True, but nothing in health tracked its
+    actual presence -- a stripped deployment missing docs/ could report
+    overall_status 'complete' while the prerequisite gate is unsatisfiable."""
+    h = _health(interpretation_guide_present=False)
+    assert h["overall_status"] == "degraded"
+    assert any(w["condition"] == "reasoning_prerequisite_absent" for w in h["warnings"])
+
+
+def test_health_no_warning_when_interpretation_guide_present():
+    h = _health(interpretation_guide_present=True)
+    assert h["overall_status"] == "complete"
+    assert not any(w["condition"] == "reasoning_prerequisite_absent" for w in h["warnings"])
+
+
 def test_health_does_not_warn_when_client_sector_explicitly_provided():
     h = _health(client_sector_status="explicit_path")
     conditions = [w["condition"] for w in h["warnings"]]

@@ -91,6 +91,33 @@ def test_union_breadth_classifies_file_level_pattern():
     assert breadth["line_styles"]["file_level"] == 1
 
 
+def test_union_breadth_does_not_merge_across_discipline_grains():
+    """PR review finding: pct_clients_present/n_clients_denominator are
+    computed by compare_cross_segment.py's build_union_inventory_rows()
+    per (view_scope, governance_role, discipline_label, unit_system,
+    domain) group, NOT corpus-wide across the whole domain. A pattern
+    present in every client of one small discipline must not be reported
+    as corpus-wide reuse for the entire domain just because it shares a
+    join_hash with a narrower-reach row in a different discipline."""
+    rows = [
+        # "Structural" discipline: 2/2 clients -> would look corpus-wide
+        # in isolation, but this grain's denominator is scoped to Structural.
+        _union_row(domain="line_styles", join_hash="h1", discipline_label="Structural",
+                   pct_clients_present="1.0", n_clients_denominator="2"),
+        # "Architectural" discipline, SAME join_hash: only 1/10 clients in
+        # its own (much larger) grain.
+        _union_row(domain="line_styles", join_hash="h1", discipline_label="Architectural",
+                   pct_clients_present="0.10", n_clients_denominator="10"),
+    ]
+    breadth = g.build_union_breadth_by_domain(rows)
+    # Each discipline grain is classified independently -- Structural's row
+    # legitimately qualifies as corpus_wide within its own scope, but this
+    # must not collapse into a single domain-wide "corpus_wide reuse"
+    # count of 1 that silently drops the Architectural grain's evidence.
+    assert breadth["line_styles"]["total"] == 2
+    assert breadth["line_styles"]["corpus_wide"] == 1
+
+
 def test_union_breadth_degraded_source_status_classifies_unclassified():
     """PR review finding: build_pattern_reuse_distribution_rows() sends a row
     with source_status != 'ok' (e.g. missing source-cluster IDs) straight to
