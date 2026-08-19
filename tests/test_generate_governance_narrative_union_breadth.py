@@ -118,6 +118,28 @@ def test_union_breadth_does_not_merge_across_discipline_grains():
     assert breadth["line_styles"]["corpus_wide"] == 1
 
 
+def test_union_breadth_degraded_row_vetoes_healthy_classification_for_same_pattern():
+    """PR review finding: when one client row for a (domain, discipline,
+    unit_system, join_hash) key is degraded but another client row for the
+    SAME key is healthy, the highest-priority-tier rule previously let the
+    healthy classification (e.g. corpus_wide) override the degraded row's
+    unclassified -- but that healthy row's own pct_clients_present was
+    computed upstream over ALL client rows for that scope, including the
+    degraded one. Degraded status must veto the whole pattern, not just
+    lose an OR-across-tiers contest."""
+    rows = [
+        _union_row(domain="line_styles", join_hash="h1", client_label="acme",
+                   pct_clients_present="0.95", n_clients_denominator="10",
+                   source_status="missing_source_cluster_id"),
+        _union_row(domain="line_styles", join_hash="h1", client_label="beta",
+                   pct_clients_present="0.95", n_clients_denominator="10"),
+    ]
+    breadth = g.build_union_breadth_by_domain(rows)
+    assert breadth["line_styles"]["corpus_wide"] == 0
+    assert breadth["line_styles"]["unclassified"] == 1
+    assert breadth["line_styles"]["total"] == 1
+
+
 def test_union_breadth_degraded_source_status_classifies_unclassified():
     """PR review finding: build_pattern_reuse_distribution_rows() sends a row
     with source_status != 'ok' (e.g. missing source-cluster IDs) straight to

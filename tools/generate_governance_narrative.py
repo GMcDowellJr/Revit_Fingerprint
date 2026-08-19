@@ -4263,6 +4263,16 @@ def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
     """
     tier_rank = {t: i for i, t in enumerate(_UNION_BREADTH_TIERS)}
     pattern_tier: dict = {}
+    # PR review finding: a degraded row's own pct_clients_present, computed
+    # upstream over ALL client rows for that scope (degraded ones included),
+    # doesn't stop a co-occurring healthy row for the SAME pattern_key from
+    # still classifying as e.g. corpus_wide -- and the highest-priority-wins
+    # rule would then let that healthy classification override the degraded
+    # row's "unclassified", using data that shares a contaminated
+    # denominator. Degraded status is a different axis from breadth
+    # (data-quality, not tier), so it must veto the whole pattern_key rather
+    # than just lose an OR-across-tiers contest with a higher-priority tier.
+    pattern_degraded: set = set()
     for row in union_inventory_rows:
         if row.get("governance_role") != "Project":
             continue
@@ -4278,7 +4288,8 @@ def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
         # check -- this independent classifier must honor the same gate
         # instead of presenting degraded inventory as confident breadth
         # evidence. Same "ok" default as the upstream check.
-        if (row.get("source_status") or "ok") != "ok" or (row.get("inventory_status") or "ok") != "ok":
+        row_degraded = (row.get("source_status") or "ok") != "ok" or (row.get("inventory_status") or "ok") != "ok"
+        if row_degraded:
             tier = "unclassified"
         else:
             pct_clients = pf(row.get("pct_clients_present"))
@@ -4309,9 +4320,14 @@ def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
         # corpus-wide for the entire domain. Include discipline_label/
         # unit_system in the key so only same-scope rows are ever compared.
         pattern_key = (domain, row.get("discipline_label", ""), row.get("unit_system", ""), join_hash)
+        if row_degraded:
+            pattern_degraded.add(pattern_key)
         existing = pattern_tier.get(pattern_key)
         if existing is None or tier_rank[tier] < tier_rank[existing]:
             pattern_tier[pattern_key] = tier
+
+    for pattern_key in pattern_degraded:
+        pattern_tier[pattern_key] = "unclassified"
 
     by_domain: dict = defaultdict(lambda: {t: 0 for t in _UNION_BREADTH_TIERS} | {"total": 0})
     for (domain, _discipline, _unit_system, _join_hash), tier in pattern_tier.items():
