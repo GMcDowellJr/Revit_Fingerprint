@@ -5481,11 +5481,15 @@ def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_sta
         total_checked = sum(c["total"] for c in comparison_completeness.values())
         completeness_lines = [
             "\n\n### Input Completeness / Staleness\n",
-            "Per-domain count of expected segment/domain comparison pairs (from "
-            "`cross_segment_summary.csv`) present in, missing from, or stale "
-            "relative to `comparison_registry.csv` -- distinguishes genuinely "
-            "weak evidence from a comparison that was never run or is out of "
-            "date. Registry content itself is never reproduced here; see "
+            "Per-domain count of segment/domain comparison pairs referenced in "
+            "`cross_segment_summary.csv` and/or `comparison_registry.csv`, "
+            "present in / missing from / stale relative to the other file -- "
+            "distinguishes genuinely weak evidence from a comparison that was "
+            "run but not (yet) registered, or registered but stale relative to "
+            "the current run. This is a proxy, not a canonical inventory: a "
+            "comparison absent from BOTH files (never run, never registered) "
+            "cannot be detected here and is not counted below. Registry "
+            "content itself is never reproduced here; see "
             "`governance_evidence_map.json`'s `comparison_registry` entry for "
             "a drill-down pointer.\n",
         ]
@@ -5502,8 +5506,10 @@ def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_sta
                 completeness_lines.append(f"\nTable limited to 20 domains; {len(flagged) - 20} domains not shown.")
         else:
             completeness_lines.append(
-                f"No missing or stale comparison pairs across {total_checked} expected "
-                "segment/domain pair(s) checked -- every pair has a current registry entry.\n"
+                f"No missing or stale comparison pairs across the {total_checked} "
+                "segment/domain pair(s) referenced in these two files -- every pair "
+                "checked has a current registry entry. This does not confirm every "
+                "comparison that should exist was run; see the note above.\n"
             )
         completeness_section = "\n".join(completeness_lines)
 

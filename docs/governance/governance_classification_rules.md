@@ -160,6 +160,23 @@ matches gets appended, in this fixed order:
 14. **Static per-domain guidance** — `dom == "loaded_family_types"` and
     guidance text exists → the `DOMAIN_GUIDANCE["loaded_family_types"]` text,
     unconditionally (no threshold gate).
+15. **Union-inventory-derived domain confidence** (only when `union_breadth`
+    is supplied — a per-domain summary from `build_union_breadth_by_domain()`,
+    itself only computed when `--comparison-registry`'s sibling
+    `cross_segment_union_inventory.csv` is available; D-033). `primary` here
+    is `tp` if present, else `cp`. Mutually exclusive (`if`/`elif`):
+    - **Broad natural reuse, weak cascade** — `corpus_wide + client_wide
+      pattern count >= union_breadth_broad_min_patterns` AND `primary <
+      union_breadth_weak_cascade_max` → natural-standard-candidate note (the
+      cascade metrics alone would miss this domain).
+    - **Narrow natural reuse, strong cascade** — `file_level pattern count /
+      total >= union_breadth_narrow_file_level_share_min` AND `primary >=
+      union_breadth_strong_cascade_min` → fragile-formal-propagation note.
+    - A domain whose `primary` falls between `union_breadth_weak_cascade_max`
+      and `union_breadth_strong_cascade_min`, or whose breadth is otherwise
+      unremarkable, triggers neither note — this is a deliberate scope limit
+      (see `docs/governance_generator_cross_compare_coverage.md`'s own
+      guardrail against a per-domain dump of raw breadth numbers), not a gap.
 
 `render_findings_and_recommendations()` independently re-evaluates only
 finding 13 above (the phases check), reading the *same*

@@ -1237,7 +1237,7 @@ def build_evidence_map(
         {},
         ["governance_question_routes", "governance_brief", "governance_narrative_context",
          "governance_reading_order", "governance_classification_rules"],
-        required_before_conclusions=False,
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(

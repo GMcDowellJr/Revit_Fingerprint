@@ -258,7 +258,7 @@ def test_narrative_includes_completeness_note_when_supplied_with_gap(tmp_path, m
                             "--out", str(tmp_path), "--comparison-registry", str(registry_path)])
     narrative = (tmp_path / "governance_narrative_context.md").read_text(encoding="utf-8")
     assert "Input Completeness / Staleness" in narrative
-    assert "line_styles" in narrative.split("Input Completeness / Staleness")[1][:500]
+    assert "line_styles" in narrative.split("Input Completeness / Staleness")[1][:900]
 
 
 def test_registry_content_never_reproduced_in_output_package(tmp_path, monkeypatch):
