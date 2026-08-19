@@ -177,6 +177,10 @@ if ($Run -eq "C") {
     Write-Host "  OneDrive-synced folder and pass -ExportsRoot pointing at the new location." -ForegroundColor Yellow
     Write-Host "  This starves comparison_registry.csv -- see CLAUDE.md Warnings for detail." -ForegroundColor Yellow
     Write-Host "Run C contract:" -ForegroundColor Cyan
+    Write-Host "  All view  = full configured vocabulary for each segment." -ForegroundColor Cyan
+    Write-Host "  Used view = project vocabulary excluding conclusively purgeable records." -ForegroundColor Cyan
+    Write-Host "  Template, Generic, and most Container roles are provided-vocabulary references;" -ForegroundColor Cyan
+    Write-Host "  purge/used interpretation is meaningful primarily for Project targets." -ForegroundColor Cyan
 
     Write-Host "--- C1: segment manifest ---" -ForegroundColor Cyan
     python tools\build_segment_manifest.py `
