@@ -4245,21 +4245,30 @@ def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
         join_hash = row.get("join_hash", "")
         if not domain or not join_hash:
             continue
-        pct_clients = pf(row.get("pct_clients_present"))
-        n_clients_den = pf(row.get("n_clients_denominator"))
-        n_projects = pf(row.get("n_projects_present"))
-        n_files = pf(row.get("n_files_present"))
-        multi_client = n_clients_den is not None and n_clients_den > 1
-        if multi_client and pct_clients is not None and pct_clients >= UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN:
-            tier = "corpus_wide"
-        elif multi_client and pct_clients is not None and pct_clients >= UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN:
-            tier = "client_wide"
-        elif n_projects is not None and n_projects >= UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS:
-            tier = "project_wide"
-        elif n_files is not None and n_files <= UNION_BREADTH_FILE_LEVEL_MAX_FILES:
-            tier = "file_level"
-        else:
+        # PR review finding: build_pattern_reuse_distribution_rows() sends a
+        # row with source_status/inventory_status != "ok" (e.g. missing
+        # source-cluster IDs) straight to unclassified before any breadth
+        # check -- this independent classifier must honor the same gate
+        # instead of presenting degraded inventory as confident breadth
+        # evidence. Same "ok" default as the upstream check.
+        if (row.get("source_status") or "ok") != "ok" or (row.get("inventory_status") or "ok") != "ok":
             tier = "unclassified"
+        else:
+            pct_clients = pf(row.get("pct_clients_present"))
+            n_clients_den = pf(row.get("n_clients_denominator"))
+            n_projects = pf(row.get("n_projects_present"))
+            n_files = pf(row.get("n_files_present"))
+            multi_client = n_clients_den is not None and n_clients_den > 1
+            if multi_client and pct_clients is not None and pct_clients >= UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN:
+                tier = "corpus_wide"
+            elif multi_client and pct_clients is not None and pct_clients >= UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN:
+                tier = "client_wide"
+            elif n_projects is not None and n_projects >= UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS:
+                tier = "project_wide"
+            elif n_files is not None and n_files <= UNION_BREADTH_FILE_LEVEL_MAX_FILES:
+                tier = "file_level"
+            else:
+                tier = "unclassified"
         pattern_key = (domain, join_hash)
         existing = pattern_tier.get(pattern_key)
         if existing is None or tier_rank[tier] < tier_rank[existing]:
@@ -5417,7 +5426,13 @@ def build_comparison_completeness(
             state_executed_utc.setdefault(_state_key(row), row.get("executed_utc", ""))
 
     by_domain: dict = defaultdict(lambda: {"total": 0, "present": 0, "missing": 0, "stale": 0})
-    for key in registry_index.keys() | summary_index.keys():
+    # PR review finding: a directed comparison that produced governance-state
+    # evidence but was excluded from comparison_registry.csv (e.g. a segment
+    # not marked complete) and has no summary row either was invisible to
+    # this loop -- neither registry_index nor summary_index has its key.
+    # Unioning state_executed_utc's keys in makes it show up as "missing"
+    # like any other unstamped work item, instead of not being counted at all.
+    for key in registry_index.keys() | summary_index.keys() | state_executed_utc.keys():
         domain = key[3]
         if not domain:
             continue
@@ -6708,7 +6723,25 @@ def main():
             READING_ORDER_PATH.name,
             CLASSIFICATION_RULES_PATH.name,
         )
-        removed = [name for name in stale_names if (out_dir / name).exists()]
+        # PR review finding: if --out IS docs/governance/ (or any directory
+        # the four static docs actually live in), these names resolve to the
+        # checked-in source documents themselves, not a D-034 copy -- deleting
+        # them would destroy tracked repo docs, not clean up a stale copy.
+        # Same resolve()-comparison guard the copy loop above already uses.
+        _doc_source_paths = {
+            INTERPRETATION_GUIDE_PATH.name, QUESTION_ROUTES_PATH.name,
+            READING_ORDER_PATH.name, CLASSIFICATION_RULES_PATH.name,
+        }
+        _doc_sources_resolved = {
+            p.resolve() for p in (
+                INTERPRETATION_GUIDE_PATH, QUESTION_ROUTES_PATH,
+                READING_ORDER_PATH, CLASSIFICATION_RULES_PATH,
+            )
+        }
+        removed = [
+            name for name in stale_names if (out_dir / name).exists()
+            and not (name in _doc_source_paths and (out_dir / name).resolve() in _doc_sources_resolved)
+        ]
         for name in removed:
             (out_dir / name).unlink()
         if removed:

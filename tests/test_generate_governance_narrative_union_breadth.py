@@ -91,6 +91,39 @@ def test_union_breadth_classifies_file_level_pattern():
     assert breadth["line_styles"]["file_level"] == 1
 
 
+def test_union_breadth_degraded_source_status_classifies_unclassified():
+    """PR review finding: build_pattern_reuse_distribution_rows() sends a row
+    with source_status != 'ok' (e.g. missing source-cluster IDs) straight to
+    unclassified before any breadth check -- this independent classifier
+    must honor the same gate rather than presenting degraded inventory as
+    confident corpus-wide reuse evidence."""
+    rows = [_union_row(domain="line_styles", join_hash="h1", pct_clients_present="0.95",
+                        n_clients_denominator="10", source_status="missing_source_cluster_id")]
+    breadth = g.build_union_breadth_by_domain(rows)
+    assert breadth["line_styles"]["corpus_wide"] == 0
+    assert breadth["line_styles"]["unclassified"] == 1
+
+
+def test_union_breadth_degraded_inventory_status_classifies_unclassified():
+    rows = [_union_row(domain="line_styles", join_hash="h1", pct_clients_present="0.95",
+                        n_clients_denominator="10", inventory_status="not_interpretable")]
+    breadth = g.build_union_breadth_by_domain(rows)
+    assert breadth["line_styles"]["corpus_wide"] == 0
+    assert breadth["line_styles"]["unclassified"] == 1
+
+
+def test_union_breadth_blank_status_fields_are_not_treated_as_degraded():
+    """A blank source_status/inventory_status (e.g. an older export missing
+    the column) defaults to 'ok', matching this generator's general
+    fail-soft posture of not silently downgrading a real signal just
+    because status metadata wasn't recorded."""
+    rows = [_union_row(domain="line_styles", join_hash="h1", pct_clients_present="0.95",
+                        n_clients_denominator="10")]
+    breadth = g.build_union_breadth_by_domain(rows)
+    assert breadth["line_styles"]["corpus_wide"] == 1
+    assert breadth["line_styles"]["unclassified"] == 0
+
+
 def test_union_breadth_ignores_non_project_role():
     rows = [_union_row(domain="line_styles", join_hash="h1", governance_role="Template", pct_clients_present="0.95")]
     breadth = g.build_union_breadth_by_domain(rows)

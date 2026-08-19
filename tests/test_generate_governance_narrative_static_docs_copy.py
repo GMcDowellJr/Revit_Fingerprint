@@ -95,6 +95,28 @@ def test_no_emit_evidence_package_removes_previously_copied_docs(tmp_path, monke
         assert not (tmp_path / getattr(g, const_name).name).exists(), const_name
 
 
+def test_no_emit_evidence_package_does_not_delete_source_docs_when_out_is_docs_governance(tmp_path, monkeypatch):
+    """P1 PR review finding: if --out resolves to the same directory the four
+    static docs actually live in (e.g. --out docs/governance), the
+    --no-emit-evidence-package stale-file cleanup must not delete the
+    checked-in source documents -- those names only mean 'stale copy' when
+    the destination is NOT the source itself."""
+    fake_docs_dir = tmp_path / "docs_governance"
+    fake_docs_dir.mkdir()
+    real_guide_text = "# Real checked-in interpretation guide\n"
+    for const_name in _DOC_CONSTANTS:
+        (fake_docs_dir / getattr(g, const_name).name).write_text(real_guide_text, encoding="utf-8")
+        monkeypatch.setattr(g, const_name, fake_docs_dir / getattr(g, const_name).name)
+
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
+                            "--out", str(fake_docs_dir), "--no-emit-evidence-package"])
+    for const_name in _DOC_CONSTANTS:
+        doc_path = fake_docs_dir / getattr(g, const_name).name
+        assert doc_path.exists(), const_name
+        assert doc_path.read_text(encoding="utf-8") == real_guide_text, const_name
+
+
 def test_copy_removed_when_source_doc_absent_but_stale_copy_exists(tmp_path, monkeypatch):
     """A stripped-down deployment without docs/ (source absent) must not
     leave a stale copy from an earlier run, when a source WAS present, sitting

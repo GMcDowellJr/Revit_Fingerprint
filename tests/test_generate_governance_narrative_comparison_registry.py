@@ -202,6 +202,20 @@ def test_completeness_state_evidence_from_detailed_rows_also_prevents_stale():
     assert completeness["line_styles"]["stale"] == 0
 
 
+def test_completeness_state_only_key_with_no_registry_or_summary_row_is_counted_missing():
+    """PR review finding: a directed comparison that produced governance-state
+    evidence but has no cross_segment_summary.csv row and no
+    comparison_registry.csv stamp either (e.g. build_comparison_registry_rows()
+    excludes it because a segment wasn't marked complete) was previously
+    invisible to this function -- neither registry_index nor summary_index
+    had its key, so the loop never visited it at all. It must be counted
+    missing like any other unstamped work item, not silently dropped."""
+    state_summary_rows = [_gov_state_summary_row(segment_id_reference="a", segment_id_target="b",
+                                                  comparison_type="generic_to_template", domain="line_styles")]
+    completeness = g.build_comparison_completeness([], [], None, state_summary_rows)
+    assert completeness["line_styles"] == {"total": 1, "present": 0, "missing": 1, "stale": 0}
+
+
 def test_completeness_ignores_rows_with_no_domain():
     summary_rows = [_summary_row(segment_id_a="a", segment_id_b="b", comparison_type="template_to_project", domain="")]
     completeness = g.build_comparison_completeness(summary_rows, [])
