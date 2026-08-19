@@ -216,3 +216,18 @@ def test_copy_removed_when_source_doc_absent_but_stale_copy_exists(tmp_path, mon
     monkeypatch.setattr(g, "INTERPRETATION_GUIDE_PATH", missing_src)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     assert not guide_dst.exists()
+
+
+def test_evidence_map_output_local_path_matches_actual_copy_end_to_end(tmp_path, monkeypatch):
+    """PR review finding: reasoning_prerequisites must be resolvable from a
+    portable --out directory alone. governance_evidence_map.json's
+    output_local_path for the interpretation guide must name the file
+    D-034's copy loop actually writes."""
+    import json
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
+    guide = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_interpretation_guide")
+    expected = tmp_path / g.INTERPRETATION_GUIDE_PATH.name
+    assert expected.exists()
+    assert guide["output_local_path"] == str(expected)

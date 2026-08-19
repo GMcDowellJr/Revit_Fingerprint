@@ -456,7 +456,7 @@ def _artifact(
     artifact_id, path, artifact_type, required, present, producer, authority_level,
     context_role, grain, key_fields, identifiers, join_keys, can_answer, cannot_answer,
     known_limitations, null_semantics, related_artifacts, *, required_before_conclusions,
-    schema_version=None,
+    schema_version=None, output_local_path=None,
 ):
     # required_before_conclusions is keyword-only with no default (D-030): every
     # call site must state explicitly whether a governance conclusion drawn
@@ -485,6 +485,15 @@ def _artifact(
     }
     if schema_version is not None:
         entry["schema_version"] = schema_version
+    # PR review finding: an automated consumer following reasoning_
+    # prerequisites needs to actually locate the artifact from a portable
+    # --out directory (no repo checkout) -- path/present alone describe the
+    # checked-in repo doc (D-034's deliberate source-of-truth choice), which
+    # is unresolvable from a moved --out. output_local_path names the D-034
+    # copy that sits beside this evidence map when present, without
+    # changing what path/present themselves describe.
+    if output_local_path is not None:
+        entry["output_local_path"] = output_local_path
     return entry
 
 
@@ -537,12 +546,22 @@ def build_evidence_map(
     # evidence-map entries must declare the same value they actually contain,
     # not PACKAGE_SCHEMA_VERSION unconditionally.
     file_inventory_schema_version: str = FILE_INVENTORY_SCHEMA_VERSION,
+    out_dir=None,  # D-034/PR review finding: Path this run is writing --out to,
+    # used only to compute output_local_path for the four static docs D-034
+    # copies alongside this evidence map (see _artifact()'s output_local_path
+    # docstring note). Omitted (None, the default) adds no output_local_path
+    # field, so a caller that hasn't adopted this keeps prior behavior.
 ) -> dict:
     artifacts = []
 
     def p(paths, key):
         v = paths.get(key)
         return str(v) if v else None
+
+    def _output_local_path(sibling_key: str):
+        if out_dir is None or not sibling_present.get(sibling_key, False):
+            return None
+        return str(Path(out_dir) / sibling_paths[sibling_key].name)
 
     artifacts.append(_artifact(
         "cross_segment_summary", p(input_paths, "cross_segment_summary"), "csv", True,
@@ -1286,6 +1305,7 @@ def build_evidence_map(
         ["governance_question_routes", "governance_brief", "governance_narrative_context",
          "governance_reading_order", "governance_classification_rules"],
         required_before_conclusions=True,
+        output_local_path=_output_local_path("interpretation_guide"),
     ))
 
     artifacts.append(_artifact(
@@ -1310,6 +1330,7 @@ def build_evidence_map(
         ["governance_interpretation_guide", "governance_brief", "governance_findings",
          "governance_reading_order", "governance_classification_rules"],
         required_before_conclusions=False,
+        output_local_path=_output_local_path("question_routes"),
     ))
 
     artifacts.append(_artifact(
@@ -1341,6 +1362,7 @@ def build_evidence_map(
          "governance_narrative_context", "governance_evidence_map",
          "governance_classification_rules"],
         required_before_conclusions=False,
+        output_local_path=_output_local_path("reading_order"),
     ))
 
     artifacts.append(_artifact(
@@ -1376,6 +1398,7 @@ def build_evidence_map(
         {},
         ["governance_interpretation_guide", "governance_reading_order"],
         required_before_conclusions=False,
+        output_local_path=_output_local_path("classification_rules"),
     ))
 
     artifacts.append(_artifact(

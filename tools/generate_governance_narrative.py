@@ -2393,11 +2393,28 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None,
         broad = union_breadth.get("corpus_wide", 0) + union_breadth.get("client_wide", 0)
         file_level = union_breadth.get("file_level", 0)
         if primary is not None and broad >= UNION_BREADTH_BROAD_MIN_PATTERNS and primary < UNION_BREADTH_WEAK_CASCADE_MAX:
+            # PR review finding: `broad`/`total` are summed across every
+            # discipline/unit_system scope for this domain -- a single
+            # narrow scope (e.g. one small discipline where all its clients
+            # happen to carry a pattern) can satisfy this threshold with no
+            # domain-wide breadth evidence at all. Name the qualifying
+            # scope(s) explicitly instead of letting the note read as a
+            # domain-wide claim.
+            broad_scopes = union_breadth.get("broad_scopes") or []
+            scope_labels = [
+                f"{disc or '(no discipline)'}/{unit or '(no unit system)'}"
+                for disc, unit in broad_scopes
+            ]
+            scope_note = (
+                f" (scope(s): {', '.join(scope_labels)})" if scope_labels else ""
+            )
             notes.append(
                 f"Broad natural reuse ({broad} corpus-wide/client-wide pattern(s) of {total} "
                 f"in cross_segment_union_inventory.csv) despite weak formal cascade (primary "
-                f"containment = {pct(primary)}). This domain may be a natural-standard "
-                "candidate the cascade metrics alone would miss."
+                f"containment = {pct(primary)}){scope_note}. This may indicate a natural-"
+                "standard candidate within the named scope(s) that the cascade metrics alone "
+                "would miss -- not necessarily domain-wide reuse; counts are summed across "
+                "discipline/unit_system scopes with independent denominators."
             )
         elif (
             primary is not None and total > 0
@@ -4348,10 +4365,26 @@ def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
     for pattern_key in pattern_degraded:
         pattern_tier[pattern_key] = "unclassified"
 
-    by_domain: dict = defaultdict(lambda: {t: 0 for t in _UNION_BREADTH_TIERS} | {"total": 0})
-    for (domain, _discipline, _unit_system, _join_hash), tier in pattern_tier.items():
+    # PR review finding: by_domain sums tier counts across every discipline/
+    # unit_system scope for a domain, so a single narrow scope (e.g. one
+    # small discipline where 2/2 clients happen to carry a pattern) can make
+    # broad == 1 at the domain level even though no domain-wide breadth
+    # evidence exists -- a "Broad natural reuse" note built only from these
+    # counts would overclaim domain-wide reuse from one scoped grain.
+    # broad_scopes records which (discipline_label, unit_system) scopes
+    # actually contributed a corpus_wide/client_wide classification, so
+    # detect_anomalies() can name the qualifying scope(s) instead of
+    # implying the whole domain.
+    by_domain: dict = defaultdict(
+        lambda: {t: 0 for t in _UNION_BREADTH_TIERS} | {"total": 0, "broad_scopes": set()}
+    )
+    for (domain, discipline, unit_system, _join_hash), tier in pattern_tier.items():
         by_domain[domain][tier] += 1
         by_domain[domain]["total"] += 1
+        if tier in ("corpus_wide", "client_wide"):
+            by_domain[domain]["broad_scopes"].add((discipline, unit_system))
+    for domain, counts in by_domain.items():
+        counts["broad_scopes"] = sorted(counts["broad_scopes"])
     return dict(by_domain)
 
 
@@ -6756,6 +6789,7 @@ def main():
             sibling_present=sibling_present,
             package_schema_version=args.package_schema_version,
             file_inventory_schema_version=FILE_INVENTORY_SCHEMA_VERSION,
+            out_dir=out_dir,
         )
         write_json(out_dir / "governance_evidence_map.json", evidence_map)
 

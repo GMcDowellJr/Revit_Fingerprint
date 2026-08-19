@@ -118,6 +118,31 @@ def test_union_breadth_does_not_merge_across_discipline_grains():
     assert breadth["line_styles"]["corpus_wide"] == 1
 
 
+def test_union_breadth_records_broad_scopes_for_corpus_and_client_wide_patterns():
+    """PR review finding: by_domain sums tier counts across every discipline/
+    unit_system scope, so a domain-level 'broad' count doesn't by itself say
+    WHICH scope qualified. broad_scopes must name the (discipline, unit_system)
+    pairs that actually contributed a corpus_wide/client_wide classification,
+    so detect_anomalies() can avoid implying domain-wide reuse from one
+    narrow scope."""
+    rows = [
+        _union_row(domain="line_styles", join_hash="h1", discipline_label="Structural",
+                   unit_system="imperial", pct_clients_present="1.0", n_clients_denominator="2"),
+        _union_row(domain="line_styles", join_hash="h2", discipline_label="Architectural",
+                   unit_system="imperial", pct_clients_present="0.10", n_clients_denominator="10",
+                   n_projects_present="1", n_files_present="1"),
+    ]
+    breadth = g.build_union_breadth_by_domain(rows)
+    assert breadth["line_styles"]["broad_scopes"] == [("Structural", "imperial")]
+
+
+def test_union_breadth_broad_scopes_empty_when_no_broad_pattern():
+    rows = [_union_row(domain="line_styles", join_hash="h1", pct_clients_present="0.10",
+                        n_projects_present="1", n_files_present="1")]
+    breadth = g.build_union_breadth_by_domain(rows)
+    assert breadth["line_styles"]["broad_scopes"] == []
+
+
 def test_union_breadth_degraded_row_vetoes_healthy_classification_for_same_pattern():
     """PR review finding: when one client row for a (domain, discipline,
     unit_system, join_hash) key is degraded but another client row for the
@@ -243,6 +268,30 @@ def test_broad_reuse_weak_cascade_fires():
     notes = g.detect_anomalies("line_styles", d, None, union_breadth)
     assert any("Broad natural reuse" in n for n in notes)
     assert not any("Narrow natural reuse" in n for n in notes)
+
+
+def test_broad_reuse_note_names_qualifying_scope_when_present():
+    """PR review finding: the note must name which scope(s) qualified rather
+    than implying domain-wide reuse from counts summed across scopes."""
+    d = _minimal_cascade_dict(tc=0.20, cp=0.20, tp=0.10)
+    union_breadth = {
+        "total": 5, "corpus_wide": 1, "client_wide": 0, "project_wide": 1, "file_level": 3,
+        "broad_scopes": [("Structural", "imperial")],
+    }
+    notes = g.detect_anomalies("line_styles", d, None, union_breadth)
+    broad_note = next(n for n in notes if "Broad natural reuse" in n)
+    assert "Structural/imperial" in broad_note
+    assert "not necessarily domain-wide" in broad_note
+
+
+def test_broad_reuse_note_omits_scope_clause_when_broad_scopes_missing():
+    """Backward compatible with a hand-built union_breadth dict lacking the
+    newer broad_scopes key (e.g. an older caller)."""
+    d = _minimal_cascade_dict(tc=0.20, cp=0.20, tp=0.10)
+    union_breadth = {"total": 5, "corpus_wide": 2, "client_wide": 0, "project_wide": 1, "file_level": 2}
+    notes = g.detect_anomalies("line_styles", d, None, union_breadth)
+    broad_note = next(n for n in notes if "Broad natural reuse" in n)
+    assert "scope(s):" not in broad_note
 
 
 def test_narrow_reuse_strong_cascade_fires():

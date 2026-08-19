@@ -381,6 +381,45 @@ def test_evidence_map_required_fields_populated_for_every_artifact():
         assert isinstance(a["required_before_conclusions"], bool), a["artifact_id"]
 
 
+def test_evidence_map_omits_output_local_path_when_out_dir_not_supplied():
+    """A caller that hasn't adopted out_dir (omitted, the default) must get
+    identical entries to before this parameter existed -- no output_local_path
+    key at all, matching every other optional field's convention."""
+    em = _evidence_map()
+    guide = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_interpretation_guide")
+    assert "output_local_path" not in guide
+
+
+def test_evidence_map_output_local_path_present_when_sibling_present_and_out_dir_supplied(tmp_path):
+    """PR review finding: an automated consumer following reasoning_
+    prerequisites needs to actually locate the artifact from a portable
+    --out directory (no repo checkout) -- path/present alone describe the
+    checked-in repo doc, unresolvable from a moved --out. output_local_path
+    must name the D-034 copy that sits beside this evidence map."""
+    guide_src = tmp_path / "repo_docs" / "governance_interpretation_guide.md"
+    guide_src.parent.mkdir()
+    guide_src.write_text("guide", encoding="utf-8")
+    em = _evidence_map(
+        sibling_paths={
+            "file_pairs": Path("cross_segment_file_pairs.csv"),
+            "comparison_registry": Path("comparison_registry.csv"),
+            "interpretation_guide": guide_src,
+        },
+        sibling_present={"file_pairs": False, "comparison_registry": False, "interpretation_guide": True},
+        out_dir=tmp_path / "out",
+    )
+    guide = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_interpretation_guide")
+    assert guide["output_local_path"] == str(tmp_path / "out" / "governance_interpretation_guide.md")
+    # path/present still describe the repo source, never the copy (D-034).
+    assert guide["path"] == str(guide_src)
+
+
+def test_evidence_map_omits_output_local_path_when_sibling_absent_even_with_out_dir(tmp_path):
+    em = _evidence_map(out_dir=tmp_path / "out")
+    guide = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_interpretation_guide")
+    assert "output_local_path" not in guide
+
+
 def test_evidence_map_authority_levels_use_only_defined_vocabulary():
     em = _evidence_map()
     for a in em["artifacts"]:
