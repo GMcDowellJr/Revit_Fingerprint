@@ -98,6 +98,38 @@ def test_render_header_points_at_repo_path_when_guide_will_not_be_copied():
     assert "not included alongside this run's output" in header
 
 
+def test_authority_header_points_at_out_directory_copy_when_guides_present():
+    """PR review finding: render_evidence_authority_header() (the second
+    renderer with these pointers) unconditionally named the guide/question-
+    routes/reading-order docs by bare basename, on the theory that they're
+    static repo docs that always exist -- but a reader of this document may
+    only have --out, where the copy only happens inside main()'s
+    emit_evidence_package branch and only for a source doc actually present
+    on disk (same gap render_header() had)."""
+    header = g.render_evidence_authority_header("record.v1", "test-generator", True, True)
+    assert f"`{g.INTERPRETATION_GUIDE_PATH.name}`" in header
+    assert f"`{g.QUESTION_ROUTES_PATH.name}`" in header
+    assert f"`{g.READING_ORDER_PATH.name}`" in header
+    assert "docs/governance/" not in header
+
+
+def test_authority_header_points_at_repo_path_when_guides_absent(monkeypatch):
+    missing_dir = Path("/does/not/exist")
+    monkeypatch.setattr(g, "INTERPRETATION_GUIDE_PATH", missing_dir / "governance_interpretation_guide.md")
+    monkeypatch.setattr(g, "QUESTION_ROUTES_PATH", missing_dir / "governance_question_routes.md")
+    monkeypatch.setattr(g, "READING_ORDER_PATH", missing_dir / "governance_reading_order.md")
+    header = g.render_evidence_authority_header("record.v1", "test-generator", True, True)
+    assert "docs/governance/governance_interpretation_guide.md" in header
+    assert "docs/governance/governance_question_routes.md" in header
+    assert "docs/governance/governance_reading_order.md" in header
+    assert "the source doc was not found on disk" in header
+
+
+def test_authority_header_points_at_repo_path_when_evidence_package_disabled():
+    header = g.render_evidence_authority_header("record.v1", "test-generator", False, True)
+    assert "this run used --no-emit-evidence-package" in header
+
+
 def test_default_run_copies_all_four_static_docs_into_out(tmp_path, monkeypatch):
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])

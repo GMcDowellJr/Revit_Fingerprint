@@ -5,7 +5,7 @@
 This is a **stable, package-type-level reading sequence** for a
 `revit_fingerprint_governance` evidence package (the outputs of
 `tools/generate_governance_narrative.py`). It is not regenerated per run.
-See `docs/governance/governance_interpretation_guide.md`'s "What this package is for"
+See `governance_interpretation_guide.md`'s "What this package is for"
 section for this package's full audience/intent statement — in short: it is
 written for a reader who does not need Revit domain knowledge, who
 understands operational tradeoffs, and who is meant to **ask** governance
@@ -23,7 +23,7 @@ that matters is completeness, not sequence polish. See `DECISIONS.md` D-030.
 
 ## Read this before drawing conclusions
 
-Two known-bad-inference entries in `docs/governance/governance_interpretation_guide.md`
+Two known-bad-inference entries in `governance_interpretation_guide.md`
 are called out here explicitly, not just by pointer, because both are
 confirmed live in the current corpus, not hypothetical:
 
@@ -40,7 +40,7 @@ confirmed live in the current corpus, not hypothetical:
   second region's data exists — this reflects current data coverage, not
   completed cross-region standardization.
 
-See `docs/governance/governance_interpretation_guide.md`'s "Known bad inferences"
+See `governance_interpretation_guide.md`'s "Known bad inferences"
 section for the full list (these two plus eight others).
 
 ---
@@ -54,7 +54,7 @@ section for the full list (these two plus eight others).
 2. **Evidence map / interpretation guide orientation** —
    `governance_evidence_map.json` (what exists, what each artifact can and
    cannot answer, and its `reasoning_prerequisites` list) and
-   `docs/governance/governance_interpretation_guide.md` (what the metrics and tiers
+   `governance_interpretation_guide.md` (what the metrics and tiers
    mean, comparability rules, authority ordering, known bad inferences).
 3. **Brief** — `governance_brief.md`, a capped top-line digest of
    `governance_findings.json` for a quick read.
@@ -65,7 +65,7 @@ section for the full list (these two plus eight others).
 5. **Narrative prose** — `governance_narrative_context.md`, the
    human-readable synthesis of the rollups above with tier labels and
    framing.
-6. **Question routes** — `docs/governance/governance_question_routes.md`, if there is
+6. **Question routes** — `governance_question_routes.md`, if there is
    a specific recurring question rather than a general read.
 7. **File inventory** — `governance_file_inventory.json`, only if deeper
    drill-down into a file this generator does not itself read is needed.

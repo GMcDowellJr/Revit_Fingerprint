@@ -13,7 +13,7 @@ key resolves to for a given run; this document holds the *order and
 exception logic* those values are evaluated in. Together, the two let a
 reader recreate a tier or anomaly-note output from
 `governance_domain_summary.csv`'s inputs instead of rediscovering the logic
-from Python source. See `docs/governance/governance_interpretation_guide.md` for what
+from Python source. See `governance_interpretation_guide.md` for what
 each field/tier *means*; this document is about evaluation order, not
 semantics.
 

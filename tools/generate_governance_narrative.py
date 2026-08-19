@@ -3339,10 +3339,29 @@ def render_evidence_authority_header(
     files are never written, so this document must not point readers at files that
     don't exist. The governance_brief.md pointer is separately gated on
     emit_interpretation_layer (only meaningful when emit_evidence_package is also on --
-    see main()). The interpretation guide/question routes/reading order pointers are
-    unconditional: they are static repo docs, not per-run outputs, so they exist
-    regardless of either flag.
+    see main()). PR review finding: the interpretation guide/question routes/reading
+    order pointers used to be treated as unconditional on the theory that they're
+    static repo docs that always exist -- true of the repo copy, but not of the
+    per-run copy this document's own reader may only have (D-034's copy-into-`--out`
+    only runs inside main()'s emit_evidence_package branch, and only for a source
+    doc that's actually present on disk). Each pointer below is gated on that same
+    "will this run's --out actually contain a usable copy" condition, falling back
+    to a repository-qualified path with an explicit note when it won't.
     """
+    def _static_doc_pointer(path: Path, label: str) -> str:
+        will_be_copied = emit_evidence_package and path.exists()
+        return (
+            f"`{path.name}`" if will_be_copied else
+            f"`docs/governance/{path.name}` in the repository (not included "
+            f"alongside this run's output -- {label})"
+        )
+    _not_copied_reason = (
+        "this run used --no-emit-evidence-package" if not emit_evidence_package else
+        "the source doc was not found on disk"
+    )
+    interpretation_guide_pointer = _static_doc_pointer(INTERPRETATION_GUIDE_PATH, _not_copied_reason)
+    question_routes_pointer = _static_doc_pointer(QUESTION_ROUTES_PATH, _not_copied_reason)
+    reading_order_pointer = _static_doc_pointer(READING_ORDER_PATH, _not_copied_reason)
     package_pointers = (
         f"""
 > **Package health:** `governance_package_health.json` (schema {package_schema_version})
@@ -3350,7 +3369,7 @@ def render_evidence_authority_header(
 > **Evidence navigation:** `governance_evidence_map.json`
 > **Reasoning prerequisites:** `governance_evidence_map.json`'s `reasoning_prerequisites`
 > field names the artifacts to check before stating a conclusion -- see
-> `{READING_ORDER_PATH.name}` for the reading sequence.
+> {reading_order_pointer} for the reading sequence.
 """
         if emit_evidence_package else
         "\n> This run was generated with `--no-emit-evidence-package`, so no "
@@ -3372,8 +3391,8 @@ def render_evidence_authority_header(
 > `governance_client_summary.csv`, `governance_bc_summary.csv`), which in
 > turn outrank this narrative's prose.
 > If this document disagrees with a rollup CSV or a source CSV, the CSV wins.
-{package_pointers}{brief_pointer}> **Metric semantics and known bad inferences:** `{INTERPRETATION_GUIDE_PATH.name}`
-> **Where to look for a specific recurring question:** `{QUESTION_ROUTES_PATH.name}`
+{package_pointers}{brief_pointer}> **Metric semantics and known bad inferences:** {interpretation_guide_pointer}
+> **Where to look for a specific recurring question:** {question_routes_pointer}
 """
 
 
@@ -5892,20 +5911,22 @@ def main():
     parser.set_defaults(emit_evidence_package=True)
     parser.add_argument("--emit-interpretation-layer", dest="emit_interpretation_layer",
                         action="store_true",
-                        help="Write governance_brief.md, and add the static "
-                             "docs/governance/governance_interpretation_guide.md / "
-                             "docs/governance/governance_question_routes.md / "
-                             "docs/governance/governance_reading_order.md as evidence-map "
-                             "entries (default: on). Only takes effect when "
+                        help="Write governance_brief.md (default: on) and render its "
+                             "narrative-header pointer. Only takes effect when "
                              "--emit-evidence-package is also on, since the brief "
                              "is built from governance_findings.json/"
-                             "governance_package_health.json.")
+                             "governance_package_health.json. PR review finding: this "
+                             "does NOT gate the interpretation-guide/question-routes/"
+                             "reading-order evidence-map entries or their docs/governance/ "
+                             "copy into --out -- those are controlled by --emit-evidence-"
+                             "package alone and by each doc's own presence on disk.")
     parser.add_argument("--no-emit-interpretation-layer", dest="emit_interpretation_layer",
                         action="store_false",
-                        help="Suppress governance_brief.md and the interpretation-"
-                             "guide/question-routes/reading-order evidence-map entries "
-                             "only; governance_package_manifest.json/_health.json/"
-                             "_evidence_map.json/governance_findings.json are unaffected.")
+                        help="Suppress governance_brief.md and its narrative-header "
+                             "pointer only; governance_package_manifest.json/_health.json/"
+                             "_evidence_map.json/governance_findings.json, and the "
+                             "interpretation-guide/question-routes/reading-order evidence-"
+                             "map entries and copies, are unaffected.")
     parser.set_defaults(emit_interpretation_layer=True)
     parser.add_argument("--out", default="governance_narrative_context.md")
     parser.add_argument("--date", default=str(date.today()),
