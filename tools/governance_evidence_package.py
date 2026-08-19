@@ -38,7 +38,7 @@ from typing import Optional
 
 PACKAGE_TYPE = "governance_evidence_package"
 PACKAGE_SCHEMA_VERSION = "1.0"
-EVIDENCE_MAP_SCHEMA_VERSION = "1.0"
+EVIDENCE_MAP_SCHEMA_VERSION = "1.1"
 FINDINGS_SCHEMA_VERSION = "1.0"
 FILE_INVENTORY_SCHEMA_VERSION = "1.0"
 
@@ -195,16 +195,19 @@ def build_package_manifest(
             "note": (
                 "Governance thresholds, domain-governance policy (excluded/"
                 "passive-inheritance-risk domains, domain guidance text), "
-                "client-onboarding interpretation thresholds, and finding-rule "
-                "documentation are loaded from --policy-dir (default: "
-                "policies/governance/) via tools/governance_policy.py at run "
-                "time -- see the `profiles` field above for which profile_id/"
-                "schema_version/source (policy_file vs. built_in_default) was "
-                "actually used for each of the four profiles this run. "
-                "policies/governance/*.json ship with values that reproduce "
-                "this generator's pre-externalization Python literals exactly; "
-                "overriding --policy-dir with a different profile set changes "
-                "classification output."
+                "client-onboarding interpretation thresholds, anomaly/note "
+                "materiality thresholds, and finding-rule documentation are "
+                "loaded from --policy-dir (default: policies/governance/) via "
+                "tools/governance_policy.py at run time -- see the `profiles` "
+                "field above for which profile_id/schema_version/source "
+                "(policy_file vs. built_in_default) was actually used for "
+                "each of the five profiles this run. Most shipped values in "
+                "policies/governance/*.json reproduce this generator's "
+                "pre-externalization Python literals exactly; the exception "
+                "is anomaly_thresholds.json's union_breadth_* keys (D-033), "
+                "which are newly introduced thresholds with no prior inline "
+                "literal to reproduce. Overriding --policy-dir with a "
+                "different profile set changes classification output."
             ) if policy_profiles else (
                 "Policy externalization (thresholds, domain-governance policy, "
                 "onboarding rules) is not yet implemented in this generator -- "
@@ -263,6 +266,8 @@ def build_package_health(
     matrix_manifest_row_count: int,
     matrix_names_seen: list,
     policy_load_status: Optional[dict] = None,  # tools/governance_policy.py's load_status
+    comparison_completeness: Optional[dict] = None,  # D-032: build_comparison_completeness()'s result
+    interpretation_guide_present: Optional[bool] = None,  # D-030/D-034: INTERPRETATION_GUIDE_PATH.exists()
 ) -> dict:
     """All text below is mechanical/factual only -- see module docstring.
 
@@ -272,6 +277,25 @@ def build_package_health(
     Omitted (None, the default) adds no policy-related warning, so a caller
     that hasn't adopted policy loading gets identical health output to
     before this parameter existed.
+
+    comparison_completeness: optional {domain: {"total":.., "present":..,
+    "missing":.., "stale":..}}, from generate_governance_narrative.py's
+    build_comparison_completeness() (D-032). Omitted (None, the default,
+    when --comparison-registry wasn't supplied) adds no
+    comparison_completeness key to the returned dict at all -- matching
+    every other optional-input field's "omit rather than blank-render"
+    convention in this module.
+
+    interpretation_guide_present: optional bool, whether the checked-in
+    docs/governance/governance_interpretation_guide.md was found on disk for
+    this run. PR review finding: this artifact's evidence-map entry carries
+    required_before_conclusions=True (D-030), but its presence is not
+    otherwise tracked anywhere health inspects -- in a stripped deployment
+    missing docs/, the prerequisite gate becomes unsatisfiable with no
+    signal in the package's own health-first flow. Omitted (None, the
+    default) adds no warning, so a caller that hasn't threaded this through
+    gets identical health output to before this parameter existed; pass
+    False explicitly to surface the gap.
     """
     blocking_conditions = []
     missing_required = sorted(k for k, present in required_inputs.items() if not present)
@@ -339,6 +363,42 @@ def build_package_health(
             ),
         })
 
+    # PR review finding: governance_interpretation_guide carries
+    # required_before_conclusions=True, but nothing in health tracked its
+    # actual presence -- a stripped deployment missing docs/ could report
+    # overall_status "complete" while the prerequisite gate is unsatisfiable.
+    if interpretation_guide_present is False:
+        warnings.append({
+            "condition": "reasoning_prerequisite_absent",
+            "detail": (
+                "governance_interpretation_guide (required_before_conclusions=true) "
+                "was not found on disk for this run -- reasoning_prerequisites in "
+                "governance_evidence_map.json cannot be satisfied."
+            ),
+        })
+
+    # PR review finding: comparison_completeness was only attached to the
+    # returned dict AFTER overall_status was already computed, so a package
+    # with missing/stale comparison-registry entries still reported
+    # "complete" -- a consumer following the documented health-first flow
+    # would wrongly conclude nothing limits interpretation. Fold any
+    # domain with a missing/stale count into warnings before computing
+    # overall_status, the same as every other degrading condition above.
+    if comparison_completeness:
+        domains_with_gaps = sorted(
+            dom for dom, c in comparison_completeness.items()
+            if c.get("missing", 0) or c.get("stale", 0)
+        )
+        if domains_with_gaps:
+            warnings.append({
+                "condition": "comparison_registry_gaps",
+                "detail": (
+                    "comparison_completeness has missing and/or stale "
+                    f"comparison-registry entries for domain(s): {domains_with_gaps}. "
+                    "See health.comparison_completeness for per-domain counts."
+                ),
+            })
+
     if missing_required:
         overall_status = "invalid"
     elif warnings:
@@ -346,7 +406,7 @@ def build_package_health(
     else:
         overall_status = "complete"
 
-    return {
+    health = {
         "schema_version": schema_version,
         "overall_status": overall_status,
         "required_inputs": required_inputs,
@@ -388,6 +448,9 @@ def build_package_health(
         "blocking_conditions": blocking_conditions,
         "warnings": warnings,
     }
+    if comparison_completeness is not None:
+        health["comparison_completeness"] = comparison_completeness
+    return health
 
 
 # ── evidence map ──────────────────────────────────────────────────────────────
@@ -395,8 +458,14 @@ def build_package_health(
 def _artifact(
     artifact_id, path, artifact_type, required, present, producer, authority_level,
     context_role, grain, key_fields, identifiers, join_keys, can_answer, cannot_answer,
-    known_limitations, null_semantics, related_artifacts, schema_version=None,
+    known_limitations, null_semantics, related_artifacts, *, required_before_conclusions,
+    schema_version=None, output_local_path=None,
 ):
+    # required_before_conclusions is keyword-only with no default (D-030): every
+    # call site must state explicitly whether a governance conclusion drawn
+    # without this artifact would be unsafe, so a future artifact addition can't
+    # silently inherit a wrong default -- see build_evidence_map()'s
+    # reasoning_prerequisites and docs/governance/governance_reading_order.md.
     entry = {
         "artifact_id": artifact_id,
         "path": path,
@@ -415,9 +484,22 @@ def _artifact(
         "known_limitations": known_limitations,
         "null_semantics": null_semantics,
         "related_artifacts": related_artifacts,
+        "required_before_conclusions": required_before_conclusions,
     }
     if schema_version is not None:
         entry["schema_version"] = schema_version
+    # PR review finding: an automated consumer following reasoning_
+    # prerequisites needs to actually locate the artifact from a portable
+    # --out directory (no repo checkout) -- path/present alone describe the
+    # checked-in repo doc (D-034's deliberate source-of-truth choice), which
+    # is unresolvable from a moved --out. output_local_path names the D-034
+    # copy that sits beside this evidence map when present, without
+    # changing what path/present themselves describe. Deliberately
+    # package-relative (a bare filename, not out_dir-qualified) -- an
+    # absolute or original-machine path here would break the instant the
+    # whole --out directory is moved or copied, defeating the point.
+    if output_local_path is not None:
+        entry["output_local_path"] = output_local_path
     return entry
 
 
@@ -437,7 +519,7 @@ def _sibling_scan_fields(path, present: bool) -> dict:
     excluded sibling artifact's own governance_evidence_map.json entry with
     its column header (name + inferred dtype) and row count. A reader who
     never opens governance_file_inventory.json still gets this for the
-    specific large files docs/governance_interpretation_guide.md's
+    specific large files docs/governance/governance_interpretation_guide.md's
     escalation section names by filename (D-024). Returns {} when the file
     is not present -- scanning a path that does not exist is meaningless,
     not an error to report. Never returns a sample row or cell value, same
@@ -470,12 +552,29 @@ def build_evidence_map(
     # evidence-map entries must declare the same value they actually contain,
     # not PACKAGE_SCHEMA_VERSION unconditionally.
     file_inventory_schema_version: str = FILE_INVENTORY_SCHEMA_VERSION,
+    out_dir=None,  # D-034/PR review finding: Path this run is writing --out to,
+    # used only to compute output_local_path for the four static docs D-034
+    # copies alongside this evidence map (see _artifact()'s output_local_path
+    # docstring note). Omitted (None, the default) adds no output_local_path
+    # field, so a caller that hasn't adopted this keeps prior behavior.
 ) -> dict:
     artifacts = []
 
     def p(paths, key):
         v = paths.get(key)
         return str(v) if v else None
+
+    def _output_local_path(sibling_key: str):
+        # PR review finding: str(Path(out_dir) / name) baked the ORIGINAL
+        # machine's --out path (absolute, if --out was) into the package
+        # itself -- wrong the moment the whole --out directory is moved or
+        # copied elsewhere, which is the exact self-contained-package
+        # scenario this field exists for. The D-034 copy always sits flat,
+        # directly beside governance_evidence_map.json, so the correct
+        # package-relative path is just the basename.
+        if out_dir is None or not sibling_present.get(sibling_key, False):
+            return None
+        return sibling_paths[sibling_key].name
 
     artifacts.append(_artifact(
         "cross_segment_summary", p(input_paths, "cross_segment_summary"), "csv", True,
@@ -499,6 +598,7 @@ def build_evidence_map(
          "not via this CSV itself."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_pooled", "governance_domain_summary", "governance_client_summary"],
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -520,6 +620,7 @@ def build_evidence_map(
          "pool_scope is checked at the read site."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_summary", "governance_client_summary"],
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -539,6 +640,7 @@ def build_evidence_map(
          "missing/local signals are inferred only indirectly."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_governance_state_summary", "governance_domain_summary"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -555,6 +657,7 @@ def build_evidence_map(
          "not unique-pattern counts -- see render_limitations()'s state_note."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_governance_states", "governance_domain_summary"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -572,6 +675,7 @@ def build_evidence_map(
          "governance-state outputs are also supplied, even if both are passed on the CLI."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_governance_state_summary"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -587,6 +691,7 @@ def build_evidence_map(
          "as 'Unknown' in render_header()."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["governance_narrative_context"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -610,6 +715,7 @@ def build_evidence_map(
          "its redundant_single_child chain."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_summary", "governance_domain_summary"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -629,6 +735,7 @@ def build_evidence_map(
          "docs/governance_narrative_scope_gap_audit.md finding C7."],
         {"*": "Missing client_label from this file simply means unclassified sector, not an error."},
         ["governance_client_summary"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -645,6 +752,7 @@ def build_evidence_map(
              "in that case."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["pattern_reuse_distribution", "matrix_output_manifest"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -658,6 +766,7 @@ def build_evidence_map(
              "only; full distribution detail beyond that is not summarized."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_union_inventory", "matrix_output_manifest", "pattern_reuse_summary_by_domain"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -675,6 +784,7 @@ def build_evidence_map(
          "governance_package_health.json's matrix_manifest.note."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_union_inventory", "pattern_reuse_distribution"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -699,6 +809,7 @@ def build_evidence_map(
          "corpus-wide reuse signal the distinct-pattern table already reports."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["pattern_reuse_distribution", "cross_segment_union_inventory"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -718,6 +829,7 @@ def build_evidence_map(
          "narrative dedupes to one row per unordered project pair"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["project_density_similarity_matrix", "project_fragmentation_diagnostic", "matrix_output_manifest"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -739,6 +851,7 @@ def build_evidence_map(
          "project_union_jaccard_matrix.csv is not also supplied"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["project_union_jaccard_matrix", "matrix_output_manifest"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -760,6 +873,7 @@ def build_evidence_map(
          "project's separate pool grains never share a matrix cell"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["matrix_output_manifest"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -783,6 +897,7 @@ def build_evidence_map(
          "narrative's pair list"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["project_union_jaccard_matrix", "matrix_output_manifest", "project_mean_file_pair_jaccard_matrix"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -810,6 +925,7 @@ def build_evidence_map(
          "average or compare them directly"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["governance_client_bc_matrix", "governance_relationships"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -836,6 +952,7 @@ def build_evidence_map(
          "and never parses it"],
         {},
         ["governance_bc_client_matrix", "governance_client_bc_matrix"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -861,6 +978,7 @@ def build_evidence_map(
          "(see tests/test_governance_relationships.py's synthetic multi-BC case)"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["governance_bc_client_matrix"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -885,6 +1003,7 @@ def build_evidence_map(
          "interpreting a single row of it."],
         {},
         ["cross_segment_summary"],
+        required_before_conclusions=False,
     ))
     artifacts[-1].update(_sibling_scan_fields(sibling_paths.get("file_pairs"), sibling_present.get("file_pairs", False)))
 
@@ -892,23 +1011,34 @@ def build_evidence_map(
         "comparison_registry", p(sibling_paths, "comparison_registry"), "csv", False,
         sibling_present.get("comparison_registry", False), "compare_cross_segment.py",
         AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
-        "archive_only -- not read by generate_governance_narrative.py; tracks "
-        "comparison staleness/forced-rerun state per "
-        "docs/governance_generator_cross_compare_coverage.md's recommended "
-        "'Input Completeness / Staleness' integration point",
+        "path resolved from --comparison-registry when explicitly supplied, else "
+        "auto-detected beside --summary's directory (D-032) -- the same resolved "
+        "path also drives governance_package_manifest.json/governance_package_"
+        "health.json's own 'comparison_registry' input tracking, so the two "
+        "never disagree about which file this means for a given run. Content is "
+        "opened and read ONLY when --comparison-registry is explicitly passed "
+        "(auto-detected presence alone never triggers a read) -- producing "
+        "governance_package_health.json's comparison_completeness field and the "
+        "narrative's Input Completeness / Staleness note near Analytical Notes.",
         "one row per (domain, segment pair) comparison registry entry", ["domain"], [], [],
-        ["whether an expected segment/domain comparison was actually run, and whether it is stale"],
-        ["this generator does not open or parse this file; presence is inferred "
-         "as a sibling of --summary's directory, never verified against its own schema"],
-        ["not consumed by this generator in PR1 -- missing rows in "
-         "cross_segment_summary.csv are currently treated as weak evidence rather "
-         "than distinguished from not-run/stale comparisons; see "
-         "docs/governance_generator_cross_compare_coverage.md. columns/row_count "
-         "below (when present) come from the same live directory scan governance_"
-         "file_inventory.json uses (_scan_csv_file, D-023/D-024), not from a "
-         "read this generator performs on a normal run."],
+        ["whether an expected segment/domain comparison was actually run, and whether it is "
+         "stale relative to the evidence CSV -- only when --comparison-registry was explicitly "
+         "supplied; presence alone (auto-detected, no flag) answers only 'does this file exist'"],
+        ["when --comparison-registry was NOT explicitly passed, this file's content is never "
+         "opened even if present is true here (auto-detected beside --summary's directory only). "
+         "When it IS passed, build_comparison_completeness() reads only identity (segment_id_a/b, "
+         "comparison_type, domain) and recency (computed_utc) fields -- never row content beyond "
+         "those, and never reproduced in the output package; see governance_package_health.json's "
+         "comparison_completeness for the derived counts."],
+        ["prior to D-032, missing rows in cross_segment_summary.csv were treated as weak "
+         "evidence with no way to distinguish a not-run/stale comparison; "
+         "docs/governance_generator_cross_compare_coverage.md's 'Input Completeness / "
+         "Staleness' row is now marked Done. columns/row_count below (when present) come "
+         "from the same live directory scan governance_file_inventory.json uses "
+         "(_scan_csv_file, D-023/D-024), independent of any --comparison-registry read."],
         {},
-        ["cross_segment_summary"],
+        ["cross_segment_summary", "governance_package_health"],
+        required_before_conclusions=False,
     ))
     artifacts[-1].update(_sibling_scan_fields(
         sibling_paths.get("comparison_registry"), sibling_present.get("comparison_registry", False),
@@ -939,6 +1069,7 @@ def build_evidence_map(
          "performs on a normal run"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["pattern_reuse_distribution", "pattern_reuse_summary_by_client"],
+        required_before_conclusions=False,
     ))
     artifacts[-1].update(_sibling_scan_fields(
         sibling_paths.get("pattern_reuse_summary_by_domain"),
@@ -970,6 +1101,7 @@ def build_evidence_map(
          "this generator performs on a normal run"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["project_fragmentation_diagnostic", "project_union_jaccard_matrix"],
+        required_before_conclusions=False,
     ))
     artifacts[-1].update(_sibling_scan_fields(
         sibling_paths.get("project_mean_file_pair_jaccard_matrix"),
@@ -998,6 +1130,7 @@ def build_evidence_map(
             "*(governance-state columns)": "'' (empty string) means governance_state_summary has no entry for this domain at all -- a different condition than a present-but-None value.",
         },
         ["cross_segment_summary", "cross_segment_pooled", "cross_segment_governance_state_summary"],
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -1014,6 +1147,7 @@ def build_evidence_map(
          "artifact's known_limitations."],
         {"*(fmt-formatted columns)": "— (em dash, U+2014 -- not an ASCII hyphen) means the field exists but has no data for this client."},
         ["cross_segment_summary", "cross_segment_pooled", "client_sector"],
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -1040,6 +1174,7 @@ def build_evidence_map(
          "BC_ALIGNMENT_HIGH's definition comment in generate_governance_narrative.py."],
         {"*(fmt-formatted columns)": "— (em dash, U+2014 -- not an ASCII hyphen) means the field exists but has no data for this business center."},
         ["cross_segment_summary", "governance_domain_summary", "governance_narrative_context"],
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -1058,7 +1193,9 @@ def build_evidence_map(
         {},
         ["governance_domain_summary", "governance_client_summary", "governance_bc_summary",
          "governance_package_health", "governance_evidence_map", "governance_findings",
-         "governance_brief", "governance_interpretation_guide", "governance_question_routes"],
+         "governance_brief", "governance_interpretation_guide", "governance_question_routes",
+         "governance_reading_order", "governance_classification_rules"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -1083,6 +1220,7 @@ def build_evidence_map(
         {},
         ["governance_domain_summary", "governance_client_summary", "governance_narrative_context"],
         schema_version=FINDINGS_SCHEMA_VERSION,
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -1117,6 +1255,7 @@ def build_evidence_map(
         {"*": "A column classified 'empty' had zero non-blank cells in the scanned file."},
         [],  # no fixed related_artifacts -- the files it lists vary run to run
         schema_version=file_inventory_schema_version,
+        required_before_conclusions=False,
     ))
 
     # governance_brief.md is the only PR4 artifact that may genuinely be
@@ -1148,12 +1287,13 @@ def build_evidence_map(
         {},
         ["governance_findings", "governance_domain_summary", "governance_client_summary",
          "governance_interpretation_guide", "governance_question_routes"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
         "governance_interpretation_guide", p(sibling_paths, "interpretation_guide"),
         "markdown", False, sibling_present.get("interpretation_guide", False),
-        "human/LLM-authored (docs/governance_interpretation_guide.md)",
+        "human/LLM-authored (docs/governance/governance_interpretation_guide.md)",
         AUTHORITY_CONTROLLED_INTERPRETATION,
         "package-specific interpretation layer: what each metric/tier means, "
         "comparability rules, missing-value semantics, authority ordering, "
@@ -1165,18 +1305,26 @@ def build_evidence_map(
         ["what a metric or governance_tier value means and does not mean; how "
          "to read missing values and comparability caveats for this package type"],
         ["this run's actual data -- it explains semantics, not this run's results"],
-        ["not written or validated by this generator; presence is a real "
-         "Path.exists() check against the checked-in repo doc, not a per-run "
-         "guarantee -- a package copied without the repo's docs/ directory "
-         "would show present: false here"],
+        ["path/present above describe the checked-in repo doc under "
+         "docs/governance/ (D-034), not written or validated by this "
+         "generator -- a package copied without the repo's docs/ directory "
+         "would show present: false here. A copy of this exact file is ALSO "
+         "written into --out alongside this run's other outputs when present "
+         "(D-034), so a package handed to someone without the repo checked "
+         "out is still self-contained; that copy is a convenience, not a "
+         "second source of truth -- this artifact's path/present always "
+         "describe the repo doc, never the copy."],
         {},
-        ["governance_question_routes", "governance_brief", "governance_narrative_context"],
+        ["governance_question_routes", "governance_brief", "governance_narrative_context",
+         "governance_reading_order", "governance_classification_rules"],
+        required_before_conclusions=True,
+        output_local_path=_output_local_path("interpretation_guide"),
     ))
 
     artifacts.append(_artifact(
         "governance_question_routes", p(sibling_paths, "question_routes"),
         "markdown", False, sibling_present.get("question_routes", False),
-        "human/LLM-authored discovery scaffold (docs/governance_question_routes.md)",
+        "human/LLM-authored discovery scaffold (docs/governance/governance_question_routes.md)",
         AUTHORITY_CONVENIENCE_SUMMARY,
         "candidate catalog of recurring question types and which artifact/"
         "fields answer them -- navigational only, not evidence",
@@ -1188,9 +1336,82 @@ def build_evidence_map(
         ["every route in this document is at 'candidate' maturity (see the "
          "document's own maturity-level scale) -- none has a proven history "
          "of repeated use for this package type yet; not an exhaustive list "
-         "of every possible question"],
+         "of every possible question. A copy of this file is also written "
+         "into --out when present (D-034); see the interpretation-guide "
+         "artifact entry's own note for that convention."],
         {},
-        ["governance_interpretation_guide", "governance_brief", "governance_findings"],
+        ["governance_interpretation_guide", "governance_brief", "governance_findings",
+         "governance_reading_order", "governance_classification_rules"],
+        required_before_conclusions=False,
+        output_local_path=_output_local_path("question_routes"),
+    ))
+
+    artifacts.append(_artifact(
+        "governance_reading_order", p(sibling_paths, "reading_order"),
+        "markdown", False, sibling_present.get("reading_order", False),
+        "human/LLM-authored (docs/governance/governance_reading_order.md)",
+        AUTHORITY_CONTROLLED_INTERPRETATION,
+        "cold-start reading sequence for this package (D-030): audience/"
+        "purpose statement, an ordered path through the package, and a "
+        "'read this before drawing conclusions' callout naming the D-031 "
+        "known-bad-inference entries -- the human-readable counterpart to "
+        "this file's own reasoning_prerequisites list",
+        "one document per package_type (not per-run; not regenerated by this "
+        "generator)",
+        [], [], [],
+        ["what order to read this package's artifacts in, and which two "
+         "known-bad-inference entries to check before drawing a conclusion"],
+        ["this run's actual data -- it is a fixed reading sequence, not a "
+         "per-run result; it does not itself enumerate reasoning_prerequisites, "
+         "see governance_evidence_map.json for the machine-checkable list"],
+        ["not written or validated by this generator; presence is a real "
+         "Path.exists() check against the checked-in repo doc, not a per-run "
+         "guarantee -- a package copied without the repo's docs/ directory "
+         "would show present: false here. A copy of this file is also written "
+         "into --out when present (D-034); see the interpretation-guide "
+         "artifact entry's own note for that convention."],
+        {},
+        ["governance_interpretation_guide", "governance_question_routes",
+         "governance_narrative_context", "governance_evidence_map",
+         "governance_classification_rules"],
+        required_before_conclusions=False,
+        output_local_path=_output_local_path("reading_order"),
+    ))
+
+    artifacts.append(_artifact(
+        "governance_classification_rules", p(sibling_paths, "classification_rules"),
+        "markdown", False, sibling_present.get("classification_rules", False),
+        "human/LLM-authored (docs/governance/governance_classification_rules.md)",
+        AUTHORITY_CONTROLLED_INTERPRETATION,
+        "classification-logic legibility aid (D-029): the branch order and "
+        "exception conditions of assign_tier(), score_reliability(), "
+        "detect_anomalies(), build_governance_state_summary()'s "
+        "primary_governance_read selection, and "
+        "_passive_inheritance_risk_domains(), referencing "
+        "governance_thresholds.json/anomaly_thresholds.json threshold keys "
+        "by name rather than restating values",
+        "one document per package_type (not per-run; not regenerated by this "
+        "generator)",
+        [], [], [],
+        ["what order a tier/anomaly-note classification function evaluates "
+         "its branches in, and which named threshold key gates each branch"],
+        ["this run's actual threshold values -- see "
+         "governance_thresholds.json/anomaly_thresholds.json for those; this "
+         "document is order/logic only"],
+        ["not written or validated by this generator; presence is a real "
+         "Path.exists() check against the checked-in repo doc, not a per-run "
+         "guarantee. Hand-maintained prose describing Python control flow, "
+         "not mechanically verified against the functions it describes -- a "
+         "future code change to a documented function's branch order could "
+         "make this document stale without anything failing (see this "
+         "document's own Known Limitation section and DECISIONS.md D-029). "
+         "A copy of this file is also written into --out when present "
+         "(D-034); see the interpretation-guide artifact entry's own note "
+         "for that convention."],
+        {},
+        ["governance_interpretation_guide", "governance_reading_order"],
+        required_before_conclusions=False,
+        output_local_path=_output_local_path("classification_rules"),
     ))
 
     artifacts.append(_artifact(
@@ -1206,6 +1427,7 @@ def build_evidence_map(
          "never parsed content"],
         [], {}, ["governance_package_health", "governance_evidence_map", "governance_findings"],
         schema_version=package_schema_version,
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -1221,6 +1443,7 @@ def build_evidence_map(
          "companion, not a superseding source"],
         [], {}, ["governance_package_manifest", "governance_evidence_map", "governance_findings"],
         schema_version=package_schema_version,
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -1236,6 +1459,7 @@ def build_evidence_map(
         [], {},
         [],  # filled in below, once every other artifact_id is known
         schema_version=EVIDENCE_MAP_SCHEMA_VERSION,
+        required_before_conclusions=False,
     ))
 
     all_ids = [a["artifact_id"] for a in artifacts]
@@ -1243,7 +1467,18 @@ def build_evidence_map(
         if a["artifact_id"] == "governance_evidence_map":
             a["related_artifacts"] = [aid for aid in all_ids if aid != "governance_evidence_map"]
 
-    return {"schema_version": schema_version, "artifacts": artifacts}
+    # D-030: the full set of required_before_conclusions=true artifact_ids,
+    # exposed once at the manifest level -- a set to exhaust, not a sequence
+    # to sample from. See docs/governance/governance_reading_order.md.
+    reasoning_prerequisites = [
+        a["artifact_id"] for a in artifacts if a["required_before_conclusions"]
+    ]
+
+    return {
+        "schema_version": schema_version,
+        "artifacts": artifacts,
+        "reasoning_prerequisites": reasoning_prerequisites,
+    }
 
 
 # ── file inventory (live directory scan) ─────────────────────────────────────

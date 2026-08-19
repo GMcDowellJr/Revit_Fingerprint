@@ -75,6 +75,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import shutil
 import statistics
 import sys
 from collections import defaultdict
@@ -545,12 +546,20 @@ _DEFAULT_CLIENT_SECTOR_PATH = Path(__file__).resolve().parent.parent / "policies
 # convention as the never-consumed sibling CSVs cross_segment_file_pairs.csv/
 # comparison_registry.csv). Versions here must be bumped by hand alongside
 # the corresponding doc's own version header if its content changes in a way
-# that matters for a reader relying on a specific version.
-_DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
+# that matters for a reader relying on a specific version. Kept in their own
+# docs/governance/ subfolder, separate from the rest of docs/, since these
+# four (and only these four) are also copied into --out at the end of a run
+# (see main()) so the generated package is self-contained/portable -- see
+# DECISIONS.md D-034.
+_DOCS_DIR = Path(__file__).resolve().parent.parent / "docs" / "governance"
 INTERPRETATION_GUIDE_PATH = _DOCS_DIR / "governance_interpretation_guide.md"
 QUESTION_ROUTES_PATH = _DOCS_DIR / "governance_question_routes.md"
+READING_ORDER_PATH = _DOCS_DIR / "governance_reading_order.md"
+CLASSIFICATION_RULES_PATH = _DOCS_DIR / "governance_classification_rules.md"
 INTERPRETATION_GUIDE_VERSION = "0.1"
 QUESTION_ROUTES_VERSION = "0.1"
+READING_ORDER_VERSION = "0.1"
+CLASSIFICATION_RULES_VERSION = "0.1"
 
 
 def load_client_sectors(client_sector_rows: Optional[list[dict]]) -> dict:
@@ -1702,6 +1711,94 @@ ONBOARD_N_FILES_LOW_MAX = _DEFAULT_ONBOARD_N_FILES_LOW_MAX
 ONBOARD_N_FILES_MODERATE_MAX = _DEFAULT_ONBOARD_N_FILES_MODERATE_MAX
 
 
+# detect_anomalies()/render_findings_and_recommendations()'s phases check/
+# _passive_inheritance_risk_domains()/_shape_note() materiality thresholds
+# (D-029). Defaults reproduce this file's pre-externalization Python literals
+# exactly; apply_governance_policy() overrides these module globals from
+# policies/governance/anomaly_thresholds.json at runtime (see main()). Kept
+# as a separate profile from governance_thresholds.json even though this
+# profile's passive_inheritance_risk_bundle_share_max numerically coincides
+# with governance_thresholds.json's passive_material_threshold today -- the
+# two gate different code paths (bundle-density fallback vs. explicit
+# governance-state share) and must be independently editable. The
+# _passive_inheritance_risk_domains() dual-schema branch's own passive-share
+# check does NOT get a new key here -- it already reads (and continues to
+# read) PASSIVE_MATERIAL_THRESHOLD directly, closing a pre-existing drift gap
+# rather than relocating it into a second, parallel constant.
+_DEFAULT_PROVIDED_CARRIED_DOWNSTREAM_MIN = 0.75
+_DEFAULT_PROVIDED_ACTIVE_USE_MAX = 0.75
+_DEFAULT_PRIMARY_READ_ACTIVE_USE_MIN = 0.85
+_DEFAULT_PASSIVE_INDICATOR_HIGH_MIN = 0.40
+_DEFAULT_PASSIVE_INDICATOR_MODERATE_MIN = 0.20
+_DEFAULT_PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX = 0.25
+_DEFAULT_BUNDLE_SHARE_VERY_LOW_MAX = 0.15
+_DEFAULT_GT_TP_GAP_GT_MIN = 0.75
+_DEFAULT_GT_TP_GAP_TP_MAX = 0.55
+_DEFAULT_GROUP2_SCOPE_DIVERGENCE_GAP_MIN = 0.25
+_DEFAULT_GROUP1_SCOPE_SPREAD_GAP_MIN = 0.25
+_DEFAULT_TP_TC_BYPASS_GAP_MIN = 0.25
+_DEFAULT_WEAK_TC_MAX = 0.20
+_DEFAULT_WEAK_CP_MAX = 0.50
+_DEFAULT_VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX = 0.05
+_DEFAULT_PHASES_TP_EXTENSION_MAX = 0.85
+_DEFAULT_PHASES_TW_MIN = 0.80
+_DEFAULT_PORTFOLIO_SHAPE_DENSITY_MIN = 0.8
+_DEFAULT_PORTFOLIO_SHAPE_UNION_JACCARD_MAX = 0.3
+
+PROVIDED_CARRIED_DOWNSTREAM_MIN = _DEFAULT_PROVIDED_CARRIED_DOWNSTREAM_MIN
+PROVIDED_ACTIVE_USE_MAX = _DEFAULT_PROVIDED_ACTIVE_USE_MAX
+PRIMARY_READ_ACTIVE_USE_MIN = _DEFAULT_PRIMARY_READ_ACTIVE_USE_MIN
+PASSIVE_INDICATOR_HIGH_MIN = _DEFAULT_PASSIVE_INDICATOR_HIGH_MIN
+PASSIVE_INDICATOR_MODERATE_MIN = _DEFAULT_PASSIVE_INDICATOR_MODERATE_MIN
+PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX = _DEFAULT_PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX
+BUNDLE_SHARE_VERY_LOW_MAX = _DEFAULT_BUNDLE_SHARE_VERY_LOW_MAX
+GT_TP_GAP_GT_MIN = _DEFAULT_GT_TP_GAP_GT_MIN
+GT_TP_GAP_TP_MAX = _DEFAULT_GT_TP_GAP_TP_MAX
+GROUP2_SCOPE_DIVERGENCE_GAP_MIN = _DEFAULT_GROUP2_SCOPE_DIVERGENCE_GAP_MIN
+GROUP1_SCOPE_SPREAD_GAP_MIN = _DEFAULT_GROUP1_SCOPE_SPREAD_GAP_MIN
+TP_TC_BYPASS_GAP_MIN = _DEFAULT_TP_TC_BYPASS_GAP_MIN
+WEAK_TC_MAX = _DEFAULT_WEAK_TC_MAX
+WEAK_CP_MAX = _DEFAULT_WEAK_CP_MAX
+VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX = _DEFAULT_VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX
+PHASES_TP_EXTENSION_MAX = _DEFAULT_PHASES_TP_EXTENSION_MAX
+PHASES_TW_MIN = _DEFAULT_PHASES_TW_MIN
+PORTFOLIO_SHAPE_DENSITY_MIN = _DEFAULT_PORTFOLIO_SHAPE_DENSITY_MIN
+PORTFOLIO_SHAPE_UNION_JACCARD_MAX = _DEFAULT_PORTFOLIO_SHAPE_UNION_JACCARD_MAX
+
+
+# Union-inventory-derived domain confidence enrichment thresholds (D-033).
+# build_union_breadth_by_domain() classifies each cross_segment_union_inventory.csv
+# pattern (join_hash) into exactly one breadth tier -- corpus_wide > client_wide
+# > project_wide > file_level > unclassified, highest-qualifying tier wins --
+# using the four _*_MIN/_MAX keys below; the remaining four gate the new
+# detect_anomalies() exception category (broad reuse despite weak cascade, or
+# narrow reuse despite strong cascade). No prior Python literal exists for any
+# of these (new functionality, not an externalization of pre-existing
+# behavior) -- values are this phase's own initial defaults, editable via
+# policies/governance/anomaly_thresholds.json like every other key in that
+# profile. Kept independent of governance_thresholds.json's tier-assignment
+# thresholds (TIER_STRONG_BASELINE_MIN etc.) even where a value could
+# numerically coincide, since this check gates a narrower narrative exception,
+# not governance_tier itself.
+_DEFAULT_UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN = 0.90
+_DEFAULT_UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN = 0.50
+_DEFAULT_UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS = 2
+_DEFAULT_UNION_BREADTH_FILE_LEVEL_MAX_FILES = 1
+_DEFAULT_UNION_BREADTH_BROAD_MIN_PATTERNS = 1
+_DEFAULT_UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN = 0.5
+_DEFAULT_UNION_BREADTH_WEAK_CASCADE_MAX = 0.40
+_DEFAULT_UNION_BREADTH_STRONG_CASCADE_MIN = 0.75
+
+UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN = _DEFAULT_UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN
+UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN = _DEFAULT_UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN
+UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS = _DEFAULT_UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS
+UNION_BREADTH_FILE_LEVEL_MAX_FILES = _DEFAULT_UNION_BREADTH_FILE_LEVEL_MAX_FILES
+UNION_BREADTH_BROAD_MIN_PATTERNS = _DEFAULT_UNION_BREADTH_BROAD_MIN_PATTERNS
+UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN = _DEFAULT_UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN
+UNION_BREADTH_WEAK_CASCADE_MAX = _DEFAULT_UNION_BREADTH_WEAK_CASCADE_MAX
+UNION_BREADTH_STRONG_CASCADE_MIN = _DEFAULT_UNION_BREADTH_STRONG_CASCADE_MIN
+
+
 # ── policy externalization: default profiles + runtime application ─────────
 #
 # _POLICY_DEFAULTS mirrors policies/governance/*.json exactly, built from the
@@ -1781,6 +1878,39 @@ _POLICY_DEFAULTS = {
             "the shipped descriptions."
         ),
     },
+    "anomaly_thresholds": {
+        "profile_id": "anomaly-thresholds-v1",
+        "schema_version": "0.1",
+        "thresholds": {
+            "provided_carried_downstream_min": _DEFAULT_PROVIDED_CARRIED_DOWNSTREAM_MIN,
+            "provided_active_use_max": _DEFAULT_PROVIDED_ACTIVE_USE_MAX,
+            "primary_read_active_use_min": _DEFAULT_PRIMARY_READ_ACTIVE_USE_MIN,
+            "passive_indicator_high_min": _DEFAULT_PASSIVE_INDICATOR_HIGH_MIN,
+            "passive_indicator_moderate_min": _DEFAULT_PASSIVE_INDICATOR_MODERATE_MIN,
+            "passive_inheritance_risk_bundle_share_max": _DEFAULT_PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX,
+            "bundle_share_very_low_max": _DEFAULT_BUNDLE_SHARE_VERY_LOW_MAX,
+            "gt_tp_gap_gt_min": _DEFAULT_GT_TP_GAP_GT_MIN,
+            "gt_tp_gap_tp_max": _DEFAULT_GT_TP_GAP_TP_MAX,
+            "group2_scope_divergence_gap_min": _DEFAULT_GROUP2_SCOPE_DIVERGENCE_GAP_MIN,
+            "group1_scope_spread_gap_min": _DEFAULT_GROUP1_SCOPE_SPREAD_GAP_MIN,
+            "tp_tc_bypass_gap_min": _DEFAULT_TP_TC_BYPASS_GAP_MIN,
+            "weak_tc_max": _DEFAULT_WEAK_TC_MAX,
+            "weak_cp_max": _DEFAULT_WEAK_CP_MAX,
+            "view_template_zero_discipline_max": _DEFAULT_VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX,
+            "phases_tp_extension_max": _DEFAULT_PHASES_TP_EXTENSION_MAX,
+            "phases_tw_min": _DEFAULT_PHASES_TW_MIN,
+            "portfolio_shape_density_min": _DEFAULT_PORTFOLIO_SHAPE_DENSITY_MIN,
+            "portfolio_shape_union_jaccard_max": _DEFAULT_PORTFOLIO_SHAPE_UNION_JACCARD_MAX,
+            "union_breadth_corpus_wide_clients_pct_min": _DEFAULT_UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN,
+            "union_breadth_client_wide_clients_pct_min": _DEFAULT_UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN,
+            "union_breadth_project_wide_min_projects": _DEFAULT_UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS,
+            "union_breadth_file_level_max_files": _DEFAULT_UNION_BREADTH_FILE_LEVEL_MAX_FILES,
+            "union_breadth_broad_min_patterns": _DEFAULT_UNION_BREADTH_BROAD_MIN_PATTERNS,
+            "union_breadth_narrow_file_level_share_min": _DEFAULT_UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN,
+            "union_breadth_weak_cascade_max": _DEFAULT_UNION_BREADTH_WEAK_CASCADE_MAX,
+            "union_breadth_strong_cascade_min": _DEFAULT_UNION_BREADTH_STRONG_CASCADE_MIN,
+        },
+    },
 }
 
 # Populated by apply_governance_policy() with whichever finding_rules profile
@@ -1821,6 +1951,18 @@ def apply_governance_policy(policy: dict) -> None:
     global ONBOARD_WP_STABLE_MIN, ONBOARD_WP_MIXED_MIN
     global ONBOARD_XC_HIGH_PORTABILITY_MIN, ONBOARD_XC_MODERATE_PORTABILITY_MIN
     global ONBOARD_N_FILES_LOW_MAX, ONBOARD_N_FILES_MODERATE_MAX
+    global PROVIDED_CARRIED_DOWNSTREAM_MIN, PROVIDED_ACTIVE_USE_MAX, PRIMARY_READ_ACTIVE_USE_MIN
+    global PASSIVE_INDICATOR_HIGH_MIN, PASSIVE_INDICATOR_MODERATE_MIN
+    global PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX, BUNDLE_SHARE_VERY_LOW_MAX
+    global GT_TP_GAP_GT_MIN, GT_TP_GAP_TP_MAX
+    global GROUP2_SCOPE_DIVERGENCE_GAP_MIN, GROUP1_SCOPE_SPREAD_GAP_MIN
+    global TP_TC_BYPASS_GAP_MIN, WEAK_TC_MAX, WEAK_CP_MAX
+    global VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX, PHASES_TP_EXTENSION_MAX, PHASES_TW_MIN
+    global PORTFOLIO_SHAPE_DENSITY_MIN, PORTFOLIO_SHAPE_UNION_JACCARD_MAX
+    global UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN, UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN
+    global UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS, UNION_BREADTH_FILE_LEVEL_MAX_FILES
+    global UNION_BREADTH_BROAD_MIN_PATTERNS, UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN
+    global UNION_BREADTH_WEAK_CASCADE_MAX, UNION_BREADTH_STRONG_CASCADE_MIN
 
     LOADED_GOVERNANCE_POLICY = policy
     profiles = policy["profiles"]
@@ -1882,6 +2024,53 @@ def apply_governance_policy(policy: dict) -> None:
     ONBOARD_N_FILES_MODERATE_MAX = ct("n_files_moderate_max", _DEFAULT_ONBOARD_N_FILES_MODERATE_MAX)
 
     FINDING_RULE_DESCRIPTIONS = dict(profiles["finding_rules"].get("rules", {}))
+
+    at = profiles["anomaly_thresholds"].get("thresholds", {})
+
+    def at_(key: str, default):
+        return at.get(key, default)
+
+    PROVIDED_CARRIED_DOWNSTREAM_MIN = at_("provided_carried_downstream_min", _DEFAULT_PROVIDED_CARRIED_DOWNSTREAM_MIN)
+    PROVIDED_ACTIVE_USE_MAX = at_("provided_active_use_max", _DEFAULT_PROVIDED_ACTIVE_USE_MAX)
+    PRIMARY_READ_ACTIVE_USE_MIN = at_("primary_read_active_use_min", _DEFAULT_PRIMARY_READ_ACTIVE_USE_MIN)
+    PASSIVE_INDICATOR_HIGH_MIN = at_("passive_indicator_high_min", _DEFAULT_PASSIVE_INDICATOR_HIGH_MIN)
+    PASSIVE_INDICATOR_MODERATE_MIN = at_("passive_indicator_moderate_min", _DEFAULT_PASSIVE_INDICATOR_MODERATE_MIN)
+    PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX = at_(
+        "passive_inheritance_risk_bundle_share_max", _DEFAULT_PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX
+    )
+    BUNDLE_SHARE_VERY_LOW_MAX = at_("bundle_share_very_low_max", _DEFAULT_BUNDLE_SHARE_VERY_LOW_MAX)
+    GT_TP_GAP_GT_MIN = at_("gt_tp_gap_gt_min", _DEFAULT_GT_TP_GAP_GT_MIN)
+    GT_TP_GAP_TP_MAX = at_("gt_tp_gap_tp_max", _DEFAULT_GT_TP_GAP_TP_MAX)
+    GROUP2_SCOPE_DIVERGENCE_GAP_MIN = at_("group2_scope_divergence_gap_min", _DEFAULT_GROUP2_SCOPE_DIVERGENCE_GAP_MIN)
+    GROUP1_SCOPE_SPREAD_GAP_MIN = at_("group1_scope_spread_gap_min", _DEFAULT_GROUP1_SCOPE_SPREAD_GAP_MIN)
+    TP_TC_BYPASS_GAP_MIN = at_("tp_tc_bypass_gap_min", _DEFAULT_TP_TC_BYPASS_GAP_MIN)
+    WEAK_TC_MAX = at_("weak_tc_max", _DEFAULT_WEAK_TC_MAX)
+    WEAK_CP_MAX = at_("weak_cp_max", _DEFAULT_WEAK_CP_MAX)
+    VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX = at_("view_template_zero_discipline_max", _DEFAULT_VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX)
+    PHASES_TP_EXTENSION_MAX = at_("phases_tp_extension_max", _DEFAULT_PHASES_TP_EXTENSION_MAX)
+    PHASES_TW_MIN = at_("phases_tw_min", _DEFAULT_PHASES_TW_MIN)
+    PORTFOLIO_SHAPE_DENSITY_MIN = at_("portfolio_shape_density_min", _DEFAULT_PORTFOLIO_SHAPE_DENSITY_MIN)
+    PORTFOLIO_SHAPE_UNION_JACCARD_MAX = at_("portfolio_shape_union_jaccard_max", _DEFAULT_PORTFOLIO_SHAPE_UNION_JACCARD_MAX)
+    UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN = at_(
+        "union_breadth_corpus_wide_clients_pct_min", _DEFAULT_UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN
+    )
+    UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN = at_(
+        "union_breadth_client_wide_clients_pct_min", _DEFAULT_UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN
+    )
+    UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS = at_(
+        "union_breadth_project_wide_min_projects", _DEFAULT_UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS
+    )
+    UNION_BREADTH_FILE_LEVEL_MAX_FILES = at_(
+        "union_breadth_file_level_max_files", _DEFAULT_UNION_BREADTH_FILE_LEVEL_MAX_FILES
+    )
+    UNION_BREADTH_BROAD_MIN_PATTERNS = at_(
+        "union_breadth_broad_min_patterns", _DEFAULT_UNION_BREADTH_BROAD_MIN_PATTERNS
+    )
+    UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN = at_(
+        "union_breadth_narrow_file_level_share_min", _DEFAULT_UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN
+    )
+    UNION_BREADTH_WEAK_CASCADE_MAX = at_("union_breadth_weak_cascade_max", _DEFAULT_UNION_BREADTH_WEAK_CASCADE_MAX)
+    UNION_BREADTH_STRONG_CASCADE_MIN = at_("union_breadth_strong_cascade_min", _DEFAULT_UNION_BREADTH_STRONG_CASCADE_MIN)
 
 
 def _state_value(state: Optional[dict], key: str) -> Optional[float]:
@@ -1994,7 +2183,8 @@ TIER_ORDER = {
 }
 
 
-def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[str]:
+def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None,
+                      union_breadth: Optional[dict] = None) -> list[str]:
     notes = []
     tc, cp, tp = d["tc"], d["cp"], d["tp"]
     xc = d["xc"]
@@ -2016,7 +2206,7 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
         local_active = state.get("local_active_share")
 
         if provided_configured is not None and provided_used is not None:
-            if provided_configured >= 0.75 and provided_used < 0.75:
+            if provided_configured >= PROVIDED_CARRIED_DOWNSTREAM_MIN and provided_used < PROVIDED_ACTIVE_USE_MAX:
                 notes.append(
                     f"Provided vocabulary is substantially carried downstream ({pct(provided_configured)}) "
                     f"but active-use containment is lower ({pct(provided_used)}). Treat this as a "
@@ -2045,27 +2235,27 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
 
     if not state:
         if bundle_schema == "dual" and passive_ind is not None:
-            if passive_ind >= 0.40:
+            if passive_ind >= PASSIVE_INDICATOR_HIGH_MIN:
                 notes.append(
                     f"High passive inheritance signal ({passive_ind*100:.0f}% of bundled shared "
                     "patterns drop out under the used view) — a significant fraction of the "
                     "template vocabulary is present in projects but not actively exercised. "
                     "Ratification should consider an active-use threshold, not just pattern presence."
                 )
-            elif passive_ind >= 0.20:
+            elif passive_ind >= PASSIVE_INDICATOR_MODERATE_MIN:
                 notes.append(
                     f"Moderate passive inheritance ({passive_ind*100:.0f}% drop from all to used view). "
                     "Some template patterns are inherited but not in active use."
                 )
         elif bundle_schema == "single" and bundle_share is not None:
-            if dom in PASSIVE_INHERITANCE_RISK_DOMAINS and bundle_share < 0.25:
+            if dom in PASSIVE_INHERITANCE_RISK_DOMAINS and bundle_share < PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX:
                 notes.append(
                     f"Low bundle density among shared patterns ({bundle_share*100:.0f}% bundled). "
                     "This domain is in the passive inheritance risk group — shared patterns may be "
                     "inherited rather than actively configured. Used-view analysis recommended "
                     "before ratification."
                 )
-            elif bundle_share is not None and bundle_share < 0.15:
+            elif bundle_share is not None and bundle_share < BUNDLE_SHARE_VERY_LOW_MAX:
                 notes.append(
                     f"Very low bundle density among shared patterns ({bundle_share*100:.0f}% bundled). "
                     "Shared vocabulary is largely unstructured — consider used-view analysis "
@@ -2078,7 +2268,7 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
     # specifically between templates and projects rather than with the baseline
     # content itself.
     gt = d.get("gt")
-    if gt is not None and gt >= 0.75 and tp is not None and tp < 0.55:
+    if gt is not None and gt >= GT_TP_GAP_GT_MIN and tp is not None and tp < GT_TP_GAP_TP_MAX:
         notes.append(
             f"Generic/enterprise baseline containment into templates is strong (G→T = {pct(gt)}) "
             f"but template-to-project propagation is weak (T→P = {pct(tp)}). The enterprise "
@@ -2103,7 +2293,7 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
         if enterprise_val is None or not scoped_vals:
             continue
         scoped_mean = statistics.mean(scoped_vals.values())
-        if abs(enterprise_val - scoped_mean) >= 0.25:
+        if abs(enterprise_val - scoped_mean) >= GROUP2_SCOPE_DIVERGENCE_GAP_MIN:
             direction = "weaker" if scoped_mean < enterprise_val else "stronger"
             detail = ", ".join(f"{k}={pct(v)}" for k, v in sorted(scoped_vals.items()))
             notes.append(
@@ -2127,10 +2317,11 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
     # cross_segment_summary.csv data -- see docs/governance_narrative_group1_scope_gap_investigation.md
     # follow-up) -- the note must not claim "business-center" divergence when
     # the actual varying dimension for that particular scope_pair could be
-    # client or discipline instead. Uses the same >=0.25 absolute-gap
-    # materiality threshold as the Group 2 check above, applied to each
-    # scope_pair's own (min, max) spread instead of an enterprise-vs-mean
-    # comparison.
+    # client or discipline instead. Uses its own group1_scope_spread_gap_min
+    # materiality threshold (a separately-editable key from the Group 2 check
+    # above's group2_scope_divergence_gap_min, even though the two default
+    # values currently coincide), applied to each scope_pair's own (min, max)
+    # spread instead of an enterprise-vs-mean comparison.
     for cascade_label, by_scope_spread, by_scope_mean in (
         ("Template→Container", d.get("tc_by_scope_spread") or {}, d.get("tc_by_scope") or {}),
         ("Container→Project", d.get("cp_by_scope_spread") or {}, d.get("cp_by_scope") or {}),
@@ -2139,7 +2330,7 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
         for scope_pair, (lo, hi) in sorted(by_scope_spread.items()):
             if scope_pair == "enterprise::enterprise":
                 continue
-            if hi - lo >= 0.25:
+            if hi - lo >= GROUP1_SCOPE_SPREAD_GAP_MIN:
                 notes.append(
                     f"{cascade_label} pooled evidence for scope '{scope_pair}' spans "
                     f"{pct(lo)}–{pct(hi)} across the individual rows pooled into this "
@@ -2149,18 +2340,18 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
                     "one number."
                 )
 
-    if tc is not None and tp is not None and tp > tc + 0.25:
+    if tc is not None and tp is not None and tp > tc + TP_TC_BYPASS_GAP_MIN:
         notes.append(
             "Template patterns arrive in projects via direct Revit inheritance, "
             "bypassing coordination files — coordination files are not the governance "
             "vehicle for this domain."
         )
-    if tc is not None and tc < 0.20:
+    if tc is not None and tc < WEAK_TC_MAX:
         notes.append(
             f"Templates propagate weakly into coordination files "
             f"(T→C = {pct(tc)}). Coordination files govern this domain independently."
         )
-    if cp is not None and cp < 0.50:
+    if cp is not None and cp < WEAK_CP_MAX:
         notes.append(
             f"Coordination-file-to-project cascade is weak (C→P = {pct(cp)}). "
             "Project teams are diverging from coordination file vocabulary."
@@ -2177,17 +2368,65 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
         )
     if "view_template" in dom:
         disc_wp = d["wp_disc"]
-        zero_discs = [_disc_label(k) for k, v in disc_wp.items() if v < 0.05 and k != "all"]
+        zero_discs = [_disc_label(k) for k, v in disc_wp.items() if v < VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX and k != "all"]
         if zero_discs:
             notes.append(
                 f"Architecturally specific — near-zero within-project coherence for: "
                 f"{', '.join(zero_discs)}. These disciplines require separate view template governance."
             )
     if dom == "phases" and "phases" in DOMAIN_GUIDANCE:
-        if tp is not None and tp < 0.85 and d["tw"] is not None and d["tw"] > 0.80:
+        if tp is not None and tp < PHASES_TP_EXTENSION_MAX and d["tw"] is not None and d["tw"] > PHASES_TW_MIN:
             notes.append(DOMAIN_GUIDANCE["phases"])
     if dom == "loaded_family_types" and "loaded_family_types" in DOMAIN_GUIDANCE:
         notes.append(DOMAIN_GUIDANCE["loaded_family_types"])
+
+    # Union-inventory-derived domain confidence enrichment (D-033). Only the
+    # strongest exceptions render -- per docs/governance_generator_cross_compare_coverage.md's
+    # own guardrail, this must not become a per-domain dump of raw breadth
+    # numbers. The two conditions are checked as an if/elif (mutually
+    # exclusive): a domain in the gap between UNION_BREADTH_WEAK_CASCADE_MAX
+    # and UNION_BREADTH_STRONG_CASCADE_MIN, or with unremarkable breadth,
+    # triggers neither.
+    if union_breadth:
+        primary = tp if tp is not None else cp
+        total = union_breadth.get("total", 0)
+        broad = union_breadth.get("corpus_wide", 0) + union_breadth.get("client_wide", 0)
+        file_level = union_breadth.get("file_level", 0)
+        if primary is not None and broad >= UNION_BREADTH_BROAD_MIN_PATTERNS and primary < UNION_BREADTH_WEAK_CASCADE_MAX:
+            # PR review finding: `broad`/`total` are summed across every
+            # discipline/unit_system scope for this domain -- a single
+            # narrow scope (e.g. one small discipline where all its clients
+            # happen to carry a pattern) can satisfy this threshold with no
+            # domain-wide breadth evidence at all. Name the qualifying
+            # scope(s) explicitly instead of letting the note read as a
+            # domain-wide claim.
+            broad_scopes = union_breadth.get("broad_scopes") or []
+            scope_labels = [
+                f"{disc or '(no discipline)'}/{unit or '(no unit system)'}"
+                for disc, unit in broad_scopes
+            ]
+            scope_note = (
+                f" (scope(s): {', '.join(scope_labels)})" if scope_labels else ""
+            )
+            notes.append(
+                f"Broad natural reuse ({broad} corpus-wide/client-wide pattern(s) of {total} "
+                f"in cross_segment_union_inventory.csv) despite weak formal cascade (primary "
+                f"containment = {pct(primary)}){scope_note}. This may indicate a natural-"
+                "standard candidate within the named scope(s) that the cascade metrics alone "
+                "would miss -- not necessarily domain-wide reuse; counts are summed across "
+                "discipline/unit_system scopes with independent denominators."
+            )
+        elif (
+            primary is not None and total > 0
+            and file_level / total >= UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN
+            and primary >= UNION_BREADTH_STRONG_CASCADE_MIN
+        ):
+            notes.append(
+                f"Narrow natural reuse ({file_level} of {total} patterns are file-level/singleton "
+                f"in cross_segment_union_inventory.csv) despite strong formal cascade (primary "
+                f"containment = {pct(primary)}). Formal propagation may be fragile — review "
+                "whether reuse is broader than the union inventory currently shows."
+            )
     return notes
 
 def build_client_summary(
@@ -2809,7 +3048,7 @@ def _finalize_state_bucket(bucket: dict) -> dict:
     if local_active_share is None and tgt_used_n:
         local_active_share = local_active / tgt_used_n
 
-    if provided_to_used is not None and provided_to_used >= 0.85:
+    if provided_to_used is not None and provided_to_used >= PRIMARY_READ_ACTIVE_USE_MIN:
         primary_read = "Provided standard is actively used"
     elif provided_passive_share is not None and provided_passive_share >= PASSIVE_MATERIAL_THRESHOLD:
         primary_read = "Provided standard is carried but partly passive"
@@ -2989,7 +3228,8 @@ def load_delta_summary(delta_rows: list[dict]) -> dict:
 # ── section renderers ──────────────────────────────────────────────────────────
 
 
-def render_header(analysis_date: str, corpus: dict, has_state_outputs: bool, legacy_used_fallback: bool) -> str:
+def render_header(analysis_date: str, corpus: dict, has_state_outputs: bool, legacy_used_fallback: bool,
+                   interpretation_guide_will_be_copied: bool = False) -> str:
     n_disc = len(corpus.get("disciplines", set()))
     disc_list = ", ".join(
         _disc_label(d)
@@ -3005,6 +3245,20 @@ def render_header(analysis_date: str, corpus: dict, has_state_outputs: bool, leg
         "Used-view columns were not found in the summary schema, so used-view measures fall back to legacy all-view columns where necessary. Claims depending on active use are therefore limited."
         if legacy_used_fallback else
         "Used-view columns are present in the summary schema and are kept separate from all-view configured vocabulary."
+    )
+    # PR review finding: this pointer previously named the guide by bare
+    # basename unconditionally, but the guide is only actually copied
+    # alongside this run's output inside main()'s `if args.emit_evidence_
+    # package:` block (D-034) -- with --no-emit-evidence-package, or a
+    # deployment missing the source doc, the pointer named a file that
+    # would not exist beside the narrative. When the guide won't be copied
+    # this run, point at the checked-in repo path instead and say so.
+    interpretation_guide_pointer = (
+        f"`{INTERPRETATION_GUIDE_PATH.name}` in this run's output directory"
+        if interpretation_guide_will_be_copied else
+        f"`docs/governance/{INTERPRETATION_GUIDE_PATH.name}` in the repository "
+        "(not included alongside this run's output -- this run used "
+        "--no-emit-evidence-package or the source doc was not found on disk)"
     )
     return f"""# Revit Configuration Governance Analysis
 ## Stantec Consulting — BIM Fingerprint System
@@ -3061,31 +3315,10 @@ region, should not be inferred from this output unless supplied by upstream CSVs
 
 ## How to Read the Analysis
 
-The analysis separates **provided vocabulary**, **configured downstream vocabulary**, and
-**active project use**. This prevents a template pattern that is merely carried into a
-project from being mistaken for a pattern actively used in delivery.
-
-**All view:** complete configured vocabulary present in a file, including inherited stock
-content.
-
-**Used view:** project vocabulary excluding conclusively purgeable or unused records.
-Used-view interpretation is meaningful primarily for **Project** targets. Template,
-Generic, and most Container roles are provided-vocabulary references, not production-use
-environments.
-
-**Containment:** evidence that one vocabulary is present inside another. It is evidence of
-reuse or propagation, not proof of governance approval or active use.
-
-**Cross-client similarity:** evidence of shared practice across client portfolios. Low
-cross-client similarity is not automatically bad; it matters when it creates onboarding,
-portability, governance, or maintenance burden.
-
-**Governance-state outputs:** when provided, these separate `provided_and_used`,
-`provided_but_passive`, `provided_but_missing`, `local_active`, `local_passive`, and
-`local_unbundled` signals.
-
-Scores range from 0 to 1. In this report, high scores indicate stronger evidence for a
-candidate baseline or common base; they do not automatically ratify a standard.
+See {interpretation_guide_pointer}'s "Metric semantics" section for what
+provided/configured/active-use vocabulary, all-view/used-view, containment,
+cross-client similarity, and score-range mean in this report, and how they
+should (and should not) be read.
 
 ---
 
@@ -3118,19 +3351,42 @@ def render_evidence_authority_header(
     -- this document remains a controlled_interpretation artifact, not authoritative
     evidence, and no LLM is involved in producing it or any other artifact in this package.
 
-    The health/findings/evidence-map pointer lines are gated on emit_evidence_package --
-    when a caller passes --no-emit-evidence-package, those three files are never
-    written, so this document must not point readers at files that don't exist. The
-    governance_brief.md pointer is separately gated on emit_interpretation_layer (only
-    meaningful when emit_evidence_package is also on -- see main()). The interpretation
-    guide/question routes pointers are unconditional: they are static repo docs, not
-    per-run outputs, so they exist regardless of either flag.
+    The health/findings/evidence-map/reasoning-prerequisites pointer lines are gated
+    on emit_evidence_package -- when a caller passes --no-emit-evidence-package, those
+    files are never written, so this document must not point readers at files that
+    don't exist. The governance_brief.md pointer is separately gated on
+    emit_interpretation_layer (only meaningful when emit_evidence_package is also on --
+    see main()). PR review finding: the interpretation guide/question routes/reading
+    order pointers used to be treated as unconditional on the theory that they're
+    static repo docs that always exist -- true of the repo copy, but not of the
+    per-run copy this document's own reader may only have (D-034's copy-into-`--out`
+    only runs inside main()'s emit_evidence_package branch, and only for a source
+    doc that's actually present on disk). Each pointer below is gated on that same
+    "will this run's --out actually contain a usable copy" condition, falling back
+    to a repository-qualified path with an explicit note when it won't.
     """
+    def _static_doc_pointer(path: Path, label: str) -> str:
+        will_be_copied = emit_evidence_package and path.exists()
+        return (
+            f"`{path.name}`" if will_be_copied else
+            f"`docs/governance/{path.name}` in the repository (not included "
+            f"alongside this run's output -- {label})"
+        )
+    _not_copied_reason = (
+        "this run used --no-emit-evidence-package" if not emit_evidence_package else
+        "the source doc was not found on disk"
+    )
+    interpretation_guide_pointer = _static_doc_pointer(INTERPRETATION_GUIDE_PATH, _not_copied_reason)
+    question_routes_pointer = _static_doc_pointer(QUESTION_ROUTES_PATH, _not_copied_reason)
+    reading_order_pointer = _static_doc_pointer(READING_ORDER_PATH, _not_copied_reason)
     package_pointers = (
         f"""
 > **Package health:** `governance_package_health.json` (schema {package_schema_version})
 > **Structured findings:** `governance_findings.json`
 > **Evidence navigation:** `governance_evidence_map.json`
+> **Reasoning prerequisites:** `governance_evidence_map.json`'s `reasoning_prerequisites`
+> field names the artifacts to check before stating a conclusion -- see
+> {reading_order_pointer} for the reading sequence.
 """
         if emit_evidence_package else
         "\n> This run was generated with `--no-emit-evidence-package`, so no "
@@ -3152,8 +3408,8 @@ def render_evidence_authority_header(
 > `governance_client_summary.csv`, `governance_bc_summary.csv`), which in
 > turn outrank this narrative's prose.
 > If this document disagrees with a rollup CSV or a source CSV, the CSV wins.
-{package_pointers}{brief_pointer}> **Metric semantics and known bad inferences:** `{INTERPRETATION_GUIDE_PATH.name}`
-> **Where to look for a specific recurring question:** `{QUESTION_ROUTES_PATH.name}`
+{package_pointers}{brief_pointer}> **Metric semantics and known bad inferences:** {interpretation_guide_pointer}
+> **Where to look for a specific recurring question:** {question_routes_pointer}
 """
 
 
@@ -3184,7 +3440,8 @@ For directed governance comparisons, the analysis separates three questions:
 
 
 
-def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> str:
+def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None,
+                         union_breadth_by_domain: Optional[dict] = None) -> str:
     # Sort domains by DoD-safe governance classification then score.
     state_summary = state_summary or {}
     scored = []
@@ -3331,7 +3588,7 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
         sections.append("")
 
         for dom, d, state in group:
-            notes = detect_anomalies(dom, d, state)
+            notes = detect_anomalies(dom, d, state, (union_breadth_by_domain or {}).get(dom))
             if notes:
                 label = DOMAIN_LABELS.get(dom, dom)
                 sections.append(f"**{label}:** " + " ".join(notes) + "\n")
@@ -3986,6 +4243,151 @@ def render_delta_section(delta_summary: dict) -> str:
     return "\n".join(lines)
 
 
+_UNION_BREADTH_TIERS = ("corpus_wide", "client_wide", "project_wide", "file_level", "unclassified")
+
+
+def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
+    """Per-domain reuse-breadth pattern counts derived from
+    cross_segment_union_inventory.csv's own presence-percentage columns
+    (D-033) -- corpus-wide/client-wide/project-wide/file-level pattern
+    counts, following the same corpus_wide/client_wide/... vocabulary
+    already rendered from pattern_reuse_distribution.csv in
+    render_union_reuse_summary()'s "Reuse breadth summary" table above, but
+    computed independently from union inventory's own pct_clients_present/
+    n_projects_present/n_files_present fields -- that file carries no
+    reuse_bucket column of its own (UNION_INVENTORY_FIELDS in
+    compare_cross_segment.py), unlike pattern_reuse_distribution.csv
+    (REUSE_DISTRIBUTION_FIELDS).
+
+    Restricted to governance_role == "Project", view_scope == "all" rows,
+    to avoid double-counting a pattern once per view scope and to keep this
+    a presence/reuse-breadth question (all-view), not an active-use one.
+
+    build_union_inventory_rows() in compare_cross_segment.py emits one row
+    per (client_label, ..., join_hash) grain -- the same (domain, join_hash)
+    pattern recurs once per client that carries it. pct_clients_present/
+    n_clients_present are identical across every row sharing the same
+    (view_scope, governance_role, discipline_label, unit_system, domain)
+    group -- NOT corpus-wide across the whole domain; a pattern's presence
+    percentage is computed independently per discipline/unit_system grain
+    (compare_cross_segment.py's build_union_inventory_rows(), the
+    clients_by_group/clients_by_pattern grouping keyed on discipline_label/
+    unit_system). n_files_present/n_projects_present are computed per-client
+    (that client's own files/projects only) on top of that. A naive
+    last-row-wins classification would make a pattern's tier depend on
+    row/client iteration order, and merging rows across different
+    discipline/unit_system grains under one key would combine
+    percentages computed against different denominators (PR review
+    findings). Each pattern -- (join_hash, discipline_label, unit_system,
+    within a domain) -- is instead classified into exactly one,
+    highest-qualifying tier across ALL of its same-scope rows -- corpus_wide
+    > client_wide > project_wide > file_level > unclassified -- mirroring
+    the bucket_priority pattern already used above for pattern_reuse_
+    distribution.csv rows (D-033). This means the same conceptual pattern
+    reused identically across multiple disciplines is counted once per
+    discipline, not once per domain -- a direct consequence of the
+    denominators themselves being discipline/unit_system-scoped upstream,
+    not an independent design choice here.
+
+    corpus_wide/client_wide additionally require n_clients_denominator > 1,
+    mirroring the identical guard compare_cross_segment.py's own
+    _reuse_bucket_for() applies to its corpus_wide classification (PR
+    review finding) -- with only one client in the grain, pct_clients_present
+    is trivially 1.0 for every pattern that client carries at all, which
+    would otherwise label every single-client domain's patterns
+    "corpus-wide reuse" with no actual cross-client evidence.
+    """
+    tier_rank = {t: i for i, t in enumerate(_UNION_BREADTH_TIERS)}
+    pattern_tier: dict = {}
+    # PR review finding: a degraded row's own pct_clients_present, computed
+    # upstream over ALL client rows for that scope (degraded ones included),
+    # doesn't stop a co-occurring healthy row for the SAME pattern_key from
+    # still classifying as e.g. corpus_wide -- and the highest-priority-wins
+    # rule would then let that healthy classification override the degraded
+    # row's "unclassified", using data that shares a contaminated
+    # denominator. Degraded status is a different axis from breadth
+    # (data-quality, not tier), so it must veto the whole pattern_key rather
+    # than just lose an OR-across-tiers contest with a higher-priority tier.
+    pattern_degraded: set = set()
+    for row in union_inventory_rows:
+        if row.get("governance_role") != "Project":
+            continue
+        if row.get("view_scope") != "all":
+            continue
+        domain = row.get("domain", "")
+        join_hash = row.get("join_hash", "")
+        if not domain or not join_hash:
+            continue
+        # PR review finding: build_pattern_reuse_distribution_rows() sends a
+        # row with source_status/inventory_status != "ok" (e.g. missing
+        # source-cluster IDs) straight to unclassified before any breadth
+        # check -- this independent classifier must honor the same gate
+        # instead of presenting degraded inventory as confident breadth
+        # evidence. Same "ok" default as the upstream check.
+        row_degraded = (row.get("source_status") or "ok") != "ok" or (row.get("inventory_status") or "ok") != "ok"
+        if row_degraded:
+            tier = "unclassified"
+        else:
+            pct_clients = pf(row.get("pct_clients_present"))
+            n_clients_den = pf(row.get("n_clients_denominator"))
+            n_projects = pf(row.get("n_projects_present"))
+            n_files = pf(row.get("n_files_present"))
+            multi_client = n_clients_den is not None and n_clients_den > 1
+            if multi_client and pct_clients is not None and pct_clients >= UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN:
+                tier = "corpus_wide"
+            elif multi_client and pct_clients is not None and pct_clients >= UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN:
+                tier = "client_wide"
+            elif n_projects is not None and n_projects >= UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS:
+                tier = "project_wide"
+            elif n_files is not None and n_files <= UNION_BREADTH_FILE_LEVEL_MAX_FILES:
+                tier = "file_level"
+            else:
+                tier = "unclassified"
+        # PR review finding: compare_cross_segment.py's own pct_clients_present/
+        # n_clients_denominator computation (build_union_inventory_rows(),
+        # ~line 1413-1437) groups by (view_scope, governance_role,
+        # discipline_label, unit_system, domain), NOT corpus-wide across the
+        # whole domain -- the earlier docstring claim that these fields are
+        # "corpus-wide there (identical across every such row)" only holds
+        # WITHIN one discipline/unit_system grain, not across them. Keying
+        # this classifier's pattern_tier by (domain, join_hash) alone merged
+        # rows from incompatible denominator scopes, so a pattern present in
+        # every client of one small discipline could be misreported as
+        # corpus-wide for the entire domain. Include discipline_label/
+        # unit_system in the key so only same-scope rows are ever compared.
+        pattern_key = (domain, row.get("discipline_label", ""), row.get("unit_system", ""), join_hash)
+        if row_degraded:
+            pattern_degraded.add(pattern_key)
+        existing = pattern_tier.get(pattern_key)
+        if existing is None or tier_rank[tier] < tier_rank[existing]:
+            pattern_tier[pattern_key] = tier
+
+    for pattern_key in pattern_degraded:
+        pattern_tier[pattern_key] = "unclassified"
+
+    # PR review finding: by_domain sums tier counts across every discipline/
+    # unit_system scope for a domain, so a single narrow scope (e.g. one
+    # small discipline where 2/2 clients happen to carry a pattern) can make
+    # broad == 1 at the domain level even though no domain-wide breadth
+    # evidence exists -- a "Broad natural reuse" note built only from these
+    # counts would overclaim domain-wide reuse from one scoped grain.
+    # broad_scopes records which (discipline_label, unit_system) scopes
+    # actually contributed a corpus_wide/client_wide classification, so
+    # detect_anomalies() can name the qualifying scope(s) instead of
+    # implying the whole domain.
+    by_domain: dict = defaultdict(
+        lambda: {t: 0 for t in _UNION_BREADTH_TIERS} | {"total": 0, "broad_scopes": set()}
+    )
+    for (domain, discipline, unit_system, _join_hash), tier in pattern_tier.items():
+        by_domain[domain][tier] += 1
+        by_domain[domain]["total"] += 1
+        if tier in ("corpus_wide", "client_wide"):
+            by_domain[domain]["broad_scopes"].add((discipline, unit_system))
+    for domain, counts in by_domain.items():
+        counts["broad_scopes"] = sorted(counts["broad_scopes"])
+    return dict(by_domain)
+
+
 def render_union_reuse_summary(
     union_inventory_rows: list,
     reuse_distribution_rows: list,
@@ -4299,7 +4701,7 @@ def _render_portfolio_density_similarity(
 
     def _shape_note(a: str, b: str, density_v: float) -> str:
         uv = union_index.get((a, b))
-        if uv is not None and density_v >= 0.8 and uv < 0.3:
+        if uv is not None and density_v >= PORTFOLIO_SHAPE_DENSITY_MIN and uv < PORTFOLIO_SHAPE_UNION_JACCARD_MAX:
             return f" -- same shape, different content (union_jaccard={fmt(uv)})"
         return ""
 
@@ -4749,11 +5151,11 @@ def _passive_inheritance_risk_domains(cascade: dict, state_summary: Optional[dic
         bundle_schema = d.get("bundle_schema", "none")
         if bundle_schema == "dual":
             passive_ind = d.get("passive_indicator")
-            if passive_ind is not None and passive_ind >= 0.20:
+            if passive_ind is not None and passive_ind >= PASSIVE_MATERIAL_THRESHOLD:
                 flagged.append(dom)
         elif bundle_schema == "single":
             bundle_share = d.get("bundle_share_all")
-            if bundle_share is not None and bundle_share < 0.25:
+            if bundle_share is not None and bundle_share < PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX:
                 flagged.append(dom)
     return sorted(flagged)
 
@@ -5014,7 +5416,7 @@ def render_findings_and_recommendations(
     if "phases" in cascade and cascade["phases"]["tp"] is not None:
         phases_tp = cascade["phases"]["tp"]
         phases_tw = cascade["phases"]["tw"]
-        if phases_tp < 0.85 and phases_tw is not None and phases_tw > 0.80:
+        if phases_tp < PHASES_TP_EXTENSION_MAX and phases_tw is not None and phases_tw > PHASES_TW_MIN:
             lines.append(
                 "**Phases show project-level extension.** Templates are internally consistent on phase definitions, but projects carry phases not defined in templates. The governance question is whether those additions are intentional project practice, client-specific vocabulary, or unmanaged accumulation.\n"
             )
@@ -5052,7 +5454,147 @@ def render_findings_and_recommendations(
     return "\n".join(lines)
 
 
-def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_state_outputs: bool = False) -> str:
+def build_comparison_completeness(
+    summary_rows: list, comparison_registry_rows: list,
+    governance_state_rows: Optional[list] = None,
+    governance_state_summary_rows: Optional[list] = None,
+) -> dict:
+    """Per-domain counts of expected (segment_id_a, segment_id_b,
+    comparison_type) pairs -- the union of keys seen in cross_segment_summary.csv
+    (proof a comparison ran and produced evidence) and comparison_registry.csv
+    (proof a comparison was computed and stamped at some point) -- that have
+    a matching entry in BOTH files ("present", further split "stale" when the
+    registry's computed_utc predates the summary row's own executed_utc, i.e.
+    the registry snapshot is older than the evidence it should describe), or
+    a matching entry in only one of the two ("missing": no registry stamp for
+    evidenced work, treated as stale rather than missing when the reverse --
+    the registry has a stamp but the current summary snapshot has no matching
+    row AND no matching governance-state evidence either -- see below).
+
+    PR review finding (D-032): iterating summary_rows alone cannot surface a
+    registry entry with no matching summary evidence at all. Unioning the two
+    key sets catches that case, but still cannot detect a comparison that was
+    NEVER run and has zero rows in EITHER file -- that would need a canonical
+    inventory of expected work items (e.g. segment_manifest.csv's full
+    lattice x domain list x comparison type), which this generator does not
+    reconstruct. This function remains a narrower, self-contained proxy: it
+    answers "is there a mismatch between what has evidence and what the
+    registry has stamped," not "was every truly-expected comparison run."
+
+    PR review finding (D-032): compare_cross_segment.py legitimately stamps
+    comparison_registry.csv for a (pair, domain) work item that produced
+    governance-state output but no cross_segment_summary.csv row at all --
+    directed work below --min-patterns still needs provided_but_missing
+    visibility, so `produced_output` there is True from governance-state
+    rows alone (see main()'s `if ctype in GOVERNANCE_STATE_DIRECTED_TYPES`
+    block). A registry-only entry that matches a governance_state_rows/
+    governance_state_summary_rows key (segment_id_reference/_target mapped
+    to segment_id_a/b) is therefore counted present rather than stale purely
+    for reference-existing purposes -- it is not automatically assumed
+    current, though: recency is still checked against that state row's own
+    `executed_utc`, the same as the summary-row path, since an independently
+    supplied registry and state CSV can come from different runs.
+
+    Self-contained: uses only comparison_registry.csv's own identity
+    (segment_id_a/b, comparison_type, domain) and recency (computed_utc)
+    fields against cross_segment_summary.csv's matching identity/executed_utc
+    fields, plus governance-state rows' identity fields for the exception
+    above. This generator has no access to compare_cross_segment.py's live
+    segment registry (run_registry.csv's population_hash/last_run_utc), so
+    this is a narrower, narrative-side proxy for staleness than
+    comparison_is_stale() computes there -- it answers "is this registry
+    snapshot older than the evidence it should describe," not "has the
+    underlying segment population changed since this pair was computed."
+    """
+    def _key(row: dict) -> tuple:
+        return (
+            row.get("segment_id_a", ""), row.get("segment_id_b", ""),
+            row.get("comparison_type", ""), row.get("domain", ""),
+        )
+
+    def _state_key(row: dict) -> tuple:
+        return (
+            row.get("segment_id_reference", ""), row.get("segment_id_target", ""),
+            row.get("comparison_type", ""), row.get("domain", ""),
+        )
+
+    registry_index: dict = {_key(row): row for row in comparison_registry_rows}
+    summary_index: dict = {}
+    for row in summary_rows:
+        if row.get("domain", ""):
+            summary_index.setdefault(_key(row), row)
+
+    # PR review finding: setdefault() kept whichever source's row for a key
+    # was seen FIRST, so if governance_state_rows and governance_state_
+    # summary_rows carry the same key from two different runs, an older
+    # raw-state timestamp could shadow newer summary evidence and hide a
+    # registry stamp that should have been flagged stale. Keep the maximum
+    # executed_utc seen across all matching rows from either source instead.
+    state_executed_utc: dict = {}
+    for row in (governance_state_rows or []) + (governance_state_summary_rows or []):
+        if row.get("domain", ""):
+            key = _state_key(row)
+            executed_utc = row.get("executed_utc", "")
+            if executed_utc and executed_utc > state_executed_utc.get(key, ""):
+                state_executed_utc[key] = executed_utc
+            else:
+                state_executed_utc.setdefault(key, executed_utc)
+
+    by_domain: dict = defaultdict(lambda: {"total": 0, "present": 0, "missing": 0, "stale": 0})
+    # PR review finding: a directed comparison that produced governance-state
+    # evidence but was excluded from comparison_registry.csv (e.g. a segment
+    # not marked complete) and has no summary row either was invisible to
+    # this loop -- neither registry_index nor summary_index has its key.
+    # Unioning state_executed_utc's keys in makes it show up as "missing"
+    # like any other unstamped work item, instead of not being counted at all.
+    for key in registry_index.keys() | summary_index.keys() | state_executed_utc.keys():
+        domain = key[3]
+        if not domain:
+            continue
+        counts = by_domain[domain]
+        counts["total"] += 1
+        registry_row = registry_index.get(key)
+        summary_row = summary_index.get(key)
+        if registry_row is None:
+            counts["missing"] += 1
+            continue
+        counts["present"] += 1
+        if summary_row is None:
+            if key in state_executed_utc:
+                # Valid state-only stamp: this (pair, domain) produced
+                # governance-state evidence but no summary row, and the
+                # registry correctly reflects that -- not a staleness signal
+                # on its own. Still compare recency: an independently
+                # supplied registry and state CSV can come from different
+                # runs, so a registry stamp older than the state evidence it
+                # should describe is stale the same way a summary-row match
+                # would be.
+                computed_utc = registry_row.get("computed_utc", "")
+                executed_utc = state_executed_utc[key]
+                if computed_utc and executed_utc and computed_utc < executed_utc:
+                    counts["stale"] += 1
+                continue
+            # Registry has a stamp, but the current summary snapshot has no
+            # matching row and no matching governance-state evidence either
+            # -- the registry is out of sync with this run's evidence (e.g.
+            # a domain-scoped run that didn't recompute everything a
+            # broader prior run did).
+            counts["stale"] += 1
+            continue
+        # PR review finding: a key can have BOTH a summary row and state
+        # evidence (from a different run) -- comparing only against the
+        # summary row's executed_utc missed a registry stamp that was stale
+        # relative to newer state evidence. Compare against whichever
+        # evidence timestamp is newest.
+        computed_utc = registry_row.get("computed_utc", "")
+        executed_utc = max(summary_row.get("executed_utc", ""), state_executed_utc.get(key, ""))
+        if computed_utc and executed_utc and computed_utc < executed_utc:
+            counts["stale"] += 1
+    return dict(by_domain)
+
+
+def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_state_outputs: bool = False,
+                        comparison_completeness: Optional[dict] = None) -> str:
     used_fallback_note = (
         "\n- **Used-view fallback:** Used-view columns were not found in the summary schema. Where legacy columns are reused as fallback, active-use conclusions are limited and should be confirmed with dual-view outputs."
         if legacy_used_fallback else ""
@@ -5080,6 +5622,47 @@ def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_sta
         )
     else:
         excluded_note = "- **Excluded domains:** none for this run's policy profile."
+
+    completeness_section = ""
+    if comparison_completeness:
+        total_checked = sum(c["total"] for c in comparison_completeness.values())
+        completeness_lines = [
+            "\n\n### Input Completeness / Staleness\n",
+            "Per-domain count of segment/domain comparison pairs referenced in "
+            "`cross_segment_summary.csv`, `comparison_registry.csv`, and/or "
+            "governance-state evidence (`--governance-state`/`--governance-"
+            "state-summary`, for directed comparisons that produce state "
+            "output but no summary row), present in / missing from / stale "
+            "relative to a registry stamp -- distinguishes genuinely weak "
+            "evidence from a comparison that was run but not (yet) "
+            "registered, or registered but stale relative to the current "
+            "run. This is a proxy, not a canonical inventory: a comparison "
+            "absent from ALL THREE evidence sources (never run, never "
+            "registered, no state evidence either) cannot be detected here "
+            "and is not counted below. Registry content itself is never "
+            "reproduced here; see `governance_evidence_map.json`'s "
+            "`comparison_registry` entry for a drill-down pointer.\n",
+        ]
+        flagged = sorted(
+            ((dom, c) for dom, c in comparison_completeness.items() if c["missing"] or c["stale"]),
+            key=lambda item: (-(item[1]["missing"] + item[1]["stale"]), item[0]),
+        )
+        if flagged:
+            completeness_lines.append("| domain | present | missing | stale |")
+            completeness_lines.append("|---|---:|---:|---:|")
+            for dom, c in flagged[:20]:
+                completeness_lines.append(f"| {dom} | {c['present']} | {c['missing']} | {c['stale']} |")
+            if len(flagged) > 20:
+                completeness_lines.append(f"\nTable limited to 20 domains; {len(flagged) - 20} domains not shown.")
+        else:
+            completeness_lines.append(
+                f"No missing or stale comparison pairs across the {total_checked} "
+                "segment/domain pair(s) referenced in these evidence sources -- every "
+                "pair checked has a current registry entry. This does not confirm every "
+                "comparison that should exist was run; see the note above.\n"
+            )
+        completeness_section = "\n".join(completeness_lines)
+
     return f"""---
 
 ## Analytical Notes and Limitations
@@ -5090,7 +5673,7 @@ def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_sta
 - **Imperial/metric split:** All project files are imperial. Metric templates and coordination files exist but metric projects are not yet represented. Metric findings are limited to template-to-container comparisons only.
 - **Scores are means across file pairs.** Individual files may score substantially higher or lower than reported means.
 - **Patterns are normalised configuration fingerprints** (join_hash values) capturing the behavioural identity of a configuration record, independent of Revit element IDs. Two files sharing a pattern have identical or functionally equivalent configuration for that element.
-{excluded_note}{used_fallback_note}{state_note}
+{excluded_note}{used_fallback_note}{state_note}{completeness_section}
 
 ---
 
@@ -5287,6 +5870,17 @@ def main():
                              "unclassified.")
     parser.add_argument("--union-inventory",
                         help="cross_segment_union_inventory.csv (optional)")
+    parser.add_argument("--comparison-registry",
+                        help="comparison_registry.csv (optional). Enables a per-domain "
+                             "Input Completeness / Staleness note near Analytical Notes: an "
+                             "evidence/registry-mismatch proxy that flags a comparison "
+                             "stamped in the registry but stale or missing relative to "
+                             "cross_segment_summary.csv/governance-state evidence (D-032). "
+                             "Cannot detect a comparison absent from ALL evidence sources "
+                             "(never run, never registered, no state evidence either) -- "
+                             "not a not-run-coverage guarantee. Never embedded/reproduced "
+                             "in the output package -- only derived present/missing/stale "
+                             "counts are.")
     parser.add_argument("--reuse-distribution",
                         help="pattern_reuse_distribution.csv (optional)")
     parser.add_argument("--matrix-manifest",
@@ -5350,19 +5944,22 @@ def main():
     parser.set_defaults(emit_evidence_package=True)
     parser.add_argument("--emit-interpretation-layer", dest="emit_interpretation_layer",
                         action="store_true",
-                        help="Write governance_brief.md, and add the static "
-                             "docs/governance_interpretation_guide.md / "
-                             "docs/governance_question_routes.md as evidence-map "
-                             "entries (default: on). Only takes effect when "
+                        help="Write governance_brief.md (default: on) and render its "
+                             "narrative-header pointer. Only takes effect when "
                              "--emit-evidence-package is also on, since the brief "
                              "is built from governance_findings.json/"
-                             "governance_package_health.json.")
+                             "governance_package_health.json. PR review finding: this "
+                             "does NOT gate the interpretation-guide/question-routes/"
+                             "reading-order evidence-map entries or their docs/governance/ "
+                             "copy into --out -- those are controlled by --emit-evidence-"
+                             "package alone and by each doc's own presence on disk.")
     parser.add_argument("--no-emit-interpretation-layer", dest="emit_interpretation_layer",
                         action="store_false",
-                        help="Suppress governance_brief.md and the interpretation-"
-                             "guide/question-routes evidence-map entries only; "
-                             "governance_package_manifest.json/_health.json/"
-                             "_evidence_map.json/governance_findings.json are unaffected.")
+                        help="Suppress governance_brief.md and its narrative-header "
+                             "pointer only; governance_package_manifest.json/_health.json/"
+                             "_evidence_map.json/governance_findings.json, and the "
+                             "interpretation-guide/question-routes/reading-order evidence-"
+                             "map entries and copies, are unaffected.")
     parser.set_defaults(emit_interpretation_layer=True)
     parser.add_argument("--out", default="governance_narrative_context.md")
     parser.add_argument("--date", default=str(date.today()),
@@ -5424,6 +6021,11 @@ def main():
     if args.union_inventory:
         print(f"Loading {args.union_inventory}...")
         union_inventory_rows = read_csv(Path(args.union_inventory))
+
+    comparison_registry_rows = []
+    if args.comparison_registry:
+        print(f"Loading {args.comparison_registry}...")
+        comparison_registry_rows = read_csv(Path(args.comparison_registry))
 
     reuse_distribution_rows = []
     if args.reuse_distribution:
@@ -5495,6 +6097,15 @@ def main():
         governance_state_rows, governance_state_summary_rows
     )
 
+    union_breadth_by_domain = build_union_breadth_by_domain(union_inventory_rows)
+
+    comparison_completeness = None
+    if args.comparison_registry:
+        comparison_completeness = build_comparison_completeness(
+            summary_rows, comparison_registry_rows,
+            governance_state_rows, governance_state_summary_rows,
+        )
+
     delta_summary = {}
     if delta_rows:
         print("Summarising legacy delta patterns...")
@@ -5563,7 +6174,8 @@ def main():
             continue
         tier = assign_tier(d, governance_state_summary.get(dom))
         reliability = score_reliability(d)
-        anomalies = detect_anomalies(dom, d, governance_state_summary.get(dom))
+        union_breadth = union_breadth_by_domain.get(dom)
+        anomalies = detect_anomalies(dom, d, governance_state_summary.get(dom), union_breadth)
         domain_csv_rows.append({
             "domain": dom,
             "domain_label": DOMAIN_LABELS.get(dom, dom),
@@ -5625,6 +6237,17 @@ def main():
                 "local_unbundled_count": governance_state_summary.get(dom, {}).get("local_unbundled_count", ""),
                 "primary_governance_read": governance_state_summary.get(dom, {}).get("primary_governance_read", ""),
             },
+            # Union-inventory-derived reuse-breadth pattern counts (D-033) --
+            # additive only; blank when --union-inventory wasn't supplied or
+            # the domain has no Project/all-view rows there. See
+            # build_union_breadth_by_domain()'s own docstring for the
+            # corpus_wide > client_wide > project_wide > file_level tier
+            # classification these counts come from.
+            "union_reuse_patterns_total": union_breadth.get("total", "") if union_breadth else "",
+            "union_reuse_patterns_corpus_wide": union_breadth.get("corpus_wide", "") if union_breadth else "",
+            "union_reuse_patterns_client_wide": union_breadth.get("client_wide", "") if union_breadth else "",
+            "union_reuse_patterns_project_wide": union_breadth.get("project_wide", "") if union_breadth else "",
+            "union_reuse_patterns_file_level": union_breadth.get("file_level", "") if union_breadth else "",
             "notable_anomalies": " | ".join(anomalies) if anomalies else "",
         })
 
@@ -5727,10 +6350,11 @@ def main():
     # ── Render and write narrative MD ─────────────────────────────────────────
     print("Rendering narrative...")
     sections = [
-        render_header(args.date, corpus, bool(governance_state_summary), legacy_fallback),
+        render_header(args.date, corpus, bool(governance_state_summary), legacy_fallback,
+                      bool(args.emit_evidence_package and INTERPRETATION_GUIDE_PATH.exists())),
         render_evidence_authority_header(args.package_schema_version, GENERATOR_IDENTITY, args.emit_evidence_package, args.emit_interpretation_layer),
         render_governance_state_model(bool(governance_state_summary)),
-        render_domain_tiers(cascade, governance_state_summary),
+        render_domain_tiers(cascade, governance_state_summary, union_breadth_by_domain),
     ]
     generic_scope_section = render_generic_baseline_scope_section(cascade)
     if generic_scope_section:
@@ -5772,7 +6396,7 @@ def main():
         sections.append(client_bc_distribution_section)
     sections += [
         render_findings_and_recommendations(cascade, client_rows, governance_state_summary, findings),
-        render_limitations(corpus, legacy_fallback, bool(governance_state_summary)),
+        render_limitations(corpus, legacy_fallback, bool(governance_state_summary), comparison_completeness),
     ]
 
     output = "\n\n".join(sections)
@@ -5805,6 +6429,17 @@ def main():
             "segment_manifest": Path(args.segment_manifest) if args.segment_manifest else None,
             "governance_bc_client_matrix": Path(args.governance_bc_client_matrix) if args.governance_bc_client_matrix else None,
             "governance_client_bc_matrix": Path(args.governance_client_bc_matrix) if args.governance_client_bc_matrix else None,
+            # Explicit override, else the same auto-detected-beside-summary
+            # default sibling_paths["comparison_registry"] uses below (D-032)
+            # -- one resolved path, tracked both as an input (this dict, for
+            # governance_package_health.json's required/optional-input
+            # "present" signal) and as an evidence-map artifact (sibling_paths,
+            # for governance_evidence_map.json navigation), so the two never
+            # disagree about which file "comparison_registry" means.
+            "comparison_registry": (
+                Path(args.comparison_registry) if args.comparison_registry
+                else Path(args.summary).parent / "comparison_registry.csv"
+            ),
         }
         input_required = {"cross_segment_summary": True, "cross_segment_pooled": True}
         input_roles = {
@@ -5826,6 +6461,7 @@ def main():
             "segment_manifest": "authoritative_deterministic_evidence",
             "governance_bc_client_matrix": "authoritative_deterministic_evidence",
             "governance_client_bc_matrix": "authoritative_deterministic_evidence",
+            "comparison_registry": "authoritative_deterministic_evidence",
         }
         input_present = {k: bool(v) and v.exists() for k, v in input_paths.items()}
 
@@ -5951,19 +6587,22 @@ def main():
             matrix_manifest_row_count=len(matrix_manifest_rows),
             matrix_names_seen=matrix_names_seen,
             policy_load_status=governance_policy["load_status"],
+            comparison_completeness=comparison_completeness,
+            interpretation_guide_present=INTERPRETATION_GUIDE_PATH.exists(),
         )
         write_json(out_dir / "governance_package_health.json", health)
 
         findings_document = build_findings_document(findings, schema_version=FINDINGS_SCHEMA_VERSION)
         write_json(out_dir / "governance_findings.json", findings_document)
 
-        # governance_interpretation_guide.md / governance_question_routes.md are
-        # human/LLM-authored static reference docs, never written by this
-        # generator -- always listed in the evidence map (like the never-consumed
-        # sibling CSVs below) with presence computed from real Path.exists(),
-        # independent of --emit-interpretation-layer (that flag controls the
-        # per-run governance_brief.md only, not whether these repo-level docs
-        # are acknowledged to exist).
+        # governance_interpretation_guide.md / governance_question_routes.md /
+        # governance_reading_order.md (D-030) are human/LLM-authored static
+        # reference docs, never written by this generator -- always listed in
+        # the evidence map (like the never-consumed sibling CSVs below) with
+        # presence computed from real Path.exists(), independent of
+        # --emit-interpretation-layer (that flag controls the per-run
+        # governance_brief.md only, not whether these repo-level docs are
+        # acknowledged to exist).
         # governance_relationships.csv (tools/governance_relationships.py) is
         # never read by this generator -- only governance_bc_client_matrix.csv/
         # governance_client_bc_matrix.csv (loaded via --governance-bc-client-
@@ -6026,9 +6665,22 @@ def main():
             else Path(args.matrix_manifest) if args.matrix_manifest
             else Path(args.summary)
         )
+        # D-032: --comparison-registry, when explicitly supplied, overrides the
+        # auto-detected sibling path below -- the same "explicit override, else
+        # fall back to the anchor default" pattern _reuse_domain_anchor/
+        # _project_mean_pair_anchor already use above. Shared by both
+        # input_paths (drives governance_package_health.json's
+        # required_inputs/optional_inputs "present" signal) and sibling_paths
+        # (drives governance_evidence_map.json's artifact entry) below, so the
+        # two never disagree about which file "comparison_registry" means for
+        # this run.
+        _comparison_registry_path = (
+            Path(args.comparison_registry) if args.comparison_registry
+            else Path(args.summary).parent / "comparison_registry.csv"
+        )
         sibling_paths = {
             "file_pairs": Path(args.summary).parent / "cross_segment_file_pairs.csv",
-            "comparison_registry": Path(args.summary).parent / "comparison_registry.csv",
+            "comparison_registry": _comparison_registry_path,
             # D-024: the other two files this generator's own module docstring
             # names as "not yet consumed directly" (see above) -- both written
             # by compare_cross_segment.py's main(), anchored beside whichever
@@ -6042,9 +6694,37 @@ def main():
             "project_mean_file_pair_jaccard_matrix": _project_mean_pair_anchor.parent / "project_mean_file_pair_jaccard_matrix.csv",
             "interpretation_guide": INTERPRETATION_GUIDE_PATH,
             "question_routes": QUESTION_ROUTES_PATH,
+            "reading_order": READING_ORDER_PATH,
+            "classification_rules": CLASSIFICATION_RULES_PATH,
             "governance_relationships": _relationships_anchor.parent / "governance_relationships.csv",
         }
         sibling_present = {k: v.exists() for k, v in sibling_paths.items()}
+
+        # ── D-034: copy the four static docs/governance/ reference docs into
+        # --out, so a governance package handed to someone without the repo
+        # checked out is still self-contained -- narrative sections/pointers
+        # name these docs by filename, which is meaningless without the file
+        # actually present alongside the rest of the run's output. Only these
+        # four (never the CSV siblings above, e.g. comparison_registry.csv --
+        # D-032 is explicit those are never embedded/reproduced). governance_
+        # evidence_map.json/governance_package_manifest.json's own path/present
+        # fields for these artifacts still describe the checked-in repo doc
+        # (the source of truth), not this copy -- the copy is a convenience,
+        # not a new source of truth, and is silently skipped if the source
+        # doc is missing (e.g. a stripped-down deployment without docs/).
+        for _doc_key in ("interpretation_guide", "question_routes", "reading_order", "classification_rules"):
+            _doc_src = sibling_paths[_doc_key]
+            _doc_dst = out_dir / _doc_src.name
+            if not sibling_present[_doc_key]:
+                # Source doc absent this run (e.g. a stripped-down deployment
+                # without docs/) -- remove a copy left by an earlier run over
+                # this same --out directory so a reader can't pair a stale
+                # doc with this run's fresh narrative/CSVs.
+                if _doc_dst.exists():
+                    _doc_dst.unlink()
+                continue
+            if _doc_src.resolve() != _doc_dst.resolve():
+                shutil.copy2(_doc_src, _doc_dst)
 
         # ── D-023: live file-availability inventory ─────────────────────────────
         # Scans the cross_segment export directory (--summary's parent) and,
@@ -6109,6 +6789,7 @@ def main():
             sibling_present=sibling_present,
             package_schema_version=args.package_schema_version,
             file_inventory_schema_version=FILE_INVENTORY_SCHEMA_VERSION,
+            out_dir=out_dir,
         )
         write_json(out_dir / "governance_evidence_map.json", evidence_map)
 
@@ -6167,8 +6848,33 @@ def main():
             "governance_findings.json",
             "governance_file_inventory.json",
             "governance_brief.md",
+            # D-034's copied static docs -- also written only inside the
+            # emit_evidence_package branch above, so they go stale the same
+            # way the JSON artifacts do when a later run opts out.
+            INTERPRETATION_GUIDE_PATH.name,
+            QUESTION_ROUTES_PATH.name,
+            READING_ORDER_PATH.name,
+            CLASSIFICATION_RULES_PATH.name,
         )
-        removed = [name for name in stale_names if (out_dir / name).exists()]
+        # PR review finding: if --out IS docs/governance/ (or any directory
+        # the four static docs actually live in), these names resolve to the
+        # checked-in source documents themselves, not a D-034 copy -- deleting
+        # them would destroy tracked repo docs, not clean up a stale copy.
+        # Same resolve()-comparison guard the copy loop above already uses.
+        _doc_source_paths = {
+            INTERPRETATION_GUIDE_PATH.name, QUESTION_ROUTES_PATH.name,
+            READING_ORDER_PATH.name, CLASSIFICATION_RULES_PATH.name,
+        }
+        _doc_sources_resolved = {
+            p.resolve() for p in (
+                INTERPRETATION_GUIDE_PATH, QUESTION_ROUTES_PATH,
+                READING_ORDER_PATH, CLASSIFICATION_RULES_PATH,
+            )
+        }
+        removed = [
+            name for name in stale_names if (out_dir / name).exists()
+            and not (name in _doc_source_paths and (out_dir / name).resolve() in _doc_sources_resolved)
+        ]
         for name in removed:
             (out_dir / name).unlink()
         if removed:

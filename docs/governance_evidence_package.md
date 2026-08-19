@@ -23,21 +23,27 @@ added the package manifest/health/evidence-map. Phase 2 (D-020) added
 structured findings (`governance_findings.json`). Phase 3 (D-021) added
 policy externalization (`policies/governance/*.json`). Phase 4 (D-022)
 added the interpretation/routing layer: a stable interpretation guide
-(`docs/governance_interpretation_guide.md`), a candidate question-route
-catalog (`docs/governance_question_routes.md`), and a narrower run-specific
+(`docs/governance/governance_interpretation_guide.md`), a candidate question-route
+catalog (`docs/governance/governance_question_routes.md`), and a narrower run-specific
 brief (`governance_brief.md`), described below. Phase 5 (D-023) added a
 live, computed-per-build directory of drill-down files the package doesn't
 otherwise describe (`governance_file_inventory.json` + a new section in
-`governance_brief.md`). None of these phases changed any existing
-classification, scoring, or CSV column — every threshold/domain-list/
-guidance-text value the policy layer reads from JSON reproduces this
-generator's pre-externalization Python literal exactly, the brief is a
-pure distillation of already-computed findings/health/file-inventory data,
-and the file inventory only ever describes files this generator does not
-otherwise read, so no existing invocation's classification output changes
-by default. `governance_narrative_context.md` is retained as a
-compatibility artifact — unchanged in content and role, just no longer the
-only carrier of findings/navigation/interpretation.
+`governance_brief.md`). Phase 6 (D-029) externalized `detect_anomalies()`/
+the phases check/`_passive_inheritance_risk_domains()`/`_shape_note()`'s
+remaining threshold literals to a fifth policy profile
+(`anomaly_thresholds.json`), added `docs/governance/governance_classification_rules.md`
+(the branch-order/exception-logic counterpart to the threshold *values* in
+the JSON profiles), and trimmed `render_header()`'s restated metric
+definitions to a pointer at the interpretation guide. None of these phases
+changed any existing classification, scoring, or CSV column — every
+threshold/domain-list/guidance-text value the policy layer reads from JSON
+reproduces this generator's pre-externalization Python literal exactly, the
+brief is a pure distillation of already-computed findings/health/
+file-inventory data, and the file inventory only ever describes files this
+generator does not otherwise read, so no existing invocation's
+classification output changes by default. `governance_narrative_context.md`
+is retained as a compatibility artifact — unchanged in content and role,
+just no longer the only carrier of findings/navigation/interpretation.
 
 ## Design reference, not a dependency
 
@@ -185,8 +191,8 @@ future integration points (drill-through appendix for file pairs;
 completeness/staleness reporting for the comparison registry; the other two
 are deliberate scoping exclusions, not gaps). Also in this group (same
 "never parsed, presence checked via `Path.exists()` only" treatment, but no
-scan since they aren't CSVs): `docs/governance_interpretation_guide.md` and
-`docs/governance_question_routes.md` — human/LLM-authored static reference
+scan since they aren't CSVs): `docs/governance/governance_interpretation_guide.md` and
+`docs/governance/governance_question_routes.md` — human/LLM-authored static reference
 docs checked into the repo, not per-run outputs of this generator, and
 unconditional on `--emit-interpretation-layer` (see below).
 
@@ -274,7 +280,7 @@ candidate file is not the same as being able to fetch it.
 
 ### Escalation-target sibling artifacts get real shape (D-024)
 
-`docs/governance_interpretation_guide.md`'s "What to do when a pre-built
+`docs/governance/governance_interpretation_guide.md`'s "What to do when a pre-built
 route isn't enough" section names `cross_segment_file_pairs.csv` and
 `comparison_registry.csv` by filename as the drill-down files a route's
 "Escalation" field points past the compact layer into. Before D-024, the
@@ -361,9 +367,10 @@ an observed result.
 
 ## Policy profiles and threshold profiles
 
-Implemented (D-021). Governance thresholds, domain-governance policy, and
-client-onboarding interpretation rules that used to be Python literals in
-`generate_governance_narrative.py` now live in four JSON profiles under
+Implemented (D-021; extended D-029). Governance thresholds, domain-governance
+policy, client-onboarding interpretation rules, and anomaly/note materiality
+thresholds that used to be Python literals in
+`generate_governance_narrative.py` now live in five JSON profiles under
 `policies/governance/`, loaded via a new sibling module,
 `tools/governance_policy.py`:
 
@@ -373,6 +380,7 @@ client-onboarding interpretation rules that used to be Python literals in
 | `domain_governance_policy.json` | `excluded_from_scoring` (domains excluded from aggregate scoring), `passive_inheritance_risk_domains`, per-domain `domain_guidance` text (`phases`, `loaded_family_types`), and `static_findings_guidance` (always-rendered findings-section prose). |
 | `client_onboarding_policy.json` | `_client_onboarding_profile()`'s interpretation thresholds. Kept as its own profile, separate from `governance_thresholds.json`, even where a value numerically coincides with a governance-tier threshold today — these gate onboarding narrative text, not `governance_tier`, and the two are allowed to diverge independently in a future change. |
 | `finding_rules.json` | Documentation-only `rule_id → {finding_type, description}` metadata for D-020's `governance_findings.json` `rule_ids[]`. Never drives classification logic — the rule_id constants and the classification rules themselves stay in `generate_governance_narrative.py`. |
+| `anomaly_thresholds.json` (D-029) | `detect_anomalies()`'s `notable_anomalies` materiality thresholds, the phases check shared by `detect_anomalies()` and `render_findings_and_recommendations()`, `_passive_inheritance_risk_domains()`'s bundle-share threshold, and `_shape_note()`'s Project Portfolio density-similarity thresholds. Kept as its own profile even where a value numerically coincides with `governance_thresholds.json` (e.g. `passive_inheritance_risk_bundle_share_max` vs. `passive_material_threshold`) — the two gate different code paths and must be independently editable. See `docs/governance/governance_classification_rules.md` for the branch order these values are evaluated in. |
 
 Each file follows the `profile_id` + `schema_version` + `notes` +
 content shape already used elsewhere in `policies/` (e.g.
@@ -428,7 +436,7 @@ it does not change any classification output — `governance_brief.md` is a
 pure distillation of `governance_findings.json`/`governance_package_health.json`,
 computing nothing new.
 
-### `docs/governance_interpretation_guide.md`
+### `docs/governance/governance_interpretation_guide.md`
 
 A **stable, package-type-level** document (not regenerated per run) that
 explains what this package's metrics and classifications mean: cascade
@@ -441,7 +449,7 @@ section. Modeled on the "interpretation layer" concept in
 runtime dependency. Versioned via a header (`interpretation_guide_version`)
 independently of `PACKAGE_SCHEMA_VERSION`.
 
-### `docs/governance_question_routes.md`
+### `docs/governance/governance_question_routes.md`
 
 A **candidate question-route catalog** — "where to look," not "what the
 answer is" (that's the artifact) or "how to extract it" (that would be a
@@ -485,8 +493,8 @@ directory, matching the existing staleness-prevention convention for the
 other evidence-package JSON files.
 
 `governance_narrative_context.md`'s authority header now also points to
-`governance_brief.md` (when present), `docs/governance_interpretation_guide.md`,
-and `docs/governance_question_routes.md`.
+`governance_brief.md` (when present), `docs/governance/governance_interpretation_guide.md`,
+and `docs/governance/governance_question_routes.md`.
 
 ## CLI reference
 
@@ -527,7 +535,7 @@ in `llm_evidence_framework/notes/current_thesis.md` (reasoning guidance +
 package-specific interpretation guidance + manifest + health + evidence map
 + rollup/flags + the user's question, not the full archive):
 
-1. `docs/governance_interpretation_guide.md` — what do this package's
+1. `docs/governance/governance_interpretation_guide.md` — what do this package's
    metrics/tiers mean, and what are the known bad inferences to avoid?
    (Static; load once per package type, not per run.)
 2. `governance_package_health.json` — is this package usable at face value?
@@ -535,7 +543,7 @@ package-specific interpretation guidance + manifest + health + evidence map
    or is a profile running on this generator's built-in default?)
 3. `governance_evidence_map.json` — which artifact answers the question at
    hand? If the question matches a recurring pattern, check
-   `docs/governance_question_routes.md` first for a candidate shortcut.
+   `docs/governance/governance_question_routes.md` first for a candidate shortcut.
 4. `governance_package_manifest.json` — what inputs actually fed this run,
    and which `policy_profiles.profiles` (`profile_id`/`schema_version`/
    `source`) were applied?

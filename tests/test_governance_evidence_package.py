@@ -175,6 +175,22 @@ def test_manifest_records_policy_profiles_when_supplied():
     assert "not yet implemented" not in m["policy_profiles"]["note"]
 
 
+def test_manifest_policy_profiles_note_says_five_profiles_not_four():
+    """PR review finding: adding anomaly_thresholds (D-029) means every
+    generated manifest carries five policy profiles, but the note still
+    said 'four' and claimed every shipped value reproduces a
+    pre-externalization literal exactly -- false for anomaly_thresholds.json's
+    union_breadth_* keys (D-033), which are newly introduced thresholds with
+    no prior inline literal to reproduce."""
+    m = _manifest(policy_dir=Path("/some/policy/dir"), policy_profiles={
+        "thresholds": {"profile_id": "x", "schema_version": "0.1", "source": "policy_file"},
+    })
+    note = m["policy_profiles"]["note"]
+    assert "five profiles" in note
+    assert "four profiles" not in note
+    assert "union_breadth_*" in note
+
+
 # ---------------------------------------------------------------------------
 # build_package_health
 # ---------------------------------------------------------------------------
@@ -269,6 +285,31 @@ def test_health_all_policy_profiles_from_file_adds_no_warning():
     assert h["fallbacks_used"] == []
 
 
+def test_health_omitted_interpretation_guide_present_adds_no_warning():
+    """A caller that hasn't threaded this through (interpretation_guide_present
+    omitted) must get identical health output to before this parameter
+    existed."""
+    h = _health()
+    assert h["overall_status"] == "complete"
+    assert not any(w["condition"] == "reasoning_prerequisite_absent" for w in h["warnings"])
+
+
+def test_health_degrades_when_interpretation_guide_absent():
+    """PR review finding: governance_interpretation_guide carries
+    required_before_conclusions=True, but nothing in health tracked its
+    actual presence -- a stripped deployment missing docs/ could report
+    overall_status 'complete' while the prerequisite gate is unsatisfiable."""
+    h = _health(interpretation_guide_present=False)
+    assert h["overall_status"] == "degraded"
+    assert any(w["condition"] == "reasoning_prerequisite_absent" for w in h["warnings"])
+
+
+def test_health_no_warning_when_interpretation_guide_present():
+    h = _health(interpretation_guide_present=True)
+    assert h["overall_status"] == "complete"
+    assert not any(w["condition"] == "reasoning_prerequisite_absent" for w in h["warnings"])
+
+
 def test_health_does_not_warn_when_client_sector_explicitly_provided():
     h = _health(client_sector_status="explicit_path")
     conditions = [w["condition"] for w in h["warnings"]]
@@ -318,13 +359,14 @@ def _evidence_map(**overrides):
     return build_evidence_map(**kwargs)
 
 
-def test_evidence_map_has_thirty_five_unique_artifacts():
+def test_evidence_map_has_thirty_seven_unique_artifacts():
     # 29 (pre-relationship-layer) + governance_bc_client_matrix +
     # governance_client_bc_matrix + governance_relationships + governance_file_inventory
-    # + pattern_reuse_summary_by_domain + project_mean_file_pair_jaccard_matrix (D-024).
+    # + pattern_reuse_summary_by_domain + project_mean_file_pair_jaccard_matrix (D-024)
+    # + governance_reading_order (D-030) + governance_classification_rules (D-029).
     em = _evidence_map()
     ids = [a["artifact_id"] for a in em["artifacts"]]
-    assert len(ids) == 35
+    assert len(ids) == 37
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
     assert "governance_bc_client_matrix" in ids
@@ -333,6 +375,8 @@ def test_evidence_map_has_thirty_five_unique_artifacts():
     assert "governance_file_inventory" in ids
     assert "pattern_reuse_summary_by_domain" in ids
     assert "project_mean_file_pair_jaccard_matrix" in ids
+    assert "governance_reading_order" in ids
+    assert "governance_classification_rules" in ids
     assert len(ids) == len(set(ids))
 
 
@@ -342,6 +386,7 @@ def test_evidence_map_required_fields_populated_for_every_artifact():
         "artifact_id", "path", "artifact_type", "required", "producer",
         "authority_level", "context_role", "grain", "can_answer",
         "cannot_answer", "known_limitations", "null_semantics", "related_artifacts",
+        "required_before_conclusions",
     }
     for a in em["artifacts"]:
         missing = required_keys - set(a.keys())
@@ -349,6 +394,49 @@ def test_evidence_map_required_fields_populated_for_every_artifact():
         assert a["artifact_type"], a["artifact_id"]
         assert a["authority_level"], a["artifact_id"]
         assert a["grain"], a["artifact_id"]
+        assert isinstance(a["required_before_conclusions"], bool), a["artifact_id"]
+
+
+def test_evidence_map_omits_output_local_path_when_out_dir_not_supplied():
+    """A caller that hasn't adopted out_dir (omitted, the default) must get
+    identical entries to before this parameter existed -- no output_local_path
+    key at all, matching every other optional field's convention."""
+    em = _evidence_map()
+    guide = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_interpretation_guide")
+    assert "output_local_path" not in guide
+
+
+def test_evidence_map_output_local_path_present_when_sibling_present_and_out_dir_supplied(tmp_path):
+    """PR review finding: an automated consumer following reasoning_
+    prerequisites needs to actually locate the artifact from a portable
+    --out directory (no repo checkout) -- path/present alone describe the
+    checked-in repo doc, unresolvable from a moved --out. output_local_path
+    must name the D-034 copy that sits beside this evidence map, as a
+    package-relative bare filename (not out_dir-qualified) so it survives
+    the whole --out directory being moved or copied elsewhere (PR review
+    finding, round 11)."""
+    guide_src = tmp_path / "repo_docs" / "governance_interpretation_guide.md"
+    guide_src.parent.mkdir()
+    guide_src.write_text("guide", encoding="utf-8")
+    em = _evidence_map(
+        sibling_paths={
+            "file_pairs": Path("cross_segment_file_pairs.csv"),
+            "comparison_registry": Path("comparison_registry.csv"),
+            "interpretation_guide": guide_src,
+        },
+        sibling_present={"file_pairs": False, "comparison_registry": False, "interpretation_guide": True},
+        out_dir=tmp_path / "out",
+    )
+    guide = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_interpretation_guide")
+    assert guide["output_local_path"] == "governance_interpretation_guide.md"
+    # path/present still describe the repo source, never the copy (D-034).
+    assert guide["path"] == str(guide_src)
+
+
+def test_evidence_map_omits_output_local_path_when_sibling_absent_even_with_out_dir(tmp_path):
+    em = _evidence_map(out_dir=tmp_path / "out")
+    guide = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_interpretation_guide")
+    assert "output_local_path" not in guide
 
 
 def test_evidence_map_authority_levels_use_only_defined_vocabulary():
@@ -505,6 +593,60 @@ def test_evidence_map_governance_file_inventory_honors_overridden_schema_version
     em = _evidence_map(file_inventory_schema_version="2.0")
     entry = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_file_inventory")
     assert entry["schema_version"] == "2.0"
+
+
+# ---------------------------------------------------------------------------
+# D-030: reasoning_prerequisites / required_before_conclusions
+# ---------------------------------------------------------------------------
+
+def test_evidence_map_reasoning_prerequisites_matches_required_before_conclusions_flags():
+    """The invariant D-030 exists to guarantee: build_evidence_map()'s
+    top-level reasoning_prerequisites list must be exactly the set of
+    artifact_ids whose own required_before_conclusions is True -- neither
+    more nor fewer, and not silently out of sync if a future artifact is
+    added or an existing flag flipped."""
+    em = _evidence_map()
+    expected = {
+        a["artifact_id"] for a in em["artifacts"] if a["required_before_conclusions"] is True
+    }
+    assert set(em["reasoning_prerequisites"]) == expected
+    assert len(em["reasoning_prerequisites"]) == len(set(em["reasoning_prerequisites"]))
+
+
+def test_evidence_map_reasoning_prerequisites_includes_primary_rollups_and_health_and_findings():
+    em = _evidence_map()
+    prereqs = set(em["reasoning_prerequisites"])
+    for artifact_id in (
+        "cross_segment_summary", "cross_segment_pooled",
+        "governance_domain_summary", "governance_client_summary", "governance_bc_summary",
+        "governance_package_health", "governance_findings",
+    ):
+        assert artifact_id in prereqs, artifact_id
+
+
+def test_evidence_map_reasoning_prerequisites_excludes_purely_descriptive_artifacts():
+    em = _evidence_map()
+    prereqs = set(em["reasoning_prerequisites"])
+    for artifact_id in ("matrix_output_manifest", "governance_file_inventory", "governance_brief"):
+        assert artifact_id not in prereqs, artifact_id
+
+
+def test_evidence_map_governance_reading_order_present_flag_reflects_filesystem():
+    """Same real Path.exists() treatment as the two existing static docs
+    (interpretation_guide, question_routes) -- see D-030."""
+    em = _evidence_map()
+    entry = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_reading_order")
+    assert entry["present"] is False
+    assert entry["authority_level"] == "controlled_interpretation"
+
+
+def test_evidence_map_governance_classification_rules_present_flag_reflects_filesystem():
+    """Same real Path.exists() treatment as the other static docs -- see D-029."""
+    em = _evidence_map()
+    entry = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_classification_rules")
+    assert entry["present"] is False
+    assert entry["authority_level"] == "controlled_interpretation"
+    assert entry["required_before_conclusions"] is False
 
 
 # ---------------------------------------------------------------------------

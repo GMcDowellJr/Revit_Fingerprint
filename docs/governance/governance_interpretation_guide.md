@@ -13,9 +13,12 @@ It is modeled on the "interpretation layer" concept in the design-reference
 `GMcDowellJr/llm_evidence_framework` repository (`notes/current_thesis.md`,
 `patterns/deterministic_to_llm_boundary.md`) — that repository is explicitly
 provisional, and this guide is this package's own content, not an import
-from it. See `docs/governance_evidence_package.md` for the full artifact
-inventory this guide accompanies, and `docs/governance_question_routes.md`
-for where to look for specific recurring questions.
+from it. See `docs/governance_evidence_package.md` in the repository (a
+developer/design doc, not copied into a run's `--out` -- unresolvable from
+a portable package without the repo checked out) for the full artifact
+inventory this guide accompanies, and `governance_question_routes.md`
+(copied alongside this guide) for where to look for specific recurring
+questions.
 
 ## What this package is for
 
@@ -25,6 +28,11 @@ enterprise/generic baselines, through templates and coordination
 ("container") files, into projects — and where client-, discipline-, or
 project-level practice diverges from that baseline. It supports **evidence
 discovery and classification for governance review**.
+
+This package is written for a reader who does not need Revit domain
+knowledge. It is written for someone who is expected to ask governance
+convergence/fragmentation questions, not resolve them unassisted — "what to
+do about it" is explicitly out of this package's scope.
 
 ## What this package is *not* for
 
@@ -68,6 +76,20 @@ the rule (and its threshold values) are documented and versioned (see
 `tp`, `cp`, `gt`/`gc`/`gp` are containment measures (asymmetric: "how much
 of A is inside B"), not Jaccard (symmetric similarity) — do not treat them
 interchangeably. `xc` and `within_project_*` are Jaccard.
+
+**Containment is evidence of reuse or propagation, not proof of governance
+approval or active use.** A high containment score shows that one
+vocabulary is present inside another; it does not show the sharing was
+approved, intended, or actually exercised in delivery — see `governance_tier`
+below and "Known bad inferences." All cascade scores are on a 0–1 scale;
+in this package, a higher score indicates stronger propagation/convergence
+evidence, not automatic ratification of a standard.
+
+**Used-view interpretation is meaningful primarily for Project targets.**
+Template, Generic, and most Container roles are provided-vocabulary
+references, not production-use environments — a Template's own "used view"
+does not mean anything was used in project delivery. See "Comparability,"
+below, for the all-view/used-view distinction itself.
 
 ### `governance_tier`
 
@@ -359,6 +381,19 @@ surfacing to a human, not silently resolved in the LLM's favor.
   pattern) is easy to clear and can saturate across all clients while actual
   adoption depth varies widely; cross-check the pattern-instance count or
   the distinct-pattern table before making a convergence claim.
+- Do not treat `Insufficient Evidence` at the enterprise scope as evidence a
+  domain has no usable data anywhere in the package — it is scope-specific:
+  a domain's enterprise-scoped tier reading `Insufficient Evidence` does not
+  mean the domain has no usable evidence anywhere in the package; check
+  `governance_client_summary.csv`, `governance_bc_summary.csv`, and the
+  domain's `cross_client_convergence` field before concluding nothing is
+  known about it.
+- Do not treat "Region" and "Enterprise" reading identically as completed
+  cross-region standardization — all corpus files currently come from one
+  region, so a future `region` segmentation dimension will produce results
+  identical to the existing enterprise-level rollup until a second region's
+  data actually exists; this reflects current data coverage, not
+  standardization.
 
 ## Policy profiles (where the thresholds live)
 
@@ -366,14 +401,15 @@ Every threshold referenced above is externalized to
 `policies/governance/*.json` (`governance_thresholds.json`,
 `domain_governance_policy.json`, `client_onboarding_policy.json`,
 `finding_rules.json`) and loaded at run time — see
-`docs/governance_evidence_package.md`'s "Policy profiles" section for the
-full list. `governance_package_manifest.json`'s `policy_profiles.profiles`
+`docs/governance_evidence_package.md`'s "Policy profiles" section in the
+repository (not copied into a run's `--out`) for the full list.
+`governance_package_manifest.json`'s `policy_profiles.profiles`
 records exactly which profile version was applied to a given run.
 
 ## Where to go next
 
 - **Quick top-line read:** `governance_brief.md`.
-- **A specific recurring question:** `docs/governance_question_routes.md`.
+- **A specific recurring question:** `governance_question_routes.md`.
 - **Full detail:** `governance_narrative_context.md`,
   `governance_domain_summary.csv`, `governance_client_summary.csv`,
   `governance_findings.json`.
@@ -382,7 +418,7 @@ records exactly which profile version was applied to a given run.
 
 ## What to do when a pre-built route isn't enough
  
-`docs/governance_question_routes.md` routes are versioned by maturity, per
+`governance_question_routes.md` routes are versioned by maturity, per
 the design reference this package's routing layer follows
 (`GMcDowellJr/llm_evidence_framework/discovery/question_route_discovery.md`):
  
@@ -439,7 +475,7 @@ from the file itself.
 4. **A recipe that gets reused is worth promoting.** If the same extraction
    pattern would answer a route's question repeatedly (not just this one
    instance), that's the signal to attach it to the route in
-   `docs/governance_question_routes.md` and move that route from `candidate`
+   `governance_question_routes.md` and move that route from `candidate`
    toward `recipe-backed` -- per the design reference's own guidance, a
    route shouldn't be promoted just because it was imagined once; it should
    be promoted because it proved useful more than once.

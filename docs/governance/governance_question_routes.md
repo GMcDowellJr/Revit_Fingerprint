@@ -17,9 +17,10 @@ treats as recurring (the leadership questions in
 `governance_narrative_context.md` and the ten `governance_findings.json`
 finding types), not invented from nothing.
 
-See `docs/governance_interpretation_guide.md` for what the fields below
-mean and how to read them, and `docs/governance_evidence_package.md` for
-the full artifact inventory.
+See `governance_interpretation_guide.md` (copied alongside this doc) for
+what the fields below mean and how to read them, and
+`docs/governance_evidence_package.md` in the repository (a developer/design
+doc, not copied into a run's `--out`) for the full artifact inventory.
 
 ---
 
@@ -65,7 +66,7 @@ Comparability requirements:
 - None beyond the domain existing in `governance_domain_summary.csv` (a domain with only Group-3 scope-level signal is excluded — see `governance_package_health.json`'s `domain_rows_excluded_no_signal`).
 
 Common traps:
-- Do not treat "Strong Baseline Candidate" as an approved standard — see `docs/governance_interpretation_guide.md`'s "Known bad inferences."
+- Do not treat "Strong Baseline Candidate" as an approved standard — see `governance_interpretation_guide.md`'s "Known bad inferences."
 - Do not ignore `score_reliability` — a `Presence-based`/`Sparse` domain needs more caution than the tier label alone implies.
 
 Escalation:
@@ -145,7 +146,7 @@ Unsupported conclusion types:
 - whether fragmentation is acceptable for that domain's nature (e.g. `loaded_family_types`, `materials` are expected to be more project-specific — see the interpretation guide)
 
 Common traps:
-- Do not apply the same convergence expectation to every domain — `docs/governance_interpretation_guide.md` and `governance_narrative_context.md`'s findings section both note some domains (families, materials) are inherently project-specific.
+- Do not apply the same convergence expectation to every domain — `governance_interpretation_guide.md` and `governance_narrative_context.md`'s findings section both note some domains (families, materials) are inherently project-specific.
 
 Escalation:
 - For per-discipline breakdown of a fragmented view-template domain, see `governance_narrative_context.md`'s discipline section (not yet a separate artifact).
@@ -404,11 +405,11 @@ Unsupported conclusion types:
 Comparability requirements:
 - None beyond both projects appearing in the relevant matrix; this grain is
   project x project, not gated by the domain-level comparability rules in
-  `docs/governance_interpretation_guide.md`.
+  `governance_interpretation_guide.md`.
   
 Common traps:
 - Do not read a low `union_jaccard` pair as evidence of poor practice --
-  see `docs/governance_interpretation_guide.md`'s "Known bad inferences."
+  see `governance_interpretation_guide.md`'s "Known bad inferences."
 - Do not treat "no ALL_DOMAINS rows available" for a matrix as a measured
   zero -- it means the underlying matrix had no row at that grain for this
   corpus.
@@ -476,7 +477,7 @@ Comparability requirements:
 Common traps:
 - Do not report "N/N clients" as strong convergence evidence without
   checking `corpus-wide pattern-instances` -- see
-  `docs/governance_interpretation_guide.md`'s "Known bad inferences": in at
+  `governance_interpretation_guide.md`'s "Known bad inferences": in at
   least one production run every domain shown reached 7/7 clients, which
   does not by itself distinguish deep adoption from a saturated low bar.
   
@@ -658,7 +659,7 @@ user/project attribution        — client onboarding/coherence
   Distribution sections. If the pair-mean cascade score for a `bc_to_bc`/
   `enterprise_to_bc` comparison needs file-level audit (e.g. "is this
   cross-BC/enterprise pattern consistency real or an artifact of a small
-  file sample?"), that is exactly `docs/governance_interpretation_guide.md`'s
+  file sample?"), that is exactly `governance_interpretation_guide.md`'s
   escalation path into `cross_segment_file_pairs.csv` filtered by
   `comparison_type=bc_to_bc`/`enterprise_to_bc` and `domain`/`segment_id_a`/
   `segment_id_b` — see that file's `governance_evidence_map.json` entry

@@ -77,6 +77,123 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   same function, so it inherits the fix without a separate change.
 
 ### Added
+- **Governance narrative evidence-package layer, Phases 7-10 (D-030 through D-034):
+  reading order/completeness gate, known-bad-inference clarifications,
+  comparison-registry completeness note, union-breadth domain confidence, and a
+  package-portable docs subfolder.**
+  - **D-030 (Phase 7):** New `docs/governance_reading_order.md` states this
+    package's intended audience (a leadership reader without Revit domain
+    knowledge, expected to ask governance convergence/fragmentation questions
+    rather than resolve them unassisted) and an explicit cold-start reading
+    path through the package. `governance_evidence_package.py`'s `_artifact()`
+    gains a mandatory `required_before_conclusions: bool` field, and
+    `build_evidence_map()`'s output gains a top-level `reasoning_prerequisites`
+    list -- the full set of `required_before_conclusions=true` artifact_ids,
+    exposed as a completeness set to exhaust rather than an ordinal to sample
+    from (an ordinal was considered and rejected: it invites reading only the
+    top few and reasoning from a partial picture while technically "following
+    the order"). `render_evidence_authority_header()` gains a pointer line.
+    No classification/CSV output changes -- descriptive fields and a new
+    static doc only.
+  - **D-031 (Phase 8, docs-only):** Two new entries in
+    `docs/governance_interpretation_guide.md`'s "Known bad inferences": (1)
+    a domain's enterprise-scoped `Insufficient Evidence` tier does not mean
+    the domain has no usable evidence anywhere in the package -- check the
+    client/BC summaries and `cross_client_convergence` first; (2) the corpus
+    currently contains files from a single region, so a future `region`
+    segmentation dimension will read identically to the existing
+    enterprise-level rollup until a second region's data exists -- a fact
+    about current data coverage, not a methodology gap. Both entries also get
+    first-class placement in the D-030 reading-order doc's "read this before
+    drawing conclusions" callout. Also adds an explicit audience/intent
+    statement to the guide's "What this package is for" section.
+  - **D-032 (Phase 9a):** New optional `--comparison-registry` CLI argument
+    (same present-or-absent, gracefully-degrading pattern as other optional
+    inputs). When supplied, renders a per-domain **Input Completeness /
+    Staleness** note near Analytical Notes -- an evidence/registry-mismatch
+    proxy (not a not-run-coverage guarantee: a comparison absent from every
+    evidence source has no key to inspect and is not counted) via new
+    `build_comparison_completeness()`. Where a mismatch IS detected, it
+    distinguishes "this domain's registry stamp is missing or stale relative
+    to its evidence" from "this domain's evidence is thin because
+    convergence is actually weak," which previously looked identical to a
+    reader of `governance_domain_summary.csv`.
+    The registry file itself is never embedded in the output package -- only
+    the derived counts are. `governance_package_health.json` gains a
+    `comparison_completeness` field when the registry is supplied. No
+    existing classification/tier output changes when the flag is absent.
+  - **D-033 (Phase 9b):** `governance_domain_summary.csv` gains new breadth
+    columns derived from `cross_segment_union_inventory.csv` via new
+    `build_union_breadth_by_domain()` (corpus-wide/client-wide/project-wide/
+    file-level reuse counts per domain; corpus-wide/client-wide classification
+    requires more than one client in the denominator, matching
+    `compare_cross_segment.py`'s own `_reuse_bucket_for()` guard). Only the
+    strongest narrative exceptions -- broad reuse with weak formal cascade
+    (a natural-standard candidate the cascade metrics alone would miss), or
+    narrow reuse despite strong cascade (worth flagging as fragile) -- are
+    rendered as a new `detect_anomalies()` note category, using the same
+    policy-externalized-threshold discipline D-029 established (new
+    `union_breadth_*` keys in `anomaly_thresholds.json`). Closes the last
+    open item in `docs/governance_generator_cross_compare_coverage.md`'s
+    implementation sequence.
+  - **D-034 (Phase 10):** The four static, package-type-level reference docs
+    (`governance_interpretation_guide.md`, `governance_question_routes.md`,
+    `governance_reading_order.md`, `governance_classification_rules.md`) move
+    into a new `docs/governance/` subfolder -- filenames unchanged, only
+    `_DOCS_DIR` in `generate_governance_narrative.py` is repointed. `main()`
+    now copies each of the four (via `shutil.copy2`, only when present) into
+    `--out` alongside a run's other outputs, so a `--out` directory handed to
+    someone without the repo checked out is self-contained -- the narrative
+    and evidence map already point readers at these docs by name. Only these
+    four are copied; the CSV siblings the same block registers
+    (`cross_segment_file_pairs.csv`, `comparison_registry.csv`, etc.) are
+    never embedded, per D-023/D-024/D-032. Evidence-map/manifest `path`/
+    `present` fields for these four artifacts continue to describe the
+    checked-in repo doc, not the copy -- the copy is a portability
+    convenience, not a second source of truth.
+  - All five phases: no existing classification, tier, or CSV/JSON field
+    *value* changes for any prior invocation -- verified via the same
+    byte-identical `governance_domain_summary.csv`/`governance_client_
+    summary.csv`/`governance_bc_summary.csv` regression discipline D-021
+    established. See D-030 through D-034 and `docs/governance_evidence_package.md`.
+- `tools/generate_governance_narrative.py`'s remaining anomaly/note materiality
+  thresholds -- `detect_anomalies()`'s ~18 bare numeric literals across 11
+  distinct `notable_anomalies` findings (including one, the
+  `provided_to_configured`/`provided_to_used` "carried but not actively used"
+  check, not previously called out as its own finding), the
+  `provided_to_used_containment` primary-read threshold in
+  `build_governance_state_summary()`'s `_finalize_state_bucket()`,
+  `render_findings_and_recommendations()`'s independently-duplicated phases
+  check, `_passive_inheritance_risk_domains()`'s bundle-share/passive-indicator
+  thresholds, and `_shape_note()`'s Project Portfolio density-similarity
+  thresholds -- now load from a fifth JSON policy profile,
+  `policies/governance/anomaly_thresholds.json`, via the same
+  `apply_governance_policy()` global-reassignment mechanism D-021 established
+  (function bodies unchanged except reading a named constant instead of a
+  literal). `_passive_inheritance_risk_domains()`'s dual-schema branch now
+  reads the existing `governance_thresholds.json` `passive_material_threshold`
+  key directly instead of an independent, drifted `0.20` literal, closing a
+  gap where a change to that policy value would not previously have
+  propagated to this function. New `docs/governance_classification_rules.md`
+  documents the branch order and exception conditions of `assign_tier()`,
+  `score_reliability()`, `detect_anomalies()`, `build_governance_state_summary()`'s
+  `primary_governance_read` selection, and `_passive_inheritance_risk_domains()`
+  by threshold-key name (not value) -- added to `governance_evidence_map.json`
+  alongside the existing static docs. `render_header()`'s "How to Read the
+  Analysis" block, which restated containment/cross-client-similarity/
+  all-view-used-view/score-range definitions already covered by
+  `docs/governance_interpretation_guide.md`, is now a one-paragraph pointer
+  at that guide's "Metric semantics" section; three concepts the block
+  covered but the guide didn't yet (containment as reuse/propagation
+  evidence rather than approval, used-view's Project-target-primary scope,
+  and the 0-1 score range) were added to the guide first, in the same
+  change. Every default value in the new JSON profile reproduces this
+  generator's pre-externalization Python literal exactly -- no existing
+  classification, tier, `notable_anomalies` text, or CSV column changes for
+  any existing invocation (verified by the same byte-identical
+  `governance_domain_summary.csv` regression test D-021 established, run
+  twice: default vs. explicit `--policy-dir policies/governance/`). See
+  D-029 and `docs/governance_evidence_package.md`.
 - **`dimension_types` domain family: field expansion across all 7 partitions (Area 7):**
   Adds ~25 new identity items across `dimension_types_linear`/`_angular`/`_radial`/
   `_diameter`/`_spot_elevation`/`_spot_coordinate`/`_spot_slope`, closing the gap
