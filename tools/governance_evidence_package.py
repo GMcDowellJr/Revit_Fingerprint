@@ -1213,7 +1213,7 @@ def build_evidence_map(
     artifacts.append(_artifact(
         "governance_interpretation_guide", p(sibling_paths, "interpretation_guide"),
         "markdown", False, sibling_present.get("interpretation_guide", False),
-        "human/LLM-authored (docs/governance_interpretation_guide.md)",
+        "human/LLM-authored (docs/governance/governance_interpretation_guide.md)",
         AUTHORITY_CONTROLLED_INTERPRETATION,
         "package-specific interpretation layer: what each metric/tier means, "
         "comparability rules, missing-value semantics, authority ordering, "
@@ -1225,10 +1225,15 @@ def build_evidence_map(
         ["what a metric or governance_tier value means and does not mean; how "
          "to read missing values and comparability caveats for this package type"],
         ["this run's actual data -- it explains semantics, not this run's results"],
-        ["not written or validated by this generator; presence is a real "
-         "Path.exists() check against the checked-in repo doc, not a per-run "
-         "guarantee -- a package copied without the repo's docs/ directory "
-         "would show present: false here"],
+        ["path/present above describe the checked-in repo doc under "
+         "docs/governance/ (D-034), not written or validated by this "
+         "generator -- a package copied without the repo's docs/ directory "
+         "would show present: false here. A copy of this exact file is ALSO "
+         "written into --out alongside this run's other outputs when present "
+         "(D-034), so a package handed to someone without the repo checked "
+         "out is still self-contained; that copy is a convenience, not a "
+         "second source of truth -- this artifact's path/present always "
+         "describe the repo doc, never the copy."],
         {},
         ["governance_question_routes", "governance_brief", "governance_narrative_context",
          "governance_reading_order", "governance_classification_rules"],
@@ -1238,7 +1243,7 @@ def build_evidence_map(
     artifacts.append(_artifact(
         "governance_question_routes", p(sibling_paths, "question_routes"),
         "markdown", False, sibling_present.get("question_routes", False),
-        "human/LLM-authored discovery scaffold (docs/governance_question_routes.md)",
+        "human/LLM-authored discovery scaffold (docs/governance/governance_question_routes.md)",
         AUTHORITY_CONVENIENCE_SUMMARY,
         "candidate catalog of recurring question types and which artifact/"
         "fields answer them -- navigational only, not evidence",
@@ -1250,7 +1255,9 @@ def build_evidence_map(
         ["every route in this document is at 'candidate' maturity (see the "
          "document's own maturity-level scale) -- none has a proven history "
          "of repeated use for this package type yet; not an exhaustive list "
-         "of every possible question"],
+         "of every possible question. A copy of this file is also written "
+         "into --out when present (D-034); see the interpretation-guide "
+         "artifact entry's own note for that convention."],
         {},
         ["governance_interpretation_guide", "governance_brief", "governance_findings",
          "governance_reading_order", "governance_classification_rules"],
@@ -1260,7 +1267,7 @@ def build_evidence_map(
     artifacts.append(_artifact(
         "governance_reading_order", p(sibling_paths, "reading_order"),
         "markdown", False, sibling_present.get("reading_order", False),
-        "human/LLM-authored (docs/governance_reading_order.md)",
+        "human/LLM-authored (docs/governance/governance_reading_order.md)",
         AUTHORITY_CONTROLLED_INTERPRETATION,
         "cold-start reading sequence for this package (D-030): audience/"
         "purpose statement, an ordered path through the package, and a "
@@ -1278,7 +1285,9 @@ def build_evidence_map(
         ["not written or validated by this generator; presence is a real "
          "Path.exists() check against the checked-in repo doc, not a per-run "
          "guarantee -- a package copied without the repo's docs/ directory "
-         "would show present: false here"],
+         "would show present: false here. A copy of this file is also written "
+         "into --out when present (D-034); see the interpretation-guide "
+         "artifact entry's own note for that convention."],
         {},
         ["governance_interpretation_guide", "governance_question_routes",
          "governance_narrative_context", "governance_evidence_map",
@@ -1289,7 +1298,7 @@ def build_evidence_map(
     artifacts.append(_artifact(
         "governance_classification_rules", p(sibling_paths, "classification_rules"),
         "markdown", False, sibling_present.get("classification_rules", False),
-        "human/LLM-authored (docs/governance_classification_rules.md)",
+        "human/LLM-authored (docs/governance/governance_classification_rules.md)",
         AUTHORITY_CONTROLLED_INTERPRETATION,
         "classification-logic legibility aid (D-029): the branch order and "
         "exception conditions of assign_tier(), score_reliability(), "
@@ -1312,7 +1321,10 @@ def build_evidence_map(
          "not mechanically verified against the functions it describes -- a "
          "future code change to a documented function's branch order could "
          "make this document stale without anything failing (see this "
-         "document's own Known Limitation section and DECISIONS.md D-029)."],
+         "document's own Known Limitation section and DECISIONS.md D-029). "
+         "A copy of this file is also written into --out when present "
+         "(D-034); see the interpretation-guide artifact entry's own note "
+         "for that convention."],
         {},
         ["governance_interpretation_guide", "governance_reading_order"],
         required_before_conclusions=False,

@@ -257,8 +257,8 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                                   _evidence_map.json/_findings.json/governance_brief.md) via
                                   governance_evidence_package.py, loads governance thresholds/domain policy/
                                   onboarding policy from policies/governance/*.json via governance_policy.py,
-                                  and points readers at docs/governance_interpretation_guide.md /
-                                  docs/governance_question_routes.md -- see docs/governance_evidence_package.md
+                                  and points readers at docs/governance/governance_interpretation_guide.md /
+                                  docs/governance/governance_question_routes.md -- see docs/governance_evidence_package.md
                                   and D-019/D-020/D-021/D-022/D-023/D-024. Also emits
                                   governance_file_inventory.json (D-023/D-024): a live Path.glob("*.csv") scan of
                                   the export directories that names files this generator never reads (header,
@@ -378,9 +378,20 @@ docs/                   Technical documentation
                                        covers
   governance_evidence_package.md     generate_governance_narrative.py's evidence-package layer (manifest/
                                        health/evidence-map/findings) — see also "Key docs for analysis work" below
-  governance_interpretation_guide.md Stable, package-type-level interpretation guide for a governance
+  governance/                        The four static, package-type-level reference docs
+                                       generate_governance_narrative.py points readers at by hardcoded path
+                                       constant (INTERPRETATION_GUIDE_PATH/QUESTION_ROUTES_PATH/
+                                       READING_ORDER_PATH/CLASSIFICATION_RULES_PATH) and copies into every
+                                       run's --out directory so the emitted package is self-contained
+                                       (D-034) — kept in their own subfolder, separate from the rest of
+                                       docs/, for exactly that reason. Never regenerated per run.
+    governance_interpretation_guide.md Stable, package-type-level interpretation guide for a governance
                                        evidence package
-  governance_question_routes.md      Candidate question-route catalog for recurring governance-package questions
+    governance_question_routes.md    Candidate question-route catalog for recurring governance-package questions
+    governance_reading_order.md      Cold-start reading sequence + "read this before drawing conclusions"
+                                       callout (D-030)
+    governance_classification_rules.md   Branch order/exception conditions of assign_tier()/score_reliability()/
+                                       detect_anomalies()/etc., referencing threshold keys by name (D-029)
   METRICS.md                         Concentration metric contracts (HHI / effective clusters)
   analysis-phases-question-map.md    Analysis questions mapped to phases
   tools_PHASE0_1_2_MAP.md            ⚠ Dated 2026-01-29; still references a `tools/phase2_analysis/` package
@@ -673,8 +684,10 @@ Phase-1 behavior is entirely governed by `tools/run_config.json`. If `domains_in
 - `docs/analysis-phases-question-map.md` — which questions each phase can answer
 - `docs/V21_ANALYSIS_SCHEMA.md` — v2.1 output schema (`Results_v21/analysis_v21/`)
 - `docs/governance_evidence_package.md` — `generate_governance_narrative.py`'s evidence-package layer (manifest/health/evidence-map/findings artifact inventory, authority ordering, policy/threshold profiles, interpretation guide/question routes/governance brief)
-- `docs/governance_interpretation_guide.md` — stable, package-type-level interpretation guide for a governance evidence package (metric semantics, comparability rules, known bad inferences)
-- `docs/governance_question_routes.md` — candidate question-route catalog (all at "candidate" maturity) for recurring governance-package questions
+- `docs/governance/governance_interpretation_guide.md` — stable, package-type-level interpretation guide for a governance evidence package (metric semantics, comparability rules, known bad inferences)
+- `docs/governance/governance_question_routes.md` — candidate question-route catalog (all at "candidate" maturity) for recurring governance-package questions
+- `docs/governance/governance_reading_order.md` — cold-start reading sequence for a governance evidence package (D-030)
+- `docs/governance/governance_classification_rules.md` — classification-logic branch order/exception conditions by threshold-key name (D-029)
 - `docs/tools_PHASE0_1_2_MAP.md` / `docs/tools_DEPRECATED.md` — useful for deprecation *reasoning*, but dated 2026-01-29 and reference a `tools/phase2_analysis/` package path that no longer exists on disk; don't treat their command examples as current without checking the actual file first
 
 ## Files to Read First

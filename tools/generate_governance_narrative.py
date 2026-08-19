@@ -75,6 +75,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import shutil
 import statistics
 import sys
 from collections import defaultdict
@@ -545,8 +546,12 @@ _DEFAULT_CLIENT_SECTOR_PATH = Path(__file__).resolve().parent.parent / "policies
 # convention as the never-consumed sibling CSVs cross_segment_file_pairs.csv/
 # comparison_registry.csv). Versions here must be bumped by hand alongside
 # the corresponding doc's own version header if its content changes in a way
-# that matters for a reader relying on a specific version.
-_DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
+# that matters for a reader relying on a specific version. Kept in their own
+# docs/governance/ subfolder, separate from the rest of docs/, since these
+# four (and only these four) are also copied into --out at the end of a run
+# (see main()) so the generated package is self-contained/portable -- see
+# DECISIONS.md D-034.
+_DOCS_DIR = Path(__file__).resolve().parent.parent / "docs" / "governance"
 INTERPRETATION_GUIDE_PATH = _DOCS_DIR / "governance_interpretation_guide.md"
 QUESTION_ROUTES_PATH = _DOCS_DIR / "governance_question_routes.md"
 READING_ORDER_PATH = _DOCS_DIR / "governance_reading_order.md"
@@ -6529,6 +6534,26 @@ def main():
             "governance_relationships": _relationships_anchor.parent / "governance_relationships.csv",
         }
         sibling_present = {k: v.exists() for k, v in sibling_paths.items()}
+
+        # ── D-034: copy the four static docs/governance/ reference docs into
+        # --out, so a governance package handed to someone without the repo
+        # checked out is still self-contained -- narrative sections/pointers
+        # name these docs by filename, which is meaningless without the file
+        # actually present alongside the rest of the run's output. Only these
+        # four (never the CSV siblings above, e.g. comparison_registry.csv --
+        # D-032 is explicit those are never embedded/reproduced). governance_
+        # evidence_map.json/governance_package_manifest.json's own path/present
+        # fields for these artifacts still describe the checked-in repo doc
+        # (the source of truth), not this copy -- the copy is a convenience,
+        # not a new source of truth, and is silently skipped if the source
+        # doc is missing (e.g. a stripped-down deployment without docs/).
+        for _doc_key in ("interpretation_guide", "question_routes", "reading_order", "classification_rules"):
+            _doc_src = sibling_paths[_doc_key]
+            if not sibling_present[_doc_key]:
+                continue
+            _doc_dst = out_dir / _doc_src.name
+            if _doc_src.resolve() != _doc_dst.resolve():
+                shutil.copy2(_doc_src, _doc_dst)
 
         # ── D-023: live file-availability inventory ─────────────────────────────
         # Scans the cross_segment export directory (--summary's parent) and,

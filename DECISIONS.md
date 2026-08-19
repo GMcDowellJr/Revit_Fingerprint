@@ -1477,3 +1477,25 @@ Implemented in the same PR as D-032 (shared optional-input plumbing), tracked se
 - `governance_domain_summary.csv` gains new columns; existing columns and their values are unaffected.
 - New anomaly-note category is gated by the same "only render the strongest exceptions" discipline the coverage doc specifies — this is a deliberate scope limit to avoid restating every domain's raw breadth numbers as narrative prose, matching the "consume, not recompute, and don't over-render" discipline established across D-020/D-022.
 - Closes the last open item in `docs/governance_generator_cross_compare_coverage.md`'s implementation sequence — that doc's table should be updated to mark this row "Done" once shipped, matching its own existing convention for the other now-complete rows.
+
+---
+
+## D-034 — Governance narrative evidence-package layer (Phase 10: static-doc subfolder + self-contained package copy)
+
+### Status
+Accepted (2026-08-19)
+
+### Context
+The four static, package-type-level reference docs `generate_governance_narrative.py` points readers at by hardcoded path constant (`INTERPRETATION_GUIDE_PATH`/`QUESTION_ROUTES_PATH`/`READING_ORDER_PATH`/`CLASSIFICATION_RULES_PATH`, added across D-022/D-030/D-029) lived directly under `docs/` alongside ~15 unrelated technical-documentation files, with no grouping signal that they specifically belong to the governance narrative package. Separately, these docs were only ever referenced by name/pointer from the generated package (`governance_narrative_context.md`'s authority header, `governance_evidence_map.json`'s sibling-artifact entries) — never actually present alongside a run's output — so a `--out` directory handed to someone without the repo checked out contained pointers to files that reader could not open.
+
+### Decision
+Two changes, neither altering any classification, tier, or CSV/JSON field value:
+
+1. Move the four docs into a new `docs/governance/` subfolder (filenames unchanged): `governance_interpretation_guide.md`, `governance_question_routes.md`, `governance_reading_order.md`, `governance_classification_rules.md`. `_DOCS_DIR` in `generate_governance_narrative.py` now points at `docs/governance/` instead of `docs/`; the four path constants are otherwise unchanged. Every other `docs/*.md` file (`governance_evidence_package.md`, `governance_generator_cross_compare_coverage.md`, `governance_narrative_scope_gap_audit.md`, `governance_narrative_group1_scope_gap_investigation.md`) stays in `docs/` — those are developer/design documentation about the system, never pointed at by a path constant or copied into a run's output, so they don't belong in the same "package-portable" subfolder.
+2. `main()`, inside the existing `if args.emit_evidence_package:` block, now copies each of the four docs into `--out` (via `shutil.copy2`, only when the source doc is present) after building `sibling_paths`/`sibling_present`. Only these four are copied — never the CSV siblings the same block registers (`cross_segment_file_pairs.csv`, `comparison_registry.csv`, `pattern_reuse_summary_by_domain.csv`, `project_mean_file_pair_jaccard_matrix.csv`, `governance_relationships.csv`), which D-023/D-024/D-032 are explicit are never embedded or reproduced in the output package. `governance_evidence_map.json`/`governance_package_manifest.json`'s `path`/`present` fields for these four artifacts continue to describe the checked-in repo doc (the source of truth), not the copy — the copy is a portability convenience, not a second source of truth, and is silently skipped when the source doc is absent (e.g. a stripped-down deployment without `docs/`).
+
+### Consequences
+- No existing classification, tier, CSV column, or JSON field value changes — this phase moves files and adds a copy step, nothing else. Verified: `governance_domain_summary.csv`/`governance_client_summary.csv`/`governance_bc_summary.csv` are byte-identical before/after: only new files appear in `--out`.
+- A `--out` directory is now self-contained: a reader with only that directory (no repo checkout) can open the four static reference docs the narrative and evidence map already point them at by name.
+- `docs/governance_evidence_package.md` and `CLAUDE.md`'s live path references to the four docs are updated to the new location; `DECISIONS.md`/`CHANGELOG.md`'s own historical entries (D-019 through D-033) are left describing the paths that were true at the time, per this repo's append-only convention for those two files.
+- A future fifth static package-type-level doc, if added, should default to `docs/governance/` and the same copy-into-`--out` treatment unless there's a specific reason not to.
