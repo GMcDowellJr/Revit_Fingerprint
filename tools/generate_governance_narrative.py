@@ -549,8 +549,10 @@ _DEFAULT_CLIENT_SECTOR_PATH = Path(__file__).resolve().parent.parent / "policies
 _DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
 INTERPRETATION_GUIDE_PATH = _DOCS_DIR / "governance_interpretation_guide.md"
 QUESTION_ROUTES_PATH = _DOCS_DIR / "governance_question_routes.md"
+READING_ORDER_PATH = _DOCS_DIR / "governance_reading_order.md"
 INTERPRETATION_GUIDE_VERSION = "0.1"
 QUESTION_ROUTES_VERSION = "0.1"
+READING_ORDER_VERSION = "0.1"
 
 
 def load_client_sectors(client_sector_rows: Optional[list[dict]]) -> dict:
@@ -3118,19 +3120,23 @@ def render_evidence_authority_header(
     -- this document remains a controlled_interpretation artifact, not authoritative
     evidence, and no LLM is involved in producing it or any other artifact in this package.
 
-    The health/findings/evidence-map pointer lines are gated on emit_evidence_package --
-    when a caller passes --no-emit-evidence-package, those three files are never
-    written, so this document must not point readers at files that don't exist. The
-    governance_brief.md pointer is separately gated on emit_interpretation_layer (only
-    meaningful when emit_evidence_package is also on -- see main()). The interpretation
-    guide/question routes pointers are unconditional: they are static repo docs, not
-    per-run outputs, so they exist regardless of either flag.
+    The health/findings/evidence-map/reasoning-prerequisites pointer lines are gated
+    on emit_evidence_package -- when a caller passes --no-emit-evidence-package, those
+    files are never written, so this document must not point readers at files that
+    don't exist. The governance_brief.md pointer is separately gated on
+    emit_interpretation_layer (only meaningful when emit_evidence_package is also on --
+    see main()). The interpretation guide/question routes/reading order pointers are
+    unconditional: they are static repo docs, not per-run outputs, so they exist
+    regardless of either flag.
     """
     package_pointers = (
         f"""
 > **Package health:** `governance_package_health.json` (schema {package_schema_version})
 > **Structured findings:** `governance_findings.json`
 > **Evidence navigation:** `governance_evidence_map.json`
+> **Reasoning prerequisites:** `governance_evidence_map.json`'s `reasoning_prerequisites`
+> field names the artifacts to check before stating a conclusion -- see
+> `{READING_ORDER_PATH.name}` for the reading sequence.
 """
         if emit_evidence_package else
         "\n> This run was generated with `--no-emit-evidence-package`, so no "
@@ -5352,7 +5358,8 @@ def main():
                         action="store_true",
                         help="Write governance_brief.md, and add the static "
                              "docs/governance_interpretation_guide.md / "
-                             "docs/governance_question_routes.md as evidence-map "
+                             "docs/governance_question_routes.md / "
+                             "docs/governance_reading_order.md as evidence-map "
                              "entries (default: on). Only takes effect when "
                              "--emit-evidence-package is also on, since the brief "
                              "is built from governance_findings.json/"
@@ -5360,8 +5367,8 @@ def main():
     parser.add_argument("--no-emit-interpretation-layer", dest="emit_interpretation_layer",
                         action="store_false",
                         help="Suppress governance_brief.md and the interpretation-"
-                             "guide/question-routes evidence-map entries only; "
-                             "governance_package_manifest.json/_health.json/"
+                             "guide/question-routes/reading-order evidence-map entries "
+                             "only; governance_package_manifest.json/_health.json/"
                              "_evidence_map.json/governance_findings.json are unaffected.")
     parser.set_defaults(emit_interpretation_layer=True)
     parser.add_argument("--out", default="governance_narrative_context.md")
@@ -5957,13 +5964,14 @@ def main():
         findings_document = build_findings_document(findings, schema_version=FINDINGS_SCHEMA_VERSION)
         write_json(out_dir / "governance_findings.json", findings_document)
 
-        # governance_interpretation_guide.md / governance_question_routes.md are
-        # human/LLM-authored static reference docs, never written by this
-        # generator -- always listed in the evidence map (like the never-consumed
-        # sibling CSVs below) with presence computed from real Path.exists(),
-        # independent of --emit-interpretation-layer (that flag controls the
-        # per-run governance_brief.md only, not whether these repo-level docs
-        # are acknowledged to exist).
+        # governance_interpretation_guide.md / governance_question_routes.md /
+        # governance_reading_order.md (D-030) are human/LLM-authored static
+        # reference docs, never written by this generator -- always listed in
+        # the evidence map (like the never-consumed sibling CSVs below) with
+        # presence computed from real Path.exists(), independent of
+        # --emit-interpretation-layer (that flag controls the per-run
+        # governance_brief.md only, not whether these repo-level docs are
+        # acknowledged to exist).
         # governance_relationships.csv (tools/governance_relationships.py) is
         # never read by this generator -- only governance_bc_client_matrix.csv/
         # governance_client_bc_matrix.csv (loaded via --governance-bc-client-
@@ -6042,6 +6050,7 @@ def main():
             "project_mean_file_pair_jaccard_matrix": _project_mean_pair_anchor.parent / "project_mean_file_pair_jaccard_matrix.csv",
             "interpretation_guide": INTERPRETATION_GUIDE_PATH,
             "question_routes": QUESTION_ROUTES_PATH,
+            "reading_order": READING_ORDER_PATH,
             "governance_relationships": _relationships_anchor.parent / "governance_relationships.csv",
         }
         sibling_present = {k: v.exists() for k, v in sibling_paths.items()}

@@ -28,6 +28,7 @@ from generate_governance_narrative import (  # noqa: E402
     CASCADE_GROUP3_TYPES,
     CASCADE_GROUP3B_TYPES,
     CASCADE_GROUP4_EXCLUDED_TYPES,
+    EVIDENCE_MAP_SCHEMA_VERSION,
     _comparison_type_coverage,
     _DIRECTED_GOVERNANCE_TYPES,
     main,
@@ -523,15 +524,16 @@ def test_segment_manifest_absent_from_evidence_package_when_not_supplied(tmp_pat
     assert health["optional_inputs"]["segment_manifest"] is False
 
 
-def test_evidence_map_lists_thirty_five_artifacts_with_required_fields(tmp_path, monkeypatch):
+def test_evidence_map_lists_thirty_six_artifacts_with_required_fields(tmp_path, monkeypatch):
     # 29 (pre-relationship-layer) + governance_bc_client_matrix +
     # governance_client_bc_matrix + governance_relationships + governance_file_inventory (D-023)
-    # + pattern_reuse_summary_by_domain + project_mean_file_pair_jaccard_matrix (D-024).
+    # + pattern_reuse_summary_by_domain + project_mean_file_pair_jaccard_matrix (D-024)
+    # + governance_reading_order (D-030).
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
     ids = [a["artifact_id"] for a in evidence_map["artifacts"]]
-    assert len(ids) == 35
+    assert len(ids) == 36
     assert len(ids) == len(set(ids))
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
@@ -541,8 +543,12 @@ def test_evidence_map_lists_thirty_five_artifacts_with_required_fields(tmp_path,
     assert "governance_file_inventory" in ids
     assert "pattern_reuse_summary_by_domain" in ids
     assert "project_mean_file_pair_jaccard_matrix" in ids
+    assert "governance_reading_order" in ids
     narrative = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_narrative_context")
     assert narrative["authority_level"] != "authoritative_deterministic_evidence"
+    assert set(evidence_map["reasoning_prerequisites"]) == {
+        a["artifact_id"] for a in evidence_map["artifacts"] if a["required_before_conclusions"] is True
+    }
 
 
 def test_governance_relationships_resolved_beside_supplied_matrix_not_summary_dir(tmp_path, monkeypatch):
@@ -1040,5 +1046,5 @@ def test_package_schema_version_override_is_consistent_across_manifest_health_an
     assert by_id["governance_package_health"]["schema_version"] == "2.0"
     # governance_evidence_map.json's own schema (EVIDENCE_MAP_SCHEMA_VERSION) is a
     # separate versioning axis with no CLI override -- it must stay at its default.
-    assert evidence_map["schema_version"] == "1.0"
-    assert by_id["governance_evidence_map"]["schema_version"] == "1.0"
+    assert evidence_map["schema_version"] == EVIDENCE_MAP_SCHEMA_VERSION
+    assert by_id["governance_evidence_map"]["schema_version"] == EVIDENCE_MAP_SCHEMA_VERSION

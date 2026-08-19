@@ -38,7 +38,7 @@ from typing import Optional
 
 PACKAGE_TYPE = "governance_evidence_package"
 PACKAGE_SCHEMA_VERSION = "1.0"
-EVIDENCE_MAP_SCHEMA_VERSION = "1.0"
+EVIDENCE_MAP_SCHEMA_VERSION = "1.1"
 FINDINGS_SCHEMA_VERSION = "1.0"
 FILE_INVENTORY_SCHEMA_VERSION = "1.0"
 
@@ -395,8 +395,14 @@ def build_package_health(
 def _artifact(
     artifact_id, path, artifact_type, required, present, producer, authority_level,
     context_role, grain, key_fields, identifiers, join_keys, can_answer, cannot_answer,
-    known_limitations, null_semantics, related_artifacts, schema_version=None,
+    known_limitations, null_semantics, related_artifacts, *, required_before_conclusions,
+    schema_version=None,
 ):
+    # required_before_conclusions is keyword-only with no default (D-030): every
+    # call site must state explicitly whether a governance conclusion drawn
+    # without this artifact would be unsafe, so a future artifact addition can't
+    # silently inherit a wrong default -- see build_evidence_map()'s
+    # reasoning_prerequisites and docs/governance_reading_order.md.
     entry = {
         "artifact_id": artifact_id,
         "path": path,
@@ -415,6 +421,7 @@ def _artifact(
         "known_limitations": known_limitations,
         "null_semantics": null_semantics,
         "related_artifacts": related_artifacts,
+        "required_before_conclusions": required_before_conclusions,
     }
     if schema_version is not None:
         entry["schema_version"] = schema_version
@@ -499,6 +506,7 @@ def build_evidence_map(
          "not via this CSV itself."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_pooled", "governance_domain_summary", "governance_client_summary"],
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -520,6 +528,7 @@ def build_evidence_map(
          "pool_scope is checked at the read site."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_summary", "governance_client_summary"],
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -539,6 +548,7 @@ def build_evidence_map(
          "missing/local signals are inferred only indirectly."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_governance_state_summary", "governance_domain_summary"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -555,6 +565,7 @@ def build_evidence_map(
          "not unique-pattern counts -- see render_limitations()'s state_note."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_governance_states", "governance_domain_summary"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -572,6 +583,7 @@ def build_evidence_map(
          "governance-state outputs are also supplied, even if both are passed on the CLI."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_governance_state_summary"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -587,6 +599,7 @@ def build_evidence_map(
          "as 'Unknown' in render_header()."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["governance_narrative_context"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -610,6 +623,7 @@ def build_evidence_map(
          "its redundant_single_child chain."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_summary", "governance_domain_summary"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -629,6 +643,7 @@ def build_evidence_map(
          "docs/governance_narrative_scope_gap_audit.md finding C7."],
         {"*": "Missing client_label from this file simply means unclassified sector, not an error."},
         ["governance_client_summary"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -645,6 +660,7 @@ def build_evidence_map(
              "in that case."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["pattern_reuse_distribution", "matrix_output_manifest"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -658,6 +674,7 @@ def build_evidence_map(
              "only; full distribution detail beyond that is not summarized."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_union_inventory", "matrix_output_manifest", "pattern_reuse_summary_by_domain"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -675,6 +692,7 @@ def build_evidence_map(
          "governance_package_health.json's matrix_manifest.note."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["cross_segment_union_inventory", "pattern_reuse_distribution"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -699,6 +717,7 @@ def build_evidence_map(
          "corpus-wide reuse signal the distinct-pattern table already reports."],
         _BLANK_STRING_NULL_SEMANTICS,
         ["pattern_reuse_distribution", "cross_segment_union_inventory"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -718,6 +737,7 @@ def build_evidence_map(
          "narrative dedupes to one row per unordered project pair"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["project_density_similarity_matrix", "project_fragmentation_diagnostic", "matrix_output_manifest"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -739,6 +759,7 @@ def build_evidence_map(
          "project_union_jaccard_matrix.csv is not also supplied"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["project_union_jaccard_matrix", "matrix_output_manifest"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -760,6 +781,7 @@ def build_evidence_map(
          "project's separate pool grains never share a matrix cell"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["matrix_output_manifest"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -783,6 +805,7 @@ def build_evidence_map(
          "narrative's pair list"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["project_union_jaccard_matrix", "matrix_output_manifest", "project_mean_file_pair_jaccard_matrix"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -810,6 +833,7 @@ def build_evidence_map(
          "average or compare them directly"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["governance_client_bc_matrix", "governance_relationships"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -836,6 +860,7 @@ def build_evidence_map(
          "and never parses it"],
         {},
         ["governance_bc_client_matrix", "governance_client_bc_matrix"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -861,6 +886,7 @@ def build_evidence_map(
          "(see tests/test_governance_relationships.py's synthetic multi-BC case)"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["governance_bc_client_matrix"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -885,6 +911,7 @@ def build_evidence_map(
          "interpreting a single row of it."],
         {},
         ["cross_segment_summary"],
+        required_before_conclusions=False,
     ))
     artifacts[-1].update(_sibling_scan_fields(sibling_paths.get("file_pairs"), sibling_present.get("file_pairs", False)))
 
@@ -909,6 +936,7 @@ def build_evidence_map(
          "read this generator performs on a normal run."],
         {},
         ["cross_segment_summary"],
+        required_before_conclusions=False,
     ))
     artifacts[-1].update(_sibling_scan_fields(
         sibling_paths.get("comparison_registry"), sibling_present.get("comparison_registry", False),
@@ -939,6 +967,7 @@ def build_evidence_map(
          "performs on a normal run"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["pattern_reuse_distribution", "pattern_reuse_summary_by_client"],
+        required_before_conclusions=False,
     ))
     artifacts[-1].update(_sibling_scan_fields(
         sibling_paths.get("pattern_reuse_summary_by_domain"),
@@ -970,6 +999,7 @@ def build_evidence_map(
          "this generator performs on a normal run"],
         _BLANK_STRING_NULL_SEMANTICS,
         ["project_fragmentation_diagnostic", "project_union_jaccard_matrix"],
+        required_before_conclusions=False,
     ))
     artifacts[-1].update(_sibling_scan_fields(
         sibling_paths.get("project_mean_file_pair_jaccard_matrix"),
@@ -998,6 +1028,7 @@ def build_evidence_map(
             "*(governance-state columns)": "'' (empty string) means governance_state_summary has no entry for this domain at all -- a different condition than a present-but-None value.",
         },
         ["cross_segment_summary", "cross_segment_pooled", "cross_segment_governance_state_summary"],
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -1014,6 +1045,7 @@ def build_evidence_map(
          "artifact's known_limitations."],
         {"*(fmt-formatted columns)": "— (em dash, U+2014 -- not an ASCII hyphen) means the field exists but has no data for this client."},
         ["cross_segment_summary", "cross_segment_pooled", "client_sector"],
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -1040,6 +1072,7 @@ def build_evidence_map(
          "BC_ALIGNMENT_HIGH's definition comment in generate_governance_narrative.py."],
         {"*(fmt-formatted columns)": "— (em dash, U+2014 -- not an ASCII hyphen) means the field exists but has no data for this business center."},
         ["cross_segment_summary", "governance_domain_summary", "governance_narrative_context"],
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -1058,7 +1091,9 @@ def build_evidence_map(
         {},
         ["governance_domain_summary", "governance_client_summary", "governance_bc_summary",
          "governance_package_health", "governance_evidence_map", "governance_findings",
-         "governance_brief", "governance_interpretation_guide", "governance_question_routes"],
+         "governance_brief", "governance_interpretation_guide", "governance_question_routes",
+         "governance_reading_order"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -1083,6 +1118,7 @@ def build_evidence_map(
         {},
         ["governance_domain_summary", "governance_client_summary", "governance_narrative_context"],
         schema_version=FINDINGS_SCHEMA_VERSION,
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -1117,6 +1153,7 @@ def build_evidence_map(
         {"*": "A column classified 'empty' had zero non-blank cells in the scanned file."},
         [],  # no fixed related_artifacts -- the files it lists vary run to run
         schema_version=file_inventory_schema_version,
+        required_before_conclusions=False,
     ))
 
     # governance_brief.md is the only PR4 artifact that may genuinely be
@@ -1148,6 +1185,7 @@ def build_evidence_map(
         {},
         ["governance_findings", "governance_domain_summary", "governance_client_summary",
          "governance_interpretation_guide", "governance_question_routes"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -1170,7 +1208,9 @@ def build_evidence_map(
          "guarantee -- a package copied without the repo's docs/ directory "
          "would show present: false here"],
         {},
-        ["governance_question_routes", "governance_brief", "governance_narrative_context"],
+        ["governance_question_routes", "governance_brief", "governance_narrative_context",
+         "governance_reading_order"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -1190,7 +1230,37 @@ def build_evidence_map(
          "of repeated use for this package type yet; not an exhaustive list "
          "of every possible question"],
         {},
-        ["governance_interpretation_guide", "governance_brief", "governance_findings"],
+        ["governance_interpretation_guide", "governance_brief", "governance_findings",
+         "governance_reading_order"],
+        required_before_conclusions=False,
+    ))
+
+    artifacts.append(_artifact(
+        "governance_reading_order", p(sibling_paths, "reading_order"),
+        "markdown", False, sibling_present.get("reading_order", False),
+        "human/LLM-authored (docs/governance_reading_order.md)",
+        AUTHORITY_CONTROLLED_INTERPRETATION,
+        "cold-start reading sequence for this package (D-030): audience/"
+        "purpose statement, an ordered path through the package, and a "
+        "'read this before drawing conclusions' callout naming the D-031 "
+        "known-bad-inference entries -- the human-readable counterpart to "
+        "this file's own reasoning_prerequisites list",
+        "one document per package_type (not per-run; not regenerated by this "
+        "generator)",
+        [], [], [],
+        ["what order to read this package's artifacts in, and which two "
+         "known-bad-inference entries to check before drawing a conclusion"],
+        ["this run's actual data -- it is a fixed reading sequence, not a "
+         "per-run result; it does not itself enumerate reasoning_prerequisites, "
+         "see governance_evidence_map.json for the machine-checkable list"],
+        ["not written or validated by this generator; presence is a real "
+         "Path.exists() check against the checked-in repo doc, not a per-run "
+         "guarantee -- a package copied without the repo's docs/ directory "
+         "would show present: false here"],
+        {},
+        ["governance_interpretation_guide", "governance_question_routes",
+         "governance_narrative_context", "governance_evidence_map"],
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -1206,6 +1276,7 @@ def build_evidence_map(
          "never parsed content"],
         [], {}, ["governance_package_health", "governance_evidence_map", "governance_findings"],
         schema_version=package_schema_version,
+        required_before_conclusions=False,
     ))
 
     artifacts.append(_artifact(
@@ -1221,6 +1292,7 @@ def build_evidence_map(
          "companion, not a superseding source"],
         [], {}, ["governance_package_manifest", "governance_evidence_map", "governance_findings"],
         schema_version=package_schema_version,
+        required_before_conclusions=True,
     ))
 
     artifacts.append(_artifact(
@@ -1236,6 +1308,7 @@ def build_evidence_map(
         [], {},
         [],  # filled in below, once every other artifact_id is known
         schema_version=EVIDENCE_MAP_SCHEMA_VERSION,
+        required_before_conclusions=False,
     ))
 
     all_ids = [a["artifact_id"] for a in artifacts]
@@ -1243,7 +1316,18 @@ def build_evidence_map(
         if a["artifact_id"] == "governance_evidence_map":
             a["related_artifacts"] = [aid for aid in all_ids if aid != "governance_evidence_map"]
 
-    return {"schema_version": schema_version, "artifacts": artifacts}
+    # D-030: the full set of required_before_conclusions=true artifact_ids,
+    # exposed once at the manifest level -- a set to exhaust, not a sequence
+    # to sample from. See docs/governance_reading_order.md.
+    reasoning_prerequisites = [
+        a["artifact_id"] for a in artifacts if a["required_before_conclusions"]
+    ]
+
+    return {
+        "schema_version": schema_version,
+        "artifacts": artifacts,
+        "reasoning_prerequisites": reasoning_prerequisites,
+    }
 
 
 # ── file inventory (live directory scan) ─────────────────────────────────────

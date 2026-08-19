@@ -318,13 +318,14 @@ def _evidence_map(**overrides):
     return build_evidence_map(**kwargs)
 
 
-def test_evidence_map_has_thirty_five_unique_artifacts():
+def test_evidence_map_has_thirty_six_unique_artifacts():
     # 29 (pre-relationship-layer) + governance_bc_client_matrix +
     # governance_client_bc_matrix + governance_relationships + governance_file_inventory
-    # + pattern_reuse_summary_by_domain + project_mean_file_pair_jaccard_matrix (D-024).
+    # + pattern_reuse_summary_by_domain + project_mean_file_pair_jaccard_matrix (D-024)
+    # + governance_reading_order (D-030).
     em = _evidence_map()
     ids = [a["artifact_id"] for a in em["artifacts"]]
-    assert len(ids) == 35
+    assert len(ids) == 36
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
     assert "governance_bc_client_matrix" in ids
@@ -333,6 +334,7 @@ def test_evidence_map_has_thirty_five_unique_artifacts():
     assert "governance_file_inventory" in ids
     assert "pattern_reuse_summary_by_domain" in ids
     assert "project_mean_file_pair_jaccard_matrix" in ids
+    assert "governance_reading_order" in ids
     assert len(ids) == len(set(ids))
 
 
@@ -342,6 +344,7 @@ def test_evidence_map_required_fields_populated_for_every_artifact():
         "artifact_id", "path", "artifact_type", "required", "producer",
         "authority_level", "context_role", "grain", "can_answer",
         "cannot_answer", "known_limitations", "null_semantics", "related_artifacts",
+        "required_before_conclusions",
     }
     for a in em["artifacts"]:
         missing = required_keys - set(a.keys())
@@ -349,6 +352,7 @@ def test_evidence_map_required_fields_populated_for_every_artifact():
         assert a["artifact_type"], a["artifact_id"]
         assert a["authority_level"], a["artifact_id"]
         assert a["grain"], a["artifact_id"]
+        assert isinstance(a["required_before_conclusions"], bool), a["artifact_id"]
 
 
 def test_evidence_map_authority_levels_use_only_defined_vocabulary():
@@ -505,6 +509,51 @@ def test_evidence_map_governance_file_inventory_honors_overridden_schema_version
     em = _evidence_map(file_inventory_schema_version="2.0")
     entry = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_file_inventory")
     assert entry["schema_version"] == "2.0"
+
+
+# ---------------------------------------------------------------------------
+# D-030: reasoning_prerequisites / required_before_conclusions
+# ---------------------------------------------------------------------------
+
+def test_evidence_map_reasoning_prerequisites_matches_required_before_conclusions_flags():
+    """The invariant D-030 exists to guarantee: build_evidence_map()'s
+    top-level reasoning_prerequisites list must be exactly the set of
+    artifact_ids whose own required_before_conclusions is True -- neither
+    more nor fewer, and not silently out of sync if a future artifact is
+    added or an existing flag flipped."""
+    em = _evidence_map()
+    expected = {
+        a["artifact_id"] for a in em["artifacts"] if a["required_before_conclusions"] is True
+    }
+    assert set(em["reasoning_prerequisites"]) == expected
+    assert len(em["reasoning_prerequisites"]) == len(set(em["reasoning_prerequisites"]))
+
+
+def test_evidence_map_reasoning_prerequisites_includes_primary_rollups_and_health_and_findings():
+    em = _evidence_map()
+    prereqs = set(em["reasoning_prerequisites"])
+    for artifact_id in (
+        "cross_segment_summary", "cross_segment_pooled",
+        "governance_domain_summary", "governance_client_summary", "governance_bc_summary",
+        "governance_package_health", "governance_findings",
+    ):
+        assert artifact_id in prereqs, artifact_id
+
+
+def test_evidence_map_reasoning_prerequisites_excludes_purely_descriptive_artifacts():
+    em = _evidence_map()
+    prereqs = set(em["reasoning_prerequisites"])
+    for artifact_id in ("matrix_output_manifest", "governance_file_inventory", "governance_brief"):
+        assert artifact_id not in prereqs, artifact_id
+
+
+def test_evidence_map_governance_reading_order_present_flag_reflects_filesystem():
+    """Same real Path.exists() treatment as the two existing static docs
+    (interpretation_guide, question_routes) -- see D-030."""
+    em = _evidence_map()
+    entry = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_reading_order")
+    assert entry["present"] is False
+    assert entry["authority_level"] == "controlled_interpretation"
 
 
 # ---------------------------------------------------------------------------
