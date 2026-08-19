@@ -3211,7 +3211,8 @@ def load_delta_summary(delta_rows: list[dict]) -> dict:
 # ── section renderers ──────────────────────────────────────────────────────────
 
 
-def render_header(analysis_date: str, corpus: dict, has_state_outputs: bool, legacy_used_fallback: bool) -> str:
+def render_header(analysis_date: str, corpus: dict, has_state_outputs: bool, legacy_used_fallback: bool,
+                   interpretation_guide_will_be_copied: bool = False) -> str:
     n_disc = len(corpus.get("disciplines", set()))
     disc_list = ", ".join(
         _disc_label(d)
@@ -3227,6 +3228,20 @@ def render_header(analysis_date: str, corpus: dict, has_state_outputs: bool, leg
         "Used-view columns were not found in the summary schema, so used-view measures fall back to legacy all-view columns where necessary. Claims depending on active use are therefore limited."
         if legacy_used_fallback else
         "Used-view columns are present in the summary schema and are kept separate from all-view configured vocabulary."
+    )
+    # PR review finding: this pointer previously named the guide by bare
+    # basename unconditionally, but the guide is only actually copied
+    # alongside this run's output inside main()'s `if args.emit_evidence_
+    # package:` block (D-034) -- with --no-emit-evidence-package, or a
+    # deployment missing the source doc, the pointer named a file that
+    # would not exist beside the narrative. When the guide won't be copied
+    # this run, point at the checked-in repo path instead and say so.
+    interpretation_guide_pointer = (
+        f"`{INTERPRETATION_GUIDE_PATH.name}` in this run's output directory"
+        if interpretation_guide_will_be_copied else
+        f"`docs/governance/{INTERPRETATION_GUIDE_PATH.name}` in the repository "
+        "(not included alongside this run's output -- this run used "
+        "--no-emit-evidence-package or the source doc was not found on disk)"
     )
     return f"""# Revit Configuration Governance Analysis
 ## Stantec Consulting — BIM Fingerprint System
@@ -3283,7 +3298,7 @@ region, should not be inferred from this output unless supplied by upstream CSVs
 
 ## How to Read the Analysis
 
-See `{INTERPRETATION_GUIDE_PATH.name}`'s "Metric semantics" section for what
+See {interpretation_guide_pointer}'s "Metric semantics" section for what
 provided/configured/active-use vocabulary, all-view/used-view, containment,
 cross-client similarity, and score-range mean in this report, and how they
 should (and should not) be read.
@@ -5417,13 +5432,21 @@ def build_comparison_completeness(
         if row.get("domain", ""):
             summary_index.setdefault(_key(row), row)
 
+    # PR review finding: setdefault() kept whichever source's row for a key
+    # was seen FIRST, so if governance_state_rows and governance_state_
+    # summary_rows carry the same key from two different runs, an older
+    # raw-state timestamp could shadow newer summary evidence and hide a
+    # registry stamp that should have been flagged stale. Keep the maximum
+    # executed_utc seen across all matching rows from either source instead.
     state_executed_utc: dict = {}
-    for row in (governance_state_rows or []):
+    for row in (governance_state_rows or []) + (governance_state_summary_rows or []):
         if row.get("domain", ""):
-            state_executed_utc.setdefault(_state_key(row), row.get("executed_utc", ""))
-    for row in (governance_state_summary_rows or []):
-        if row.get("domain", ""):
-            state_executed_utc.setdefault(_state_key(row), row.get("executed_utc", ""))
+            key = _state_key(row)
+            executed_utc = row.get("executed_utc", "")
+            if executed_utc and executed_utc > state_executed_utc.get(key, ""):
+                state_executed_utc[key] = executed_utc
+            else:
+                state_executed_utc.setdefault(key, executed_utc)
 
     by_domain: dict = defaultdict(lambda: {"total": 0, "present": 0, "missing": 0, "stale": 0})
     # PR review finding: a directed comparison that produced governance-state
@@ -5752,10 +5775,15 @@ def main():
                         help="cross_segment_union_inventory.csv (optional)")
     parser.add_argument("--comparison-registry",
                         help="comparison_registry.csv (optional). Enables a per-domain "
-                             "Input Completeness / Staleness note near Analytical Notes, "
-                             "distinguishing a not-run/stale comparison from genuinely weak "
-                             "evidence (D-032). Never embedded/reproduced in the output "
-                             "package -- only derived present/missing/stale counts are.")
+                             "Input Completeness / Staleness note near Analytical Notes: an "
+                             "evidence/registry-mismatch proxy that flags a comparison "
+                             "stamped in the registry but stale or missing relative to "
+                             "cross_segment_summary.csv/governance-state evidence (D-032). "
+                             "Cannot detect a comparison absent from ALL evidence sources "
+                             "(never run, never registered, no state evidence either) -- "
+                             "not a not-run-coverage guarantee. Never embedded/reproduced "
+                             "in the output package -- only derived present/missing/stale "
+                             "counts are.")
     parser.add_argument("--reuse-distribution",
                         help="pattern_reuse_distribution.csv (optional)")
     parser.add_argument("--matrix-manifest",
@@ -6223,7 +6251,8 @@ def main():
     # ── Render and write narrative MD ─────────────────────────────────────────
     print("Rendering narrative...")
     sections = [
-        render_header(args.date, corpus, bool(governance_state_summary), legacy_fallback),
+        render_header(args.date, corpus, bool(governance_state_summary), legacy_fallback,
+                      bool(args.emit_evidence_package and INTERPRETATION_GUIDE_PATH.exists())),
         render_evidence_authority_header(args.package_schema_version, GENERATOR_IDENTITY, args.emit_evidence_package, args.emit_interpretation_layer),
         render_governance_state_model(bool(governance_state_summary)),
         render_domain_tiers(cascade, governance_state_summary, union_breadth_by_domain),

@@ -186,6 +186,33 @@ def test_completeness_registry_only_entry_with_state_evidence_not_stale_when_reg
     assert completeness["line_styles"] == {"total": 1, "present": 1, "missing": 0, "stale": 0}
 
 
+def test_completeness_state_evidence_uses_newest_timestamp_across_both_state_sources():
+    """PR review finding: setdefault() kept whichever of governance_state_rows/
+    governance_state_summary_rows was processed first for a shared key, so an
+    older raw-state timestamp could shadow newer summary evidence and hide a
+    registry stamp that fell between the two and should have been flagged
+    stale. The maximum executed_utc across both sources must be used."""
+    from compare_cross_segment import GOVERNANCE_STATE_FIELDS
+
+    def _gov_state_row(**overrides):
+        r = {f: "" for f in GOVERNANCE_STATE_FIELDS}
+        r.update(overrides)
+        return r
+
+    registry_rows = [_registry_row(segment_id_a="a", segment_id_b="b", comparison_type="generic_to_template",
+                                    domain="line_styles", computed_utc="2026-08-05T00:00:00Z")]
+    # Older raw-state row processed first, newer summary-state row second --
+    # the registry stamp (08-05) falls between them, so this must be stale.
+    state_rows = [_gov_state_row(segment_id_reference="a", segment_id_target="b",
+                                  comparison_type="generic_to_template", domain="line_styles",
+                                  executed_utc="2026-08-01T00:00:00Z")]
+    state_summary_rows = [_gov_state_summary_row(segment_id_reference="a", segment_id_target="b",
+                                                  comparison_type="generic_to_template", domain="line_styles",
+                                                  executed_utc="2026-08-10T00:00:00Z")]
+    completeness = g.build_comparison_completeness([], registry_rows, state_rows, state_summary_rows)
+    assert completeness["line_styles"] == {"total": 1, "present": 1, "missing": 0, "stale": 1}
+
+
 def test_completeness_state_evidence_from_detailed_rows_also_prevents_stale():
     from compare_cross_segment import GOVERNANCE_STATE_FIELDS
 

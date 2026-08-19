@@ -72,12 +72,52 @@ _DOC_CONSTANTS = (
 )
 
 
+_MINIMAL_CORPUS = {
+    "total": 1, "Template": 0, "Container": 0, "Project": 1,
+    "disciplines": set(), "clients": set(),
+}
+
+
+def test_render_header_points_at_out_directory_copy_when_guide_will_be_copied():
+    """PR review finding: the 'How to Read the Analysis' pointer named the
+    guide by bare basename unconditionally, but the guide is only actually
+    copied alongside the narrative inside main()'s emit_evidence_package
+    branch -- with --no-emit-evidence-package the pointer named a file that
+    would not exist beside the output. When the guide WILL be copied this
+    run, the pointer should say so."""
+    header = g.render_header("2026-08-19", _MINIMAL_CORPUS, False, False,
+                              interpretation_guide_will_be_copied=True)
+    assert "in this run's output directory" in header
+    assert "docs/governance/" not in header
+
+
+def test_render_header_points_at_repo_path_when_guide_will_not_be_copied():
+    header = g.render_header("2026-08-19", _MINIMAL_CORPUS, False, False,
+                              interpretation_guide_will_be_copied=False)
+    assert "docs/governance/governance_interpretation_guide.md" in header
+    assert "not included alongside this run's output" in header
+
+
 def test_default_run_copies_all_four_static_docs_into_out(tmp_path, monkeypatch):
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     for const_name in _DOC_CONSTANTS:
         src = getattr(g, const_name)
         assert (tmp_path / src.name).exists(), src.name
+
+
+def test_narrative_pointer_matches_actual_guide_presence_end_to_end(tmp_path, monkeypatch):
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    narrative = (tmp_path / "governance_narrative_context.md").read_text(encoding="utf-8")
+    assert "in this run's output directory" in narrative
+    assert (tmp_path / g.INTERPRETATION_GUIDE_PATH.name).exists()
+
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
+                            "--out", str(tmp_path), "--no-emit-evidence-package"])
+    narrative = (tmp_path / "governance_narrative_context.md").read_text(encoding="utf-8")
+    assert "not included alongside this run's output" in narrative
+    assert not (tmp_path / g.INTERPRETATION_GUIDE_PATH.name).exists()
 
 
 def test_no_emit_evidence_package_removes_previously_copied_docs(tmp_path, monkeypatch):
