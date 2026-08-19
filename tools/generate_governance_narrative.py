@@ -4220,6 +4220,14 @@ def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
     unclassified -- mirroring the bucket_priority pattern already used
     above for pattern_reuse_distribution.csv rows (PR review finding,
     D-033).
+
+    corpus_wide/client_wide additionally require n_clients_denominator > 1,
+    mirroring the identical guard compare_cross_segment.py's own
+    _reuse_bucket_for() applies to its corpus_wide classification (PR
+    review finding) -- with only one client in the grain, pct_clients_present
+    is trivially 1.0 for every pattern that client carries at all, which
+    would otherwise label every single-client domain's patterns
+    "corpus-wide reuse" with no actual cross-client evidence.
     """
     tier_rank = {t: i for i, t in enumerate(_UNION_BREADTH_TIERS)}
     pattern_tier: dict = {}
@@ -4233,11 +4241,13 @@ def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
         if not domain or not join_hash:
             continue
         pct_clients = pf(row.get("pct_clients_present"))
+        n_clients_den = pf(row.get("n_clients_denominator"))
         n_projects = pf(row.get("n_projects_present"))
         n_files = pf(row.get("n_files_present"))
-        if pct_clients is not None and pct_clients >= UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN:
+        multi_client = n_clients_den is not None and n_clients_den > 1
+        if multi_client and pct_clients is not None and pct_clients >= UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN:
             tier = "corpus_wide"
-        elif pct_clients is not None and pct_clients >= UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN:
+        elif multi_client and pct_clients is not None and pct_clients >= UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN:
             tier = "client_wide"
         elif n_projects is not None and n_projects >= UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS:
             tier = "project_wide"
@@ -5323,7 +5333,11 @@ def render_findings_and_recommendations(
     return "\n".join(lines)
 
 
-def build_comparison_completeness(summary_rows: list, comparison_registry_rows: list) -> dict:
+def build_comparison_completeness(
+    summary_rows: list, comparison_registry_rows: list,
+    governance_state_rows: Optional[list] = None,
+    governance_state_summary_rows: Optional[list] = None,
+) -> dict:
     """Per-domain counts of expected (segment_id_a, segment_id_b,
     comparison_type) pairs -- the union of keys seen in cross_segment_summary.csv
     (proof a comparison ran and produced evidence) and comparison_registry.csv
@@ -5334,8 +5348,7 @@ def build_comparison_completeness(summary_rows: list, comparison_registry_rows: 
     a matching entry in only one of the two ("missing": no registry stamp for
     evidenced work, treated as stale rather than missing when the reverse --
     the registry has a stamp but the current summary snapshot has no matching
-    row, e.g. a domain-scoped run that didn't recompute everything a broader
-    prior run did).
+    row AND no matching governance-state evidence either -- see below).
 
     PR review finding (D-032): iterating summary_rows alone cannot surface a
     registry entry with no matching summary evidence at all. Unioning the two
@@ -5347,10 +5360,22 @@ def build_comparison_completeness(summary_rows: list, comparison_registry_rows: 
     answers "is there a mismatch between what has evidence and what the
     registry has stamped," not "was every truly-expected comparison run."
 
+    PR review finding (D-032): compare_cross_segment.py legitimately stamps
+    comparison_registry.csv for a (pair, domain) work item that produced
+    governance-state output but no cross_segment_summary.csv row at all --
+    directed work below --min-patterns still needs provided_but_missing
+    visibility, so `produced_output` there is True from governance-state
+    rows alone (see main()'s `if ctype in GOVERNANCE_STATE_DIRECTED_TYPES`
+    block). A registry-only entry that matches a governance_state_rows/
+    governance_state_summary_rows key (segment_id_reference/_target mapped
+    to segment_id_a/b) is therefore counted present, not stale -- it is
+    valid, current, same-run evidence that simply lives in a different file.
+
     Self-contained: uses only comparison_registry.csv's own identity
     (segment_id_a/b, comparison_type, domain) and recency (computed_utc)
     fields against cross_segment_summary.csv's matching identity/executed_utc
-    fields. This generator has no access to compare_cross_segment.py's live
+    fields, plus governance-state rows' identity fields for the exception
+    above. This generator has no access to compare_cross_segment.py's live
     segment registry (run_registry.csv's population_hash/last_run_utc), so
     this is a narrower, narrative-side proxy for staleness than
     comparison_is_stale() computes there -- it answers "is this registry
@@ -5363,11 +5388,25 @@ def build_comparison_completeness(summary_rows: list, comparison_registry_rows: 
             row.get("comparison_type", ""), row.get("domain", ""),
         )
 
+    def _state_key(row: dict) -> tuple:
+        return (
+            row.get("segment_id_reference", ""), row.get("segment_id_target", ""),
+            row.get("comparison_type", ""), row.get("domain", ""),
+        )
+
     registry_index: dict = {_key(row): row for row in comparison_registry_rows}
     summary_index: dict = {}
     for row in summary_rows:
         if row.get("domain", ""):
             summary_index.setdefault(_key(row), row)
+
+    state_keys: set = set()
+    for row in (governance_state_rows or []):
+        if row.get("domain", ""):
+            state_keys.add(_state_key(row))
+    for row in (governance_state_summary_rows or []):
+        if row.get("domain", ""):
+            state_keys.add(_state_key(row))
 
     by_domain: dict = defaultdict(lambda: {"total": 0, "present": 0, "missing": 0, "stale": 0})
     for key in registry_index.keys() | summary_index.keys():
@@ -5383,10 +5422,16 @@ def build_comparison_completeness(summary_rows: list, comparison_registry_rows: 
             continue
         counts["present"] += 1
         if summary_row is None:
+            if key in state_keys:
+                # Valid state-only stamp: this (pair, domain) produced
+                # governance-state evidence but no summary row, and the
+                # registry correctly reflects that -- not a staleness signal.
+                continue
             # Registry has a stamp, but the current summary snapshot has no
-            # matching row -- the registry is out of sync with this run's
-            # evidence (e.g. a domain-scoped run that didn't recompute
-            # everything a broader prior run did).
+            # matching row and no matching governance-state evidence either
+            # -- the registry is out of sync with this run's evidence (e.g.
+            # a domain-scoped run that didn't recompute everything a
+            # broader prior run did).
             counts["stale"] += 1
             continue
         computed_utc = registry_row.get("computed_utc", "")
@@ -5888,7 +5933,10 @@ def main():
 
     comparison_completeness = None
     if args.comparison_registry:
-        comparison_completeness = build_comparison_completeness(summary_rows, comparison_registry_rows)
+        comparison_completeness = build_comparison_completeness(
+            summary_rows, comparison_registry_rows,
+            governance_state_rows, governance_state_summary_rows,
+        )
 
     delta_summary = {}
     if delta_rows:

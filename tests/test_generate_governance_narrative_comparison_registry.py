@@ -13,7 +13,9 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
-from compare_cross_segment import SUMMARY_FIELDS, POOLED_FIELDS, COMPARISON_REGISTRY_FIELDS  # noqa: E402
+from compare_cross_segment import (  # noqa: E402
+    SUMMARY_FIELDS, POOLED_FIELDS, COMPARISON_REGISTRY_FIELDS, GOVERNANCE_STATE_SUMMARY_FIELDS,
+)
 import generate_governance_narrative as g  # noqa: E402
 
 
@@ -31,6 +33,12 @@ def _pooled_row(**overrides):
 
 def _registry_row(**overrides):
     r = {f: "" for f in COMPARISON_REGISTRY_FIELDS}
+    r.update(overrides)
+    return r
+
+
+def _gov_state_summary_row(**overrides):
+    r = {f: "" for f in GOVERNANCE_STATE_SUMMARY_FIELDS}
     r.update(overrides)
     return r
 
@@ -130,6 +138,43 @@ def test_completeness_registry_only_entry_uses_registry_own_domain_for_grouping(
     completeness = g.build_comparison_completeness([], registry_rows)
     assert "materials" in completeness
     assert "line_styles" not in completeness
+
+
+def test_completeness_registry_only_entry_with_matching_state_evidence_is_not_stale():
+    """PR review finding: compare_cross_segment.py legitimately stamps
+    comparison_registry.csv for directed work below --min-patterns that
+    produced governance-state output but no cross_segment_summary.csv row.
+    A registry-only entry matching governance-state evidence (segment_id_
+    reference/_target mapped to segment_id_a/b) must not be flagged stale."""
+    registry_rows = [_registry_row(segment_id_a="a", segment_id_b="b", comparison_type="generic_to_template",
+                                    domain="line_styles", computed_utc="2026-08-01T00:00:00Z")]
+    state_summary_rows = [_gov_state_summary_row(segment_id_reference="a", segment_id_target="b",
+                                                  comparison_type="generic_to_template", domain="line_styles")]
+    completeness = g.build_comparison_completeness([], registry_rows, None, state_summary_rows)
+    assert completeness["line_styles"] == {"total": 1, "present": 1, "missing": 0, "stale": 0}
+
+
+def test_completeness_registry_only_entry_without_state_evidence_is_still_stale():
+    registry_rows = [_registry_row(segment_id_a="a", segment_id_b="b", comparison_type="generic_to_template",
+                                    domain="line_styles", computed_utc="2026-08-01T00:00:00Z")]
+    completeness = g.build_comparison_completeness([], registry_rows, None, None)
+    assert completeness["line_styles"] == {"total": 1, "present": 1, "missing": 0, "stale": 1}
+
+
+def test_completeness_state_evidence_from_detailed_rows_also_prevents_stale():
+    from compare_cross_segment import GOVERNANCE_STATE_FIELDS
+
+    def _gov_state_row(**overrides):
+        r = {f: "" for f in GOVERNANCE_STATE_FIELDS}
+        r.update(overrides)
+        return r
+
+    registry_rows = [_registry_row(segment_id_a="a", segment_id_b="b", comparison_type="generic_to_template",
+                                    domain="line_styles", computed_utc="2026-08-01T00:00:00Z")]
+    state_rows = [_gov_state_row(segment_id_reference="a", segment_id_target="b",
+                                  comparison_type="generic_to_template", domain="line_styles")]
+    completeness = g.build_comparison_completeness([], registry_rows, state_rows, None)
+    assert completeness["line_styles"]["stale"] == 0
 
 
 def test_completeness_ignores_rows_with_no_domain():

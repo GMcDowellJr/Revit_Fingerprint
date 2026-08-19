@@ -50,17 +50,32 @@ def _minimal_cascade_dict(**overrides):
 # ---------------------------------------------------------------------------
 
 def test_union_breadth_classifies_corpus_wide_pattern():
-    rows = [_union_row(domain="line_styles", join_hash="h1", pct_clients_present="0.95")]
+    rows = [_union_row(domain="line_styles", join_hash="h1", pct_clients_present="0.95",
+                        n_clients_denominator="10")]
     breadth = g.build_union_breadth_by_domain(rows)
     assert breadth["line_styles"]["corpus_wide"] == 1
     assert breadth["line_styles"]["total"] == 1
 
 
 def test_union_breadth_classifies_client_wide_pattern():
-    rows = [_union_row(domain="line_styles", join_hash="h1", pct_clients_present="0.60")]
+    rows = [_union_row(domain="line_styles", join_hash="h1", pct_clients_present="0.60",
+                        n_clients_denominator="10")]
     breadth = g.build_union_breadth_by_domain(rows)
     assert breadth["line_styles"]["client_wide"] == 1
     assert breadth["line_styles"]["corpus_wide"] == 0
+
+
+def test_union_breadth_single_client_grain_never_classifies_corpus_or_client_wide():
+    """PR review finding: with only one client in the grain, pct_clients_present
+    is trivially 1.0 for every pattern that client carries -- must not be
+    labeled corpus-wide/client-wide reuse with no actual cross-client
+    evidence, mirroring compare_cross_segment.py's own _reuse_bucket_for()
+    n_clients_den > 1 guard."""
+    rows = [_union_row(domain="line_styles", join_hash="h1", pct_clients_present="1.000000",
+                        n_clients_denominator="1", n_projects_present="1", n_files_present="1")]
+    breadth = g.build_union_breadth_by_domain(rows)
+    assert breadth["line_styles"]["corpus_wide"] == 0
+    assert breadth["line_styles"]["client_wide"] == 0
 
 
 def test_union_breadth_classifies_project_wide_pattern():
