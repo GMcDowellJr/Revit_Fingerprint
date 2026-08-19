@@ -262,6 +262,37 @@ def test_health_reports_comparison_registry_present_and_completeness_when_suppli
     assert health["comparison_completeness"]["line_styles"]["present"] == 1
 
 
+def test_health_overall_status_degrades_when_comparison_completeness_has_gaps(tmp_path, monkeypatch):
+    """PR review finding: overall_status was computed before
+    comparison_completeness was attached to the health dict, so a package
+    with missing/stale comparison-registry entries still reported
+    'complete' -- a consumer following the health-first flow would wrongly
+    conclude nothing limits interpretation."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    registry_path = tmp_path / "my_registry.csv"
+    _write_csv(registry_path, COMPARISON_REGISTRY_FIELDS, [])  # no rows -> the summary pair is "missing"
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
+                            "--out", str(tmp_path), "--comparison-registry", str(registry_path)])
+    health = json.loads((tmp_path / "governance_package_health.json").read_text(encoding="utf-8"))
+    assert health["overall_status"] == "degraded"
+    assert any(w["condition"] == "comparison_registry_gaps" for w in health["warnings"])
+
+
+def test_health_overall_status_stays_complete_when_comparison_completeness_has_no_gaps(tmp_path, monkeypatch):
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    registry_path = tmp_path / "my_registry.csv"
+    _write_csv(registry_path, COMPARISON_REGISTRY_FIELDS, [
+        _registry_row(segment_id_a="imperial|Template", segment_id_b="imperial|Project|acme",
+                      comparison_type="template_to_project", domain="line_styles",
+                      computed_utc="2026-07-16T00:00:00Z"),
+    ])
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
+                            "--out", str(tmp_path), "--comparison-registry", str(registry_path)])
+    health = json.loads((tmp_path / "governance_package_health.json").read_text(encoding="utf-8"))
+    assert health["overall_status"] == "complete"
+    assert not any(w["condition"] == "comparison_registry_gaps" for w in health["warnings"])
+
+
 def test_evidence_map_comparison_registry_path_matches_explicit_flag(tmp_path, monkeypatch):
     """The evidence-map artifact and the health/manifest input tracking must
     resolve to the SAME path when --comparison-registry is explicitly
@@ -297,7 +328,7 @@ def test_narrative_includes_completeness_note_when_supplied_with_gap(tmp_path, m
                             "--out", str(tmp_path), "--comparison-registry", str(registry_path)])
     narrative = (tmp_path / "governance_narrative_context.md").read_text(encoding="utf-8")
     assert "Input Completeness / Staleness" in narrative
-    assert "line_styles" in narrative.split("Input Completeness / Staleness")[1][:900]
+    assert "line_styles" in narrative.split("Input Completeness / Staleness")[1][:1200]
 
 
 def test_registry_content_never_reproduced_in_output_package(tmp_path, monkeypatch):

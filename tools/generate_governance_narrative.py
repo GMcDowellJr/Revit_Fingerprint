@@ -5509,16 +5509,19 @@ def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_sta
         completeness_lines = [
             "\n\n### Input Completeness / Staleness\n",
             "Per-domain count of segment/domain comparison pairs referenced in "
-            "`cross_segment_summary.csv` and/or `comparison_registry.csv`, "
-            "present in / missing from / stale relative to the other file -- "
-            "distinguishes genuinely weak evidence from a comparison that was "
-            "run but not (yet) registered, or registered but stale relative to "
-            "the current run. This is a proxy, not a canonical inventory: a "
-            "comparison absent from BOTH files (never run, never registered) "
-            "cannot be detected here and is not counted below. Registry "
-            "content itself is never reproduced here; see "
-            "`governance_evidence_map.json`'s `comparison_registry` entry for "
-            "a drill-down pointer.\n",
+            "`cross_segment_summary.csv`, `comparison_registry.csv`, and/or "
+            "governance-state evidence (`--governance-state`/`--governance-"
+            "state-summary`, for directed comparisons that produce state "
+            "output but no summary row), present in / missing from / stale "
+            "relative to a registry stamp -- distinguishes genuinely weak "
+            "evidence from a comparison that was run but not (yet) "
+            "registered, or registered but stale relative to the current "
+            "run. This is a proxy, not a canonical inventory: a comparison "
+            "absent from ALL THREE evidence sources (never run, never "
+            "registered, no state evidence either) cannot be detected here "
+            "and is not counted below. Registry content itself is never "
+            "reproduced here; see `governance_evidence_map.json`'s "
+            "`comparison_registry` entry for a drill-down pointer.\n",
         ]
         flagged = sorted(
             ((dom, c) for dom, c in comparison_completeness.items() if c["missing"] or c["stale"]),
@@ -5534,8 +5537,8 @@ def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_sta
         else:
             completeness_lines.append(
                 f"No missing or stale comparison pairs across the {total_checked} "
-                "segment/domain pair(s) referenced in these two files -- every pair "
-                "checked has a current registry entry. This does not confirm every "
+                "segment/domain pair(s) referenced in these evidence sources -- every "
+                "pair checked has a current registry entry. This does not confirm every "
                 "comparison that should exist was run; see the note above.\n"
             )
         completeness_section = "\n".join(completeness_lines)

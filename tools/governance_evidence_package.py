@@ -348,6 +348,28 @@ def build_package_health(
             ),
         })
 
+    # PR review finding: comparison_completeness was only attached to the
+    # returned dict AFTER overall_status was already computed, so a package
+    # with missing/stale comparison-registry entries still reported
+    # "complete" -- a consumer following the documented health-first flow
+    # would wrongly conclude nothing limits interpretation. Fold any
+    # domain with a missing/stale count into warnings before computing
+    # overall_status, the same as every other degrading condition above.
+    if comparison_completeness:
+        domains_with_gaps = sorted(
+            dom for dom, c in comparison_completeness.items()
+            if c.get("missing", 0) or c.get("stale", 0)
+        )
+        if domains_with_gaps:
+            warnings.append({
+                "condition": "comparison_registry_gaps",
+                "detail": (
+                    "comparison_completeness has missing and/or stale "
+                    f"comparison-registry entries for domain(s): {domains_with_gaps}. "
+                    "See health.comparison_completeness for per-domain counts."
+                ),
+            })
+
     if missing_required:
         overall_status = "invalid"
     elif warnings:
