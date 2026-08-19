@@ -1499,3 +1499,40 @@ Two changes, neither altering any classification, tier, or CSV/JSON field value:
 - A `--out` directory is now self-contained: a reader with only that directory (no repo checkout) can open the four static reference docs the narrative and evidence map already point them at by name.
 - `docs/governance_evidence_package.md` and `CLAUDE.md`'s live path references to the four docs are updated to the new location; `DECISIONS.md`/`CHANGELOG.md`'s own historical entries (D-019 through D-033) are left describing the paths that were true at the time, per this repo's append-only convention for those two files.
 - A future fifth static package-type-level doc, if added, should default to `docs/governance/` and the same copy-into-`--out` treatment unless there's a specific reason not to.
+
+## D-035 — Join-policy gate exemption for single-record-per-file domains (`units_doc`, `worksets_doc`)
+
+### Status
+Accepted (2026-08-19)
+
+### Context
+`units_doc` and `worksets_doc` are the two domains already flagged elsewhere as structurally mismatched to the pairwise join/comparison machinery the rest of the corpus uses (see the open backlog item: "single-record-per-file domains... right fix is a dedicated aggregate/distribution reporter; decision and DECISIONS.md entry not yet written"). `run_extract_all.py`'s join-policy gate (`_enforce_policy_gate()`, ~line 711) enforces `join_key_status == ok` across all in-scope domains before authority/patterns processing begins, and these two domains cannot satisfy that check by construction — a `record_pk` grain of one row per file has no meaningful pairwise join key to compute, so their `join_key_status` reads `blocked`/`non_ok_status` on every record, every run (confirmed 2026-08-19: 1,256 of 1,256 flagged rows across two prior diagnostics runs were both domains, 100% of their records, `join_key_status=blocked`).
+
+Because `_enforce_policy_gate()` fires immediately after records load and before any authority/patterns output is written (confirmed by reading the call site, ~line 1017 — it precedes the analysis/pattern-mining work entirely), a gate failure here is a fast, silent, whole-run abort: no partial output, no `analysis/` directory, and — critically — no distinguishing console signal loud enough to notice if the run's tail isn't watched closely. This is exactly what happened: `units_doc`/`worksets_doc` were introduced and the corpus re-extracted, every subsequent Run B invocation hit this gate and exited in seconds, and the resulting absence of an `analysis/` directory was read as "hasn't gotten there yet" rather than "failing" for an extended, unknown period — only surfaced as a side effect of debugging an unrelated OneDrive relocation issue. The only reason it was caught is that a run finally succeeded (via `-AllowSigHashJoinKey`, added this session) and the runtime jump from "seconds" to "actually doing the work" made the change visible.
+
+`--allow-sig-hash-join-key` unblocks the run, but it is a **global** escape hatch — it doesn't scope to the two known-exempt domains, so a real, unexpected join-key regression in an unrelated domain would be silently waved through by the same flag, undetected, for as long as the flag stays on. Relying on a human remembering to pass it by hand every Run B invocation is also exactly the failure mode that produced this incident in the first place.
+
+### Decision
+Scope the gate exemption to the two known domains, rather than either (a) leaving this as a manually-remembered flag, or (b) permanently defaulting the global bypass on. At the `_enforce_policy_gate()` call site(s) in `run_extract_all.py`, introduce a new constant — distinct from `SUPPRESSED_DOWNSTREAM_DOMAINS`, since that constant's effect is broader (excludes a domain from downstream processing generally) and this exemption should apply *only* to the gate check, not to authority/patterns output for these domains:
+
+```python
+# Single-record-per-file domains structurally cannot produce a pairwise join key
+# (record_pk grain is one row per file) -- join_key_status=blocked is expected and
+# permanent for these, not a data-quality regression. Exempt from the join-policy
+# gate specifically; still fully processed by authority/patterns otherwise. See
+# DECISIONS.md D-035.
+JOIN_GATE_EXEMPT_SINGLE_RECORD_DOMAINS = {"units_doc", "worksets_doc"}
+```
+
+and filter the `domains` list passed into `_enforce_policy_gate()` at each call site (~1017, ~1204) to exclude this set before the gate evaluates it — `_emit_join_policy_diagnostics()`'s existing `dom_filter` inclusion-list mechanism already supports this without further code changes to that function.
+
+Until this lands, `-AllowSigHashJoinKey` (added to `corpus_update_runbook.ps1` this session) remains the manual interim workaround, and this decision is the record of why it exists and why it shouldn't become the permanent answer.
+
+This is explicitly a narrower, faster fix than the "dedicated aggregate/distribution reporter" — it stops the gate from silently killing the whole run over a known, structural, non-actionable condition; it does not give `units_doc`/`worksets_doc` a real pairwise-comparable governance signal, which remains the open, undecided problem the reporter would actually solve.
+
+### Consequences
+- Once implemented, Run B no longer requires `-AllowSigHashJoinKey` for the currently-known case, and the flag reverts to what it always should have been: a rare, visible, deliberate override for a genuinely new problem, not routine cover for a permanent one.
+- A future domain that legitimately regresses into `blocked`/identity-mode status is still caught by the gate and still halts the run loudly — this fix narrows the exemption to exactly the two domains it's justified for, rather than widening tolerance generally.
+- `analysis/` output for `units_doc`/`worksets_doc` continues to be produced using whatever degraded/identity-mode join behavior they've always structurally had — this decision does not change what that output means or whether it's governance-grade; that's still gated on the reporter work.
+- If a third domain is ever found to have the same single-record-per-file structural property, it needs to be added to `JOIN_GATE_EXEMPT_SINGLE_RECORD_DOMAINS` explicitly — this is not auto-detected, by design, so a new case doesn't silently inherit an exemption it wasn't reviewed for.
+- Worth a follow-up check once this lands: confirm `domain_patterns.csv`/`analysis/` row counts for `units_doc`/`worksets_doc` from *today's* run (the first successful one) against whatever the corpus should actually contain, since this is the first time this data has existed at all since those domains were introduced — there's no prior "last known good" version to diff against, only the extraction/export side to cross-check.

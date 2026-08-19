@@ -14,13 +14,6 @@ param(
     [string]$Run = "",
     [switch]$ForceAll,
     [switch]$NameKey,
-    # Passthrough for run_extract_all.py's join-policy gate. Only unblocks records the
-    # gate already found in a blocked/identity-mode join_key_status -- it does not touch
-    # any record that already has a valid join_hash (see join_policy_gate_diagnostics.csv
-    # for exactly which domain/records this affects on a given run). units_doc/worksets_doc
-    # are known, structurally single-record-per-file domains expected to hit this gate --
-    # see CLAUDE.md Warnings.
-    [switch]$AllowSigHashJoinKey,
     # Root containing the raw *.json exports plus the results\/segments\ folders nested
     # under it (previously hardcoded as .../Fingerprint_Out/exports; moved to OneDrive as
     # of 2026-07 -- exposed as a param so a future move is a CLI override, not a script edit).
@@ -41,10 +34,6 @@ $SEGMENTS     = "$ExportsRoot\segments"
 $RECORDS      = "$RESULTS\records"
 $SIG_POL      = "$REPO\policies\domain_sig_hash_policies.json"
 $JOIN_POL     = "$REPO\policies\domain_join_key_policies.json"
-# NOTE: must be @(if (...) { "..." }) -- assigning a bare `if (...) { @(...) } else { @() }`
-# expression unwraps a single-element array result to a scalar string, which then
-# splats character-by-character onto a native command (confirmed via repro 2026-08-19).
-$AllowSigHashArgs = @(if ($AllowSigHashJoinKey) { "--allow-sig-hash-join-key" })
 $NAME_KEY_POL = "$REPO\policies\domain_name_key_policies.json"
 $NAME_KEY_CSV = "$RESULTS\name_key\name_key_results.csv"
 
@@ -118,8 +107,7 @@ if ($Run -eq "A") {
         --out-root-is-results-root `
         --stages sig_hash,flatten,apply,placeholders `
         --sig-hash-policy $SIG_POL `
-        --join-policy $JOIN_POL `
-        @AllowSigHashArgs
+        --join-policy $JOIN_POL
     Invoke-Checked -StepName "Run A: flatten/apply/placeholders"
 
     if ($NameKey) {
@@ -154,8 +142,7 @@ if ($Run -eq "B") {
     python tools/run_extract_all.py $EXPORTS `
         --out-root $RESULTS `
         --out-root-is-results-root `
-        --stages authority,patterns `
-        @AllowSigHashArgs
+        --stages authority,patterns
     Invoke-Checked -StepName "Run B1: authority/patterns"
 
     Write-Host "--- B2: patch corpus domain_patterns ---" -ForegroundColor Cyan
@@ -182,20 +169,14 @@ if ($Run -eq "B") {
 
 if ($Run -eq "C") {
     Write-Host "=== RUN C: Segments + all/used bundle analysis ===" -ForegroundColor Green
-    Write-Host "PAUSE ONEDRIVE SYNC BEFORE CONTINUING (Fingerprint_Data is under an OneDrive-synced" -ForegroundColor Yellow
-    Write-Host "  folder). Confirmed 2026-08-19: OneDrive intermittently locks files under" -ForegroundColor Yellow
-    Write-Host "  ...\segments\<segment>\results\bundle_analysis\name_all\<domain> during this phase," -ForegroundColor Yellow
-    Write-Host "  causing run_type=bundle segment runs to fail at the clear_stale_name_all step with" -ForegroundColor Yellow
-    Write-Host "  [WinError 5] Access is denied (73 of 74 bundle runs failed this way in one run;" -ForegroundColor Yellow
-    Write-Host "  run_type=reference runs were unaffected). This starves comparison_registry.csv" -ForegroundColor Yellow
-    Write-Host "  (stamped almost entirely by successful bundle/reference runs) even though" -ForegroundColor Yellow
-    Write-Host "  cross_segment_summary.csv keeps filling in normally from elsewhere -- see the" -ForegroundColor Yellow
-    Write-Host "  comparison_registry.csv Warnings entry in CLAUDE.md for the full diagnosis." -ForegroundColor Yellow
+    Write-Host "IF FINGERPRINT_DATA IS UNDER A ONEDRIVE-SYNCED FOLDER: bundle segment runs can" -ForegroundColor Yellow
+    Write-Host "  fail near-100% at clear_stale_name_all with [WinError 5] Access is denied on" -ForegroundColor Yellow
+    Write-Host "  results\bundle_analysis\name_all\<domain>. Pausing OneDrive sync did NOT fix" -ForegroundColor Yellow
+    Write-Host "  this in testing (2026-08-19) -- root cause is unconfirmed, not necessarily" -ForegroundColor Yellow
+    Write-Host "  OneDrive itself. Confirmed workaround: relocate Fingerprint_Data outside any" -ForegroundColor Yellow
+    Write-Host "  OneDrive-synced folder and pass -ExportsRoot pointing at the new location." -ForegroundColor Yellow
+    Write-Host "  This starves comparison_registry.csv -- see CLAUDE.md Warnings for detail." -ForegroundColor Yellow
     Write-Host "Run C contract:" -ForegroundColor Cyan
-    Write-Host "  All view  = full configured vocabulary for each segment." -ForegroundColor Cyan
-    Write-Host "  Used view = project vocabulary excluding conclusively purgeable records." -ForegroundColor Cyan
-    Write-Host "  Template, Generic, and most Container roles are provided-vocabulary references;" -ForegroundColor Cyan
-    Write-Host "  purge/used interpretation is meaningful primarily for Project targets." -ForegroundColor Cyan
 
     Write-Host "--- C1: segment manifest ---" -ForegroundColor Cyan
     python tools\build_segment_manifest.py `
