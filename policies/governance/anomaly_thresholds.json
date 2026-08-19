@@ -1,0 +1,31 @@
+{
+  "profile_id": "anomaly-thresholds-v1",
+  "schema_version": "0.1",
+  "notes": "Materiality thresholds consumed by tools/generate_governance_narrative.py's detect_anomalies() (notable_anomalies text in governance_domain_summary.csv), render_findings_and_recommendations()'s phases check, _passive_inheritance_risk_domains(), and _shape_note() (Project Portfolio density-similarity section). Values here reproduce the generator's own pre-externalization Python literals exactly (see docs/governance_evidence_package.md and DECISIONS.md D-029) -- this profile does not change any anomaly-note, tier, or CSV column output by itself. phases_tp_extension_max/phases_tw_min are read from this single profile by both detect_anomalies() and render_findings_and_recommendations(), which previously duplicated the same two literals independently. passive_inheritance_risk_bundle_share_max is a separate profile from governance_thresholds.json's passive_material_threshold even though their default values currently coincide -- the two gate different code paths (bundle-density fallback signal vs. explicit governance-state passive share) and must be independently editable. _passive_inheritance_risk_domains()'s dual-schema branch reads governance_thresholds.json's passive_material_threshold directly, not a key in this profile -- see this generator's own _DEFAULT_PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX comment.",
+  "thresholds": {
+    "provided_carried_downstream_min": 0.75,
+    "provided_active_use_max": 0.75,
+    "primary_read_active_use_min": 0.85,
+
+    "passive_indicator_high_min": 0.40,
+    "passive_indicator_moderate_min": 0.20,
+    "passive_inheritance_risk_bundle_share_max": 0.25,
+    "bundle_share_very_low_max": 0.15,
+
+    "gt_tp_gap_gt_min": 0.75,
+    "gt_tp_gap_tp_max": 0.55,
+    "group2_scope_divergence_gap_min": 0.25,
+    "group1_scope_spread_gap_min": 0.25,
+    "tp_tc_bypass_gap_min": 0.25,
+    "weak_tc_max": 0.20,
+    "weak_cp_max": 0.50,
+
+    "view_template_zero_discipline_max": 0.05,
+
+    "phases_tp_extension_max": 0.85,
+    "phases_tw_min": 0.80,
+
+    "portfolio_shape_density_min": 0.8,
+    "portfolio_shape_union_jaccard_max": 0.3
+  }
+}

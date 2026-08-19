@@ -104,6 +104,7 @@ def test_default_policy_dir_is_policies_governance_in_repo():
      ("excluded_from_scoring", "passive_inheritance_risk_domains", "domain_guidance",
       "static_findings_guidance")),
     ("client_onboarding_policy.json", "client_onboarding", ("thresholds",)),
+    ("anomaly_thresholds.json", "anomaly_thresholds", ("thresholds",)),
 ])
 def test_shipped_policy_file_matches_python_default_profile(filename, profile_key, behavioral_keys):
     """The shipped JSON and generate_governance_narrative.py's own
@@ -157,6 +158,11 @@ def test_loading_default_policy_dir_reproduces_module_level_defaults():
     assert g.PASSIVE_INHERITANCE_RISK_DOMAINS == g._DEFAULT_PASSIVE_INHERITANCE_RISK_DOMAINS
     assert g.DOMAIN_GUIDANCE == g._DEFAULT_DOMAIN_GUIDANCE
     assert g.STATIC_FINDINGS_GUIDANCE == g._DEFAULT_STATIC_FINDINGS_GUIDANCE
+    assert g.WEAK_TC_MAX == g._DEFAULT_WEAK_TC_MAX
+    assert g.PHASES_TP_EXTENSION_MAX == g._DEFAULT_PHASES_TP_EXTENSION_MAX
+    assert g.PHASES_TW_MIN == g._DEFAULT_PHASES_TW_MIN
+    assert g.PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX == g._DEFAULT_PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX
+    assert g.PORTFOLIO_SHAPE_DENSITY_MIN == g._DEFAULT_PORTFOLIO_SHAPE_DENSITY_MIN
     assert all(s["source"] == "policy_file" for s in policy["load_status"].values())
 
 
@@ -277,6 +283,33 @@ def test_overriding_client_onboarding_threshold_changes_profile_text(tmp_path):
 
     profile = g._client_onboarding_profile({"n_files": 20, "xc_mean": None, "wp_mean": 0.20})
     assert "Stable internal portfolio" in profile["internal_read"]
+
+
+def test_overriding_anomaly_threshold_changes_detect_anomalies_text(tmp_path):
+    """Mirrors D-021's threshold-override test pattern (D-029): a
+    --policy-dir override to anomaly_thresholds.json must be reflected in
+    detect_anomalies()'s notable_anomalies text, not just the JSON profile."""
+    custom = json.loads(json.dumps(g._POLICY_DEFAULTS["anomaly_thresholds"]))
+    custom["thresholds"]["weak_tc_max"] = 0.50
+    (tmp_path / "anomaly_thresholds.json").write_text(json.dumps(custom), encoding="utf-8")
+
+    g.apply_governance_policy(load_governance_policy(tmp_path, g._POLICY_DEFAULTS))
+
+    d = {
+        "tc": 0.30, "cp": None, "tp": None, "xc": None,
+        "wp_p10": None, "wp_p90": None, "wp_all": None,
+        "tp_by_scope": {}, "cp_by_scope": {},
+        "bundle_schema": "none", "passive_indicator": None, "bundle_share_all": None,
+        "wp_disc": {}, "tw": None,
+    }
+    notes = g.detect_anomalies("some_domain", d)
+    assert any("propagate weakly into coordination files" in n for n in notes)
+
+    # Sanity: the same dict under the built-in default threshold (0.20) does
+    # NOT flag tc=0.30 as weak.
+    g.apply_governance_policy(load_governance_policy(None, g._POLICY_DEFAULTS))
+    notes_default = g.detect_anomalies("some_domain", d)
+    assert not any("propagate weakly into coordination files" in n for n in notes_default)
 
 
 # ---------------------------------------------------------------------------

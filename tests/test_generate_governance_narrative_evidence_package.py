@@ -524,16 +524,16 @@ def test_segment_manifest_absent_from_evidence_package_when_not_supplied(tmp_pat
     assert health["optional_inputs"]["segment_manifest"] is False
 
 
-def test_evidence_map_lists_thirty_six_artifacts_with_required_fields(tmp_path, monkeypatch):
+def test_evidence_map_lists_thirty_seven_artifacts_with_required_fields(tmp_path, monkeypatch):
     # 29 (pre-relationship-layer) + governance_bc_client_matrix +
     # governance_client_bc_matrix + governance_relationships + governance_file_inventory (D-023)
     # + pattern_reuse_summary_by_domain + project_mean_file_pair_jaccard_matrix (D-024)
-    # + governance_reading_order (D-030).
+    # + governance_reading_order (D-030) + governance_classification_rules (D-029).
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
     evidence_map = json.loads((tmp_path / "governance_evidence_map.json").read_text(encoding="utf-8"))
     ids = [a["artifact_id"] for a in evidence_map["artifacts"]]
-    assert len(ids) == 36
+    assert len(ids) == 37
     assert len(ids) == len(set(ids))
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
@@ -544,8 +544,12 @@ def test_evidence_map_lists_thirty_six_artifacts_with_required_fields(tmp_path, 
     assert "pattern_reuse_summary_by_domain" in ids
     assert "project_mean_file_pair_jaccard_matrix" in ids
     assert "governance_reading_order" in ids
+    assert "governance_classification_rules" in ids
     narrative = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_narrative_context")
     assert narrative["authority_level"] != "authoritative_deterministic_evidence"
+    assert set(evidence_map["reasoning_prerequisites"]) == {
+        a["artifact_id"] for a in evidence_map["artifacts"] if a["required_before_conclusions"] is True
+    }
     assert set(evidence_map["reasoning_prerequisites"]) == {
         a["artifact_id"] for a in evidence_map["artifacts"] if a["required_before_conclusions"] is True
     }

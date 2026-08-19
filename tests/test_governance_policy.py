@@ -17,6 +17,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
 from governance_policy import (  # noqa: E402
+    ANOMALY_THRESHOLDS_FILENAME,
     CLIENT_ONBOARDING_FILENAME,
     DEFAULT_POLICY_DIR,
     DOMAIN_POLICY_FILENAME,
@@ -30,6 +31,7 @@ _DEFAULTS = {
     "domain_policy": {"profile_id": "default-domain-policy"},
     "client_onboarding": {"profile_id": "default-client-onboarding"},
     "finding_rules": {"profile_id": "default-finding-rules"},
+    "anomaly_thresholds": {"profile_id": "default-anomaly-thresholds"},
 }
 
 
@@ -69,8 +71,9 @@ def test_present_file_overrides_default_for_that_profile_only(tmp_path):
     assert result["load_status"]["domain_policy"]["source"] == "built_in_default"
 
 
-def test_all_four_profile_files_can_be_overridden_independently(tmp_path):
-    for filename in (THRESHOLDS_FILENAME, DOMAIN_POLICY_FILENAME, CLIENT_ONBOARDING_FILENAME, FINDING_RULES_FILENAME):
+def test_all_five_profile_files_can_be_overridden_independently(tmp_path):
+    for filename in (THRESHOLDS_FILENAME, DOMAIN_POLICY_FILENAME, CLIENT_ONBOARDING_FILENAME,
+                      FINDING_RULES_FILENAME, ANOMALY_THRESHOLDS_FILENAME):
         (tmp_path / filename).write_text(json.dumps({"profile_id": filename}), encoding="utf-8")
 
     result = load_governance_policy(tmp_path, _DEFAULTS)
@@ -79,6 +82,7 @@ def test_all_four_profile_files_can_be_overridden_independently(tmp_path):
     assert result["profiles"]["domain_policy"]["profile_id"] == DOMAIN_POLICY_FILENAME
     assert result["profiles"]["client_onboarding"]["profile_id"] == CLIENT_ONBOARDING_FILENAME
     assert result["profiles"]["finding_rules"]["profile_id"] == FINDING_RULES_FILENAME
+    assert result["profiles"]["anomaly_thresholds"]["profile_id"] == ANOMALY_THRESHOLDS_FILENAME
     assert all(s["source"] == "policy_file" for s in result["load_status"].values())
 
 

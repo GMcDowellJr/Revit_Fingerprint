@@ -318,14 +318,14 @@ def _evidence_map(**overrides):
     return build_evidence_map(**kwargs)
 
 
-def test_evidence_map_has_thirty_six_unique_artifacts():
+def test_evidence_map_has_thirty_seven_unique_artifacts():
     # 29 (pre-relationship-layer) + governance_bc_client_matrix +
     # governance_client_bc_matrix + governance_relationships + governance_file_inventory
     # + pattern_reuse_summary_by_domain + project_mean_file_pair_jaccard_matrix (D-024)
-    # + governance_reading_order (D-030).
+    # + governance_reading_order (D-030) + governance_classification_rules (D-029).
     em = _evidence_map()
     ids = [a["artifact_id"] for a in em["artifacts"]]
-    assert len(ids) == 36
+    assert len(ids) == 37
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
     assert "governance_bc_client_matrix" in ids
@@ -335,6 +335,7 @@ def test_evidence_map_has_thirty_six_unique_artifacts():
     assert "pattern_reuse_summary_by_domain" in ids
     assert "project_mean_file_pair_jaccard_matrix" in ids
     assert "governance_reading_order" in ids
+    assert "governance_classification_rules" in ids
     assert len(ids) == len(set(ids))
 
 
@@ -554,6 +555,15 @@ def test_evidence_map_governance_reading_order_present_flag_reflects_filesystem(
     entry = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_reading_order")
     assert entry["present"] is False
     assert entry["authority_level"] == "controlled_interpretation"
+
+
+def test_evidence_map_governance_classification_rules_present_flag_reflects_filesystem():
+    """Same real Path.exists() treatment as the other static docs -- see D-029."""
+    em = _evidence_map()
+    entry = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_classification_rules")
+    assert entry["present"] is False
+    assert entry["authority_level"] == "controlled_interpretation"
+    assert entry["required_before_conclusions"] is False
 
 
 # ---------------------------------------------------------------------------

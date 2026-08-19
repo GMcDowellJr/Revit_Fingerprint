@@ -28,16 +28,22 @@ catalog (`docs/governance_question_routes.md`), and a narrower run-specific
 brief (`governance_brief.md`), described below. Phase 5 (D-023) added a
 live, computed-per-build directory of drill-down files the package doesn't
 otherwise describe (`governance_file_inventory.json` + a new section in
-`governance_brief.md`). None of these phases changed any existing
-classification, scoring, or CSV column — every threshold/domain-list/
-guidance-text value the policy layer reads from JSON reproduces this
-generator's pre-externalization Python literal exactly, the brief is a
-pure distillation of already-computed findings/health/file-inventory data,
-and the file inventory only ever describes files this generator does not
-otherwise read, so no existing invocation's classification output changes
-by default. `governance_narrative_context.md` is retained as a
-compatibility artifact — unchanged in content and role, just no longer the
-only carrier of findings/navigation/interpretation.
+`governance_brief.md`). Phase 6 (D-029) externalized `detect_anomalies()`/
+the phases check/`_passive_inheritance_risk_domains()`/`_shape_note()`'s
+remaining threshold literals to a fifth policy profile
+(`anomaly_thresholds.json`), added `docs/governance_classification_rules.md`
+(the branch-order/exception-logic counterpart to the threshold *values* in
+the JSON profiles), and trimmed `render_header()`'s restated metric
+definitions to a pointer at the interpretation guide. None of these phases
+changed any existing classification, scoring, or CSV column — every
+threshold/domain-list/guidance-text value the policy layer reads from JSON
+reproduces this generator's pre-externalization Python literal exactly, the
+brief is a pure distillation of already-computed findings/health/
+file-inventory data, and the file inventory only ever describes files this
+generator does not otherwise read, so no existing invocation's
+classification output changes by default. `governance_narrative_context.md`
+is retained as a compatibility artifact — unchanged in content and role,
+just no longer the only carrier of findings/navigation/interpretation.
 
 ## Design reference, not a dependency
 
@@ -361,9 +367,10 @@ an observed result.
 
 ## Policy profiles and threshold profiles
 
-Implemented (D-021). Governance thresholds, domain-governance policy, and
-client-onboarding interpretation rules that used to be Python literals in
-`generate_governance_narrative.py` now live in four JSON profiles under
+Implemented (D-021; extended D-029). Governance thresholds, domain-governance
+policy, client-onboarding interpretation rules, and anomaly/note materiality
+thresholds that used to be Python literals in
+`generate_governance_narrative.py` now live in five JSON profiles under
 `policies/governance/`, loaded via a new sibling module,
 `tools/governance_policy.py`:
 
@@ -373,6 +380,7 @@ client-onboarding interpretation rules that used to be Python literals in
 | `domain_governance_policy.json` | `excluded_from_scoring` (domains excluded from aggregate scoring), `passive_inheritance_risk_domains`, per-domain `domain_guidance` text (`phases`, `loaded_family_types`), and `static_findings_guidance` (always-rendered findings-section prose). |
 | `client_onboarding_policy.json` | `_client_onboarding_profile()`'s interpretation thresholds. Kept as its own profile, separate from `governance_thresholds.json`, even where a value numerically coincides with a governance-tier threshold today — these gate onboarding narrative text, not `governance_tier`, and the two are allowed to diverge independently in a future change. |
 | `finding_rules.json` | Documentation-only `rule_id → {finding_type, description}` metadata for D-020's `governance_findings.json` `rule_ids[]`. Never drives classification logic — the rule_id constants and the classification rules themselves stay in `generate_governance_narrative.py`. |
+| `anomaly_thresholds.json` (D-029) | `detect_anomalies()`'s `notable_anomalies` materiality thresholds, the phases check shared by `detect_anomalies()` and `render_findings_and_recommendations()`, `_passive_inheritance_risk_domains()`'s bundle-share threshold, and `_shape_note()`'s Project Portfolio density-similarity thresholds. Kept as its own profile even where a value numerically coincides with `governance_thresholds.json` (e.g. `passive_inheritance_risk_bundle_share_max` vs. `passive_material_threshold`) — the two gate different code paths and must be independently editable. See `docs/governance_classification_rules.md` for the branch order these values are evaluated in. |
 
 Each file follows the `profile_id` + `schema_version` + `notes` +
 content shape already used elsewhere in `policies/` (e.g.

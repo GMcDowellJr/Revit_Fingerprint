@@ -74,6 +74,20 @@ the rule (and its threshold values) are documented and versioned (see
 of A is inside B"), not Jaccard (symmetric similarity) — do not treat them
 interchangeably. `xc` and `within_project_*` are Jaccard.
 
+**Containment is evidence of reuse or propagation, not proof of governance
+approval or active use.** A high containment score shows that one
+vocabulary is present inside another; it does not show the sharing was
+approved, intended, or actually exercised in delivery — see `governance_tier`
+below and "Known bad inferences." All cascade scores are on a 0–1 scale;
+in this package, a higher score indicates stronger propagation/convergence
+evidence, not automatic ratification of a standard.
+
+**Used-view interpretation is meaningful primarily for Project targets.**
+Template, Generic, and most Container roles are provided-vocabulary
+references, not production-use environments — a Template's own "used view"
+does not mean anything was used in project delivery. See "Comparability,"
+below, for the all-view/used-view distinction itself.
+
 ### `governance_tier`
 
 A **classification of evidence readiness**, computed by `assign_tier()`

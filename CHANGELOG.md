@@ -77,6 +77,44 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   same function, so it inherits the fix without a separate change.
 
 ### Added
+- `tools/generate_governance_narrative.py`'s remaining anomaly/note materiality
+  thresholds -- `detect_anomalies()`'s ~18 bare numeric literals across 11
+  distinct `notable_anomalies` findings (including one, the
+  `provided_to_configured`/`provided_to_used` "carried but not actively used"
+  check, not previously called out as its own finding), the
+  `provided_to_used_containment` primary-read threshold in
+  `build_governance_state_summary()`'s `_finalize_state_bucket()`,
+  `render_findings_and_recommendations()`'s independently-duplicated phases
+  check, `_passive_inheritance_risk_domains()`'s bundle-share/passive-indicator
+  thresholds, and `_shape_note()`'s Project Portfolio density-similarity
+  thresholds -- now load from a fifth JSON policy profile,
+  `policies/governance/anomaly_thresholds.json`, via the same
+  `apply_governance_policy()` global-reassignment mechanism D-021 established
+  (function bodies unchanged except reading a named constant instead of a
+  literal). `_passive_inheritance_risk_domains()`'s dual-schema branch now
+  reads the existing `governance_thresholds.json` `passive_material_threshold`
+  key directly instead of an independent, drifted `0.20` literal, closing a
+  gap where a change to that policy value would not previously have
+  propagated to this function. New `docs/governance_classification_rules.md`
+  documents the branch order and exception conditions of `assign_tier()`,
+  `score_reliability()`, `detect_anomalies()`, `build_governance_state_summary()`'s
+  `primary_governance_read` selection, and `_passive_inheritance_risk_domains()`
+  by threshold-key name (not value) -- added to `governance_evidence_map.json`
+  alongside the existing static docs. `render_header()`'s "How to Read the
+  Analysis" block, which restated containment/cross-client-similarity/
+  all-view-used-view/score-range definitions already covered by
+  `docs/governance_interpretation_guide.md`, is now a one-paragraph pointer
+  at that guide's "Metric semantics" section; three concepts the block
+  covered but the guide didn't yet (containment as reuse/propagation
+  evidence rather than approval, used-view's Project-target-primary scope,
+  and the 0-1 score range) were added to the guide first, in the same
+  change. Every default value in the new JSON profile reproduces this
+  generator's pre-externalization Python literal exactly -- no existing
+  classification, tier, `notable_anomalies` text, or CSV column changes for
+  any existing invocation (verified by the same byte-identical
+  `governance_domain_summary.csv` regression test D-021 established, run
+  twice: default vs. explicit `--policy-dir policies/governance/`). See
+  D-029 and `docs/governance_evidence_package.md`.
 - **`dimension_types` domain family: field expansion across all 7 partitions (Area 7):**
   Adds ~25 new identity items across `dimension_types_linear`/`_angular`/`_radial`/
   `_diameter`/`_spot_elevation`/`_spot_coordinate`/`_spot_slope`, closing the gap

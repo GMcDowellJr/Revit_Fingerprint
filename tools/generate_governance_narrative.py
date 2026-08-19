@@ -550,9 +550,11 @@ _DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
 INTERPRETATION_GUIDE_PATH = _DOCS_DIR / "governance_interpretation_guide.md"
 QUESTION_ROUTES_PATH = _DOCS_DIR / "governance_question_routes.md"
 READING_ORDER_PATH = _DOCS_DIR / "governance_reading_order.md"
+CLASSIFICATION_RULES_PATH = _DOCS_DIR / "governance_classification_rules.md"
 INTERPRETATION_GUIDE_VERSION = "0.1"
 QUESTION_ROUTES_VERSION = "0.1"
 READING_ORDER_VERSION = "0.1"
+CLASSIFICATION_RULES_VERSION = "0.1"
 
 
 def load_client_sectors(client_sector_rows: Optional[list[dict]]) -> dict:
@@ -1704,6 +1706,61 @@ ONBOARD_N_FILES_LOW_MAX = _DEFAULT_ONBOARD_N_FILES_LOW_MAX
 ONBOARD_N_FILES_MODERATE_MAX = _DEFAULT_ONBOARD_N_FILES_MODERATE_MAX
 
 
+# detect_anomalies()/render_findings_and_recommendations()'s phases check/
+# _passive_inheritance_risk_domains()/_shape_note() materiality thresholds
+# (D-029). Defaults reproduce this file's pre-externalization Python literals
+# exactly; apply_governance_policy() overrides these module globals from
+# policies/governance/anomaly_thresholds.json at runtime (see main()). Kept
+# as a separate profile from governance_thresholds.json even though this
+# profile's passive_inheritance_risk_bundle_share_max numerically coincides
+# with governance_thresholds.json's passive_material_threshold today -- the
+# two gate different code paths (bundle-density fallback vs. explicit
+# governance-state share) and must be independently editable. The
+# _passive_inheritance_risk_domains() dual-schema branch's own passive-share
+# check does NOT get a new key here -- it already reads (and continues to
+# read) PASSIVE_MATERIAL_THRESHOLD directly, closing a pre-existing drift gap
+# rather than relocating it into a second, parallel constant.
+_DEFAULT_PROVIDED_CARRIED_DOWNSTREAM_MIN = 0.75
+_DEFAULT_PROVIDED_ACTIVE_USE_MAX = 0.75
+_DEFAULT_PRIMARY_READ_ACTIVE_USE_MIN = 0.85
+_DEFAULT_PASSIVE_INDICATOR_HIGH_MIN = 0.40
+_DEFAULT_PASSIVE_INDICATOR_MODERATE_MIN = 0.20
+_DEFAULT_PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX = 0.25
+_DEFAULT_BUNDLE_SHARE_VERY_LOW_MAX = 0.15
+_DEFAULT_GT_TP_GAP_GT_MIN = 0.75
+_DEFAULT_GT_TP_GAP_TP_MAX = 0.55
+_DEFAULT_GROUP2_SCOPE_DIVERGENCE_GAP_MIN = 0.25
+_DEFAULT_GROUP1_SCOPE_SPREAD_GAP_MIN = 0.25
+_DEFAULT_TP_TC_BYPASS_GAP_MIN = 0.25
+_DEFAULT_WEAK_TC_MAX = 0.20
+_DEFAULT_WEAK_CP_MAX = 0.50
+_DEFAULT_VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX = 0.05
+_DEFAULT_PHASES_TP_EXTENSION_MAX = 0.85
+_DEFAULT_PHASES_TW_MIN = 0.80
+_DEFAULT_PORTFOLIO_SHAPE_DENSITY_MIN = 0.8
+_DEFAULT_PORTFOLIO_SHAPE_UNION_JACCARD_MAX = 0.3
+
+PROVIDED_CARRIED_DOWNSTREAM_MIN = _DEFAULT_PROVIDED_CARRIED_DOWNSTREAM_MIN
+PROVIDED_ACTIVE_USE_MAX = _DEFAULT_PROVIDED_ACTIVE_USE_MAX
+PRIMARY_READ_ACTIVE_USE_MIN = _DEFAULT_PRIMARY_READ_ACTIVE_USE_MIN
+PASSIVE_INDICATOR_HIGH_MIN = _DEFAULT_PASSIVE_INDICATOR_HIGH_MIN
+PASSIVE_INDICATOR_MODERATE_MIN = _DEFAULT_PASSIVE_INDICATOR_MODERATE_MIN
+PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX = _DEFAULT_PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX
+BUNDLE_SHARE_VERY_LOW_MAX = _DEFAULT_BUNDLE_SHARE_VERY_LOW_MAX
+GT_TP_GAP_GT_MIN = _DEFAULT_GT_TP_GAP_GT_MIN
+GT_TP_GAP_TP_MAX = _DEFAULT_GT_TP_GAP_TP_MAX
+GROUP2_SCOPE_DIVERGENCE_GAP_MIN = _DEFAULT_GROUP2_SCOPE_DIVERGENCE_GAP_MIN
+GROUP1_SCOPE_SPREAD_GAP_MIN = _DEFAULT_GROUP1_SCOPE_SPREAD_GAP_MIN
+TP_TC_BYPASS_GAP_MIN = _DEFAULT_TP_TC_BYPASS_GAP_MIN
+WEAK_TC_MAX = _DEFAULT_WEAK_TC_MAX
+WEAK_CP_MAX = _DEFAULT_WEAK_CP_MAX
+VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX = _DEFAULT_VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX
+PHASES_TP_EXTENSION_MAX = _DEFAULT_PHASES_TP_EXTENSION_MAX
+PHASES_TW_MIN = _DEFAULT_PHASES_TW_MIN
+PORTFOLIO_SHAPE_DENSITY_MIN = _DEFAULT_PORTFOLIO_SHAPE_DENSITY_MIN
+PORTFOLIO_SHAPE_UNION_JACCARD_MAX = _DEFAULT_PORTFOLIO_SHAPE_UNION_JACCARD_MAX
+
+
 # ── policy externalization: default profiles + runtime application ─────────
 #
 # _POLICY_DEFAULTS mirrors policies/governance/*.json exactly, built from the
@@ -1783,6 +1840,31 @@ _POLICY_DEFAULTS = {
             "the shipped descriptions."
         ),
     },
+    "anomaly_thresholds": {
+        "profile_id": "anomaly-thresholds-v1",
+        "schema_version": "0.1",
+        "thresholds": {
+            "provided_carried_downstream_min": _DEFAULT_PROVIDED_CARRIED_DOWNSTREAM_MIN,
+            "provided_active_use_max": _DEFAULT_PROVIDED_ACTIVE_USE_MAX,
+            "primary_read_active_use_min": _DEFAULT_PRIMARY_READ_ACTIVE_USE_MIN,
+            "passive_indicator_high_min": _DEFAULT_PASSIVE_INDICATOR_HIGH_MIN,
+            "passive_indicator_moderate_min": _DEFAULT_PASSIVE_INDICATOR_MODERATE_MIN,
+            "passive_inheritance_risk_bundle_share_max": _DEFAULT_PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX,
+            "bundle_share_very_low_max": _DEFAULT_BUNDLE_SHARE_VERY_LOW_MAX,
+            "gt_tp_gap_gt_min": _DEFAULT_GT_TP_GAP_GT_MIN,
+            "gt_tp_gap_tp_max": _DEFAULT_GT_TP_GAP_TP_MAX,
+            "group2_scope_divergence_gap_min": _DEFAULT_GROUP2_SCOPE_DIVERGENCE_GAP_MIN,
+            "group1_scope_spread_gap_min": _DEFAULT_GROUP1_SCOPE_SPREAD_GAP_MIN,
+            "tp_tc_bypass_gap_min": _DEFAULT_TP_TC_BYPASS_GAP_MIN,
+            "weak_tc_max": _DEFAULT_WEAK_TC_MAX,
+            "weak_cp_max": _DEFAULT_WEAK_CP_MAX,
+            "view_template_zero_discipline_max": _DEFAULT_VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX,
+            "phases_tp_extension_max": _DEFAULT_PHASES_TP_EXTENSION_MAX,
+            "phases_tw_min": _DEFAULT_PHASES_TW_MIN,
+            "portfolio_shape_density_min": _DEFAULT_PORTFOLIO_SHAPE_DENSITY_MIN,
+            "portfolio_shape_union_jaccard_max": _DEFAULT_PORTFOLIO_SHAPE_UNION_JACCARD_MAX,
+        },
+    },
 }
 
 # Populated by apply_governance_policy() with whichever finding_rules profile
@@ -1823,6 +1905,14 @@ def apply_governance_policy(policy: dict) -> None:
     global ONBOARD_WP_STABLE_MIN, ONBOARD_WP_MIXED_MIN
     global ONBOARD_XC_HIGH_PORTABILITY_MIN, ONBOARD_XC_MODERATE_PORTABILITY_MIN
     global ONBOARD_N_FILES_LOW_MAX, ONBOARD_N_FILES_MODERATE_MAX
+    global PROVIDED_CARRIED_DOWNSTREAM_MIN, PROVIDED_ACTIVE_USE_MAX, PRIMARY_READ_ACTIVE_USE_MIN
+    global PASSIVE_INDICATOR_HIGH_MIN, PASSIVE_INDICATOR_MODERATE_MIN
+    global PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX, BUNDLE_SHARE_VERY_LOW_MAX
+    global GT_TP_GAP_GT_MIN, GT_TP_GAP_TP_MAX
+    global GROUP2_SCOPE_DIVERGENCE_GAP_MIN, GROUP1_SCOPE_SPREAD_GAP_MIN
+    global TP_TC_BYPASS_GAP_MIN, WEAK_TC_MAX, WEAK_CP_MAX
+    global VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX, PHASES_TP_EXTENSION_MAX, PHASES_TW_MIN
+    global PORTFOLIO_SHAPE_DENSITY_MIN, PORTFOLIO_SHAPE_UNION_JACCARD_MAX
 
     LOADED_GOVERNANCE_POLICY = policy
     profiles = policy["profiles"]
@@ -1884,6 +1974,33 @@ def apply_governance_policy(policy: dict) -> None:
     ONBOARD_N_FILES_MODERATE_MAX = ct("n_files_moderate_max", _DEFAULT_ONBOARD_N_FILES_MODERATE_MAX)
 
     FINDING_RULE_DESCRIPTIONS = dict(profiles["finding_rules"].get("rules", {}))
+
+    at = profiles["anomaly_thresholds"].get("thresholds", {})
+
+    def at_(key: str, default):
+        return at.get(key, default)
+
+    PROVIDED_CARRIED_DOWNSTREAM_MIN = at_("provided_carried_downstream_min", _DEFAULT_PROVIDED_CARRIED_DOWNSTREAM_MIN)
+    PROVIDED_ACTIVE_USE_MAX = at_("provided_active_use_max", _DEFAULT_PROVIDED_ACTIVE_USE_MAX)
+    PRIMARY_READ_ACTIVE_USE_MIN = at_("primary_read_active_use_min", _DEFAULT_PRIMARY_READ_ACTIVE_USE_MIN)
+    PASSIVE_INDICATOR_HIGH_MIN = at_("passive_indicator_high_min", _DEFAULT_PASSIVE_INDICATOR_HIGH_MIN)
+    PASSIVE_INDICATOR_MODERATE_MIN = at_("passive_indicator_moderate_min", _DEFAULT_PASSIVE_INDICATOR_MODERATE_MIN)
+    PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX = at_(
+        "passive_inheritance_risk_bundle_share_max", _DEFAULT_PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX
+    )
+    BUNDLE_SHARE_VERY_LOW_MAX = at_("bundle_share_very_low_max", _DEFAULT_BUNDLE_SHARE_VERY_LOW_MAX)
+    GT_TP_GAP_GT_MIN = at_("gt_tp_gap_gt_min", _DEFAULT_GT_TP_GAP_GT_MIN)
+    GT_TP_GAP_TP_MAX = at_("gt_tp_gap_tp_max", _DEFAULT_GT_TP_GAP_TP_MAX)
+    GROUP2_SCOPE_DIVERGENCE_GAP_MIN = at_("group2_scope_divergence_gap_min", _DEFAULT_GROUP2_SCOPE_DIVERGENCE_GAP_MIN)
+    GROUP1_SCOPE_SPREAD_GAP_MIN = at_("group1_scope_spread_gap_min", _DEFAULT_GROUP1_SCOPE_SPREAD_GAP_MIN)
+    TP_TC_BYPASS_GAP_MIN = at_("tp_tc_bypass_gap_min", _DEFAULT_TP_TC_BYPASS_GAP_MIN)
+    WEAK_TC_MAX = at_("weak_tc_max", _DEFAULT_WEAK_TC_MAX)
+    WEAK_CP_MAX = at_("weak_cp_max", _DEFAULT_WEAK_CP_MAX)
+    VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX = at_("view_template_zero_discipline_max", _DEFAULT_VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX)
+    PHASES_TP_EXTENSION_MAX = at_("phases_tp_extension_max", _DEFAULT_PHASES_TP_EXTENSION_MAX)
+    PHASES_TW_MIN = at_("phases_tw_min", _DEFAULT_PHASES_TW_MIN)
+    PORTFOLIO_SHAPE_DENSITY_MIN = at_("portfolio_shape_density_min", _DEFAULT_PORTFOLIO_SHAPE_DENSITY_MIN)
+    PORTFOLIO_SHAPE_UNION_JACCARD_MAX = at_("portfolio_shape_union_jaccard_max", _DEFAULT_PORTFOLIO_SHAPE_UNION_JACCARD_MAX)
 
 
 def _state_value(state: Optional[dict], key: str) -> Optional[float]:
@@ -2018,7 +2135,7 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
         local_active = state.get("local_active_share")
 
         if provided_configured is not None and provided_used is not None:
-            if provided_configured >= 0.75 and provided_used < 0.75:
+            if provided_configured >= PROVIDED_CARRIED_DOWNSTREAM_MIN and provided_used < PROVIDED_ACTIVE_USE_MAX:
                 notes.append(
                     f"Provided vocabulary is substantially carried downstream ({pct(provided_configured)}) "
                     f"but active-use containment is lower ({pct(provided_used)}). Treat this as a "
@@ -2047,27 +2164,27 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
 
     if not state:
         if bundle_schema == "dual" and passive_ind is not None:
-            if passive_ind >= 0.40:
+            if passive_ind >= PASSIVE_INDICATOR_HIGH_MIN:
                 notes.append(
                     f"High passive inheritance signal ({passive_ind*100:.0f}% of bundled shared "
                     "patterns drop out under the used view) — a significant fraction of the "
                     "template vocabulary is present in projects but not actively exercised. "
                     "Ratification should consider an active-use threshold, not just pattern presence."
                 )
-            elif passive_ind >= 0.20:
+            elif passive_ind >= PASSIVE_INDICATOR_MODERATE_MIN:
                 notes.append(
                     f"Moderate passive inheritance ({passive_ind*100:.0f}% drop from all to used view). "
                     "Some template patterns are inherited but not in active use."
                 )
         elif bundle_schema == "single" and bundle_share is not None:
-            if dom in PASSIVE_INHERITANCE_RISK_DOMAINS and bundle_share < 0.25:
+            if dom in PASSIVE_INHERITANCE_RISK_DOMAINS and bundle_share < PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX:
                 notes.append(
                     f"Low bundle density among shared patterns ({bundle_share*100:.0f}% bundled). "
                     "This domain is in the passive inheritance risk group — shared patterns may be "
                     "inherited rather than actively configured. Used-view analysis recommended "
                     "before ratification."
                 )
-            elif bundle_share is not None and bundle_share < 0.15:
+            elif bundle_share is not None and bundle_share < BUNDLE_SHARE_VERY_LOW_MAX:
                 notes.append(
                     f"Very low bundle density among shared patterns ({bundle_share*100:.0f}% bundled). "
                     "Shared vocabulary is largely unstructured — consider used-view analysis "
@@ -2080,7 +2197,7 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
     # specifically between templates and projects rather than with the baseline
     # content itself.
     gt = d.get("gt")
-    if gt is not None and gt >= 0.75 and tp is not None and tp < 0.55:
+    if gt is not None and gt >= GT_TP_GAP_GT_MIN and tp is not None and tp < GT_TP_GAP_TP_MAX:
         notes.append(
             f"Generic/enterprise baseline containment into templates is strong (G→T = {pct(gt)}) "
             f"but template-to-project propagation is weak (T→P = {pct(tp)}). The enterprise "
@@ -2105,7 +2222,7 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
         if enterprise_val is None or not scoped_vals:
             continue
         scoped_mean = statistics.mean(scoped_vals.values())
-        if abs(enterprise_val - scoped_mean) >= 0.25:
+        if abs(enterprise_val - scoped_mean) >= GROUP2_SCOPE_DIVERGENCE_GAP_MIN:
             direction = "weaker" if scoped_mean < enterprise_val else "stronger"
             detail = ", ".join(f"{k}={pct(v)}" for k, v in sorted(scoped_vals.items()))
             notes.append(
@@ -2129,10 +2246,11 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
     # cross_segment_summary.csv data -- see docs/governance_narrative_group1_scope_gap_investigation.md
     # follow-up) -- the note must not claim "business-center" divergence when
     # the actual varying dimension for that particular scope_pair could be
-    # client or discipline instead. Uses the same >=0.25 absolute-gap
-    # materiality threshold as the Group 2 check above, applied to each
-    # scope_pair's own (min, max) spread instead of an enterprise-vs-mean
-    # comparison.
+    # client or discipline instead. Uses its own group1_scope_spread_gap_min
+    # materiality threshold (a separately-editable key from the Group 2 check
+    # above's group2_scope_divergence_gap_min, even though the two default
+    # values currently coincide), applied to each scope_pair's own (min, max)
+    # spread instead of an enterprise-vs-mean comparison.
     for cascade_label, by_scope_spread, by_scope_mean in (
         ("Template→Container", d.get("tc_by_scope_spread") or {}, d.get("tc_by_scope") or {}),
         ("Container→Project", d.get("cp_by_scope_spread") or {}, d.get("cp_by_scope") or {}),
@@ -2141,7 +2259,7 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
         for scope_pair, (lo, hi) in sorted(by_scope_spread.items()):
             if scope_pair == "enterprise::enterprise":
                 continue
-            if hi - lo >= 0.25:
+            if hi - lo >= GROUP1_SCOPE_SPREAD_GAP_MIN:
                 notes.append(
                     f"{cascade_label} pooled evidence for scope '{scope_pair}' spans "
                     f"{pct(lo)}–{pct(hi)} across the individual rows pooled into this "
@@ -2151,18 +2269,18 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
                     "one number."
                 )
 
-    if tc is not None and tp is not None and tp > tc + 0.25:
+    if tc is not None and tp is not None and tp > tc + TP_TC_BYPASS_GAP_MIN:
         notes.append(
             "Template patterns arrive in projects via direct Revit inheritance, "
             "bypassing coordination files — coordination files are not the governance "
             "vehicle for this domain."
         )
-    if tc is not None and tc < 0.20:
+    if tc is not None and tc < WEAK_TC_MAX:
         notes.append(
             f"Templates propagate weakly into coordination files "
             f"(T→C = {pct(tc)}). Coordination files govern this domain independently."
         )
-    if cp is not None and cp < 0.50:
+    if cp is not None and cp < WEAK_CP_MAX:
         notes.append(
             f"Coordination-file-to-project cascade is weak (C→P = {pct(cp)}). "
             "Project teams are diverging from coordination file vocabulary."
@@ -2179,14 +2297,14 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
         )
     if "view_template" in dom:
         disc_wp = d["wp_disc"]
-        zero_discs = [_disc_label(k) for k, v in disc_wp.items() if v < 0.05 and k != "all"]
+        zero_discs = [_disc_label(k) for k, v in disc_wp.items() if v < VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX and k != "all"]
         if zero_discs:
             notes.append(
                 f"Architecturally specific — near-zero within-project coherence for: "
                 f"{', '.join(zero_discs)}. These disciplines require separate view template governance."
             )
     if dom == "phases" and "phases" in DOMAIN_GUIDANCE:
-        if tp is not None and tp < 0.85 and d["tw"] is not None and d["tw"] > 0.80:
+        if tp is not None and tp < PHASES_TP_EXTENSION_MAX and d["tw"] is not None and d["tw"] > PHASES_TW_MIN:
             notes.append(DOMAIN_GUIDANCE["phases"])
     if dom == "loaded_family_types" and "loaded_family_types" in DOMAIN_GUIDANCE:
         notes.append(DOMAIN_GUIDANCE["loaded_family_types"])
@@ -2811,7 +2929,7 @@ def _finalize_state_bucket(bucket: dict) -> dict:
     if local_active_share is None and tgt_used_n:
         local_active_share = local_active / tgt_used_n
 
-    if provided_to_used is not None and provided_to_used >= 0.85:
+    if provided_to_used is not None and provided_to_used >= PRIMARY_READ_ACTIVE_USE_MIN:
         primary_read = "Provided standard is actively used"
     elif provided_passive_share is not None and provided_passive_share >= PASSIVE_MATERIAL_THRESHOLD:
         primary_read = "Provided standard is carried but partly passive"
@@ -3063,31 +3181,10 @@ region, should not be inferred from this output unless supplied by upstream CSVs
 
 ## How to Read the Analysis
 
-The analysis separates **provided vocabulary**, **configured downstream vocabulary**, and
-**active project use**. This prevents a template pattern that is merely carried into a
-project from being mistaken for a pattern actively used in delivery.
-
-**All view:** complete configured vocabulary present in a file, including inherited stock
-content.
-
-**Used view:** project vocabulary excluding conclusively purgeable or unused records.
-Used-view interpretation is meaningful primarily for **Project** targets. Template,
-Generic, and most Container roles are provided-vocabulary references, not production-use
-environments.
-
-**Containment:** evidence that one vocabulary is present inside another. It is evidence of
-reuse or propagation, not proof of governance approval or active use.
-
-**Cross-client similarity:** evidence of shared practice across client portfolios. Low
-cross-client similarity is not automatically bad; it matters when it creates onboarding,
-portability, governance, or maintenance burden.
-
-**Governance-state outputs:** when provided, these separate `provided_and_used`,
-`provided_but_passive`, `provided_but_missing`, `local_active`, `local_passive`, and
-`local_unbundled` signals.
-
-Scores range from 0 to 1. In this report, high scores indicate stronger evidence for a
-candidate baseline or common base; they do not automatically ratify a standard.
+See `{INTERPRETATION_GUIDE_PATH.name}`'s "Metric semantics" section for what
+provided/configured/active-use vocabulary, all-view/used-view, containment,
+cross-client similarity, and score-range mean in this report, and how they
+should (and should not) be read.
 
 ---
 
@@ -4305,7 +4402,7 @@ def _render_portfolio_density_similarity(
 
     def _shape_note(a: str, b: str, density_v: float) -> str:
         uv = union_index.get((a, b))
-        if uv is not None and density_v >= 0.8 and uv < 0.3:
+        if uv is not None and density_v >= PORTFOLIO_SHAPE_DENSITY_MIN and uv < PORTFOLIO_SHAPE_UNION_JACCARD_MAX:
             return f" -- same shape, different content (union_jaccard={fmt(uv)})"
         return ""
 
@@ -4755,11 +4852,11 @@ def _passive_inheritance_risk_domains(cascade: dict, state_summary: Optional[dic
         bundle_schema = d.get("bundle_schema", "none")
         if bundle_schema == "dual":
             passive_ind = d.get("passive_indicator")
-            if passive_ind is not None and passive_ind >= 0.20:
+            if passive_ind is not None and passive_ind >= PASSIVE_MATERIAL_THRESHOLD:
                 flagged.append(dom)
         elif bundle_schema == "single":
             bundle_share = d.get("bundle_share_all")
-            if bundle_share is not None and bundle_share < 0.25:
+            if bundle_share is not None and bundle_share < PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX:
                 flagged.append(dom)
     return sorted(flagged)
 
@@ -5020,7 +5117,7 @@ def render_findings_and_recommendations(
     if "phases" in cascade and cascade["phases"]["tp"] is not None:
         phases_tp = cascade["phases"]["tp"]
         phases_tw = cascade["phases"]["tw"]
-        if phases_tp < 0.85 and phases_tw is not None and phases_tw > 0.80:
+        if phases_tp < PHASES_TP_EXTENSION_MAX and phases_tw is not None and phases_tw > PHASES_TW_MIN:
             lines.append(
                 "**Phases show project-level extension.** Templates are internally consistent on phase definitions, but projects carry phases not defined in templates. The governance question is whether those additions are intentional project practice, client-specific vocabulary, or unmanaged accumulation.\n"
             )
@@ -6051,6 +6148,7 @@ def main():
             "interpretation_guide": INTERPRETATION_GUIDE_PATH,
             "question_routes": QUESTION_ROUTES_PATH,
             "reading_order": READING_ORDER_PATH,
+            "classification_rules": CLASSIFICATION_RULES_PATH,
             "governance_relationships": _relationships_anchor.parent / "governance_relationships.csv",
         }
         sibling_present = {k: v.exists() for k, v in sibling_paths.items()}

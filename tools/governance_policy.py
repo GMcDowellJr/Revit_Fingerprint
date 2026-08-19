@@ -4,8 +4,9 @@ governance_policy.py
 Generic JSON policy-profile loader for tools/generate_governance_narrative.py's
 externalized governance policy: thresholds, domain-governance policy (excluded/
 passive-inheritance-risk domains, domain guidance text), client-onboarding
-interpretation thresholds, and finding-rule documentation
-(policies/governance/*.json).
+interpretation thresholds, finding-rule documentation, and detect_anomalies()/
+phases-check/_passive_inheritance_risk_domains()/_shape_note() anomaly-note
+materiality thresholds (D-029) (policies/governance/*.json).
 
 Mechanical load/fallback/validation only -- this module owns no governance
 business content itself. The default threshold VALUES and domain-governance
@@ -35,12 +36,14 @@ THRESHOLDS_FILENAME = "governance_thresholds.json"
 DOMAIN_POLICY_FILENAME = "domain_governance_policy.json"
 CLIENT_ONBOARDING_FILENAME = "client_onboarding_policy.json"
 FINDING_RULES_FILENAME = "finding_rules.json"
+ANOMALY_THRESHOLDS_FILENAME = "anomaly_thresholds.json"
 
 _PROFILE_FILENAMES = {
     "thresholds": THRESHOLDS_FILENAME,
     "domain_policy": DOMAIN_POLICY_FILENAME,
     "client_onboarding": CLIENT_ONBOARDING_FILENAME,
     "finding_rules": FINDING_RULES_FILENAME,
+    "anomaly_thresholds": ANOMALY_THRESHOLDS_FILENAME,
 }
 
 
@@ -62,12 +65,13 @@ def _load_profile(policy_dir: Optional[Path], filename: str, default: dict) -> t
 
 
 def load_governance_policy(policy_dir: Optional[Path], defaults: dict) -> dict:
-    """Load all four governance policy profiles from policy_dir, falling back
+    """Load all five governance policy profiles from policy_dir, falling back
     per-file to the caller-supplied default profile dict when a given file is
     absent (or policy_dir itself is None).
 
     defaults: {"thresholds": {...}, "domain_policy": {...},
-               "client_onboarding": {...}, "finding_rules": {...}}
+               "client_onboarding": {...}, "finding_rules": {...},
+               "anomaly_thresholds": {...}}
     -- each a complete default profile dict (including its own profile_id/
     schema_version/notes keys), used verbatim when the corresponding JSON
     file is not found. Passing an incomplete `defaults` dict is a caller
@@ -77,7 +81,8 @@ def load_governance_policy(policy_dir: Optional[Path], defaults: dict) -> dict:
       {
         "policy_dir": str | None,
         "profiles": {"thresholds": {...}, "domain_policy": {...},
-                      "client_onboarding": {...}, "finding_rules": {...}},
+                      "client_onboarding": {...}, "finding_rules": {...},
+                      "anomaly_thresholds": {...}},
         "load_status": {"thresholds": {...}, ...},  # see _load_profile()
       }
     """
