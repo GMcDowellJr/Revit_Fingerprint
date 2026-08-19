@@ -948,7 +948,7 @@ def test_file_inventory_surfaces_regardless_of_interpretation_layer_flag(tmp_pat
 
 # ---------------------------------------------------------------------------
 # D-024: escalation-target files (the large cross_segment_* siblings this
-# generator never parses, named in docs/governance_interpretation_guide.md's
+# generator never parses, named in docs/governance/governance_interpretation_guide.md's
 # escalation section) get their own governance_evidence_map.json artifact
 # with real header/row_count, instead of only the generic file-inventory
 # scan bucket.

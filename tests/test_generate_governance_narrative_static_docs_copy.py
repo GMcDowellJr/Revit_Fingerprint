@@ -1,0 +1,110 @@
+"""Tests for D-034's static-doc copy-into-out behavior: main() copies the
+four docs/governance/*.md reference docs into --out when present, and keeps
+that copy in sync with source presence / --emit-evidence-package across
+repeated runs over the same --out directory. See DECISIONS.md D-034.
+"""
+from __future__ import annotations
+
+import csv
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+
+from compare_cross_segment import SUMMARY_FIELDS, POOLED_FIELDS  # noqa: E402
+import generate_governance_narrative as g  # noqa: E402
+
+
+def _summary_row(**overrides):
+    r = {f: "" for f in SUMMARY_FIELDS}
+    r.update(overrides)
+    return r
+
+
+def _pooled_row(**overrides):
+    r = {f: "" for f in POOLED_FIELDS}
+    r.update(overrides)
+    return r
+
+
+def _write_csv(path: Path, fields: list, rows: list) -> None:
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        w.writerows(rows)
+
+
+def _minimal_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    summary_rows = [
+        _summary_row(
+            comparison_run_id="run1", segment_id_a="imperial|Template",
+            segment_id_b="imperial|Project|acme", governance_role_a="Template",
+            governance_role_b="Project", client_label_b="acme",
+            comparison_type="template_to_project", domain="line_styles",
+            all_pairwise_containment_a_in_b_mean="0.6", all_pairwise_jaccard_mean="0.5",
+            n_files_a="3", n_files_b="10",
+            executed_utc="2026-07-16T00:00:00Z", unit_system="imperial",
+        ),
+    ]
+    pooled_rows = [
+        _pooled_row(
+            comparison_run_id="run1", segment_id="imperial|Project|acme",
+            client_label="acme", governance_role="Project", pool_scope="parent_sibling",
+            domain="line_styles", n_files_focal="10", n_files_pool="30",
+            executed_utc="2026-07-16T00:00:00Z",
+        ),
+    ]
+    summary_path = tmp_path / "cross_segment_summary.csv"
+    pooled_path = tmp_path / "cross_segment_pooled.csv"
+    _write_csv(summary_path, SUMMARY_FIELDS, summary_rows)
+    _write_csv(pooled_path, POOLED_FIELDS, pooled_rows)
+    return summary_path, pooled_path
+
+
+def _run_main(monkeypatch, argv):
+    monkeypatch.setattr(sys, "argv", ["generate_governance_narrative.py"] + argv)
+    g.main()
+
+
+_DOC_CONSTANTS = (
+    "INTERPRETATION_GUIDE_PATH", "QUESTION_ROUTES_PATH",
+    "READING_ORDER_PATH", "CLASSIFICATION_RULES_PATH",
+)
+
+
+def test_default_run_copies_all_four_static_docs_into_out(tmp_path, monkeypatch):
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    for const_name in _DOC_CONSTANTS:
+        src = getattr(g, const_name)
+        assert (tmp_path / src.name).exists(), src.name
+
+
+def test_no_emit_evidence_package_removes_previously_copied_docs(tmp_path, monkeypatch):
+    """A prior run (default flags) copies the four docs in; a later run over
+    the same --out with --no-emit-evidence-package must not leave them
+    behind alongside a package that claims no evidence-package output."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    for const_name in _DOC_CONSTANTS:
+        assert (tmp_path / getattr(g, const_name).name).exists()
+
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path),
+                            "--out", str(tmp_path), "--no-emit-evidence-package"])
+    for const_name in _DOC_CONSTANTS:
+        assert not (tmp_path / getattr(g, const_name).name).exists(), const_name
+
+
+def test_copy_removed_when_source_doc_absent_but_stale_copy_exists(tmp_path, monkeypatch):
+    """A stripped-down deployment without docs/ (source absent) must not
+    leave a stale copy from an earlier run, when a source WAS present, sitting
+    in --out alongside this run's freshly-written narrative/CSVs."""
+    summary_path, pooled_path = _minimal_fixture(tmp_path)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    guide_dst = tmp_path / g.INTERPRETATION_GUIDE_PATH.name
+    assert guide_dst.exists()
+
+    missing_src = tmp_path / "does_not_exist" / "governance_interpretation_guide.md"
+    monkeypatch.setattr(g, "INTERPRETATION_GUIDE_PATH", missing_src)
+    _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
+    assert not guide_dst.exists()

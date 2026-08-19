@@ -14,7 +14,7 @@ It is modeled on the "interpretation layer" concept in the design-reference
 `patterns/deterministic_to_llm_boundary.md`) — that repository is explicitly
 provisional, and this guide is this package's own content, not an import
 from it. See `docs/governance_evidence_package.md` for the full artifact
-inventory this guide accompanies, and `docs/governance_question_routes.md`
+inventory this guide accompanies, and `docs/governance/governance_question_routes.md`
 for where to look for specific recurring questions.
 
 ## What this package is for
@@ -405,7 +405,7 @@ records exactly which profile version was applied to a given run.
 ## Where to go next
 
 - **Quick top-line read:** `governance_brief.md`.
-- **A specific recurring question:** `docs/governance_question_routes.md`.
+- **A specific recurring question:** `docs/governance/governance_question_routes.md`.
 - **Full detail:** `governance_narrative_context.md`,
   `governance_domain_summary.csv`, `governance_client_summary.csv`,
   `governance_findings.json`.
@@ -414,7 +414,7 @@ records exactly which profile version was applied to a given run.
 
 ## What to do when a pre-built route isn't enough
  
-`docs/governance_question_routes.md` routes are versioned by maturity, per
+`docs/governance/governance_question_routes.md` routes are versioned by maturity, per
 the design reference this package's routing layer follows
 (`GMcDowellJr/llm_evidence_framework/discovery/question_route_discovery.md`):
  
@@ -471,7 +471,7 @@ from the file itself.
 4. **A recipe that gets reused is worth promoting.** If the same extraction
    pattern would answer a route's question repeatedly (not just this one
    instance), that's the signal to attach it to the route in
-   `docs/governance_question_routes.md` and move that route from `candidate`
+   `docs/governance/governance_question_routes.md` and move that route from `candidate`
    toward `recipe-backed` -- per the design reference's own guidance, a
    route shouldn't be promoted just because it was imagined once; it should
    be promoted because it proved useful more than once.

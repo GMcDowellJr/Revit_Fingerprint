@@ -5373,8 +5373,11 @@ def build_comparison_completeness(
     rows alone (see main()'s `if ctype in GOVERNANCE_STATE_DIRECTED_TYPES`
     block). A registry-only entry that matches a governance_state_rows/
     governance_state_summary_rows key (segment_id_reference/_target mapped
-    to segment_id_a/b) is therefore counted present, not stale -- it is
-    valid, current, same-run evidence that simply lives in a different file.
+    to segment_id_a/b) is therefore counted present rather than stale purely
+    for reference-existing purposes -- it is not automatically assumed
+    current, though: recency is still checked against that state row's own
+    `executed_utc`, the same as the summary-row path, since an independently
+    supplied registry and state CSV can come from different runs.
 
     Self-contained: uses only comparison_registry.csv's own identity
     (segment_id_a/b, comparison_type, domain) and recency (computed_utc)
@@ -5405,13 +5408,13 @@ def build_comparison_completeness(
         if row.get("domain", ""):
             summary_index.setdefault(_key(row), row)
 
-    state_keys: set = set()
+    state_executed_utc: dict = {}
     for row in (governance_state_rows or []):
         if row.get("domain", ""):
-            state_keys.add(_state_key(row))
+            state_executed_utc.setdefault(_state_key(row), row.get("executed_utc", ""))
     for row in (governance_state_summary_rows or []):
         if row.get("domain", ""):
-            state_keys.add(_state_key(row))
+            state_executed_utc.setdefault(_state_key(row), row.get("executed_utc", ""))
 
     by_domain: dict = defaultdict(lambda: {"total": 0, "present": 0, "missing": 0, "stale": 0})
     for key in registry_index.keys() | summary_index.keys():
@@ -5427,10 +5430,19 @@ def build_comparison_completeness(
             continue
         counts["present"] += 1
         if summary_row is None:
-            if key in state_keys:
+            if key in state_executed_utc:
                 # Valid state-only stamp: this (pair, domain) produced
                 # governance-state evidence but no summary row, and the
-                # registry correctly reflects that -- not a staleness signal.
+                # registry correctly reflects that -- not a staleness signal
+                # on its own. Still compare recency: an independently
+                # supplied registry and state CSV can come from different
+                # runs, so a registry stamp older than the state evidence it
+                # should describe is stale the same way a summary-row match
+                # would be.
+                computed_utc = registry_row.get("computed_utc", "")
+                executed_utc = state_executed_utc[key]
+                if computed_utc and executed_utc and computed_utc < executed_utc:
+                    counts["stale"] += 1
                 continue
             # Registry has a stamp, but the current summary snapshot has no
             # matching row and no matching governance-state evidence either
@@ -5790,9 +5802,9 @@ def main():
     parser.add_argument("--emit-interpretation-layer", dest="emit_interpretation_layer",
                         action="store_true",
                         help="Write governance_brief.md, and add the static "
-                             "docs/governance_interpretation_guide.md / "
-                             "docs/governance_question_routes.md / "
-                             "docs/governance_reading_order.md as evidence-map "
+                             "docs/governance/governance_interpretation_guide.md / "
+                             "docs/governance/governance_question_routes.md / "
+                             "docs/governance/governance_reading_order.md as evidence-map "
                              "entries (default: on). Only takes effect when "
                              "--emit-evidence-package is also on, since the brief "
                              "is built from governance_findings.json/"
@@ -6555,9 +6567,15 @@ def main():
         # doc is missing (e.g. a stripped-down deployment without docs/).
         for _doc_key in ("interpretation_guide", "question_routes", "reading_order", "classification_rules"):
             _doc_src = sibling_paths[_doc_key]
-            if not sibling_present[_doc_key]:
-                continue
             _doc_dst = out_dir / _doc_src.name
+            if not sibling_present[_doc_key]:
+                # Source doc absent this run (e.g. a stripped-down deployment
+                # without docs/) -- remove a copy left by an earlier run over
+                # this same --out directory so a reader can't pair a stale
+                # doc with this run's fresh narrative/CSVs.
+                if _doc_dst.exists():
+                    _doc_dst.unlink()
+                continue
             if _doc_src.resolve() != _doc_dst.resolve():
                 shutil.copy2(_doc_src, _doc_dst)
 
@@ -6682,6 +6700,13 @@ def main():
             "governance_findings.json",
             "governance_file_inventory.json",
             "governance_brief.md",
+            # D-034's copied static docs -- also written only inside the
+            # emit_evidence_package branch above, so they go stale the same
+            # way the JSON artifacts do when a later run opts out.
+            INTERPRETATION_GUIDE_PATH.name,
+            QUESTION_ROUTES_PATH.name,
+            READING_ORDER_PATH.name,
+            CLASSIFICATION_RULES_PATH.name,
         )
         removed = [name for name in stale_names if (out_dir / name).exists()]
         for name in removed:

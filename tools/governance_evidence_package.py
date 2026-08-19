@@ -414,7 +414,7 @@ def _artifact(
     # call site must state explicitly whether a governance conclusion drawn
     # without this artifact would be unsafe, so a future artifact addition can't
     # silently inherit a wrong default -- see build_evidence_map()'s
-    # reasoning_prerequisites and docs/governance_reading_order.md.
+    # reasoning_prerequisites and docs/governance/governance_reading_order.md.
     entry = {
         "artifact_id": artifact_id,
         "path": path,
@@ -456,7 +456,7 @@ def _sibling_scan_fields(path, present: bool) -> dict:
     excluded sibling artifact's own governance_evidence_map.json entry with
     its column header (name + inferred dtype) and row count. A reader who
     never opens governance_file_inventory.json still gets this for the
-    specific large files docs/governance_interpretation_guide.md's
+    specific large files docs/governance/governance_interpretation_guide.md's
     escalation section names by filename (D-024). Returns {} when the file
     is not present -- scanning a path that does not exist is meaningless,
     not an error to report. Never returns a sample row or cell value, same
@@ -1385,7 +1385,7 @@ def build_evidence_map(
 
     # D-030: the full set of required_before_conclusions=true artifact_ids,
     # exposed once at the manifest level -- a set to exhaust, not a sequence
-    # to sample from. See docs/governance_reading_order.md.
+    # to sample from. See docs/governance/governance_reading_order.md.
     reasoning_prerequisites = [
         a["artifact_id"] for a in artifacts if a["required_before_conclusions"]
     ]

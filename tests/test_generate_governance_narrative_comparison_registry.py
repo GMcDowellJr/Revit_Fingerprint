@@ -161,6 +161,31 @@ def test_completeness_registry_only_entry_without_state_evidence_is_still_stale(
     assert completeness["line_styles"] == {"total": 1, "present": 1, "missing": 0, "stale": 1}
 
 
+def test_completeness_registry_only_entry_with_state_evidence_is_stale_when_registry_predates_state():
+    """PR review finding: an independently supplied registry and state CSV
+    can come from different runs. A registry-only entry matching
+    governance-state evidence must still be checked for recency against
+    that state row's own executed_utc, not unconditionally treated as
+    current just because a matching state key exists."""
+    registry_rows = [_registry_row(segment_id_a="a", segment_id_b="b", comparison_type="generic_to_template",
+                                    domain="line_styles", computed_utc="2026-07-01T00:00:00Z")]
+    state_summary_rows = [_gov_state_summary_row(segment_id_reference="a", segment_id_target="b",
+                                                  comparison_type="generic_to_template", domain="line_styles",
+                                                  executed_utc="2026-08-01T00:00:00Z")]
+    completeness = g.build_comparison_completeness([], registry_rows, None, state_summary_rows)
+    assert completeness["line_styles"] == {"total": 1, "present": 1, "missing": 0, "stale": 1}
+
+
+def test_completeness_registry_only_entry_with_state_evidence_not_stale_when_registry_is_current():
+    registry_rows = [_registry_row(segment_id_a="a", segment_id_b="b", comparison_type="generic_to_template",
+                                    domain="line_styles", computed_utc="2026-08-10T00:00:00Z")]
+    state_summary_rows = [_gov_state_summary_row(segment_id_reference="a", segment_id_target="b",
+                                                  comparison_type="generic_to_template", domain="line_styles",
+                                                  executed_utc="2026-08-01T00:00:00Z")]
+    completeness = g.build_comparison_completeness([], registry_rows, None, state_summary_rows)
+    assert completeness["line_styles"] == {"total": 1, "present": 1, "missing": 0, "stale": 0}
+
+
 def test_completeness_state_evidence_from_detailed_rows_also_prevents_stale():
     from compare_cross_segment import GOVERNANCE_STATE_FIELDS
 

@@ -13,7 +13,7 @@ key resolves to for a given run; this document holds the *order and
 exception logic* those values are evaluated in. Together, the two let a
 reader recreate a tier or anomaly-note output from
 `governance_domain_summary.csv`'s inputs instead of rediscovering the logic
-from Python source. See `docs/governance_interpretation_guide.md` for what
+from Python source. See `docs/governance/governance_interpretation_guide.md` for what
 each field/tier *means*; this document is about evaluation order, not
 semantics.
 
@@ -162,8 +162,9 @@ matches gets appended, in this fixed order:
     unconditionally (no threshold gate).
 15. **Union-inventory-derived domain confidence** (only when `union_breadth`
     is supplied — a per-domain summary from `build_union_breadth_by_domain()`,
-    itself only computed when `--comparison-registry`'s sibling
-    `cross_segment_union_inventory.csv` is available; D-033). `primary` here
+    itself only computed when the separate `--union-inventory` argument
+    (`cross_segment_union_inventory.csv`) is supplied; D-033 — this is
+    independent of `--comparison-registry`, not a sibling of it). `primary` here
     is `tp` if present, else `cp`. Mutually exclusive (`if`/`elif`):
     - **Broad natural reuse, weak cascade** — `corpus_wide + client_wide
       pattern count >= union_breadth_broad_min_patterns` AND `primary <
