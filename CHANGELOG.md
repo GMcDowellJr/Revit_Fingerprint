@@ -110,12 +110,14 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   - **D-032 (Phase 9a):** New optional `--comparison-registry` CLI argument
     (same present-or-absent, gracefully-degrading pattern as other optional
     inputs). When supplied, renders a per-domain **Input Completeness /
-    Staleness** note near Analytical Notes -- count of expected
-    segment/domain comparison pairs present vs. missing vs. stale -- via new
-    `build_comparison_completeness()`. Distinguishes "this domain's evidence
-    is thin because the comparison wasn't run or is stale" from "this
-    domain's evidence is thin because convergence is actually weak," which
-    previously looked identical to a reader of `governance_domain_summary.csv`.
+    Staleness** note near Analytical Notes -- an evidence/registry-mismatch
+    proxy (not a not-run-coverage guarantee: a comparison absent from every
+    evidence source has no key to inspect and is not counted) via new
+    `build_comparison_completeness()`. Where a mismatch IS detected, it
+    distinguishes "this domain's registry stamp is missing or stale relative
+    to its evidence" from "this domain's evidence is thin because
+    convergence is actually weak," which previously looked identical to a
+    reader of `governance_domain_summary.csv`.
     The registry file itself is never embedded in the output package -- only
     the derived counts are. `governance_package_health.json` gains a
     `comparison_completeness` field when the registry is supplied. No

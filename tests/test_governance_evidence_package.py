@@ -175,6 +175,22 @@ def test_manifest_records_policy_profiles_when_supplied():
     assert "not yet implemented" not in m["policy_profiles"]["note"]
 
 
+def test_manifest_policy_profiles_note_says_five_profiles_not_four():
+    """PR review finding: adding anomaly_thresholds (D-029) means every
+    generated manifest carries five policy profiles, but the note still
+    said 'four' and claimed every shipped value reproduces a
+    pre-externalization literal exactly -- false for anomaly_thresholds.json's
+    union_breadth_* keys (D-033), which are newly introduced thresholds with
+    no prior inline literal to reproduce."""
+    m = _manifest(policy_dir=Path("/some/policy/dir"), policy_profiles={
+        "thresholds": {"profile_id": "x", "schema_version": "0.1", "source": "policy_file"},
+    })
+    note = m["policy_profiles"]["note"]
+    assert "five profiles" in note
+    assert "four profiles" not in note
+    assert "union_breadth_*" in note
+
+
 # ---------------------------------------------------------------------------
 # build_package_health
 # ---------------------------------------------------------------------------
@@ -395,7 +411,10 @@ def test_evidence_map_output_local_path_present_when_sibling_present_and_out_dir
     prerequisites needs to actually locate the artifact from a portable
     --out directory (no repo checkout) -- path/present alone describe the
     checked-in repo doc, unresolvable from a moved --out. output_local_path
-    must name the D-034 copy that sits beside this evidence map."""
+    must name the D-034 copy that sits beside this evidence map, as a
+    package-relative bare filename (not out_dir-qualified) so it survives
+    the whole --out directory being moved or copied elsewhere (PR review
+    finding, round 11)."""
     guide_src = tmp_path / "repo_docs" / "governance_interpretation_guide.md"
     guide_src.parent.mkdir()
     guide_src.write_text("guide", encoding="utf-8")
@@ -409,7 +428,7 @@ def test_evidence_map_output_local_path_present_when_sibling_present_and_out_dir
         out_dir=tmp_path / "out",
     )
     guide = next(a for a in em["artifacts"] if a["artifact_id"] == "governance_interpretation_guide")
-    assert guide["output_local_path"] == str(tmp_path / "out" / "governance_interpretation_guide.md")
+    assert guide["output_local_path"] == "governance_interpretation_guide.md"
     # path/present still describe the repo source, never the copy (D-034).
     assert guide["path"] == str(guide_src)
 

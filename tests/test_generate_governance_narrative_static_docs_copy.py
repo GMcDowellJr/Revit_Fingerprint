@@ -222,7 +222,9 @@ def test_evidence_map_output_local_path_matches_actual_copy_end_to_end(tmp_path,
     """PR review finding: reasoning_prerequisites must be resolvable from a
     portable --out directory alone. governance_evidence_map.json's
     output_local_path for the interpretation guide must name the file
-    D-034's copy loop actually writes."""
+    D-034's copy loop actually writes, as a package-relative bare filename
+    (not out_dir-qualified) so it survives the whole --out directory being
+    moved or copied to another machine (PR review finding, round 11)."""
     import json
     summary_path, pooled_path = _minimal_fixture(tmp_path)
     _run_main(monkeypatch, ["--summary", str(summary_path), "--pooled", str(pooled_path), "--out", str(tmp_path)])
@@ -230,4 +232,5 @@ def test_evidence_map_output_local_path_matches_actual_copy_end_to_end(tmp_path,
     guide = next(a for a in evidence_map["artifacts"] if a["artifact_id"] == "governance_interpretation_guide")
     expected = tmp_path / g.INTERPRETATION_GUIDE_PATH.name
     assert expected.exists()
-    assert guide["output_local_path"] == str(expected)
+    assert guide["output_local_path"] == g.INTERPRETATION_GUIDE_PATH.name
+    assert "/" not in guide["output_local_path"]

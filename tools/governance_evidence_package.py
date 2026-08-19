@@ -195,16 +195,19 @@ def build_package_manifest(
             "note": (
                 "Governance thresholds, domain-governance policy (excluded/"
                 "passive-inheritance-risk domains, domain guidance text), "
-                "client-onboarding interpretation thresholds, and finding-rule "
-                "documentation are loaded from --policy-dir (default: "
-                "policies/governance/) via tools/governance_policy.py at run "
-                "time -- see the `profiles` field above for which profile_id/"
-                "schema_version/source (policy_file vs. built_in_default) was "
-                "actually used for each of the four profiles this run. "
-                "policies/governance/*.json ship with values that reproduce "
-                "this generator's pre-externalization Python literals exactly; "
-                "overriding --policy-dir with a different profile set changes "
-                "classification output."
+                "client-onboarding interpretation thresholds, anomaly/note "
+                "materiality thresholds, and finding-rule documentation are "
+                "loaded from --policy-dir (default: policies/governance/) via "
+                "tools/governance_policy.py at run time -- see the `profiles` "
+                "field above for which profile_id/schema_version/source "
+                "(policy_file vs. built_in_default) was actually used for "
+                "each of the five profiles this run. Most shipped values in "
+                "policies/governance/*.json reproduce this generator's "
+                "pre-externalization Python literals exactly; the exception "
+                "is anomaly_thresholds.json's union_breadth_* keys (D-033), "
+                "which are newly introduced thresholds with no prior inline "
+                "literal to reproduce. Overriding --policy-dir with a "
+                "different profile set changes classification output."
             ) if policy_profiles else (
                 "Policy externalization (thresholds, domain-governance policy, "
                 "onboarding rules) is not yet implemented in this generator -- "
@@ -491,7 +494,10 @@ def _artifact(
     # checked-in repo doc (D-034's deliberate source-of-truth choice), which
     # is unresolvable from a moved --out. output_local_path names the D-034
     # copy that sits beside this evidence map when present, without
-    # changing what path/present themselves describe.
+    # changing what path/present themselves describe. Deliberately
+    # package-relative (a bare filename, not out_dir-qualified) -- an
+    # absolute or original-machine path here would break the instant the
+    # whole --out directory is moved or copied, defeating the point.
     if output_local_path is not None:
         entry["output_local_path"] = output_local_path
     return entry
@@ -559,9 +565,16 @@ def build_evidence_map(
         return str(v) if v else None
 
     def _output_local_path(sibling_key: str):
+        # PR review finding: str(Path(out_dir) / name) baked the ORIGINAL
+        # machine's --out path (absolute, if --out was) into the package
+        # itself -- wrong the moment the whole --out directory is moved or
+        # copied elsewhere, which is the exact self-contained-package
+        # scenario this field exists for. The D-034 copy always sits flat,
+        # directly beside governance_evidence_map.json, so the correct
+        # package-relative path is just the basename.
         if out_dir is None or not sibling_present.get(sibling_key, False):
             return None
-        return str(Path(out_dir) / sibling_paths[sibling_key].name)
+        return sibling_paths[sibling_key].name
 
     artifacts.append(_artifact(
         "cross_segment_summary", p(input_paths, "cross_segment_summary"), "csv", True,
