@@ -169,11 +169,16 @@ if ($Run -eq "B") {
 
 if ($Run -eq "C") {
     Write-Host "=== RUN C: Segments + all/used bundle analysis ===" -ForegroundColor Green
+    Write-Host "PAUSE ONEDRIVE SYNC BEFORE CONTINUING (Fingerprint_Data is under an OneDrive-synced" -ForegroundColor Yellow
+    Write-Host "  folder). Confirmed 2026-08-19: OneDrive intermittently locks files under" -ForegroundColor Yellow
+    Write-Host "  ...\segments\<segment>\results\bundle_analysis\name_all\<domain> during this phase," -ForegroundColor Yellow
+    Write-Host "  causing run_type=bundle segment runs to fail at the clear_stale_name_all step with" -ForegroundColor Yellow
+    Write-Host "  [WinError 5] Access is denied (73 of 74 bundle runs failed this way in one run;" -ForegroundColor Yellow
+    Write-Host "  run_type=reference runs were unaffected). This starves comparison_registry.csv" -ForegroundColor Yellow
+    Write-Host "  (stamped almost entirely by successful bundle/reference runs) even though" -ForegroundColor Yellow
+    Write-Host "  cross_segment_summary.csv keeps filling in normally from elsewhere -- see the" -ForegroundColor Yellow
+    Write-Host "  comparison_registry.csv Warnings entry in CLAUDE.md for the full diagnosis." -ForegroundColor Yellow
     Write-Host "Run C contract:" -ForegroundColor Cyan
-    Write-Host "  All view  = full configured vocabulary for each segment." -ForegroundColor Cyan
-    Write-Host "  Used view = project vocabulary excluding conclusively purgeable records." -ForegroundColor Cyan
-    Write-Host "  Template, Generic, and most Container roles are provided-vocabulary references;" -ForegroundColor Cyan
-    Write-Host "  purge/used interpretation is meaningful primarily for Project targets." -ForegroundColor Cyan
 
     Write-Host "--- C1: segment manifest ---" -ForegroundColor Cyan
     python tools\build_segment_manifest.py `
