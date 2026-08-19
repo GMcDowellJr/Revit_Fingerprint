@@ -24,7 +24,9 @@ import csv
 import sys
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Dict, Iterable, Iterator, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Set, Tuple
+
+from jenks_utils import jenks_breaks
 
 # ---------------------------------------------------------------------------
 # CSV I/O helpers
@@ -70,6 +72,82 @@ def _int_safe(val: str) -> int:
         return int(val)
     except (ValueError, TypeError):
         return 0
+
+
+def _float_safe(val: str) -> Optional[float]:
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Auto top-bundles threshold (Jenks natural breaks on support_pct)
+# ---------------------------------------------------------------------------
+
+# Same convention as tools/bundle_analysis/step2_find_bundles.py's
+# compute_auto_threshold: too few distinct values makes a Jenks break
+# meaningless (it degenerates to splitting off a single low/high outlier
+# rather than finding a real noise/signal transition). Below this count,
+# keep everything rather than manufacture a cut. Matches Greg's Q4 answer:
+# "all bundles if too few".
+_MIN_DISTINCT_VALUES_FOR_JENKS = 4
+
+
+def _compute_domain_bundle_threshold(bundles: List[Dict[str, str]]) -> Dict[str, Any]:
+    """Derive a domain-specific top-bundles cutoff via Jenks natural breaks
+    over each bundle's support_pct, pooled across every scope_key in the
+    domain (bundles.csv is already written per-domain across all scopes, so
+    no extra pooling step is needed -- see step2_find_bundles.py's
+    find_bundles_for_domain, which writes one bundles.csv per domain
+    covering every scope).
+
+    support_pct (not files_present) so the break is comparable across
+    scopes/segments of very different file-count scale -- same reasoning
+    Greg gave for preferring percent over N-files-present at the CLI level.
+
+    n_classes=2: a single break separating "top tier" bundles (the
+    behavioral signal for this domain) from the long tail, following the
+    same n_classes=2 / break_0-as-floor convention documented in
+    compare_cross_segment.py's _compute_containment_thresholds (bundles AT
+    the break clear the floor, i.e. keep if support_pct >= break_value).
+
+    Returns a dict with keys: method, break_value (float or None),
+    n_bundles_before, n_distinct_values, source_value_min, source_value_max.
+    """
+    support_values = [v for v in (_float_safe(r.get("support_pct", "")) for r in bundles) if v is not None]
+    n_bundles = len(bundles)
+    distinct_values = sorted(set(support_values))
+
+    if len(distinct_values) < _MIN_DISTINCT_VALUES_FOR_JENKS:
+        return {
+            "method": "insufficient_distinct_values_keep_all",
+            "break_value": None,
+            "n_bundles_before": n_bundles,
+            "n_distinct_values": len(distinct_values),
+            "source_value_min": min(support_values) if support_values else None,
+            "source_value_max": max(support_values) if support_values else None,
+        }
+
+    breaks = jenks_breaks(support_values, n_classes=2)
+    break_value = breaks[0] if breaks else None
+    return {
+        "method": "jenks_natural_breaks",
+        "break_value": break_value,
+        "n_bundles_before": n_bundles,
+        "n_distinct_values": len(distinct_values),
+        "source_value_min": min(support_values),
+        "source_value_max": max(support_values),
+    }
+
+
+def _apply_bundle_threshold(
+    bundles: List[Dict[str, str]], threshold: Dict[str, Any]
+) -> List[Dict[str, str]]:
+    if threshold["break_value"] is None:
+        return bundles
+    break_value = threshold["break_value"]
+    return [r for r in bundles if (_float_safe(r.get("support_pct", "")) or 0.0) >= break_value]
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +197,28 @@ def _resolve_segment_paths(
         records_csv = records_dir / "records.csv"
         identity_items_dir = records_dir / "identity_items_by_domain"
 
-    label_synth_dir = records_dir.parent / "label_synthesis"
+    # Prefer segment-scoped label population (this is what actually answers
+    # "what names were observed for this join_hash within THIS segment" --
+    # run_segment_orchestrator.py's patterns stage writes
+    # {out_root}/results/label_synthesis/{domain}.joinhash_label_population.csv
+    # per segment; --label-synth-dir there only overrides the READ source for
+    # LLM cache/curator annotations reuse, not where analysis outputs land --
+    # see run_extract_all.py's --label-synth-dir help text). Corpus-level
+    # label_synthesis/ never contains this file; falling back to it here was
+    # the bug -- every join_hash silently missed and got the blank
+    # placeholder row, which had nothing to do with whether LLM synthesis
+    # had been run.
+    seg_label_synth_dir = seg_out / "results" / "label_synthesis"
+    if seg_label_synth_dir.is_dir():
+        label_synth_dir = seg_label_synth_dir
+    else:
+        print(
+            f"[WARN] {seg_label_synth_dir} not found; falling back to corpus-level "
+            f"label_synthesis under {records_dir.parent} (segment likely hasn't run "
+            f"the patterns stage yet)",
+            file=sys.stderr,
+        )
+        label_synth_dir = records_dir.parent / "label_synthesis"
 
     return segment_id, ba_root, domain_patterns_path, records_csv, identity_items_dir, label_synth_dir
 
@@ -260,6 +359,7 @@ def _process_domain(
     identity_items_dir: Path,
     label_synth_dir: Path,
     top_bundles: Optional[int],
+    top_bundles_auto: bool,
 ) -> Tuple[
     List[Dict[str, str]],  # inventory rows
     List[Dict[str, str]],  # settings rows
@@ -268,6 +368,7 @@ def _process_domain(
     int,  # patterns_emitted
     int,  # join_hashes_with_items
     int,  # join_hashes_with_names
+    Optional[Dict[str, Any]],  # bundle selection threshold diagnostics (None if not --top-bundles-auto)
 ]:
     domain_out_dir = ba_root / domain
     bundles_csv_path = domain_out_dir / "bundles.csv"
@@ -278,16 +379,32 @@ def _process_domain(
             f"[WARN] bundles.csv missing for domain '{domain}', skipping: {bundles_csv_path}",
             file=sys.stderr,
         )
-        return [], [], [], 0, 0, 0, 0
+        return [], [], [], 0, 0, 0, 0, None
     if not membership_csv_path.exists():
         print(
             f"[WARN] bundle_membership.csv missing for domain '{domain}', skipping: {membership_csv_path}",
             file=sys.stderr,
         )
-        return [], [], [], 0, 0, 0, 0
+        return [], [], [], 0, 0, 0, 0, None
 
     bundles = _read_csv(bundles_csv_path)
-    if top_bundles is not None:
+    threshold_diag: Optional[Dict[str, Any]] = None
+    if top_bundles_auto:
+        # Domain-specific cutoff, not a fixed N -- a domain with a thin,
+        # obvious top tier keeps a couple of bundles; a domain with many
+        # comparably-supported bundles keeps most of them. See
+        # _compute_domain_bundle_threshold for the method.
+        threshold_diag = _compute_domain_bundle_threshold(bundles)
+        bundles = _apply_bundle_threshold(bundles, threshold_diag)
+        threshold_diag["n_bundles_after"] = len(bundles)
+        print(
+            f"[top-bundles-auto] domain={domain} method={threshold_diag['method']} "
+            f"break_value={threshold_diag['break_value']} "
+            f"bundles_before={threshold_diag['n_bundles_before']} "
+            f"bundles_after={threshold_diag['n_bundles_after']}",
+            file=sys.stderr,
+        )
+    elif top_bundles is not None:
         bundles = [r for r in bundles if _int_safe(r.get("bundle_rank", "")) <= top_bundles]
 
     membership_rows = _read_csv(membership_csv_path)
@@ -408,6 +525,7 @@ def _process_domain(
         len(inventory_rows),
         len(seen_jh_items),
         len(seen_jh_names),
+        threshold_diag,
     )
 
 
@@ -429,6 +547,12 @@ _SETTINGS_FIELDS: Tuple[str, ...] = (
 
 _NAMES_FIELDS: Tuple[str, ...] = (
     "segment_id", "domain", "join_hash", "label_v", "label_q", "files_count",
+)
+
+_THRESHOLDS_FIELDS: Tuple[str, ...] = (
+    "segment_id", "domain", "purge_view", "method", "break_value",
+    "n_bundles_before", "n_bundles_after", "n_distinct_values",
+    "source_value_min", "source_value_max",
 )
 
 
@@ -458,12 +582,26 @@ def main() -> None:
         choices=["all", "used"],
         help="Bundle analysis subdir to read (default: all)",
     )
-    ap.add_argument(
+    top_bundles_group = ap.add_mutually_exclusive_group()
+    top_bundles_group.add_argument(
         "--top-bundles",
         type=int,
         default=None,
         metavar="N",
-        help="Emit only bundles where bundle_rank <= N (default: emit all)",
+        help="Emit only bundles where bundle_rank <= N (default: emit all). "
+        "Mutually exclusive with --top-bundles-auto.",
+    )
+    top_bundles_group.add_argument(
+        "--top-bundles-auto",
+        action="store_true",
+        help="Emit only bundles whose support_pct clears a domain-specific Jenks "
+        "natural-breaks cutoff (pooled across all scopes in the domain), instead "
+        "of a fixed rank cutoff -- a domain with an obvious thin top tier keeps "
+        "few bundles, a domain with many comparably-supported bundles keeps most. "
+        "Falls back to emitting all bundles for a domain when there are fewer "
+        "than 4 distinct support_pct values to break on. Diagnostics written to "
+        "bundle_selection_thresholds.csv in --out-dir. Mutually exclusive with "
+        "--top-bundles.",
     )
     args = ap.parse_args()
 
@@ -490,6 +628,7 @@ def main() -> None:
     all_inventory: List[Dict[str, str]] = []
     all_settings: List[Dict[str, str]] = []
     all_names: List[Dict[str, str]] = []
+    all_thresholds: List[Dict[str, str]] = []
 
     total_domains = 0
     total_bundles = 0
@@ -498,7 +637,7 @@ def main() -> None:
     total_jh_names = 0
 
     for domain in domains:
-        inv, sett, names, nb, np_, jhi, jhn = _process_domain(
+        inv, sett, names, nb, np_, jhi, jhn, threshold_diag = _process_domain(
             segment_id=segment_id,
             domain=domain,
             purge_view=args.purge_view,
@@ -508,6 +647,7 @@ def main() -> None:
             identity_items_dir=identity_items_dir,
             label_synth_dir=label_synth_dir,
             top_bundles=args.top_bundles,
+            top_bundles_auto=args.top_bundles_auto,
         )
         if not inv and not sett and not names and nb == 0:
             # Domain was skipped (warning already printed to stderr)
@@ -520,11 +660,34 @@ def main() -> None:
         total_patterns += np_
         total_jh_items += jhi
         total_jh_names += jhn
+        if threshold_diag is not None:
+            all_thresholds.append(
+                {
+                    "segment_id": segment_id,
+                    "domain": domain,
+                    "purge_view": args.purge_view,
+                    "method": threshold_diag["method"],
+                    "break_value": (
+                        "" if threshold_diag["break_value"] is None else f"{threshold_diag['break_value']:.6f}"
+                    ),
+                    "n_bundles_before": str(threshold_diag["n_bundles_before"]),
+                    "n_bundles_after": str(threshold_diag.get("n_bundles_after", threshold_diag["n_bundles_before"])),
+                    "n_distinct_values": str(threshold_diag["n_distinct_values"]),
+                    "source_value_min": (
+                        "" if threshold_diag["source_value_min"] is None else f"{threshold_diag['source_value_min']:.6f}"
+                    ),
+                    "source_value_max": (
+                        "" if threshold_diag["source_value_max"] is None else f"{threshold_diag['source_value_max']:.6f}"
+                    ),
+                }
+            )
 
     out_dir.mkdir(parents=True, exist_ok=True)
     _atomic_write_csv(out_dir / "bundle_pattern_inventory.csv", _INVENTORY_FIELDS, all_inventory)
     _atomic_write_csv(out_dir / "pattern_settings.csv", _SETTINGS_FIELDS, all_settings)
     _atomic_write_csv(out_dir / "pattern_names.csv", _NAMES_FIELDS, all_names)
+    if args.top_bundles_auto:
+        _atomic_write_csv(out_dir / "bundle_selection_thresholds.csv", _THRESHOLDS_FIELDS, all_thresholds)
 
     print(
         f"Done. domains={total_domains} bundles={total_bundles} "

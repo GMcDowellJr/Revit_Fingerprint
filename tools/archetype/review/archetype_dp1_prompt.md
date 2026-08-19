@@ -33,7 +33,7 @@ For each candidate in `archetype_definitions_candidates.json`:
    - Keep all other fields from the candidate (signals, join_hash, top_join_hash_pairs, etc.) unchanged.
    - Use the wrapper format: `{ "schema_version": "1.0", "generated_utc": "...", "source": "...", "archetype_count": N, "archetypes": [...] }`
 
-## Known skip conditions (from corpus experience)
+## Known skip conditions (from corpus experience -- verify these values and report if now eligbile for use)
 - Any signal involving `object_styles_model.material__materials` with `_coverage_pct = 0.0` — deferred pending materials join_hash PR.
 - `vfd__wall_types.do_not_edit_acoustic_batts`, `partition_series`, `all_model_manufacturer`, `all_model_instance_comments` — coverage ≤ 1.6%, custom/niche parameters.
 - `vfd__roof_types.fire_label__4adcd90c` — 3.5% coverage, low jaccard.

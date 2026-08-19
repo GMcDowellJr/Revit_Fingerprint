@@ -67,39 +67,56 @@ python tools/compare_cross_segment.py `
 	--records-dir "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\records" `
 	--out-dir "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment"
 
+python tools/governance_relationships.py --file-meta "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\records\file_metadata.csv" --out-dir "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\records"
 
-python "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\generate_governance_narrative.py" `
-	--summary "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\cross_segment_summary.csv" `
-	--pooled "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\cross_segment_pooled.csv" `
-	--governance-states "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\cross_segment_governance_states.csv" `
-	--governance-state-summary "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\cross_segment_governance_state_summary.csv" `
-	--delta "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\cross_segment_delta.csv" `
-	--file-meta "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\records\file_metadata.csv" `
-	--union-inventory "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\cross_segment_union_inventory.csv" `
-	--reuse-distribution "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\pattern_reuse_distribution.csv" `
-	--matrix-manifest "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\matrix_output_manifest.csv" `
-	--package-schema-version 3.0 `
-	--segment-manifest "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\records\segment_manifest.csv" `
-	--reuse-by-client                    "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\pattern_reuse_summary_by_client.csv" `
-	--project-union-jaccard-matrix       "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\project_union_jaccard_matrix.csv" `
-	--project-density-similarity-matrix  "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\project_density_similarity_matrix.csv" `
-	--project-pool-containment-matrix    "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\project_pool_containment_similarity_matrix.csv" `
-	--project-fragmentation-diagnostic   "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\project_fragmentation_diagnostic.csv" `
-	--out "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\governance_narrative"
+-----
 
+$fpData = "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data"
+$repo   = "C:\Users\gmcdowell\Documents\Revit_Fingerprint"
 
+$ggnArgs = @(
+    "--summary", "$fpData\cross_segment\cross_segment_summary.csv"
+    "--pooled", "$fpData\cross_segment\cross_segment_pooled.csv"
+    "--segment-manifest", "$fpData\records\segment_manifest.csv"
+    "--governance-states", "$fpData\cross_segment\cross_segment_governance_states.csv"
+    "--governance-state-summary", "$fpData\cross_segment\cross_segment_governance_state_summary.csv"
+    "--delta", "$fpData\cross_segment\cross_segment_delta.csv"
+    "--file-meta", "$fpData\records\file_metadata.csv"
+    "--client-sector", "$repo\policies\client_sector.csv"
+    "--union-inventory", "$fpData\cross_segment\cross_segment_union_inventory.csv"
+    "--comparison-registry", "$fpData\cross_segment\comparison_registry.csv"
+    "--reuse-distribution", "$fpData\cross_segment\pattern_reuse_distribution.csv"
+    "--matrix-manifest", "$fpData\cross_segment\matrix_output_manifest.csv"
+    "--reuse-by-client", "$fpData\cross_segment\pattern_reuse_summary_by_client.csv"
+    "--project-union-jaccard-matrix", "$fpData\cross_segment\project_union_jaccard_matrix.csv"
+    "--project-density-similarity-matrix", "$fpData\cross_segment\project_density_similarity_matrix.csv"
+    "--project-pool-containment-matrix", "$fpData\cross_segment\project_pool_containment_similarity_matrix.csv"
+    "--project-fragmentation-diagnostic", "$fpData\cross_segment\project_fragmentation_diagnostic.csv"
+    "--governance-bc-client-matrix", "$fpData\records\governance_bc_client_matrix.csv"
+    "--governance-client-bc-matrix", "$fpData\records\governance_client_bc_matrix.csv"
+    "--policy-dir", "$repo\policies\governance"
+    "--package-schema-version", "1.0"
+    "--emit-evidence-package"
+    "--emit-interpretation-layer"
+    "--out", "$fpData\governance_narrative"
+    "--date", "2026-08-19"
+)
 
+python "$repo\tools\generate_governance_narrative.py" @ggnArgs
+
+----
 
 
 cd "C:\Users\gmcdowell\Documents\Revit_Fingerprint"
 python tools/export_bundle_pattern_detail.py `
-	--output-folder imperial_project_sutter `
-	--segments-root C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\segments `
-	--records-dir C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\results\records `
-	--out-dir C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\pattern_detail `
-	--purge-view all `
-	--top-bundles 2
-
+    --output-folder imperial_project_architectural_2014 `
+    --segments-root "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\segments" `
+    --records-dir "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\records" `
+    --out-dir "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\pattern_detail\imperial_project_architectural_2014" `
+    --purge-view all `
+    --top-bundles-auto
+	
+	
 python "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\acc_scan_dc.py"  `
 	--root "C:\Users\gmcdowell\DC\ACCDocs\Herrero Builders" `
 	--out "C:\Users\gmcdowell\Documents\Fingerprint_Out\acc_herroro_manifest.csv"
@@ -109,8 +126,8 @@ python "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\acc_sync_dc.py"  `
 	
 
 python "C:\Users\gmcdowell\Documents\Revit_Fingerprint\tools\analyze_promotion_candidates.py" `
-	--root "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment"
-	--output C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\promotion_candidate_analysis"
-	--enable-semantic-noise-filter
-	--esport-top 10
+	--root "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment" `
+	--output "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data\cross_segment\promotion_candidate_analysis" `
+	--enable-semantic-noise-filter `
+	--export-top 10 `
 	--verbose
