@@ -1,7 +1,7 @@
 {
   "profile_id": "anomaly-thresholds-v1",
   "schema_version": "0.1",
-  "notes": "Materiality thresholds consumed by tools/generate_governance_narrative.py's detect_anomalies() (notable_anomalies text in governance_domain_summary.csv), render_findings_and_recommendations()'s phases check, _passive_inheritance_risk_domains(), and _shape_note() (Project Portfolio density-similarity section). Values here reproduce the generator's own pre-externalization Python literals exactly (see docs/governance_evidence_package.md and DECISIONS.md D-029) -- this profile does not change any anomaly-note, tier, or CSV column output by itself. phases_tp_extension_max/phases_tw_min are read from this single profile by both detect_anomalies() and render_findings_and_recommendations(), which previously duplicated the same two literals independently. passive_inheritance_risk_bundle_share_max is a separate profile from governance_thresholds.json's passive_material_threshold even though their default values currently coincide -- the two gate different code paths (bundle-density fallback signal vs. explicit governance-state passive share) and must be independently editable. _passive_inheritance_risk_domains()'s dual-schema branch reads governance_thresholds.json's passive_material_threshold directly, not a key in this profile -- see this generator's own _DEFAULT_PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX comment.",
+  "notes": "Materiality thresholds consumed by tools/generate_governance_narrative.py's detect_anomalies() (notable_anomalies text in governance_domain_summary.csv), render_findings_and_recommendations()'s phases check, _passive_inheritance_risk_domains(), _shape_note() (Project Portfolio density-similarity section), and build_union_breadth_by_domain()/detect_anomalies()'s union-inventory-derived reuse-breadth exception check. Values here reproduce the generator's own pre-externalization Python literals exactly where a prior literal existed (see docs/governance_evidence_package.md and DECISIONS.md D-029) -- this profile does not change any anomaly-note, tier, or CSV column output by itself. phases_tp_extension_max/phases_tw_min are read from this single profile by both detect_anomalies() and render_findings_and_recommendations(), which previously duplicated the same two literals independently. passive_inheritance_risk_bundle_share_max is a separate profile from governance_thresholds.json's passive_material_threshold even though their default values currently coincide -- the two gate different code paths (bundle-density fallback signal vs. explicit governance-state passive share) and must be independently editable. _passive_inheritance_risk_domains()'s dual-schema branch reads governance_thresholds.json's passive_material_threshold directly, not a key in this profile -- see this generator's own _DEFAULT_PASSIVE_INHERITANCE_RISK_BUNDLE_SHARE_MAX comment. The union_breadth_* keys (D-033) have no prior Python literal to reproduce -- new functionality, not an externalization of pre-existing behavior; see this generator's own _DEFAULT_UNION_BREADTH_* comment for the rationale behind each default.",
   "thresholds": {
     "provided_carried_downstream_min": 0.75,
     "provided_active_use_max": 0.75,
@@ -26,6 +26,15 @@
     "phases_tw_min": 0.80,
 
     "portfolio_shape_density_min": 0.8,
-    "portfolio_shape_union_jaccard_max": 0.3
+    "portfolio_shape_union_jaccard_max": 0.3,
+
+    "union_breadth_corpus_wide_clients_pct_min": 0.90,
+    "union_breadth_client_wide_clients_pct_min": 0.50,
+    "union_breadth_project_wide_min_projects": 2,
+    "union_breadth_file_level_max_files": 1,
+    "union_breadth_broad_min_patterns": 1,
+    "union_breadth_narrow_file_level_share_min": 0.5,
+    "union_breadth_weak_cascade_max": 0.40,
+    "union_breadth_strong_cascade_min": 0.75
   }
 }

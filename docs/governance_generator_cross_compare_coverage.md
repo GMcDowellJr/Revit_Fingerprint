@@ -35,14 +35,19 @@ It optionally consumes:
   `--project-fragmentation-diagnostic`) feed the new **Project Portfolio**
   section, kept outside `assign_tier()`/`governance_domain_summary.csv` per
   the reporting guardrails below.
+- `comparison_registry.csv` via `--comparison-registry` (D-032), for the
+  **Input Completeness / Staleness** note near Analytical Notes and
+  `governance_package_health.json`'s `comparison_completeness` field --
+  never embedded/reproduced in the output package, only derived
+  present/missing/stale counts are.
 
 ## Cross-segment outputs still absent or under-used
 
 | Cross-segment output | Current generator coverage | Recommended inclusion point | Why it belongs there |
 |---|---|---|---|
-| `comparison_registry.csv` | Not consumed. | Add optional `--comparison-registry`; render an **Input Completeness / Staleness** note near Analytical Notes and block or warn when expected segment/domain pairs are missing or stale. | The narrative currently treats missing rows as weak evidence, but the registry can distinguish actual weak evidence from not-run/stale comparisons. |
+| `comparison_registry.csv` | Consumed via optional `--comparison-registry` (D-032), rendering an **Input Completeness / Staleness** note near Analytical Notes and `governance_package_health.json`'s `comparison_completeness` field. | Done. | The narrative previously treated missing rows as weak evidence with no way to distinguish actual weak evidence from not-run/stale comparisons. |
 | `cross_segment_file_pairs.csv` | Not consumed. | Usually keep out of the top-level narrative; use only for drill-through appendix links or a generated review pack for domains flagged by anomalies. | It is too large for leadership summary, but it is the best evidence trail when a tier or anomaly needs file-level audit. |
-| `cross_segment_union_inventory.csv` | Partially consumed only to count blocked project domains when manifest metadata exists. | Extend the domain summary CSV with corpus-wide/project/client/file breadth fields and use it to annotate tier confidence. | It reports pattern prevalence across files/projects/clients, which pairwise Jaccard cannot express. |
+| `cross_segment_union_inventory.csv` | Consumed for blocked-project-domain counting when manifest metadata exists, and (D-033) for `governance_domain_summary.csv`'s corpus-wide/client-wide/project-wide/file-level breadth columns plus `detect_anomalies()`'s broad-reuse/weak-cascade and narrow-reuse/strong-cascade exception notes. | Done. | It reports pattern prevalence across files/projects/clients, which pairwise Jaccard cannot express. |
 | `cross_segment_delta.csv` | Consumed only as fallback if governance-state summaries are not supplied. | Keep as fallback; do not blend with governance-state outputs unless rendered as a separate legacy-comparison appendix. | Governance-state rows supersede delta for provided/local/missing interpretation; mixing both can double-count the same drift signal. |
 | `pattern_reuse_distribution.csv` | Consumed for a top-20 bucket table by domain. | Add domain-level reuse-breadth metrics to `governance_domain_summary.csv` and call out domains with high `corpus_wide`/`client_wide` reuse but weak formal cascade. | This identifies natural standards candidates that are broadly reused even when template propagation is weak. |
 | `pattern_reuse_summary_by_domain.csv` | Not consumed -- deliberate scoping decision, not a gap. | Do not wire in: its `n_patterns` duplicates the corpus-wide reuse signal the distinct-pattern table (sourced from `pattern_reuse_distribution.csv`) already reports. | Evaluated and confirmed to add no new signal beyond what the existing distinct-pattern dedup table already provides. |
@@ -56,16 +61,17 @@ It optionally consumes:
 
 ## Suggested implementation sequence
 
-1. **Completeness first:** add `--comparison-registry` and an input completeness
-   section before making additional governance claims from missing rows.
+1. **Completeness first:** done (D-032) -- `--comparison-registry` and an
+   **Input Completeness / Staleness** section were added before further
+   governance claims from missing rows.
 2. **Cheap compact reuse:** ~~add `--reuse-summary-by-domain` and~~
    `--reuse-by-client` -- done, as an additive adoption-breadth cut alongside
    the existing distinct-pattern table. `--reuse-summary-by-domain` was
    evaluated and deliberately not added (see the table above).
-3. **Domain confidence enrichment:** add union-inventory-derived breadth columns to
-   `governance_domain_summary.csv`, then render only the strongest narrative
-   exceptions: broad natural reuse but weak formal cascade, or narrow reuse but
-   strong cascade. (Still open.)
+3. **Domain confidence enrichment:** done (D-033) -- union-inventory-derived
+   breadth columns were added to `governance_domain_summary.csv`, and only
+   the strongest narrative exceptions render: broad natural reuse but weak
+   formal cascade, or narrow reuse but strong cascade.
 4. **Project/portfolio matrix section:** done -- the **Project Portfolio**
    section consumes `project_union_jaccard_matrix.csv`,
    `project_density_similarity_matrix.csv`,

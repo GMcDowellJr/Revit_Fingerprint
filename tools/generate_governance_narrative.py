@@ -1761,6 +1761,39 @@ PORTFOLIO_SHAPE_DENSITY_MIN = _DEFAULT_PORTFOLIO_SHAPE_DENSITY_MIN
 PORTFOLIO_SHAPE_UNION_JACCARD_MAX = _DEFAULT_PORTFOLIO_SHAPE_UNION_JACCARD_MAX
 
 
+# Union-inventory-derived domain confidence enrichment thresholds (D-033).
+# build_union_breadth_by_domain() classifies each cross_segment_union_inventory.csv
+# pattern (join_hash) into exactly one breadth tier -- corpus_wide > client_wide
+# > project_wide > file_level > unclassified, highest-qualifying tier wins --
+# using the four _*_MIN/_MAX keys below; the remaining four gate the new
+# detect_anomalies() exception category (broad reuse despite weak cascade, or
+# narrow reuse despite strong cascade). No prior Python literal exists for any
+# of these (new functionality, not an externalization of pre-existing
+# behavior) -- values are this phase's own initial defaults, editable via
+# policies/governance/anomaly_thresholds.json like every other key in that
+# profile. Kept independent of governance_thresholds.json's tier-assignment
+# thresholds (TIER_STRONG_BASELINE_MIN etc.) even where a value could
+# numerically coincide, since this check gates a narrower narrative exception,
+# not governance_tier itself.
+_DEFAULT_UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN = 0.90
+_DEFAULT_UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN = 0.50
+_DEFAULT_UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS = 2
+_DEFAULT_UNION_BREADTH_FILE_LEVEL_MAX_FILES = 1
+_DEFAULT_UNION_BREADTH_BROAD_MIN_PATTERNS = 1
+_DEFAULT_UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN = 0.5
+_DEFAULT_UNION_BREADTH_WEAK_CASCADE_MAX = 0.40
+_DEFAULT_UNION_BREADTH_STRONG_CASCADE_MIN = 0.75
+
+UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN = _DEFAULT_UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN
+UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN = _DEFAULT_UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN
+UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS = _DEFAULT_UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS
+UNION_BREADTH_FILE_LEVEL_MAX_FILES = _DEFAULT_UNION_BREADTH_FILE_LEVEL_MAX_FILES
+UNION_BREADTH_BROAD_MIN_PATTERNS = _DEFAULT_UNION_BREADTH_BROAD_MIN_PATTERNS
+UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN = _DEFAULT_UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN
+UNION_BREADTH_WEAK_CASCADE_MAX = _DEFAULT_UNION_BREADTH_WEAK_CASCADE_MAX
+UNION_BREADTH_STRONG_CASCADE_MIN = _DEFAULT_UNION_BREADTH_STRONG_CASCADE_MIN
+
+
 # ── policy externalization: default profiles + runtime application ─────────
 #
 # _POLICY_DEFAULTS mirrors policies/governance/*.json exactly, built from the
@@ -1863,6 +1896,14 @@ _POLICY_DEFAULTS = {
             "phases_tw_min": _DEFAULT_PHASES_TW_MIN,
             "portfolio_shape_density_min": _DEFAULT_PORTFOLIO_SHAPE_DENSITY_MIN,
             "portfolio_shape_union_jaccard_max": _DEFAULT_PORTFOLIO_SHAPE_UNION_JACCARD_MAX,
+            "union_breadth_corpus_wide_clients_pct_min": _DEFAULT_UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN,
+            "union_breadth_client_wide_clients_pct_min": _DEFAULT_UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN,
+            "union_breadth_project_wide_min_projects": _DEFAULT_UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS,
+            "union_breadth_file_level_max_files": _DEFAULT_UNION_BREADTH_FILE_LEVEL_MAX_FILES,
+            "union_breadth_broad_min_patterns": _DEFAULT_UNION_BREADTH_BROAD_MIN_PATTERNS,
+            "union_breadth_narrow_file_level_share_min": _DEFAULT_UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN,
+            "union_breadth_weak_cascade_max": _DEFAULT_UNION_BREADTH_WEAK_CASCADE_MAX,
+            "union_breadth_strong_cascade_min": _DEFAULT_UNION_BREADTH_STRONG_CASCADE_MIN,
         },
     },
 }
@@ -1913,6 +1954,10 @@ def apply_governance_policy(policy: dict) -> None:
     global TP_TC_BYPASS_GAP_MIN, WEAK_TC_MAX, WEAK_CP_MAX
     global VIEW_TEMPLATE_ZERO_DISCIPLINE_MAX, PHASES_TP_EXTENSION_MAX, PHASES_TW_MIN
     global PORTFOLIO_SHAPE_DENSITY_MIN, PORTFOLIO_SHAPE_UNION_JACCARD_MAX
+    global UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN, UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN
+    global UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS, UNION_BREADTH_FILE_LEVEL_MAX_FILES
+    global UNION_BREADTH_BROAD_MIN_PATTERNS, UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN
+    global UNION_BREADTH_WEAK_CASCADE_MAX, UNION_BREADTH_STRONG_CASCADE_MIN
 
     LOADED_GOVERNANCE_POLICY = policy
     profiles = policy["profiles"]
@@ -2001,6 +2046,26 @@ def apply_governance_policy(policy: dict) -> None:
     PHASES_TW_MIN = at_("phases_tw_min", _DEFAULT_PHASES_TW_MIN)
     PORTFOLIO_SHAPE_DENSITY_MIN = at_("portfolio_shape_density_min", _DEFAULT_PORTFOLIO_SHAPE_DENSITY_MIN)
     PORTFOLIO_SHAPE_UNION_JACCARD_MAX = at_("portfolio_shape_union_jaccard_max", _DEFAULT_PORTFOLIO_SHAPE_UNION_JACCARD_MAX)
+    UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN = at_(
+        "union_breadth_corpus_wide_clients_pct_min", _DEFAULT_UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN
+    )
+    UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN = at_(
+        "union_breadth_client_wide_clients_pct_min", _DEFAULT_UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN
+    )
+    UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS = at_(
+        "union_breadth_project_wide_min_projects", _DEFAULT_UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS
+    )
+    UNION_BREADTH_FILE_LEVEL_MAX_FILES = at_(
+        "union_breadth_file_level_max_files", _DEFAULT_UNION_BREADTH_FILE_LEVEL_MAX_FILES
+    )
+    UNION_BREADTH_BROAD_MIN_PATTERNS = at_(
+        "union_breadth_broad_min_patterns", _DEFAULT_UNION_BREADTH_BROAD_MIN_PATTERNS
+    )
+    UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN = at_(
+        "union_breadth_narrow_file_level_share_min", _DEFAULT_UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN
+    )
+    UNION_BREADTH_WEAK_CASCADE_MAX = at_("union_breadth_weak_cascade_max", _DEFAULT_UNION_BREADTH_WEAK_CASCADE_MAX)
+    UNION_BREADTH_STRONG_CASCADE_MIN = at_("union_breadth_strong_cascade_min", _DEFAULT_UNION_BREADTH_STRONG_CASCADE_MIN)
 
 
 def _state_value(state: Optional[dict], key: str) -> Optional[float]:
@@ -2113,7 +2178,8 @@ TIER_ORDER = {
 }
 
 
-def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[str]:
+def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None,
+                      union_breadth: Optional[dict] = None) -> list[str]:
     notes = []
     tc, cp, tp = d["tc"], d["cp"], d["tp"]
     xc = d["xc"]
@@ -2308,6 +2374,37 @@ def detect_anomalies(dom: str, d: dict, state: Optional[dict] = None) -> list[st
             notes.append(DOMAIN_GUIDANCE["phases"])
     if dom == "loaded_family_types" and "loaded_family_types" in DOMAIN_GUIDANCE:
         notes.append(DOMAIN_GUIDANCE["loaded_family_types"])
+
+    # Union-inventory-derived domain confidence enrichment (D-033). Only the
+    # strongest exceptions render -- per docs/governance_generator_cross_compare_coverage.md's
+    # own guardrail, this must not become a per-domain dump of raw breadth
+    # numbers. The two conditions are checked as an if/elif (mutually
+    # exclusive): a domain in the gap between UNION_BREADTH_WEAK_CASCADE_MAX
+    # and UNION_BREADTH_STRONG_CASCADE_MIN, or with unremarkable breadth,
+    # triggers neither.
+    if union_breadth:
+        primary = tp if tp is not None else cp
+        total = union_breadth.get("total", 0)
+        broad = union_breadth.get("corpus_wide", 0) + union_breadth.get("client_wide", 0)
+        file_level = union_breadth.get("file_level", 0)
+        if primary is not None and broad >= UNION_BREADTH_BROAD_MIN_PATTERNS and primary < UNION_BREADTH_WEAK_CASCADE_MAX:
+            notes.append(
+                f"Broad natural reuse ({broad} corpus-wide/client-wide pattern(s) of {total} "
+                f"in cross_segment_union_inventory.csv) despite weak formal cascade (primary "
+                f"containment = {pct(primary)}). This domain may be a natural-standard "
+                "candidate the cascade metrics alone would miss."
+            )
+        elif (
+            primary is not None and total > 0
+            and file_level / total >= UNION_BREADTH_NARROW_FILE_LEVEL_SHARE_MIN
+            and primary >= UNION_BREADTH_STRONG_CASCADE_MIN
+        ):
+            notes.append(
+                f"Narrow natural reuse ({file_level} of {total} patterns are file-level/singleton "
+                f"in cross_segment_union_inventory.csv) despite strong formal cascade (primary "
+                f"containment = {pct(primary)}). Formal propagation may be fragile — review "
+                "whether reuse is broader than the union inventory currently shows."
+            )
     return notes
 
 def build_client_summary(
@@ -3287,7 +3384,8 @@ For directed governance comparisons, the analysis separates three questions:
 
 
 
-def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> str:
+def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None,
+                         union_breadth_by_domain: Optional[dict] = None) -> str:
     # Sort domains by DoD-safe governance classification then score.
     state_summary = state_summary or {}
     scored = []
@@ -3434,7 +3532,7 @@ def render_domain_tiers(cascade: dict, state_summary: Optional[dict] = None) -> 
         sections.append("")
 
         for dom, d, state in group:
-            notes = detect_anomalies(dom, d, state)
+            notes = detect_anomalies(dom, d, state, (union_breadth_by_domain or {}).get(dom))
             if notes:
                 label = DOMAIN_LABELS.get(dom, dom)
                 sections.append(f"**{label}:** " + " ".join(notes) + "\n")
@@ -4087,6 +4185,63 @@ def render_delta_section(delta_summary: dict) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+_UNION_BREADTH_TIERS = ("corpus_wide", "client_wide", "project_wide", "file_level", "unclassified")
+
+
+def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
+    """Per-domain reuse-breadth pattern counts derived from
+    cross_segment_union_inventory.csv's own presence-percentage columns
+    (D-033) -- corpus-wide/client-wide/project-wide/file-level pattern
+    counts, following the same corpus_wide/client_wide/... vocabulary
+    already rendered from pattern_reuse_distribution.csv in
+    render_union_reuse_summary()'s "Reuse breadth summary" table above, but
+    computed independently from union inventory's own pct_clients_present/
+    n_projects_present/n_files_present fields -- that file carries no
+    reuse_bucket column of its own (UNION_INVENTORY_FIELDS in
+    compare_cross_segment.py), unlike pattern_reuse_distribution.csv
+    (REUSE_DISTRIBUTION_FIELDS).
+
+    Restricted to governance_role == "Project", view_scope == "all" rows,
+    to avoid double-counting a pattern once per view scope and to keep this
+    a presence/reuse-breadth question (all-view), not an active-use one.
+
+    Each pattern (join_hash, within a domain) is classified into exactly
+    one, highest-qualifying tier -- corpus_wide > client_wide > project_wide
+    > file_level > unclassified -- mirroring the bucket_priority pattern
+    already used above for pattern_reuse_distribution.csv rows.
+    """
+    pattern_tier: dict = {}
+    for row in union_inventory_rows:
+        if row.get("governance_role") != "Project":
+            continue
+        if row.get("view_scope") != "all":
+            continue
+        domain = row.get("domain", "")
+        join_hash = row.get("join_hash", "")
+        if not domain or not join_hash:
+            continue
+        pct_clients = pf(row.get("pct_clients_present"))
+        n_projects = pf(row.get("n_projects_present"))
+        n_files = pf(row.get("n_files_present"))
+        if pct_clients is not None and pct_clients >= UNION_BREADTH_CORPUS_WIDE_CLIENTS_PCT_MIN:
+            tier = "corpus_wide"
+        elif pct_clients is not None and pct_clients >= UNION_BREADTH_CLIENT_WIDE_CLIENTS_PCT_MIN:
+            tier = "client_wide"
+        elif n_projects is not None and n_projects >= UNION_BREADTH_PROJECT_WIDE_MIN_PROJECTS:
+            tier = "project_wide"
+        elif n_files is not None and n_files <= UNION_BREADTH_FILE_LEVEL_MAX_FILES:
+            tier = "file_level"
+        else:
+            tier = "unclassified"
+        pattern_tier[(domain, join_hash)] = tier
+
+    by_domain: dict = defaultdict(lambda: {t: 0 for t in _UNION_BREADTH_TIERS} | {"total": 0})
+    for (domain, _join_hash), tier in pattern_tier.items():
+        by_domain[domain][tier] += 1
+        by_domain[domain]["total"] += 1
+    return dict(by_domain)
 
 
 def render_union_reuse_summary(
@@ -5155,7 +5310,58 @@ def render_findings_and_recommendations(
     return "\n".join(lines)
 
 
-def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_state_outputs: bool = False) -> str:
+def build_comparison_completeness(summary_rows: list, comparison_registry_rows: list) -> dict:
+    """Per-domain counts of expected (segment_id_a, segment_id_b,
+    comparison_type) pairs -- drawn from cross_segment_summary.csv, since
+    every row there is itself proof a comparison ran and produced evidence
+    -- that have a matching comparison_registry.csv entry ("present"), no
+    matching entry ("missing"), or a matching entry whose computed_utc
+    predates the summary row's own executed_utc ("stale": the registry
+    snapshot is older than the evidence it should be describing).
+
+    Self-contained: uses only comparison_registry.csv's own identity
+    (segment_id_a/b, comparison_type, domain) and recency (computed_utc)
+    fields against cross_segment_summary.csv's matching identity/executed_utc
+    fields (D-032). This generator has no access to compare_cross_segment.py's
+    live segment registry (run_registry.csv's population_hash/last_run_utc),
+    so this is a narrower, narrative-side proxy for staleness than
+    comparison_is_stale() computes there -- it answers "is this registry
+    snapshot older than the evidence it should describe," not "has the
+    underlying segment population changed since this pair was computed."
+    """
+    registry_index: dict = {}
+    for row in comparison_registry_rows:
+        key = (
+            row.get("segment_id_a", ""), row.get("segment_id_b", ""),
+            row.get("comparison_type", ""), row.get("domain", ""),
+        )
+        registry_index[key] = row
+
+    by_domain: dict = defaultdict(lambda: {"total": 0, "present": 0, "missing": 0, "stale": 0})
+    for row in summary_rows:
+        domain = row.get("domain", "")
+        if not domain:
+            continue
+        key = (
+            row.get("segment_id_a", ""), row.get("segment_id_b", ""),
+            row.get("comparison_type", ""), domain,
+        )
+        counts = by_domain[domain]
+        counts["total"] += 1
+        registry_row = registry_index.get(key)
+        if registry_row is None:
+            counts["missing"] += 1
+            continue
+        counts["present"] += 1
+        computed_utc = registry_row.get("computed_utc", "")
+        executed_utc = row.get("executed_utc", "")
+        if computed_utc and executed_utc and computed_utc < executed_utc:
+            counts["stale"] += 1
+    return dict(by_domain)
+
+
+def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_state_outputs: bool = False,
+                        comparison_completeness: Optional[dict] = None) -> str:
     used_fallback_note = (
         "\n- **Used-view fallback:** Used-view columns were not found in the summary schema. Where legacy columns are reused as fallback, active-use conclusions are limited and should be confirmed with dual-view outputs."
         if legacy_used_fallback else ""
@@ -5183,6 +5389,38 @@ def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_sta
         )
     else:
         excluded_note = "- **Excluded domains:** none for this run's policy profile."
+
+    completeness_section = ""
+    if comparison_completeness:
+        total_checked = sum(c["total"] for c in comparison_completeness.values())
+        completeness_lines = [
+            "\n\n### Input Completeness / Staleness\n",
+            "Per-domain count of expected segment/domain comparison pairs (from "
+            "`cross_segment_summary.csv`) present in, missing from, or stale "
+            "relative to `comparison_registry.csv` -- distinguishes genuinely "
+            "weak evidence from a comparison that was never run or is out of "
+            "date. Registry content itself is never reproduced here; see "
+            "`governance_evidence_map.json`'s `comparison_registry` entry for "
+            "a drill-down pointer.\n",
+        ]
+        flagged = sorted(
+            ((dom, c) for dom, c in comparison_completeness.items() if c["missing"] or c["stale"]),
+            key=lambda item: (-(item[1]["missing"] + item[1]["stale"]), item[0]),
+        )
+        if flagged:
+            completeness_lines.append("| domain | present | missing | stale |")
+            completeness_lines.append("|---|---:|---:|---:|")
+            for dom, c in flagged[:20]:
+                completeness_lines.append(f"| {dom} | {c['present']} | {c['missing']} | {c['stale']} |")
+            if len(flagged) > 20:
+                completeness_lines.append(f"\nTable limited to 20 domains; {len(flagged) - 20} domains not shown.")
+        else:
+            completeness_lines.append(
+                f"No missing or stale comparison pairs across {total_checked} expected "
+                "segment/domain pair(s) checked -- every pair has a current registry entry.\n"
+            )
+        completeness_section = "\n".join(completeness_lines)
+
     return f"""---
 
 ## Analytical Notes and Limitations
@@ -5193,7 +5431,7 @@ def render_limitations(corpus: dict, legacy_used_fallback: bool = False, has_sta
 - **Imperial/metric split:** All project files are imperial. Metric templates and coordination files exist but metric projects are not yet represented. Metric findings are limited to template-to-container comparisons only.
 - **Scores are means across file pairs.** Individual files may score substantially higher or lower than reported means.
 - **Patterns are normalised configuration fingerprints** (join_hash values) capturing the behavioural identity of a configuration record, independent of Revit element IDs. Two files sharing a pattern have identical or functionally equivalent configuration for that element.
-{excluded_note}{used_fallback_note}{state_note}
+{excluded_note}{used_fallback_note}{state_note}{completeness_section}
 
 ---
 
@@ -5390,6 +5628,12 @@ def main():
                              "unclassified.")
     parser.add_argument("--union-inventory",
                         help="cross_segment_union_inventory.csv (optional)")
+    parser.add_argument("--comparison-registry",
+                        help="comparison_registry.csv (optional). Enables a per-domain "
+                             "Input Completeness / Staleness note near Analytical Notes, "
+                             "distinguishing a not-run/stale comparison from genuinely weak "
+                             "evidence (D-032). Never embedded/reproduced in the output "
+                             "package -- only derived present/missing/stale counts are.")
     parser.add_argument("--reuse-distribution",
                         help="pattern_reuse_distribution.csv (optional)")
     parser.add_argument("--matrix-manifest",
@@ -5529,6 +5773,11 @@ def main():
         print(f"Loading {args.union_inventory}...")
         union_inventory_rows = read_csv(Path(args.union_inventory))
 
+    comparison_registry_rows = []
+    if args.comparison_registry:
+        print(f"Loading {args.comparison_registry}...")
+        comparison_registry_rows = read_csv(Path(args.comparison_registry))
+
     reuse_distribution_rows = []
     if args.reuse_distribution:
         print(f"Loading {args.reuse_distribution}...")
@@ -5599,6 +5848,12 @@ def main():
         governance_state_rows, governance_state_summary_rows
     )
 
+    union_breadth_by_domain = build_union_breadth_by_domain(union_inventory_rows)
+
+    comparison_completeness = None
+    if args.comparison_registry:
+        comparison_completeness = build_comparison_completeness(summary_rows, comparison_registry_rows)
+
     delta_summary = {}
     if delta_rows:
         print("Summarising legacy delta patterns...")
@@ -5667,7 +5922,8 @@ def main():
             continue
         tier = assign_tier(d, governance_state_summary.get(dom))
         reliability = score_reliability(d)
-        anomalies = detect_anomalies(dom, d, governance_state_summary.get(dom))
+        union_breadth = union_breadth_by_domain.get(dom)
+        anomalies = detect_anomalies(dom, d, governance_state_summary.get(dom), union_breadth)
         domain_csv_rows.append({
             "domain": dom,
             "domain_label": DOMAIN_LABELS.get(dom, dom),
@@ -5729,6 +5985,17 @@ def main():
                 "local_unbundled_count": governance_state_summary.get(dom, {}).get("local_unbundled_count", ""),
                 "primary_governance_read": governance_state_summary.get(dom, {}).get("primary_governance_read", ""),
             },
+            # Union-inventory-derived reuse-breadth pattern counts (D-033) --
+            # additive only; blank when --union-inventory wasn't supplied or
+            # the domain has no Project/all-view rows there. See
+            # build_union_breadth_by_domain()'s own docstring for the
+            # corpus_wide > client_wide > project_wide > file_level tier
+            # classification these counts come from.
+            "union_reuse_patterns_total": union_breadth.get("total", "") if union_breadth else "",
+            "union_reuse_patterns_corpus_wide": union_breadth.get("corpus_wide", "") if union_breadth else "",
+            "union_reuse_patterns_client_wide": union_breadth.get("client_wide", "") if union_breadth else "",
+            "union_reuse_patterns_project_wide": union_breadth.get("project_wide", "") if union_breadth else "",
+            "union_reuse_patterns_file_level": union_breadth.get("file_level", "") if union_breadth else "",
             "notable_anomalies": " | ".join(anomalies) if anomalies else "",
         })
 
@@ -5834,7 +6101,7 @@ def main():
         render_header(args.date, corpus, bool(governance_state_summary), legacy_fallback),
         render_evidence_authority_header(args.package_schema_version, GENERATOR_IDENTITY, args.emit_evidence_package, args.emit_interpretation_layer),
         render_governance_state_model(bool(governance_state_summary)),
-        render_domain_tiers(cascade, governance_state_summary),
+        render_domain_tiers(cascade, governance_state_summary, union_breadth_by_domain),
     ]
     generic_scope_section = render_generic_baseline_scope_section(cascade)
     if generic_scope_section:
@@ -5876,7 +6143,7 @@ def main():
         sections.append(client_bc_distribution_section)
     sections += [
         render_findings_and_recommendations(cascade, client_rows, governance_state_summary, findings),
-        render_limitations(corpus, legacy_fallback, bool(governance_state_summary)),
+        render_limitations(corpus, legacy_fallback, bool(governance_state_summary), comparison_completeness),
     ]
 
     output = "\n\n".join(sections)
@@ -5909,6 +6176,17 @@ def main():
             "segment_manifest": Path(args.segment_manifest) if args.segment_manifest else None,
             "governance_bc_client_matrix": Path(args.governance_bc_client_matrix) if args.governance_bc_client_matrix else None,
             "governance_client_bc_matrix": Path(args.governance_client_bc_matrix) if args.governance_client_bc_matrix else None,
+            # Explicit override, else the same auto-detected-beside-summary
+            # default sibling_paths["comparison_registry"] uses below (D-032)
+            # -- one resolved path, tracked both as an input (this dict, for
+            # governance_package_health.json's required/optional-input
+            # "present" signal) and as an evidence-map artifact (sibling_paths,
+            # for governance_evidence_map.json navigation), so the two never
+            # disagree about which file "comparison_registry" means.
+            "comparison_registry": (
+                Path(args.comparison_registry) if args.comparison_registry
+                else Path(args.summary).parent / "comparison_registry.csv"
+            ),
         }
         input_required = {"cross_segment_summary": True, "cross_segment_pooled": True}
         input_roles = {
@@ -5930,6 +6208,7 @@ def main():
             "segment_manifest": "authoritative_deterministic_evidence",
             "governance_bc_client_matrix": "authoritative_deterministic_evidence",
             "governance_client_bc_matrix": "authoritative_deterministic_evidence",
+            "comparison_registry": "authoritative_deterministic_evidence",
         }
         input_present = {k: bool(v) and v.exists() for k, v in input_paths.items()}
 
@@ -6055,6 +6334,7 @@ def main():
             matrix_manifest_row_count=len(matrix_manifest_rows),
             matrix_names_seen=matrix_names_seen,
             policy_load_status=governance_policy["load_status"],
+            comparison_completeness=comparison_completeness,
         )
         write_json(out_dir / "governance_package_health.json", health)
 
@@ -6131,9 +6411,22 @@ def main():
             else Path(args.matrix_manifest) if args.matrix_manifest
             else Path(args.summary)
         )
+        # D-032: --comparison-registry, when explicitly supplied, overrides the
+        # auto-detected sibling path below -- the same "explicit override, else
+        # fall back to the anchor default" pattern _reuse_domain_anchor/
+        # _project_mean_pair_anchor already use above. Shared by both
+        # input_paths (drives governance_package_health.json's
+        # required_inputs/optional_inputs "present" signal) and sibling_paths
+        # (drives governance_evidence_map.json's artifact entry) below, so the
+        # two never disagree about which file "comparison_registry" means for
+        # this run.
+        _comparison_registry_path = (
+            Path(args.comparison_registry) if args.comparison_registry
+            else Path(args.summary).parent / "comparison_registry.csv"
+        )
         sibling_paths = {
             "file_pairs": Path(args.summary).parent / "cross_segment_file_pairs.csv",
-            "comparison_registry": Path(args.summary).parent / "comparison_registry.csv",
+            "comparison_registry": _comparison_registry_path,
             # D-024: the other two files this generator's own module docstring
             # names as "not yet consumed directly" (see above) -- both written
             # by compare_cross_segment.py's main(), anchored beside whichever

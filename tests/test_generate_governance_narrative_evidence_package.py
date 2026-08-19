@@ -232,7 +232,11 @@ _EXPECTED_DOMAIN_COLUMNS = [
     "provided_to_configured_containment", "provided_to_used_containment", "provided_passive_share",
     "provided_missing_share", "local_active_share", "provided_and_used_count",
     "provided_but_passive_count", "provided_but_missing_count", "local_active_count",
-    "local_passive_count", "local_unbundled_count", "primary_governance_read", "notable_anomalies",
+    "local_passive_count", "local_unbundled_count", "primary_governance_read",
+    "union_reuse_patterns_total", "union_reuse_patterns_corpus_wide",
+    "union_reuse_patterns_client_wide", "union_reuse_patterns_project_wide",
+    "union_reuse_patterns_file_level",
+    "notable_anomalies",
 ]
 
 _EXPECTED_CLIENT_COLUMNS = [

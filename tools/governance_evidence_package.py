@@ -263,6 +263,7 @@ def build_package_health(
     matrix_manifest_row_count: int,
     matrix_names_seen: list,
     policy_load_status: Optional[dict] = None,  # tools/governance_policy.py's load_status
+    comparison_completeness: Optional[dict] = None,  # D-032: build_comparison_completeness()'s result
 ) -> dict:
     """All text below is mechanical/factual only -- see module docstring.
 
@@ -272,6 +273,14 @@ def build_package_health(
     Omitted (None, the default) adds no policy-related warning, so a caller
     that hasn't adopted policy loading gets identical health output to
     before this parameter existed.
+
+    comparison_completeness: optional {domain: {"total":.., "present":..,
+    "missing":.., "stale":..}}, from generate_governance_narrative.py's
+    build_comparison_completeness() (D-032). Omitted (None, the default,
+    when --comparison-registry wasn't supplied) adds no
+    comparison_completeness key to the returned dict at all -- matching
+    every other optional-input field's "omit rather than blank-render"
+    convention in this module.
     """
     blocking_conditions = []
     missing_required = sorted(k for k, present in required_inputs.items() if not present)
@@ -346,7 +355,7 @@ def build_package_health(
     else:
         overall_status = "complete"
 
-    return {
+    health = {
         "schema_version": schema_version,
         "overall_status": overall_status,
         "required_inputs": required_inputs,
@@ -388,6 +397,9 @@ def build_package_health(
         "blocking_conditions": blocking_conditions,
         "warnings": warnings,
     }
+    if comparison_completeness is not None:
+        health["comparison_completeness"] = comparison_completeness
+    return health
 
 
 # ── evidence map ──────────────────────────────────────────────────────────────
@@ -919,23 +931,33 @@ def build_evidence_map(
         "comparison_registry", p(sibling_paths, "comparison_registry"), "csv", False,
         sibling_present.get("comparison_registry", False), "compare_cross_segment.py",
         AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
-        "archive_only -- not read by generate_governance_narrative.py; tracks "
-        "comparison staleness/forced-rerun state per "
-        "docs/governance_generator_cross_compare_coverage.md's recommended "
-        "'Input Completeness / Staleness' integration point",
+        "path resolved from --comparison-registry when explicitly supplied, else "
+        "auto-detected beside --summary's directory (D-032) -- the same resolved "
+        "path also drives governance_package_manifest.json/governance_package_"
+        "health.json's own 'comparison_registry' input tracking, so the two "
+        "never disagree about which file this means for a given run. Content is "
+        "opened and read ONLY when --comparison-registry is explicitly passed "
+        "(auto-detected presence alone never triggers a read) -- producing "
+        "governance_package_health.json's comparison_completeness field and the "
+        "narrative's Input Completeness / Staleness note near Analytical Notes.",
         "one row per (domain, segment pair) comparison registry entry", ["domain"], [], [],
-        ["whether an expected segment/domain comparison was actually run, and whether it is stale"],
-        ["this generator does not open or parse this file; presence is inferred "
-         "as a sibling of --summary's directory, never verified against its own schema"],
-        ["not consumed by this generator in PR1 -- missing rows in "
-         "cross_segment_summary.csv are currently treated as weak evidence rather "
-         "than distinguished from not-run/stale comparisons; see "
-         "docs/governance_generator_cross_compare_coverage.md. columns/row_count "
-         "below (when present) come from the same live directory scan governance_"
-         "file_inventory.json uses (_scan_csv_file, D-023/D-024), not from a "
-         "read this generator performs on a normal run."],
+        ["whether an expected segment/domain comparison was actually run, and whether it is "
+         "stale relative to the evidence CSV -- only when --comparison-registry was explicitly "
+         "supplied; presence alone (auto-detected, no flag) answers only 'does this file exist'"],
+        ["when --comparison-registry was NOT explicitly passed, this file's content is never "
+         "opened even if present is true here (auto-detected beside --summary's directory only). "
+         "When it IS passed, build_comparison_completeness() reads only identity (segment_id_a/b, "
+         "comparison_type, domain) and recency (computed_utc) fields -- never row content beyond "
+         "those, and never reproduced in the output package; see governance_package_health.json's "
+         "comparison_completeness for the derived counts."],
+        ["prior to D-032, missing rows in cross_segment_summary.csv were treated as weak "
+         "evidence with no way to distinguish a not-run/stale comparison; "
+         "docs/governance_generator_cross_compare_coverage.md's 'Input Completeness / "
+         "Staleness' row is now marked Done. columns/row_count below (when present) come "
+         "from the same live directory scan governance_file_inventory.json uses "
+         "(_scan_csv_file, D-023/D-024), independent of any --comparison-registry read."],
         {},
-        ["cross_segment_summary"],
+        ["cross_segment_summary", "governance_package_health"],
         required_before_conclusions=False,
     ))
     artifacts[-1].update(_sibling_scan_fields(
