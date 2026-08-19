@@ -4207,11 +4207,21 @@ def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
     to avoid double-counting a pattern once per view scope and to keep this
     a presence/reuse-breadth question (all-view), not an active-use one.
 
-    Each pattern (join_hash, within a domain) is classified into exactly
-    one, highest-qualifying tier -- corpus_wide > client_wide > project_wide
-    > file_level > unclassified -- mirroring the bucket_priority pattern
-    already used above for pattern_reuse_distribution.csv rows.
+    build_union_inventory_rows() in compare_cross_segment.py emits one row
+    per (client_label, ..., join_hash) grain -- the same (domain, join_hash)
+    pattern recurs once per client that carries it. pct_clients_present/
+    n_clients_present are corpus-wide there (identical across every such
+    row), but n_files_present/n_projects_present are computed per-client
+    (that client's own files/projects only) -- so a naive last-row-wins
+    classification would make a pattern's tier depend on row/client
+    iteration order. Each pattern (join_hash, within a domain) is instead
+    classified into exactly one, highest-qualifying tier across ALL of its
+    rows -- corpus_wide > client_wide > project_wide > file_level >
+    unclassified -- mirroring the bucket_priority pattern already used
+    above for pattern_reuse_distribution.csv rows (PR review finding,
+    D-033).
     """
+    tier_rank = {t: i for i, t in enumerate(_UNION_BREADTH_TIERS)}
     pattern_tier: dict = {}
     for row in union_inventory_rows:
         if row.get("governance_role") != "Project":
@@ -4235,7 +4245,10 @@ def build_union_breadth_by_domain(union_inventory_rows: list) -> dict:
             tier = "file_level"
         else:
             tier = "unclassified"
-        pattern_tier[(domain, join_hash)] = tier
+        pattern_key = (domain, join_hash)
+        existing = pattern_tier.get(pattern_key)
+        if existing is None or tier_rank[tier] < tier_rank[existing]:
+            pattern_tier[pattern_key] = tier
 
     by_domain: dict = defaultdict(lambda: {t: 0 for t in _UNION_BREADTH_TIERS} | {"total": 0})
     for (domain, _join_hash), tier in pattern_tier.items():
@@ -5312,49 +5325,72 @@ def render_findings_and_recommendations(
 
 def build_comparison_completeness(summary_rows: list, comparison_registry_rows: list) -> dict:
     """Per-domain counts of expected (segment_id_a, segment_id_b,
-    comparison_type) pairs -- drawn from cross_segment_summary.csv, since
-    every row there is itself proof a comparison ran and produced evidence
-    -- that have a matching comparison_registry.csv entry ("present"), no
-    matching entry ("missing"), or a matching entry whose computed_utc
-    predates the summary row's own executed_utc ("stale": the registry
-    snapshot is older than the evidence it should be describing).
+    comparison_type) pairs -- the union of keys seen in cross_segment_summary.csv
+    (proof a comparison ran and produced evidence) and comparison_registry.csv
+    (proof a comparison was computed and stamped at some point) -- that have
+    a matching entry in BOTH files ("present", further split "stale" when the
+    registry's computed_utc predates the summary row's own executed_utc, i.e.
+    the registry snapshot is older than the evidence it should describe), or
+    a matching entry in only one of the two ("missing": no registry stamp for
+    evidenced work, treated as stale rather than missing when the reverse --
+    the registry has a stamp but the current summary snapshot has no matching
+    row, e.g. a domain-scoped run that didn't recompute everything a broader
+    prior run did).
+
+    PR review finding (D-032): iterating summary_rows alone cannot surface a
+    registry entry with no matching summary evidence at all. Unioning the two
+    key sets catches that case, but still cannot detect a comparison that was
+    NEVER run and has zero rows in EITHER file -- that would need a canonical
+    inventory of expected work items (e.g. segment_manifest.csv's full
+    lattice x domain list x comparison type), which this generator does not
+    reconstruct. This function remains a narrower, self-contained proxy: it
+    answers "is there a mismatch between what has evidence and what the
+    registry has stamped," not "was every truly-expected comparison run."
 
     Self-contained: uses only comparison_registry.csv's own identity
     (segment_id_a/b, comparison_type, domain) and recency (computed_utc)
     fields against cross_segment_summary.csv's matching identity/executed_utc
-    fields (D-032). This generator has no access to compare_cross_segment.py's
-    live segment registry (run_registry.csv's population_hash/last_run_utc),
-    so this is a narrower, narrative-side proxy for staleness than
+    fields. This generator has no access to compare_cross_segment.py's live
+    segment registry (run_registry.csv's population_hash/last_run_utc), so
+    this is a narrower, narrative-side proxy for staleness than
     comparison_is_stale() computes there -- it answers "is this registry
     snapshot older than the evidence it should describe," not "has the
     underlying segment population changed since this pair was computed."
     """
-    registry_index: dict = {}
-    for row in comparison_registry_rows:
-        key = (
+    def _key(row: dict) -> tuple:
+        return (
             row.get("segment_id_a", ""), row.get("segment_id_b", ""),
             row.get("comparison_type", ""), row.get("domain", ""),
         )
-        registry_index[key] = row
+
+    registry_index: dict = {_key(row): row for row in comparison_registry_rows}
+    summary_index: dict = {}
+    for row in summary_rows:
+        if row.get("domain", ""):
+            summary_index.setdefault(_key(row), row)
 
     by_domain: dict = defaultdict(lambda: {"total": 0, "present": 0, "missing": 0, "stale": 0})
-    for row in summary_rows:
-        domain = row.get("domain", "")
+    for key in registry_index.keys() | summary_index.keys():
+        domain = key[3]
         if not domain:
             continue
-        key = (
-            row.get("segment_id_a", ""), row.get("segment_id_b", ""),
-            row.get("comparison_type", ""), domain,
-        )
         counts = by_domain[domain]
         counts["total"] += 1
         registry_row = registry_index.get(key)
+        summary_row = summary_index.get(key)
         if registry_row is None:
             counts["missing"] += 1
             continue
         counts["present"] += 1
+        if summary_row is None:
+            # Registry has a stamp, but the current summary snapshot has no
+            # matching row -- the registry is out of sync with this run's
+            # evidence (e.g. a domain-scoped run that didn't recompute
+            # everything a broader prior run did).
+            counts["stale"] += 1
+            continue
         computed_utc = registry_row.get("computed_utc", "")
-        executed_utc = row.get("executed_utc", "")
+        executed_utc = summary_row.get("executed_utc", "")
         if computed_utc and executed_utc and computed_utc < executed_utc:
             counts["stale"] += 1
     return dict(by_domain)

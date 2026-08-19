@@ -92,6 +92,39 @@ def test_union_breadth_empty_input_returns_empty_dict():
     assert g.build_union_breadth_by_domain([]) == {}
 
 
+def test_union_breadth_preserves_highest_tier_across_repeated_client_rows():
+    """PR review finding: cross_segment_union_inventory.csv emits one row
+    per (client_label, ..., join_hash) grain for the same pattern -- pct_clients_present
+    is corpus-wide (identical across rows), but n_projects_present/
+    n_files_present are per-client. A later, narrower client row for the
+    SAME (domain, join_hash) must not downgrade an already-qualified
+    project_wide classification to file_level."""
+    rows = [
+        # Client A: broad reach within its own files/projects -> project_wide.
+        _union_row(domain="line_styles", join_hash="h1", client_label="acme",
+                   pct_clients_present="0.10", n_projects_present="5", n_files_present="20"),
+        # Client B, same pattern, narrower reach -> would classify file_level alone.
+        _union_row(domain="line_styles", join_hash="h1", client_label="beta",
+                   pct_clients_present="0.10", n_projects_present="1", n_files_present="1"),
+    ]
+    breadth = g.build_union_breadth_by_domain(rows)
+    assert breadth["line_styles"]["project_wide"] == 1
+    assert breadth["line_styles"]["file_level"] == 0
+    assert breadth["line_styles"]["total"] == 1
+
+
+def test_union_breadth_preserves_highest_tier_regardless_of_row_order():
+    rows_reversed = [
+        _union_row(domain="line_styles", join_hash="h1", client_label="beta",
+                   pct_clients_present="0.10", n_projects_present="1", n_files_present="1"),
+        _union_row(domain="line_styles", join_hash="h1", client_label="acme",
+                   pct_clients_present="0.10", n_projects_present="5", n_files_present="20"),
+    ]
+    breadth = g.build_union_breadth_by_domain(rows_reversed)
+    assert breadth["line_styles"]["project_wide"] == 1
+    assert breadth["line_styles"]["file_level"] == 0
+
+
 def test_union_breadth_never_returns_raw_pattern_content():
     """Only aggregate integer counts per domain -- never join_hash/pattern_label
     values, matching D-033's 'only derived counts' scope boundary."""

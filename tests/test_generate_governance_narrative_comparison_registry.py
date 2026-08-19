@@ -112,6 +112,26 @@ def test_completeness_not_stale_when_registry_computed_utc_is_current():
     assert completeness["line_styles"]["stale"] == 0
 
 
+def test_completeness_counts_registry_only_entry_as_present_and_stale():
+    """PR review finding: a registry stamp with no matching summary row (the
+    current summary snapshot doesn't reflect it, e.g. a domain-scoped run
+    that didn't recompute everything a broader prior run did) must not be
+    invisible -- it's counted as present (the registry did stamp it) and
+    stale (out of sync with the current evidence)."""
+    registry_rows = [_registry_row(segment_id_a="a", segment_id_b="b", comparison_type="template_to_project",
+                                    domain="line_styles", computed_utc="2026-08-01T00:00:00Z")]
+    completeness = g.build_comparison_completeness([], registry_rows)
+    assert completeness["line_styles"] == {"total": 1, "present": 1, "missing": 0, "stale": 1}
+
+
+def test_completeness_registry_only_entry_uses_registry_own_domain_for_grouping():
+    registry_rows = [_registry_row(segment_id_a="a", segment_id_b="b", comparison_type="template_to_project",
+                                    domain="materials", computed_utc="2026-08-01T00:00:00Z")]
+    completeness = g.build_comparison_completeness([], registry_rows)
+    assert "materials" in completeness
+    assert "line_styles" not in completeness
+
+
 def test_completeness_ignores_rows_with_no_domain():
     summary_rows = [_summary_row(segment_id_a="a", segment_id_b="b", comparison_type="template_to_project", domain="")]
     completeness = g.build_comparison_completeness(summary_rows, [])
