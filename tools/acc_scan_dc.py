@@ -7,7 +7,7 @@ run script.py (BatchExtract button).
 
 Usage:
     python acc_scan_dc.py --root <path> --out <csv_path>
-    python acc_scan_dc.py --root "C:\\Users\\gmcdowell\\DC\\ACCDocs\\Stantec Consulting" --out "C:\\...\\acc_manifest.csv"
+    python acc_scan_dc.py --root "./ACCDocs/ExampleEnterprise" --out "./acc_manifest.csv"
     python acc_scan_dc.py --root <path> --out <csv_path> --version
     python acc_scan_dc.py --root <path> --out <csv_path> --types rvt rfa
     python acc_scan_dc.py --root <path> --out <csv_path> --types all

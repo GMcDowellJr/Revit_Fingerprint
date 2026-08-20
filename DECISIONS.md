@@ -1536,3 +1536,14 @@ This is explicitly a narrower, faster fix than the "dedicated aggregate/distribu
 - `analysis/` output for `units_doc`/`worksets_doc` continues to be produced using whatever degraded/identity-mode join behavior they've always structurally had — this decision does not change what that output means or whether it's governance-grade; that's still gated on the reporter work.
 - If a third domain is ever found to have the same single-record-per-file structural property, it needs to be added to `JOIN_GATE_EXEMPT_SINGLE_RECORD_DOMAINS` explicitly — this is not auto-detected, by design, so a new case doesn't silently inherit an exemption it wasn't reviewed for.
 - Worth a follow-up check once this lands: confirm `domain_patterns.csv`/`analysis/` row counts for `units_doc`/`worksets_doc` from *today's* run (the first successful one) against whatever the corpus should actually contain, since this is the first time this data has existed at all since those domains were introduced — there's no prior "last known good" version to diff against, only the extraction/export side to cross-check.
+
+## D-026 — Audit reports remain historical, not operational
+
+`audit_results/` is retained as clearly historical evidence for earlier releases.
+Production correctness must be justified by maintained contracts, policies, code
+comments, and tests; live tools must not require an audit file at runtime. Existing
+references are being consolidated incrementally: contract rationale belongs in
+`DECISIONS.md` or the relevant contract, implementation explanation belongs beside
+maintained code, and obsolete operator links are removed. Historical changelog and
+audit-to-audit links may remain, but are non-operational and must not be treated as
+current configuration or a deployment runbook.

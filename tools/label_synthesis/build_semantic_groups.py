@@ -207,7 +207,7 @@ Text types in Revit serve specific annotation roles. Size and format together in
 
 Size and format define separate groups. A bold 1/8" type and a regular 1/8" type serve different governance roles even if the same font.
 
-Firm naming conventions in Stantec projects often include:
+Enterprise naming conventions in deployment projects often include:
 - ".01_" or numeric prefixes: standard firm styles in preferred sort order
 - "AR-", "ST-", "ME-": discipline prefixes (Architecture, Structural, MEP)
 - "Title", "Note", "Tag", "Label", "Head": role suffixes

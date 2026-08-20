@@ -3,6 +3,8 @@
 
 import json
 
+import pytest
+
 import domains.identity as identity_module
 from core.join_key_policy import load_join_key_policies
 from core.record_v2 import ITEM_Q_MISSING, ITEM_Q_OK, ITEM_Q_UNREADABLE, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE
@@ -48,6 +50,12 @@ class FakeGuid:
 
     def __repr__(self):
         return "FakeGuid({!r})".format(self.s)
+
+
+@pytest.fixture(autouse=True)
+def _system_guid_available(monkeypatch):
+    """Normal extraction tests model production's required System.Guid surface."""
+    monkeypatch.setattr(identity_module, "Guid", FakeGuid)
 
 
 class FakeProjectInformation:
@@ -272,16 +280,13 @@ def test_business_center_is_read_via_shared_parameter_guid_when_available(monkey
     assert items["project_info.business_center"]["v"] == "BusinessCenter01"
 
 
-def test_business_center_falls_back_to_lookup_by_name_when_guid_type_unavailable(monkeypatch):
-    """Outside a .NET runtime (e.g. this pytest environment without System.Guid),
-    identity_module.Guid is None and the code must fall back to LookupParameter
-    by name rather than crashing or always reporting not_applicable."""
+def test_guid_configuration_fails_closed_when_guid_type_unavailable(monkeypatch):
+    """A configured GUID never silently degrades to ambiguous name lookup."""
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
     monkeypatch.setattr(identity_module, "Guid", None)
 
-    items = _as_dict(_extract_items(_DocForPI(_enterprise_like_pi())))
-    assert items["project_info.business_center"]["q"] == ITEM_Q_OK
-    assert items["project_info.business_center"]["v"] == "BusinessCenter01"
+    with pytest.raises(RuntimeError, match="System.Guid"):
+        _extract_items(_DocForPI(_enterprise_like_pi()))
 
 
 def test_business_center_is_not_applicable_when_shared_param_absent_not_unreadable(monkeypatch):
@@ -334,6 +339,7 @@ def test_named_field_present_but_blank_is_missing_not_not_applicable(monkeypatch
         builtin_values=_ALL_BUILTIN_VALUES,
         named_present={"Business Center"},
         named_values={"Business Center": None},
+        guid_values={_BUSINESS_CENTER_SHARED_PARAM_GUID: None},
     )
     items = _as_dict(_extract_items(_DocForPI(pi)))
     assert items["project_info.business_center"]["q"] == ITEM_Q_MISSING
