@@ -163,7 +163,7 @@ as operational documentation. Removing them requires updating the descriptive
 references in `CLAUDE.md` and `REPO_OPERATIONAL_REVIEW.md` so those documents do
 not advertise a deleted command file.
 
-### Pull after consolidating durable decisions: historical audits
+### Retain as classified historical material: historical audits
 
 The following 15 files under `audit_results/` are review snapshots, not runtime
 inputs or test fixtures:
@@ -184,15 +184,15 @@ inputs or test fixtures:
 - `audit_14_identity_items_shard_port_pr2.md`
 - `audit_15_identity_items_monolithic_removal_pr4.md`
 
-They total approximately 0.30 MiB. The test suite only mentions audit 7 and
-audit 11 in comments; it does not read either file. However, production-source
-comments, policies, `CHANGELOG.md`, and operator documentation contain numerous
-links to these audits. Pulling the audits without cleaning those references
-would make the repository's explanatory trail stale. First migrate any current
-contract or rationale into `DECISIONS.md`, the relevant contract/policy file,
-or maintained documentation; then remove the audit directory and replace or
-delete historical links. If preserving review history matters, store the audit
-set with release/PR artifacts rather than in the operational tree.
+They total approximately 0.30 MiB. The completed decision is to retain this set in
+place as explicitly classified historical material. `audit_results/README.md` marks
+its 2024–2025/2.1-era scope and non-operational status. Durable name-projection,
+bundle-adapter, and extractor rationale is consolidated in `DECISIONS.md` D-037 and
+maintained implementation comments; production code, tests, policies, and operator
+runbooks no longer cite an audit to explain current correctness. Historical changelog
+and audit-to-audit citations remain because their targets are retained. The tracked
+checker `scripts/check_audit_references.py` distinguishes a bare directory/section
+reference from a file path and rejects every nonexistent referenced file.
 
 ### Do not classify as removable without a workflow decision
 

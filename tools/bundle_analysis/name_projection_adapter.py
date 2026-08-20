@@ -12,7 +12,7 @@ larger diff surface touching code that must stay byte-identical for the `config`
 target), this module normalizes PR2's output into that exact shape once, at the boundary,
 so the unmodified step0-step7 pipeline can run against it unchanged.
 
-See audit_results/audit_8_bundle_pipeline_name_projection.md for the full enumeration of
+See DECISIONS.md D-037 for the full enumeration of
 schema gaps this module papers over and why each default is safe -- every default here is
 logged and/or carried into `emit_name_target_provenance()`'s manifest, never silent.
 """
@@ -96,7 +96,7 @@ PROVENANCE_NOTE_NAME_TARGET = (
     "cross-checked against a live re-extracted corpus -- PR2's agreement check (N=25, "
     "match_rate=1.0) reconstructed the inline computation from source rather than "
     "validating against real exports. See "
-    "audit_results/audit_7_name_key_agreement_and_cli_naming.md Item 0."
+    "DECISIONS.md D-037."
 )
 
 
@@ -120,7 +120,7 @@ def stage_name_projection_analysis_dir(
       staging_dir/domain_coverage.csv         (verbatim copy, for provenance reporting)
 
     Known, deliberate degradations vs. the `config`-target production schema (see
-    audit_results/audit_8_bundle_pipeline_name_projection.md items 4-5):
+    DECISIONS.md D-037):
       - `is_cad_import` is always emitted empty (false) -- PR2's output carries no CAD-import
         evidence, so no name-projection pattern is ever excluded as a CAD import.
       - `pattern_label_human` is populated from PR2's `pattern_label` (same synthesized
@@ -276,7 +276,7 @@ Only `ALL` view is supported for this comparison_target -- USED-view purgeabilit
 filtering, `--compute-share-profile`, and `--compare` all depend on production
 (`config`-target) artifacts with no defined name-projection equivalent yet, and are
 blocked explicitly rather than silently downgraded. See
-`audit_results/audit_8_bundle_pipeline_name_projection.md` items 7, 9, 10.
+`DECISIONS.md D-037` items 7, 9, 10.
 
 ## Excluded domains
 

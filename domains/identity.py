@@ -77,7 +77,7 @@ except ImportError:
 #
 # Built-ins: present on ProjectInformation for every Revit project regardless
 # of template (confirmed via tools/probes/probe_identity.py's definition_origin
-# classifier -- see audit_results/audit_11_domain_extractor_delta_step0_findings.md
+# classifier -- see DECISIONS.md D-037
 # section 5.2). Read via BuiltInParameter so behavior is independent of Revit's
 # display-language locale (LookupParameter-by-name is locale-sensitive). The
 # three IFC GUID fields are ALSO confirmed built-ins (PR review follow-up):

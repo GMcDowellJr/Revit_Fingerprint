@@ -101,7 +101,7 @@ def test_object_styles_model_parent_name_missing_and_none_for_top_level_category
     # policy ("Identity values (v) MUST NOT contain sentinel literals -- use
     # v: null + q: 'missing' instead"), that's q=missing, not q=ok and not q=unreadable
     # (unreadable is reserved for actual read failures/exceptions). Matches the probe's own
-    # classification (audit_results/audit_11_domain_extractor_delta_step0_findings.md §9.3:
+    # classification (DECISIONS.md D-037:
     # ok=364; missing=279 for top-level rows).
     registry = _domain_identity_registry_v2()
     identity_items = _area9_identity_items(is_subcategory=False)

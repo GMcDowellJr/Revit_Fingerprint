@@ -763,11 +763,11 @@ def _active_domains_from_presence_csv(analysis_dir: Path) -> Optional[frozenset]
 def _active_domains_from_name_patterns(name_patterns_dir: Path) -> Optional[frozenset]:
     """Same purpose as _active_domains_from_presence_csv(), but for the name-projection
     pattern shape (tools/generate_name_key_patterns.py's domain_patterns.csv has no
-    pattern_presence_file.csv equivalent -- see audit_results/audit_8 for the schema diff).
+    pattern_presence_file.csv equivalent -- see DECISIONS.md D-037 for the schema diff).
 
     Unlike _active_domains_from_presence_csv(), an empty-but-present domain_patterns.csv
     is a legitimate, expected outcome for the name projection (a segment whose files don't
-    intersect any of the 25 eligible domains -- see audit_results/audit_9's "what this PR
+    intersect any of the 25 eligible domains -- see DECISIONS.md D-037's "what this PR
     does not attempt"), not a signal to fall back to "unfiltered." This function therefore
     returns `frozenset()` (not `None`) when the file exists but has zero domain rows, so
     merge_bi_outputs() excludes every domain subfolder instead of treating None-as-unfiltered

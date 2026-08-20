@@ -2,8 +2,8 @@
 Provenance note (added 2026-08-07, not part of the original document):
 
 This file was produced externally on 2026-08-05 (see title below) and was
-missing from the repo when Audit 11 (`audit_results/audit_11_domain_extractor_delta_step0_findings.md`)
-went looking for it under this exact path. It was supplied after the fact
+missing from the repo when the audit work now summarized by `DECISIONS.md` D-037
+looked for it under this exact path. It was supplied after the fact
 and is committed here verbatim, unedited, for future tracking -- do not
 silently rewrite its findings in place; append corrections instead, the way
 this note does.

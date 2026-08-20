@@ -77,7 +77,7 @@ if ($Run -eq "") {
     Write-Host "  -NameKey (Run A/B/C, opt-in, additive): also produce the Canonical Name"
     Write-Host "    Identity Projection (join_key_name_identity) alongside the default"
     Write-Host "    join_hash output. Does NOT change any default Run A/B/C output -- see"
-    Write-Host "    audit_results/audit_8 and audit_9 for what this does and does not cover."
+    Write-Host "    DECISIONS.md D-037 for what this does and does not cover."
     Write-Host "      -Run A -NameKey   # parse exports once, corpus-wide -> $NAME_KEY_CSV"
     Write-Host "      -Run B -NameKey   # OPTIONAL whole-corpus (unsegmented) name patterns;"
     Write-Host "                        # not required before Run C, which re-clusters per segment"
@@ -280,7 +280,7 @@ if ($Run -eq "C") {
     Write-Host "Cross-segment comparison: run compare_cross_segment.py separately" -ForegroundColor Cyan
     Write-Host "Reminder: used/purge signals are active-delivery signals primarily for Project targets; do not label Template or Generic stock content as unused bloat." -ForegroundColor Cyan
     if ($NameKey) {
-        Write-Host "Name-projection output: {segment folder}\results\bundle_analysis\name_all\... (join_key_name_identity instead of join_hash; ALL view only -- no used-view/compare/share-profile equivalent yet, see audit_results/audit_8, audit_9, and audit_10)" -ForegroundColor Cyan
+        Write-Host "Name-projection output: {segment folder}\results\bundle_analysis\name_all\... (join_key_name_identity instead of join_hash; ALL view only -- no used-view/compare/share-profile equivalent yet, see DECISIONS.md D-037)" -ForegroundColor Cyan
     }
 }
 
@@ -320,9 +320,7 @@ if ($Run -eq "C") {
 #                      results/bundle_analysis/name_all/ per segment alongside the
 #                      existing all/used folders -- ALL view only (no used-view/compare/
 #                      share-profile equivalent for the name projection yet). See
-#                      audit_results/audit_8_bundle_pipeline_name_projection.md,
-#                      audit_results/audit_9_segment_orchestrator_name_projection.md, and
-#                      audit_results/audit_10_bundle_bi_output_location_correction.md (the
+#                      DECISIONS.md D-037 (including the
 #                      name_all/ flat-path correction -- name/all/ in earlier revisions of
 #                      this script was never reachable via the Power BI model's pPurgeView
 #                      parameter).

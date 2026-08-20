@@ -5,7 +5,7 @@
     "used by policies/domain_join_key_policies.json, loaded/validated with the same",
     "core/join_key_policy.load_join_key_policies()/get_domain_join_key_policy() functions.",
     "Every entry's required_items references the single identity item backing that domain's",
-    "own label.display value (see audit_results/audit_6_name_key_step0_within_pr1.md).",
+    "own label.display value (see DECISIONS.md D-037).",
     "join_key_schema is 'name_identity.join_key.v1' for every domain except phases, which uses",
     "'phases.name_identity.join_key.v1.redundant' -- phases' join_hash (configuration policy)",
     "already keys off phase.name, the same string this policy keys off, so the two projections",

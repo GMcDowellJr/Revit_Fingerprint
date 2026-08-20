@@ -905,7 +905,7 @@ def _validate_name_target_constraints(
 ) -> None:
     """Fail loudly (never guess, never silently fall back) when a caller asks the
     name-projection target for a feature that has no defined name-projection equivalent
-    yet. See audit_results/audit_8_bundle_pipeline_name_projection.md items 7, 9, 10."""
+    yet. See DECISIONS.md D-037."""
     if comparison_target not in ("name", "both"):
         return
     if purge_view != "all":
@@ -915,21 +915,21 @@ def _validate_name_target_constraints(
             "(latent_purgeable.csv is sig_hash-keyed; name-projection patterns key off "
             "join_key_name_identity's join_hash instead) -- pass --purge-view all "
             "explicitly, or run comparison_target=config separately for USED-view output. "
-            "See audit_results/audit_8_bundle_pipeline_name_projection.md item 7."
+            "See DECISIONS.md D-037."
         )
     if compute_share_profile:
         raise SystemExit(
             f"--comparison-target {comparison_target} does not support "
             "--compute-share-profile. pattern_share_pct/is_dominant_pattern have no "
             "name-projection equivalent (PR2's pattern_membership.csv carries neither "
-            "field). See audit_results/audit_8_bundle_pipeline_name_projection.md item 9."
+            "field). See DECISIONS.md D-037."
         )
     if compare:
         raise SystemExit(
             f"--comparison-target {comparison_target} does not support --compare. No "
             "name-projection reference-bundle baseline is defined yet, and resolving that "
             "gap is explicitly out of scope for this PR. See "
-            "audit_results/audit_8_bundle_pipeline_name_projection.md item 10."
+            "DECISIONS.md D-037."
         )
 
 

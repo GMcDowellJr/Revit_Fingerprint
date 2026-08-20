@@ -8,7 +8,7 @@ record.v2 JSON, without requiring re-extraction through domains/*.py + runner/ru
 This works because every value the projection needs -- identity_basis.items, phase2 bucket
 items (cosmetic/coordination/unknown/semantic/lineage), and label.display -- is already
 present in existing *.details.json exports today, for every eligible domain. See
-audit_results/audit_6_name_key_step0_within_pr1.md for the per-domain trace of where each
+DECISIONS.md D-037 for the per-domain trace of where each
 domain's own name value actually lives.
 
 Reuses, rather than reimplements: core.canonical_items.build_flat_items() for the bucket
