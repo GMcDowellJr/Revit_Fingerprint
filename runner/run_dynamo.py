@@ -156,9 +156,8 @@ from domains import worksets
 from domains import browser_organization
 from core.manifest import build_manifest
 from core.features import build_features
-from core.join_key_policy import load_join_key_policies
 from core.canonical_items import canonicalize_record
-from core.deployment_config import load_deployment_config
+from runner.extraction_context import build_extraction_context, operator_deployment_config_path
 
 # Domain selection configuration
 # Set to None to run all domains, or provide a list of domain names to run specific domains
@@ -536,22 +535,9 @@ def run_fingerprint(doc, timing=None):
 
     # Context dictionary for cross-domain references
     # Populated by global domains, consumed by contextual domains
-    ctx = {}
-    ctx["debug_vg_details"] = False
-
-    # One operator-controlled deployment file; validation occurs before any domain runs.
-    deployment_path = str(os.environ.get("REVIT_FINGERPRINT_DEPLOYMENT_CONFIG", "")).strip() or None
-    contract_path = os.path.join(_REPO_ROOT, "contracts", "domain_identity_keys_v2.json")
-    ctx.update(load_deployment_config(deployment_path, contract_path))
-
-    # Join-key policies (explicit ctx injection; no globals)
-    policy_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "policies", "domain_join_key_policies.json")
-    ctx["join_key_policies"] = load_join_key_policies(policy_path)
-
-    # Name-identity policies (second, independent join_hash variant -- same loader/mechanism,
-    # different policy file; see policies/domain_name_key_policies.json)
-    name_key_policy_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "policies", "domain_name_key_policies.json")
-    ctx["name_key_policies"] = load_join_key_policies(name_key_policy_path)
+    # Environment is read only here; construction is importable without Revit assemblies.
+    # Loading and all validation finish before collectors or domains can write output.
+    ctx = build_extraction_context(_REPO_ROOT, operator_deployment_config_path())
 
     # PR5: per-run collector cache + counters
     ctx["_collect"] = CollectCtx()

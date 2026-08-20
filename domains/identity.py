@@ -19,7 +19,6 @@ updated here beyond this note, per this change's own scope boundary.
 
 import os
 import sys
-import uuid
 
 # Ensure repo root is importable (so `import core...` works everywhere)
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -58,6 +57,7 @@ from core.record_v2 import (
 )
 from core.join_key_policy import get_domain_join_key_policy
 from core.join_key_builder import build_join_key_from_policy, compute_projection_status
+from core.deployment_config import validate_project_info_shared_parameters
 
 try:
     from Autodesk.Revit.DB import WorksharingUtils, BuiltInParameter
@@ -186,41 +186,6 @@ def _read_project_info_named_item(pi, key, param_name, guid_str=None):
 
     v, q = canonicalize_str(raw)
     return make_identity_item(key, v, q)
-
-
-def validate_project_info_shared_parameters(fields, allowed_keys=None):
-    """Validate and normalize deployment fields before extraction starts."""
-    if fields is None:
-        return []
-    if not isinstance(fields, (list, tuple)):
-        raise ValueError("project_info_shared_parameters must be a list")
-    builtins = {key for key, _ in _PROJECT_INFO_BUILTIN_FIELDS} | {"project_info.name"}
-    seen_keys, seen_guids, normalized = set(), {}, []
-    for field in fields:
-        if not isinstance(field, dict):
-            raise ValueError("each configured project-information field must be a mapping")
-        key = safe_str(field.get("key")).strip()
-        name = safe_str(field.get("name")).strip()
-        guid = safe_str(field.get("guid")).strip() or None
-        if not key.startswith("project_info.") or not name:
-            raise ValueError("configured project-information fields require project_info.* key and non-blank name")
-        if key in builtins:
-            raise ValueError("configured key collides with a built-in field: {}".format(key))
-        if allowed_keys is not None and key not in allowed_keys:
-            raise ValueError("configured project-information key is not contract-registered: {}".format(key))
-        if key in seen_keys:
-            raise ValueError("duplicate configured project-information key: {}".format(key))
-        if guid:
-            try:
-                guid = str(uuid.UUID(guid))
-            except (ValueError, AttributeError, TypeError):
-                raise ValueError("malformed GUID for configured project-information field: {}".format(key))
-            if guid in seen_guids and seen_guids[guid] != key:
-                raise ValueError("configured GUID maps to conflicting keys")
-            seen_guids[guid] = key
-        seen_keys.add(key)
-        normalized.append({"key": key, "name": name, "guid": guid})
-    return normalized
 
 
 def _configured_project_info_fields(ctx):

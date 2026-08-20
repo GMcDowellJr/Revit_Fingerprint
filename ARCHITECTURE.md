@@ -59,6 +59,15 @@ The `ctx` dictionary flows through domain execution. Keys are populated by upstr
 | `_collect` | CollectCtx | Collector cache instance (from `core/collect.py`) |
 | `_doc_view` | DocViewContext | Document + view context (from `core/context.py`) |
 | `debug_vg_details` | bool | Enable verbose VG debug output |
+| `project_info_shared_parameters` | list[dict] | Canonical deployment mappings validated against the identity contract before extraction |
+| `join_key_policies` | dict | Contract-backed join-key policies |
+| `name_key_policies` | dict | Contract-backed name-key policies |
+
+`runner.extraction_context.build_extraction_context()` is the importable, Revit-free
+construction boundary. `run_dynamo.py` reads
+`REVIT_FINGERPRINT_DEPLOYMENT_CONFIG` exactly once at its operator boundary and
+passes the explicit path into that builder. JSON/schema/contract validation thus
+finishes before collectors are initialized or any domain can emit output.
 
 #### Domain-Populated Keys
 
