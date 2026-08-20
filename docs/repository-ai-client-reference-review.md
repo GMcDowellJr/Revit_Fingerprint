@@ -225,6 +225,25 @@ removal set after durable-reference cleanup. This boundary avoids deleting
 versioned contracts, executable Dynamo graphs, test fixtures, or artifacts that
 the current Graphify workflow explicitly publishes.
 
+## Immutable enterprise policy boundary
+
+Enterprise identity classification uses the frozen `EnterprisePolicy` value in
+`tools/enterprise_policy.py`. Loader precedence is CLI label override, then a
+deployment-local JSON policy, then the checked-in synthetic `InternalEnterprise`
+default. The bookkeeping token remains the separate fixed `0000` value: only the
+configured label plus `0000` is enterprise; that label plus a real BC is
+business-center scope, and an external client plus `0000` is never enterprise.
+
+Production classification APIs in `governance_manifest.py` and
+`compare_cross_segment.py` require explicit policy propagation, including pair
+discovery, multiprocessing workers, governance-state construction, serializers,
+and pooled rows. Provenance contains schema, effective label, token, source, and
+a deterministic safe `configuration_identifier`; the absolute local policy path
+is memory-only. Relationship and narrative tools preserve already-classified
+scope columns, promotion analysis consumes comparison classifications, and
+segment construction/extraction orchestration preserve literal identity metadata;
+these consumers do not independently classify enterprise identity.
+
 ## Recommended remediation order
 
 1. **Decide whether captured probe exports may be public.** If not, remove the

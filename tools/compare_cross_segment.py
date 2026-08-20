@@ -162,7 +162,7 @@ if _TOOLS_DIR not in sys.path:
 
 from na_token import is_blank_or_na, ENTERPRISE_BC_BOOKKEEPING_TOKENS as _ENTERPRISE_BC_BOOKKEEPING_TOKENS
 from jenks_utils import jenks_breaks
-from enterprise_policy import DEFAULT_ENTERPRISE_LABEL, load_enterprise_policy, write_enterprise_policy_provenance
+from enterprise_policy import EnterprisePolicy, load_enterprise_policy, write_enterprise_policy_provenance
 
 
 # ---------------------------------------------------------------------------
@@ -1970,17 +1970,15 @@ def _client_of(row: Dict[str, str]) -> str:
 
 
 
-_enterprise_label = DEFAULT_ENTERPRISE_LABEL
-
-def _is_internal_client(client_label: str) -> bool:
-    return client_label.strip().casefold() == _enterprise_label.casefold()
+def _is_enterprise_client(client_label: str, policy: EnterprisePolicy) -> bool:
+    return policy.is_enterprise(client_label)
 
 
-def _is_enterprise_bc(bc_label: str) -> bool:
-    return bc_label.strip() == _ENTERPRISE_BC_LABEL
+def _is_enterprise_bc(bc_label: str, policy: EnterprisePolicy) -> bool:
+    return bc_label.strip() == policy.enterprise_business_center_token
 
 
-def _scope_level(row: Dict[str, str]) -> Optional[str]:
+def _scope_level(row: Dict[str, str], policy: EnterprisePolicy) -> Optional[str]:
     """Classify a segment row's own (client_label, business_center_label)
     cut values. Returns None when either dimension is not cut on this row
     (a roll-up pooling multiple real scopes) -- callers that need roll-up
@@ -1991,8 +1989,8 @@ def _scope_level(row: Dict[str, str]) -> Optional[str]:
     bc = _bc_of(row)
     if not client or not bc:
         return None
-    internal = _is_internal_client(client)
-    enterprise_bc = _is_enterprise_bc(bc)
+    internal = _is_enterprise_client(client, policy)
+    enterprise_bc = _is_enterprise_bc(bc, policy)
     if internal and enterprise_bc:
         return "enterprise"
     if internal and not enterprise_bc:
@@ -2004,7 +2002,7 @@ def _scope_level(row: Dict[str, str]) -> Optional[str]:
     return None
 
 
-def _is_client_wide_rollup(row: Dict[str, str]) -> bool:
+def _is_client_wide_rollup(row: Dict[str, str], policy: EnterprisePolicy) -> bool:
     """A real, non-InternalEnterprise client's row with business_center_label not cut
     (pools that client's work across whichever real BCs it touches). This
     is the "client-wide roll-up" population -- distinct from
@@ -2012,7 +2010,7 @@ def _is_client_wide_rollup(row: Dict[str, str]) -> bool:
     be cut to one specific real value.
     """
     client = _client_of(row)
-    if not client or _is_internal_client(client):
+    if not client or _is_enterprise_client(client, policy):
         return False
     return not _bc_of(row)
 
@@ -2518,6 +2516,7 @@ def _scope_override_key(comparison_type: str) -> str:
 
 
 def _stash_scope_override(
+    policy: EnterprisePolicy,
     manifest: Dict[str, Dict[str, str]],
     resolved_sid: str,
     comparison_type: str,
@@ -2548,7 +2547,7 @@ def _stash_scope_override(
     manifest[resolved_sid][_scope_override_key(comparison_type)] = {
         "business_center_label": _bc_of(original_row),
         "discipline_label": original_row.get("discipline_label", ""),
-        "scope_level": _scope_level(original_row) or "",
+        "scope_level": _scope_level(original_row, policy) or "",
     }
 
 
@@ -2566,6 +2565,7 @@ _SIBLING_CTYPE_BY_ROLE = {
 
 
 def discover_sibling_segments(
+    policy: EnterprisePolicy,
     manifest: Dict[str, Dict[str, str]],
     ancestor_map: Optional[Dict[str, Set[str]]] = None,
     containment_map: Optional[Dict[str, Set[str]]] = None,
@@ -2620,7 +2620,7 @@ def discover_sibling_segments(
             continue
         if resolved != sid:
             _stash_scope_override(
-                manifest, resolved,
+                policy, manifest, resolved,
                 _SIBLING_CTYPE_BY_ROLE.get(role_key, "sibling_segments"),
                 row,
             )
@@ -2672,6 +2672,7 @@ def _is_client_only_project_segment(row: Dict[str, str]) -> bool:
 
 
 def discover_cross_client(
+    policy: EnterprisePolicy,
     manifest: Dict[str, Dict[str, str]],
 ) -> List[ComparisonPair]:
     """Purpose-built client-vs-client comparison: each client's own broadest
@@ -2720,7 +2721,7 @@ def discover_cross_client(
         if resolved is None:
             continue
         if resolved != sid:
-            _stash_scope_override(manifest, resolved, "cross_client", row)
+            _stash_scope_override(policy, manifest, resolved, "cross_client", row)
         # First-seen wins if the manifest somehow carries more than one
         # client-only Project segment for the same (client, unit, discipline)
         # -- shouldn't happen given build_segment_manifest.py's
@@ -2739,6 +2740,7 @@ def discover_cross_client(
 
 
 def discover_client_cross_bc(
+    policy: EnterprisePolicy,
     manifest: Dict[str, Dict[str, str]],
 ) -> List[ComparisonPair]:
     """Same-client, cross-business-center comparison: for a real (non-InternalEnterprise)
@@ -2756,7 +2758,7 @@ def discover_client_cross_bc(
     for sid, row in manifest.items():
         if row.get("run_type", "").strip().lower() not in ("bundle", "reference"):
             continue
-        if _scope_level(row) != "client_business_center":
+        if _scope_level(row, policy) != "client_business_center":
             continue
         client = row.get("client_label", "").strip()
         unit = row.get("unit_system", "").strip()
@@ -2836,6 +2838,7 @@ def discover_parent_siblings(
 
 
 def discover_governance_chain(
+    policy: EnterprisePolicy,
     manifest: Dict[str, Dict[str, str]],
 ) -> List[ComparisonPair]:
     # Directed pairs along the provision chain:
@@ -3044,8 +3047,8 @@ def discover_governance_chain(
         (sid, row) for sid, row in eligible_rows
         if _role_key(row.get("governance_role", "")) == "project"
     ]
-    enterprise_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row) == "enterprise"]
-    bc_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row) == "business_center"]
+    enterprise_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row, policy) == "enterprise"]
+    bc_standards = [(sid, row) for sid, row in standard_rows if _scope_level(row, policy) == "business_center"]
     # enterprise_to_client targets: a client's standards, whether narrowed to
     # one specific business center (client_business_center scope) or pooled
     # across every business center that client touches (a client-wide
@@ -3053,7 +3056,7 @@ def discover_governance_chain(
     # both, they produce separate comparison rows, not a merged population.
     client_standards = [
         (sid, row) for sid, row in standard_rows
-        if _scope_level(row) == "client_business_center" or _is_client_wide_rollup(row)
+        if _scope_level(row, policy) == "client_business_center" or _is_client_wide_rollup(row, policy)
     ]
 
     # These loops group purely by scope level, ignoring parent_segment_id —
@@ -3139,7 +3142,7 @@ def discover_governance_chain(
     # business_center-scoped rows -- scope level is orthogonal to role.
     by_role_bc: Dict[str, List[str]] = defaultdict(list)
     for sid, row in eligible_rows:
-        if _scope_level(row) == "business_center":
+        if _scope_level(row, policy) == "business_center":
             by_role_bc[_role_key(row.get("governance_role", ""))].append(sid)
     for _role, sids in by_role_bc.items():
         for a_sid, b_sid in combinations(sorted(sids), 2):
@@ -3306,6 +3309,7 @@ def make_comparison_run_id(
 # ---------------------------------------------------------------------------
 
 def run_pair(
+    policy: EnterprisePolicy,
     seg_a: str,
     seg_b: str,
     comparison_type: str,
@@ -3442,7 +3446,7 @@ def run_pair(
         n_unique_wp = len(total_jhs)
 
         summary_row = _build_summary_row(
-            crid, seg_a, seg_b, comparison_type, domain,
+            policy, crid, seg_a, seg_b, comparison_type, domain,
             manifest, metrics,
             n_patterns_a=n_unique_wp,
             n_patterns_b=n_unique_wp,
@@ -3558,7 +3562,7 @@ def run_pair(
         bnd_a_used_blocked = load_bundle_join_hash_set(segments_root, registry, seg_a, domain, "used")
         bnd_b_used_blocked = load_bundle_join_hash_set(segments_root, registry, seg_b, domain, "used")
         blocked_row = _build_summary_row(
-            crid_blocked, seg_a, seg_b, comparison_type, domain,
+            policy, crid_blocked, seg_a, seg_b, comparison_type, domain,
             manifest, {"n_files_a": str(n_files_a_ct), "n_files_b": str(n_files_b_ct), "n_pairs": "0"},
             # n_a/n_b are the populated side's real pattern counts (a blocked
             # side is zero by definition, but the other side may not be) --
@@ -3669,7 +3673,7 @@ def run_pair(
 
     crid = make_comparison_run_id(seg_a, seg_b, executed_utc, comparison_type)
     summary = _build_summary_row(
-        crid, seg_a, seg_b, comparison_type, domain,
+        policy, crid, seg_a, seg_b, comparison_type, domain,
         manifest, metrics,
         n_patterns_a=n_a,
         n_patterns_b=n_b,
@@ -3723,6 +3727,7 @@ def run_pair(
 
 
 def _run_pair_domain(
+    policy: EnterprisePolicy,
     seg_a: str,
     seg_b: str,
     comparison_type: str,
@@ -3738,6 +3743,7 @@ def _run_pair_domain(
     """Wrapper around run_pair for a single pair×domain. Returns (summary_row, detail_rows)."""
     _ = no_delta  # Accepted for future use; run_pair does not currently consume it.
     return run_pair(
+        policy=policy,
         seg_a=seg_a,
         seg_b=seg_b,
         comparison_type=comparison_type,
@@ -3752,6 +3758,7 @@ def _run_pair_domain(
 
 
 def _build_summary_row(
+    policy: EnterprisePolicy,
     crid: str,
     seg_a: str,
     seg_b: str,
@@ -3821,8 +3828,8 @@ def _build_summary_row(
         "client_label_b": mb.get("client_label", ""),
         "business_center_label_a": override_a.get("business_center_label", _bc_of(ma)),
         "business_center_label_b": override_b.get("business_center_label", _bc_of(mb)),
-        "scope_level_a": override_a.get("scope_level", _scope_level(ma) or ""),
-        "scope_level_b": override_b.get("scope_level", _scope_level(mb) or ""),
+        "scope_level_a": override_a.get("scope_level", _scope_level(ma, policy) or ""),
+        "scope_level_b": override_b.get("scope_level", _scope_level(mb, policy) or ""),
         "discipline_label_a": override_a.get("discipline_label", ma.get("discipline_label", "")),
         "discipline_label_b": override_b.get("discipline_label", mb.get("discipline_label", "")),
         "unit_system": ma.get("unit_system", ""),
@@ -3875,6 +3882,7 @@ def _build_summary_row(
 
 
 def build_governance_state_outputs(
+    policy: EnterprisePolicy,
     crid: str,
     seg_ref: str,
     seg_tgt: str,
@@ -4031,6 +4039,7 @@ def build_governance_state_outputs(
 # ---------------------------------------------------------------------------
 
 def _build_pooled_row(
+    policy: EnterprisePolicy,
     focal_sid: str,
     pool_sids: List[str],
     domain: str,
@@ -4101,7 +4110,7 @@ def _build_pooled_row(
             "governance_role": mf_blocked.get("governance_role", ""),
             "client_label": mf_blocked.get("client_label", ""),
             "business_center_label": _bc_of(mf_blocked),
-            "scope_level": _scope_level(mf_blocked) or "",
+            "scope_level": _scope_level(mf_blocked, policy) or "",
             "unit_system": mf_blocked.get("unit_system", ""),
             "domain": domain,
             "pool_scope": pool_scope,
@@ -4215,7 +4224,7 @@ def _build_pooled_row(
         "governance_role": mf.get("governance_role", ""),
         "client_label": mf.get("client_label", ""),
         "business_center_label": _bc_of(mf),
-        "scope_level": _scope_level(mf) or "",
+        "scope_level": _scope_level(mf, policy) or "",
         "unit_system": mf.get("unit_system", ""),
         "domain": domain,
         "pool_scope": pool_scope,
@@ -4246,6 +4255,7 @@ def _build_pooled_row(
 
 
 def run_pooled_comparison(
+    policy: EnterprisePolicy,
     manifest: Dict[str, Dict[str, str]],
     registry: Dict[str, Dict[str, str]],
     segments_root: Path,
@@ -4371,7 +4381,7 @@ def run_pooled_comparison(
 
                 for domain in sorted(focal_domains):
                     pooled_row = _build_pooled_row(
-                        focal_sid, pool_sids, domain, manifest, registry,
+                        policy, focal_sid, pool_sids, domain, manifest, registry,
                         segments_root, min_patterns, executed_utc,
                         pool_scope, pool_key_str,
                     )
@@ -4782,9 +4792,7 @@ def main() -> int:
     ap.add_argument("--enterprise-label", default=None, help="Enterprise label override (takes precedence over policy file)")
 
     args = ap.parse_args()
-    global _enterprise_label
     policy = load_enterprise_policy(args.enterprise_policy, args.enterprise_label)
-    _enterprise_label = policy.enterprise_label
     args.workers = resolve_worker_count(args.workers)
 
     segments_root = Path(args.segments_root).resolve()
@@ -4878,16 +4886,16 @@ def main() -> int:
     if args.within_segment:
         pairs.extend(discover_within_segment(manifest))
     if args.sibling_segments:
-        pairs.extend(discover_sibling_segments(manifest, ancestor_map, containment_map))
+        pairs.extend(discover_sibling_segments(policy, manifest, ancestor_map, containment_map))
     if args.parent_siblings:
         pairs.extend(discover_parent_siblings(manifest))
     if args.governance_chain:
-        pairs.extend(discover_governance_chain(manifest))
+        pairs.extend(discover_governance_chain(policy, manifest))
     if args.within_project:
         pairs.extend(discover_within_project(manifest, registry, file_metadata, segments_root))
     if args.cross_client:
-        pairs.extend(discover_cross_client(manifest))
-        pairs.extend(discover_client_cross_bc(manifest))
+        pairs.extend(discover_cross_client(policy, manifest))
+        pairs.extend(discover_client_cross_bc(policy, manifest))
 
     pairs = deduplicate_pairs(pairs)
 
@@ -5004,7 +5012,7 @@ def main() -> int:
         future_to_item = {
             executor.submit(
                 _run_pair_domain,
-                seg_a, seg_b, ctype, dom,
+                policy, seg_a, seg_b, ctype, dom,
                 manifest, registry, file_metadata,
                 segments_root, args.min_patterns,
                 executed_utc, args.no_delta,
@@ -5141,6 +5149,7 @@ def main() -> int:
                     else make_comparison_run_id(seg_a, seg_b, executed_utc, ctype)
                 )
                 state_rows, state_summary = build_governance_state_outputs(
+                    policy=policy,
                     crid=crid,
                     seg_ref=seg_a,
                     seg_tgt=seg_b,
@@ -5201,7 +5210,7 @@ def main() -> int:
             focal_filter.add(args.segment_b)
 
     pooled_rows = run_pooled_comparison(
-        manifest, registry, segments_root,
+        policy, manifest, registry, segments_root,
         args.min_patterns, executed_utc,
         domain_filter=args.domain,
         focal_segment_ids=focal_filter,

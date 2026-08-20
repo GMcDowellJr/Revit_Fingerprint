@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import hashlib
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -19,6 +20,7 @@ class EnterprisePolicy:
     normalized_enterprise_label: str
     enterprise_business_center_token: str
     source: str
+    configuration_identifier: str = ""
     policy_path: Optional[str] = None
     schema: str = POLICY_SCHEMA
 
@@ -31,9 +33,8 @@ class EnterprisePolicy:
             "enterprise_label": self.enterprise_label,
             "enterprise_business_center_token": self.enterprise_business_center_token,
             "source": self.source,
+            "configuration_identifier": self.configuration_identifier,
         }
-        if self.policy_path:
-            value["policy_path"] = self.policy_path
         return value
 
 
@@ -50,20 +51,31 @@ def load_enterprise_policy(
     """Load default/file policy, then apply the CLI label override (highest precedence)."""
     label = DEFAULT_ENTERPRISE_LABEL
     source = "checked_in_default"
-    safe_path = None
+    local_path = None
     if policy_path:
         path = Path(policy_path).expanduser().resolve()
         payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("enterprise policy must be a JSON object")
         if payload.get("schema") != POLICY_SCHEMA:
             raise ValueError("enterprise policy schema must be {}".format(POLICY_SCHEMA))
         label = _label(payload.get("enterprise_label"))
         token = payload.get("enterprise_business_center_token", DEFAULT_ENTERPRISE_BC_TOKEN)
         if token != DEFAULT_ENTERPRISE_BC_TOKEN:
             raise ValueError("enterprise business-center bookkeeping token must be 0000")
-        source, safe_path = "policy_file", path.name
+        source, local_path = "policy_file", str(path)
     if enterprise_label is not None:
         label, source = _label(enterprise_label), "cli_override"
-    return EnterprisePolicy(label, label.casefold(), DEFAULT_ENTERPRISE_BC_TOKEN, source, safe_path)
+    identifier_material = json.dumps(
+        {"schema": POLICY_SCHEMA, "enterprise_label": label,
+         "enterprise_business_center_token": DEFAULT_ENTERPRISE_BC_TOKEN,
+         "source": source}, sort_keys=True, separators=(",", ":")
+    )
+    configuration_identifier = "ep_" + hashlib.sha256(identifier_material.encode("utf-8")).hexdigest()[:16]
+    return EnterprisePolicy(
+        label, label.casefold(), DEFAULT_ENTERPRISE_BC_TOKEN, source,
+        configuration_identifier, local_path,
+    )
 
 
 def normalize_enterprise_label(value: Optional[str] = None) -> str:

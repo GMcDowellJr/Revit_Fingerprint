@@ -10,6 +10,9 @@ for candidate in (str(_REPO_ROOT), str(_TOOLS_DIR)):
         sys.path.insert(0, candidate)
 
 from tools.governance_manifest import build_governance_populations
+from tools.enterprise_policy import load_enterprise_policy
+
+POLICY = load_enterprise_policy()
 from tools.compare_governance_populations import (
     discover_same_role_peer_pairs,
     discover_directed_tc_to_project_pairs,
@@ -44,7 +47,7 @@ def _synthetic_manifest():
         _row("proj_clientbeta", "Project", "ClientBeta", "9999"),
         _row("gen1", "Generic", "InternalEnterprise", "0000"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     return manifest_rows, membership_rows
 
@@ -98,7 +101,7 @@ def test_same_role_peer_excludes_project_scoped_template_or_container():
         _row("t_proj", "Template", "ClientBeta", "2014"),  # scope_level "project"
         _row("t_bc", "Template", "InternalEnterprise", "2014"),   # scope_level "bc"
     ]
-    manifest_rows, _membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, _membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     pairs = discover_same_role_peer_pairs(manifest_rows)
     assert pairs == []
@@ -110,7 +113,7 @@ def test_comparison_type_still_unambiguous_with_project_scoped_template():
         _row("t_bc", "Template", "InternalEnterprise", "2014"),
         _row("p1", "Project", "InternalEnterprise", "2014"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     records_rows = _records_rows({
         "t_proj": {"h1"}, "t_bc": {"h1"}, "p1": {"h1"},
@@ -171,7 +174,7 @@ def test_directed_bc_to_project_matches_regardless_of_differing_client():
         _row("bc1", "Container", "InternalEnterprise", "2014"),
         _row("proj_ext", "Project", "Acme", "2014"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     pairs = discover_directed_tc_to_project_pairs(manifest_rows)
     types = {t for _a, _b, t in pairs}
@@ -190,7 +193,7 @@ def test_directed_client_to_project_matches_by_client_label_alone():
         _row("cl1", "Template", "Acme", "0000"),
         _row("proj_bc", "Project", "Acme", "2270"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     pairs = discover_directed_tc_to_project_pairs(manifest_rows)
     assert len(pairs) == 1
@@ -210,7 +213,7 @@ def test_files_with_no_inventory_for_domain_are_excluded_not_zero_padded():
         _row("b1", "Container", "InternalEnterprise", "2270"),
         _row("b2", "Container", "InternalEnterprise", "2270"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
 
     records_rows = [
@@ -235,7 +238,7 @@ def test_zero_inventory_domain_produces_no_row():
         _row("a1", "Container", "InternalEnterprise", "2014"),
         _row("b1", "Container", "InternalEnterprise", "2270"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     records_rows = [
         {"export_run_id": "a1", "domain": "domain_y", "join_hash": "h1"},

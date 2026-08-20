@@ -139,7 +139,7 @@ def _is_generic_role(role: str) -> bool:
 # scope_key composition (Change A)
 # ---------------------------------------------------------------------------
 
-def compute_scope_key(client_label: str, business_center_label: str, policy: EnterprisePolicy = None) -> Tuple[str, str, str, str]:
+def compute_scope_key(client_label: str, business_center_label: str, policy: EnterprisePolicy) -> Tuple[str, str, str, str]:
     """Returns (scope_key, scope_level, normalized_client_label, normalized_bc).
 
     A row is Enterprise-scoped only when BOTH client_label == "InternalEnterprise" AND
@@ -148,9 +148,6 @@ def compute_scope_key(client_label: str, business_center_label: str, policy: Ent
     can still be enterprise-bookkeeping-tagged; a InternalEnterprise-internal file can
     still carry a real business center).
     """
-    if isinstance(policy, str):
-        policy = load_enterprise_policy(enterprise_label=policy)
-    policy = policy or load_enterprise_policy()
     normalized_bc, is_enterprise_bc = normalize_business_center_label(business_center_label)
     is_internal = _is_enterprise_client(client_label, policy)
     client = client_label.strip()
@@ -228,7 +225,7 @@ def _normalize_manual_metadata(meta_rows: List[Dict[str, str]]) -> List[Dict[str
 
 def build_governance_populations(
     meta_rows: List[Dict[str, str]],
-    policy: EnterprisePolicy = None,
+    policy: EnterprisePolicy,
 ) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]]]:
     """Group file_metadata.csv rows into disjoint governance populations.
 
@@ -266,7 +263,7 @@ def build_governance_populations(
             scope_key, norm_client, norm_bc = "", "", ""
         elif role_key in KNOWN_TCP_ROLES:
             scope_key, _scope_level, norm_client, norm_bc = compute_scope_key(
-                client_label, business_center_label, policy or load_enterprise_policy()
+                client_label, business_center_label, policy
             )
         else:
             excluded_rows.append({

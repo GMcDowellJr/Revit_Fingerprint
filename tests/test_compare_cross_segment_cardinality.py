@@ -19,6 +19,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
 import compare_cross_segment as ccs  # noqa: E402
+from enterprise_policy import load_enterprise_policy
+POLICY = load_enterprise_policy()
+
 from compare_cross_segment import (  # noqa: E402
     compare_directed_file,
     compare_symmetric_file,
@@ -88,7 +91,7 @@ def test_one_by_one_comparison_is_ok_and_populates_union_and_pairwise(tmp_path):
     registry = {"a": _registry_entry("a"), "b": _registry_entry("b")}
 
     row, pairs = run_pair(
-        "a", "b", "cross_client", domain, manifest, registry, {},
+        POLICY, "a", "b", "cross_client", domain, manifest, registry, {},
         segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
     )
 
@@ -117,7 +120,7 @@ def test_one_by_twenty_comparison_is_degraded_single_a(tmp_path):
     registry = {"a": _registry_entry("a"), "b": _registry_entry("b")}
 
     row, pairs = run_pair(
-        "a", "b", "cross_client", domain, manifest, registry, {},
+        POLICY, "a", "b", "cross_client", domain, manifest, registry, {},
         segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
     )
 
@@ -147,7 +150,7 @@ def test_three_by_twenty_comparison_n_pairs_not_used_for_status(tmp_path):
     registry = {"a": _registry_entry("a"), "b": _registry_entry("b")}
 
     row, pairs = run_pair(
-        "a", "b", "cross_client", domain, manifest, registry, {},
+        POLICY, "a", "b", "cross_client", domain, manifest, registry, {},
         segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
     )
 
@@ -172,7 +175,7 @@ def test_union_metrics_stable_pairwise_mean_shifts_under_duplication(tmp_path):
     manifest = {"a": _manifest_entry(), "b": _manifest_entry()}
     registry = {"a": _registry_entry("a"), "b": _registry_entry("b")}
     row1, _ = run_pair(
-        "a", "b", "cross_client", domain, manifest, registry, {},
+        POLICY, "a", "b", "cross_client", domain, manifest, registry, {},
         segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
     )
 
@@ -189,7 +192,7 @@ def test_union_metrics_stable_pairwise_mean_shifts_under_duplication(tmp_path):
     manifest2 = {"a2": _manifest_entry(), "b2": _manifest_entry()}
     registry2 = {"a2": _registry_entry("a2"), "b2": _registry_entry("b2")}
     row2, _ = run_pair(
-        "a2", "b2", "cross_client", domain2, manifest2, registry2, {},
+        POLICY, "a2", "b2", "cross_client", domain2, manifest2, registry2, {},
         segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
     )
 
@@ -241,7 +244,7 @@ def test_directed_single_file_reference_produces_normal_output(tmp_path):
     registry = {"ref": _registry_entry("ref"), "tgt": _registry_entry("tgt")}
 
     row, pairs = run_pair(
-        "ref", "tgt", "template_to_project", domain, manifest, registry, {},
+        POLICY, "ref", "tgt", "template_to_project", domain, manifest, registry, {},
         segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
     )
 
@@ -276,7 +279,7 @@ def test_zero_files_on_either_side_is_blocked_not_zero_valued(tmp_path):
     }
 
     row, pairs = run_pair(
-        "missing", "populated", "cross_client", domain, manifest, registry, {},
+        POLICY, "missing", "populated", "cross_client", domain, manifest, registry, {},
         segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
     )
 
@@ -334,11 +337,11 @@ def test_empty_domain_and_unreadable_segment_get_different_inventory_status(tmp_
     assert status_empty != status_unreadable
 
     row_empty, _ = run_pair(
-        "empty", "populated", "cross_client", domain, manifest, registry, {},
+        POLICY, "empty", "populated", "cross_client", domain, manifest, registry, {},
         segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
     )
     row_unreadable, _ = run_pair(
-        "unreadable", "populated", "cross_client", domain, manifest, registry, {},
+        POLICY, "unreadable", "populated", "cross_client", domain, manifest, registry, {},
         segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
     )
 
@@ -371,7 +374,7 @@ def test_union_containment_does_not_track_file_count_ratio_like_pairwise_mean(tm
     registry = {"bc_dominant": _registry_entry("bc_dominant"), "bc_small": _registry_entry("bc_small")}
 
     row, _ = run_pair(
-        "bc_dominant", "bc_small", "client_cross_bc", domain, manifest, registry, {},
+        POLICY, "bc_dominant", "bc_small", "client_cross_bc", domain, manifest, registry, {},
         segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
     )
 
@@ -403,7 +406,7 @@ def test_single_file_side_is_never_blocked(tmp_path):
     registry = {"a": _registry_entry("a"), "b": _registry_entry("b")}
 
     row, _ = run_pair(
-        "a", "b", "cross_client", domain, manifest, registry, {},
+        POLICY, "a", "b", "cross_client", domain, manifest, registry, {},
         segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
     )
 
@@ -440,7 +443,7 @@ def test_pooled_comparison_schedules_pool_only_domain_for_empty_focal(tmp_path):
     }
 
     rows = run_pooled_comparison(
-        manifest, registry, segments_root, min_patterns=1,
+        POLICY, manifest, registry, segments_root, min_patterns=1,
         executed_utc="2026-07-20T00:00:00Z", focal_segment_ids={"focal_empty"},
     )
 
@@ -480,7 +483,7 @@ def test_pooled_comparison_skips_when_lineage_filtering_empties_the_pool(tmp_pat
     }
 
     rows = run_pooled_comparison(
-        manifest, registry, segments_root, min_patterns=1,
+        POLICY, manifest, registry, segments_root, min_patterns=1,
         executed_utc="2026-07-20T00:00:00Z", focal_segment_ids={"bc_parent"},
     )
 
@@ -522,7 +525,7 @@ def test_blocked_row_preserves_populated_side_bundle_availability(tmp_path):
     }
 
     row, _ = run_pair(
-        "missing", "populated", "cross_client", domain, manifest, registry, {},
+        POLICY, "missing", "populated", "cross_client", domain, manifest, registry, {},
         segments_root, min_patterns=1, executed_utc="2026-07-20T00:00:00Z",
     )
 
@@ -561,7 +564,7 @@ def test_pooled_blocked_row_preserves_pool_bundle_availability(tmp_path):
     }
 
     rows = run_pooled_comparison(
-        manifest, registry, segments_root, min_patterns=1,
+        POLICY, manifest, registry, segments_root, min_patterns=1,
         executed_utc="2026-07-20T00:00:00Z", focal_segment_ids={"focal_empty"},
     )
     pooldom_rows = [
