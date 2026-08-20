@@ -350,7 +350,7 @@ def test_empty_domain_and_unreadable_segment_get_different_inventory_status(tmp_
 
 
 # ---------------------------------------------------------------------------
-# 10. cross_client / client_cross_bc imbalance check (Kaiser-style fixture)
+# 10. cross_client / client_cross_bc imbalance check (ClientAlpha-style fixture)
 # ---------------------------------------------------------------------------
 
 def test_union_containment_does_not_track_file_count_ratio_like_pairwise_mean(tmp_path):
@@ -359,7 +359,7 @@ def test_union_containment_does_not_track_file_count_ratio_like_pairwise_mean(tm
     because one side happens to have more files -- unlike the pairwise mean,
     which is dominated by whichever side has more files contributing pairs."""
     _clear_caches()
-    domain = "dkaiser"
+    domain = "dclientalpha"
     segments_root = tmp_path / "segments"
     # bc_dominant: 18 files, all near-identical vocabulary {core1, core2}.
     dominant_files = {f"fd{i}": ["core1", "core2"] for i in range(18)}

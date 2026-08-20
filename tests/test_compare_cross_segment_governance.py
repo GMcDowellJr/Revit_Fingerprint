@@ -153,7 +153,7 @@ def test_discover_governance_chain_preserves_collection_scope_within_business_ce
     # build_segment_manifest.py's collection_label cut dimension). Two rows
     # sharing business_center_label but differing in collection_label must
     # not be pooled together, or Page's standards and the firm-wide
-    # "Stantec Standards" collection (both business_center=BC_0000 in
+    # "InternalEnterprise Standards" collection (both business_center=BC_0000 in
     # practice) would get spurious template_to_project/container_to_project
     # pairs against each other.
     manifest = {
@@ -167,15 +167,15 @@ def test_discover_governance_chain_preserves_collection_scope_within_business_ce
             "business_center_label": "BC_0000",
             "collection_label": "Page Standards",
         },
-        "stantec_t": {
+        "internalenterprise_t": {
             **_seg("Template", client="__NOT_APPLICABLE__"),
             "business_center_label": "BC_0000",
-            "collection_label": "Stantec Standards",
+            "collection_label": "InternalEnterprise Standards",
         },
-        "stantec_c": {
+        "internalenterprise_c": {
             **_seg("Container", client="n/a"),
             "business_center_label": "BC_0000",
-            "collection_label": "Stantec Standards",
+            "collection_label": "InternalEnterprise Standards",
         },
         # No collection_label at all — still groups purely on business_center,
         # unaffected by the new collection-scoping.
@@ -193,10 +193,10 @@ def test_discover_governance_chain_preserves_collection_scope_within_business_ce
 
     # Same business_center AND same collection: still group.
     assert ("page_t", "page_c", "template_to_container") in pairs
-    assert ("stantec_t", "stantec_c", "template_to_container") in pairs
+    assert ("internalenterprise_t", "internalenterprise_c", "template_to_container") in pairs
     # Same business_center, DIFFERENT collection: must not cross-pollinate.
-    assert ("page_t", "stantec_c", "template_to_container") not in pairs
-    assert ("stantec_t", "page_c", "template_to_container") not in pairs
+    assert ("page_t", "internalenterprise_c", "template_to_container") not in pairs
+    assert ("internalenterprise_t", "page_c", "template_to_container") not in pairs
     # business_center-only rows (no collection_label) are unaffected.
     assert ("bc_only_t", "bc_only_c", "template_to_container") in pairs
 
@@ -222,7 +222,7 @@ def test_discover_governance_chain_final_fallback_normalizes_na_spelling():
 
 def test_discover_governance_chain_collection_match_is_soft_for_client_scope():
     # Mirrors real data: a client's own Container/Template rows are tagged
-    # with that client's collection_label (e.g. "Sutter Standards"), but its
+    # with that client's collection_label (e.g. "ClientBeta Standards"), but its
     # Project rows typically carry no collection_label at all. Hard-
     # partitioning by collection_label would put those in different _key()
     # buckets and silently stop producing template_to_project/
@@ -231,33 +231,33 @@ def test_discover_governance_chain_collection_match_is_soft_for_client_scope():
     # them, while two DIFFERENT populated collections under the same client
     # must not cross-pollinate.
     manifest = {
-        "sutter_t": {**_seg("Template", client="Sutter"), "collection_label": "Sutter Standards"},
-        "sutter_c": {**_seg("Container", client="Sutter"), "collection_label": "Sutter Standards"},
+        "clientbeta_t": {**_seg("Template", client="ClientBeta"), "collection_label": "ClientBeta Standards"},
+        "clientbeta_c": {**_seg("Container", client="ClientBeta"), "collection_label": "ClientBeta Standards"},
         # Project rows: no collection_label at all, matching real data.
-        "sutter_p": _seg("Project", client="Sutter"),
+        "clientbeta_p": _seg("Project", client="ClientBeta"),
         # A second, differently-named collection under the SAME client must
-        # not silently pair with "Sutter Standards" — two populated,
+        # not silently pair with "ClientBeta Standards" — two populated,
         # different values are a genuine mismatch.
-        "sutter_legacy_t": {**_seg("Template", client="Sutter"), "collection_label": "Sutter Legacy"},
+        "clientbeta_legacy_t": {**_seg("Template", client="ClientBeta"), "collection_label": "ClientBeta Legacy"},
     }
 
     pairs = set(discover_governance_chain(manifest))
 
     # Collection-tagged standards still pair with collection-blank usage.
-    assert ("sutter_t", "sutter_p", "template_to_project") in pairs
-    assert ("sutter_c", "sutter_p", "container_to_project") in pairs
-    assert ("sutter_t", "sutter_c", "template_to_container") in pairs
+    assert ("clientbeta_t", "clientbeta_p", "template_to_project") in pairs
+    assert ("clientbeta_c", "clientbeta_p", "container_to_project") in pairs
+    assert ("clientbeta_t", "clientbeta_c", "template_to_container") in pairs
     # Two different, both-populated collections under the same client don't
     # cross-pollinate.
-    assert ("sutter_legacy_t", "sutter_c", "template_to_container") not in pairs
+    assert ("clientbeta_legacy_t", "clientbeta_c", "template_to_container") not in pairs
     # But the differently-collectioned template still reaches the
     # collection-blank project, since blank is permissive on one side.
-    assert ("sutter_legacy_t", "sutter_p", "template_to_project") in pairs
+    assert ("clientbeta_legacy_t", "clientbeta_p", "template_to_project") in pairs
 
 
 def test_discover_governance_chain_rollup_does_not_wildcard_match_specific_collection():
     # Mirrors real data: business_center_label="BC_0000" hosts two distinct
-    # collections (Page Standards, Stantec Standards). build_segment_manifest.py
+    # collections (Page Standards, InternalEnterprise Standards). build_segment_manifest.py
     # keeps a runnable, collection-blank aggregate Template alongside its
     # collection-specific children whenever the aggregate's population isn't
     # identical to either child's (i.e. the BC hosts more than one
@@ -288,10 +288,10 @@ def test_discover_governance_chain_rollup_does_not_wildcard_match_specific_colle
             "business_center_label": "BC_0000",
             "collection_label": "Page Standards",
         },
-        "bc_c_stantec": {
+        "bc_c_internalenterprise": {
             **_seg("Container", client="n/a"),
             "business_center_label": "BC_0000",
-            "collection_label": "Stantec Standards",
+            "collection_label": "InternalEnterprise Standards",
         },
     }
 
@@ -299,18 +299,18 @@ def test_discover_governance_chain_rollup_does_not_wildcard_match_specific_colle
 
     # The roll-up must not wildcard-match ANY specific-collection Container.
     assert ("bc_t_rollup", "bc_c_page", "template_to_container") not in pairs
-    assert ("bc_t_rollup", "bc_c_stantec", "template_to_container") not in pairs
+    assert ("bc_t_rollup", "bc_c_internalenterprise", "template_to_container") not in pairs
     # A collection-specific Template still correctly pairs with the matching
     # collection's Container, and not with a different one.
     assert ("bc_t_page", "bc_c_page", "template_to_container") in pairs
-    assert ("bc_t_page", "bc_c_stantec", "template_to_container") not in pairs
+    assert ("bc_t_page", "bc_c_internalenterprise", "template_to_container") not in pairs
 
 
 def test_scope_level_derivation():
     # Scope level is derived from explicit, literal client_label/
     # business_center_label values -- orthogonal to governance_role.
-    assert _scope_level({**_seg("Template", client="Stantec"), "business_center_label": "0000"}) == "enterprise"
-    assert _scope_level({**_seg("Template", client="Stantec"), "business_center_label": "2270"}) == "business_center"
+    assert _scope_level({**_seg("Template", client="InternalEnterprise"), "business_center_label": "0000"}) == "enterprise"
+    assert _scope_level({**_seg("Template", client="InternalEnterprise"), "business_center_label": "2270"}) == "business_center"
     assert _scope_level({**_seg("Project", client="Acme"), "business_center_label": "2270"}) == "client_business_center"
     # Role never enters into the classification -- a client+bc segment can
     # be Template, Container, or Project; scope alone doesn't imply role.
@@ -327,8 +327,8 @@ def test_0000_flows_through_as_literal_enterprise_value():
     # be folded to blank anymore.
     assert _normalize_bc_label("0000") == "0000"
     assert _normalize_bc_label("BC_1234") == "BC_1234"
-    assert _bc_of({**_seg("Template", client="Stantec"), "business_center_label": "0000"}) == "0000"
-    assert _scope_level({**_seg("Template", client="Stantec"), "business_center_label": "0000"}) == "enterprise"
+    assert _bc_of({**_seg("Template", client="InternalEnterprise"), "business_center_label": "0000"}) == "0000"
+    assert _scope_level({**_seg("Template", client="InternalEnterprise"), "business_center_label": "0000"}) == "enterprise"
 
 
 def test_bc_0000_spelling_variants_canonicalize_to_0000():
@@ -339,7 +339,7 @@ def test_bc_0000_spelling_variants_canonicalize_to_0000():
     # business centers, and must not fold to blank either.
     for token in ("BC_0000", "bc_0000", "Bc_0000"):
         assert _normalize_bc_label(token) == "0000"
-        row = {**_seg("Template", client="Stantec"), "business_center_label": token}
+        row = {**_seg("Template", client="InternalEnterprise"), "business_center_label": token}
         assert _bc_of(row) == "0000"
         assert _scope_level(row) == "enterprise"
 
@@ -352,18 +352,18 @@ def test_na_spelled_business_center_labels_normalize_to_blank():
     # defined scope level.
     for token in ("n/a", "NA", "__NOT_APPLICABLE__", "not applicable"):
         assert _normalize_bc_label(token) == ""
-        row = {**_seg("Template", client="Stantec"), "business_center_label": token}
+        row = {**_seg("Template", client="InternalEnterprise"), "business_center_label": token}
         assert _bc_of(row) == ""
         assert _scope_level(row) is None
 
 
 def test_discover_governance_chain_enterprise_to_project_reaches_every_scope():
-    # An enterprise-scoped Template/Container (Stantec/"0000") has no real
+    # An enterprise-scoped Template/Container (InternalEnterprise/"0000") has no real
     # client/bc narrowing of its own and applies across the whole business —
     # it must reach every Project regardless of that project's own client/bc
     # scope.
     manifest = {
-        "ent_t": {**_seg("Template", client="Stantec"), "business_center_label": "0000"},
+        "ent_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "0000"},
         "proj_a": {**_seg("Project", client="Acme"), "business_center_label": "BC_1234"},
         "proj_b": {**_seg("Project", client="Widgets"), "business_center_label": "BC_9999"},
     }
@@ -375,12 +375,12 @@ def test_discover_governance_chain_enterprise_to_project_reaches_every_scope():
 
 
 def test_discover_governance_chain_bc_to_project_scoped_to_matching_bc_only():
-    # A business_center-scoped Template (Stantec + a real bc) only reaches
+    # A business_center-scoped Template (InternalEnterprise + a real bc) only reaches
     # Projects within the SAME (normalized) business center — not projects
     # in a different bc, even though both are still "downstream" of the
     # enterprise.
     manifest = {
-        "bc_t": {**_seg("Template", client="Stantec"), "business_center_label": "BC_1234"},
+        "bc_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "BC_1234"},
         "proj_same_bc": {**_seg("Project", client="Acme"), "business_center_label": "BC_1234"},
         "proj_other_bc": {**_seg("Project", client="Widgets"), "business_center_label": "BC_9999"},
     }
@@ -396,10 +396,10 @@ def test_discover_governance_chain_enterprise_to_bc_and_client_are_same_role_onl
     # (Template vs Template, Container vs Container) — they must not mix
     # roles (Template vs Container).
     manifest = {
-        "ent_t": {**_seg("Template", client="Stantec"), "business_center_label": "0000"},
-        "ent_c": {**_seg("Container", client="Stantec"), "business_center_label": "0000"},
-        "bc_t": {**_seg("Template", client="Stantec"), "business_center_label": "BC_1234"},
-        "bc_c": {**_seg("Container", client="Stantec"), "business_center_label": "BC_1234"},
+        "ent_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "0000"},
+        "ent_c": {**_seg("Container", client="InternalEnterprise"), "business_center_label": "0000"},
+        "bc_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "BC_1234"},
+        "bc_c": {**_seg("Container", client="InternalEnterprise"), "business_center_label": "BC_1234"},
         # No business_center_label at all -- a client-wide roll-up, a valid
         # (distinct) enterprise_to_client target alongside any
         # client_business_center-scoped standard the client might also have.
@@ -415,7 +415,7 @@ def test_discover_governance_chain_enterprise_to_bc_and_client_are_same_role_onl
 
 
 def test_enterprise_to_bc_and_sibling_template_survive_with_distinct_run_ids():
-    # An enterprise (Stantec/0000) standard and a real-BC standard of the
+    # An enterprise (InternalEnterprise/0000) standard and a real-BC standard of the
     # same role sharing a parent_segment_id get paired BOTH as
     # sibling_templates (discover_sibling_segments, symmetric Jaccard) AND
     # as enterprise_to_bc (discover_governance_chain, directed reference-
@@ -429,12 +429,12 @@ def test_enterprise_to_bc_and_sibling_template_survive_with_distinct_run_ids():
     # collide on comparison_run_id.
     manifest = {
         "seg_0000": {
-            **_seg("Template", client="Stantec"),
+            **_seg("Template", client="InternalEnterprise"),
             "business_center_label": "0000",
             "parent_segment_id": "parent1",
         },
         "seg_bc001": {
-            **_seg("Template", client="Stantec"),
+            **_seg("Template", client="InternalEnterprise"),
             "business_center_label": "BC1",
             "parent_segment_id": "parent1",
         },
@@ -491,11 +491,11 @@ def test_discover_governance_chain_excludes_ancestor_descendant_from_scope_fanou
     # even though a descendant's data is always a subset of its ancestor's.
     manifest = {
         "ent_t": {
-            **_seg("Template", client="Stantec"), "business_center_label": "0000",
+            **_seg("Template", client="InternalEnterprise"), "business_center_label": "0000",
             "parent_segment_id": "",
         },
         "bc_t_child": {
-            **_seg("Template", client="Stantec"), "business_center_label": "BC_1234",
+            **_seg("Template", client="InternalEnterprise"), "business_center_label": "BC_1234",
             "parent_segment_id": "ent_t",
         },
         "proj_grandchild": {
@@ -503,7 +503,7 @@ def test_discover_governance_chain_excludes_ancestor_descendant_from_scope_fanou
             "parent_segment_id": "bc_t_child",
         },
         "bc_t_unrelated": {
-            **_seg("Template", client="Stantec"), "business_center_label": "BC_1234",
+            **_seg("Template", client="InternalEnterprise"), "business_center_label": "BC_1234",
             "parent_segment_id": "",
         },
         "proj_unrelated": {
@@ -529,10 +529,10 @@ def test_discover_governance_chain_enterprise_to_bc_reaches_every_real_bc():
     # center's same-role Template, not just one -- a fixture with 3+ BCs must
     # show all 3, not a fixed pair.
     manifest = {
-        "ent_t": {**_seg("Template", client="Stantec"), "business_center_label": "0000"},
-        "bc1_t": {**_seg("Template", client="Stantec"), "business_center_label": "1450"},
-        "bc2_t": {**_seg("Template", client="Stantec"), "business_center_label": "2270"},
-        "bc3_t": {**_seg("Template", client="Stantec"), "business_center_label": "9999"},
+        "ent_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "0000"},
+        "bc1_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "1450"},
+        "bc2_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "2270"},
+        "bc3_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "9999"},
     }
 
     pairs = {(a, b) for a, b, ctype in discover_governance_chain(manifest) if ctype == "enterprise_to_bc"}
@@ -544,9 +544,9 @@ def test_discover_governance_chain_bc_to_bc_pairs_every_peer_business_center():
     # Purpose-built BC-to-BC peer discovery: every pair of real business
     # centers' same-role, same-discipline Template populations.
     manifest = {
-        "bc1_t": {**_seg("Template", client="Stantec"), "business_center_label": "1450"},
-        "bc2_t": {**_seg("Template", client="Stantec"), "business_center_label": "2270"},
-        "bc3_t": {**_seg("Template", client="Stantec"), "business_center_label": "9999"},
+        "bc1_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "1450"},
+        "bc2_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "2270"},
+        "bc3_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "9999"},
     }
 
     pairs = {(a, b) for a, b, ctype in discover_governance_chain(manifest) if ctype == "bc_to_bc"}
@@ -556,9 +556,9 @@ def test_discover_governance_chain_bc_to_bc_pairs_every_peer_business_center():
 
 def test_discover_governance_chain_bc_to_bc_excludes_same_bc_and_enterprise():
     manifest = {
-        "bc1_t": {**_seg("Template", client="Stantec"), "business_center_label": "1450"},
-        "bc1_t_dup": {**_seg("Template", client="Stantec"), "business_center_label": "1450"},
-        "ent_t": {**_seg("Template", client="Stantec"), "business_center_label": "0000"},
+        "bc1_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "1450"},
+        "bc1_t_dup": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "1450"},
+        "ent_t": {**_seg("Template", client="InternalEnterprise"), "business_center_label": "0000"},
     }
 
     pairs = {(a, b, ctype) for a, b, ctype in discover_governance_chain(manifest) if ctype == "bc_to_bc"}
@@ -575,10 +575,10 @@ def test_discover_governance_chain_disc_match_has_no_blank_wildcard():
     # the removed _disc_match() blank wildcard must not silently reappear.
     manifest = {
         "bc1_t_blank": {
-            **_seg("Template", client="Stantec", discipline=""), "business_center_label": "1450",
+            **_seg("Template", client="InternalEnterprise", discipline=""), "business_center_label": "1450",
         },
         "bc2_t_arch": {
-            **_seg("Template", client="Stantec", discipline="Architectural"), "business_center_label": "2270",
+            **_seg("Template", client="InternalEnterprise", discipline="Architectural"), "business_center_label": "2270",
         },
     }
 
@@ -627,11 +627,11 @@ def test_discover_client_cross_bc_and_bc_to_bc_do_not_reference_collection_label
             "collection_label": "A Totally Different Collection",
         },
         "bc1_t": {
-            **_seg("Template", client="Stantec"), "business_center_label": "1450",
+            **_seg("Template", client="InternalEnterprise"), "business_center_label": "1450",
             "collection_label": "Some Collection",
         },
         "bc2_t": {
-            **_seg("Template", client="Stantec"), "business_center_label": "2270",
+            **_seg("Template", client="InternalEnterprise"), "business_center_label": "2270",
             "collection_label": "A Totally Different Collection",
         },
     }
@@ -702,8 +702,8 @@ def test_pooled_comparison_bc_scope_pools_enterprise_0000_segments(tmp_path):
         ["p1", "p2"],
     )
     manifest = {
-        "ent_a": {**_seg("Project", client="Stantec"), "business_center_label": "0000", "segment_label": "Ent A"},
-        "ent_b": {**_seg("Project", client="Stantec"), "business_center_label": "0000", "segment_label": "Ent B"},
+        "ent_a": {**_seg("Project", client="InternalEnterprise"), "business_center_label": "0000", "segment_label": "Ent A"},
+        "ent_b": {**_seg("Project", client="InternalEnterprise"), "business_center_label": "0000", "segment_label": "Ent B"},
     }
     registry = {
         "ent_a": {"output_folder": "ent_a", "run_type": "bundle"},
@@ -712,7 +712,7 @@ def test_pooled_comparison_bc_scope_pools_enterprise_0000_segments(tmp_path):
 
     rows = run_pooled_comparison(manifest, registry, segments_root, min_patterns=1, executed_utc="2026-07-13T00:00:00Z")
 
-    # Same client (both "Stantec") -- both bc and client pools fire, since
+    # Same client (both "InternalEnterprise") -- both bc and client pools fire, since
     # "0000" is no longer folded away and client_groups still fires
     # independently.
     assert {r["pool_scope"] for r in rows} == {"bc", "client"}

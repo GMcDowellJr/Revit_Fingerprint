@@ -54,10 +54,10 @@ def _full_row(export_run_id, unit_system, client_label, governance_role, discipl
 # exercise _build_segments()'s own permissive combinatorics directly; main()
 # would now block on all of that, so main()-level tests use VALID_ROWS.
 VALID_ROWS = [
-    _full_row("r01", "imperial", "Kaiser", "Project", "architectural", "1450"),
-    _full_row("r02", "imperial", "Kaiser", "Project", "architectural", "1450"),
-    _full_row("r03", "imperial", "Kaiser", "Project", "architectural", "1450"),
-    _full_row("r04", "imperial", "Kaiser", "Template", "architectural", "1450"),
+    _full_row("r01", "imperial", "ClientAlpha", "Project", "architectural", "1450"),
+    _full_row("r02", "imperial", "ClientAlpha", "Project", "architectural", "1450"),
+    _full_row("r03", "imperial", "ClientAlpha", "Project", "architectural", "1450"),
+    _full_row("r04", "imperial", "ClientAlpha", "Template", "architectural", "1450"),
     _full_row("r05", "imperial", "Renown", "Project", "structural", "2270"),
     _full_row("r06", "imperial", "Renown", "Project", "structural", "2270"),
     _full_row("r07", "imperial", "Renown", "Project", "structural", "2270"),
@@ -83,10 +83,10 @@ def _membership_ids(out_dir: Path, segment_id: str) -> set:
 # ---------------------------------------------------------------------------
 
 ROWS = [
-    _meta_row("r01", "imperial", "Kaiser", "Project"),
-    _meta_row("r02", "imperial", "Kaiser", "Project"),
-    _meta_row("r03", "imperial", "Kaiser", "Project"),
-    _meta_row("r04", "imperial", "Kaiser", "Template"),
+    _meta_row("r01", "imperial", "ClientAlpha", "Project"),
+    _meta_row("r02", "imperial", "ClientAlpha", "Project"),
+    _meta_row("r03", "imperial", "ClientAlpha", "Project"),
+    _meta_row("r04", "imperial", "ClientAlpha", "Template"),
     _meta_row("r05", "imperial", "Renown", "Project"),
     _meta_row("r06", "imperial", "Renown", "Project"),
     _meta_row("r07", "imperial", "Renown", "Project"),
@@ -144,7 +144,7 @@ def test_level2_segments_present():
     segs = _build_segments(ROWS, min_files=3)
     l2 = [r for r in segs if r["segment_level"] == "2"]
     seg_ids = {r["segment_id"] for r in l2}
-    assert "imperial|Kaiser" in seg_ids
+    assert "imperial|ClientAlpha" in seg_ids
     assert "imperial|Renown" in seg_ids
     assert "metric|Global" in seg_ids
 
@@ -157,15 +157,15 @@ def test_level2_run_type_below_min():
 
 def test_level2_run_type_at_min():
     segs = _build_segments(ROWS, min_files=3)
-    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
-    assert kaiser["run_type"] == "registration"
+    clientalpha = next(r for r in segs if r["segment_id"] == "imperial|ClientAlpha")
+    assert clientalpha["run_type"] == "registration"
 
 
 def test_seed_detection_level2():
     segs = _build_segments(ROWS, min_files=3)
-    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
-    assert kaiser["has_seed_file"] == "true"
-    assert "r04" in kaiser["seed_export_run_ids"].split("|")
+    clientalpha = next(r for r in segs if r["segment_id"] == "imperial|ClientAlpha")
+    assert clientalpha["has_seed_file"] == "true"
+    assert "r04" in clientalpha["seed_export_run_ids"].split("|")
 
 
 def test_seed_detection_renown_no_seed():
@@ -216,15 +216,15 @@ def test_export_run_ids_sorted_pipe_delimited():
     # for large populations). Rows are sorted (segment_id, export_run_id).
     segs = _build_segments(ROWS, min_files=3)
     membership = _build_membership_rows(segs)
-    kaiser_ids = [r["export_run_id"] for r in membership if r["segment_id"] == "imperial|Kaiser"]
-    assert kaiser_ids == sorted(kaiser_ids)
-    assert kaiser_ids  # non-empty for this fixture
+    clientalpha_ids = [r["export_run_id"] for r in membership if r["segment_id"] == "imperial|ClientAlpha"]
+    assert clientalpha_ids == sorted(clientalpha_ids)
+    assert clientalpha_ids  # non-empty for this fixture
 
 
 def test_membership_rows_no_pipe_delimited_values():
     # Regression guard for the original bug: export_run_id/is_seed must never
     # be a pipe-joined list (segment_id legitimately contains "|" as its own
-    # hierarchical separator, e.g. "imperial|Kaiser" — that's unrelated).
+    # hierarchical separator, e.g. "imperial|ClientAlpha" — that's unrelated).
     segs = _build_segments(ROWS, min_files=3)
     membership = _build_membership_rows(segs)
     for row in membership:
@@ -244,9 +244,9 @@ def test_manifest_and_registry_have_no_list_columns():
 
 def test_population_hash_in_manifest():
     segs = _build_segments(ROWS, min_files=3)
-    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
-    expected = _population_hash(kaiser["export_run_ids"].split("|"))
-    assert kaiser["population_hash"] == expected
+    clientalpha = next(r for r in segs if r["segment_id"] == "imperial|ClientAlpha")
+    expected = _population_hash(clientalpha["export_run_ids"].split("|"))
+    assert clientalpha["population_hash"] == expected
 
 
 def test_registry_excludes_skip_segments():
@@ -259,8 +259,8 @@ def test_registry_excludes_skip_segments():
 def test_registry_output_folder_sanitized():
     segs = _build_segments(ROWS, min_files=3)
     reg = _build_registry(segs)
-    kaiser_reg = next(r for r in reg if r["segment_id"] == "imperial|Project|Kaiser")
-    assert kaiser_reg["output_folder"] == "imperial_project_kaiser"
+    clientalpha_reg = next(r for r in reg if r["segment_id"] == "imperial|Project|ClientAlpha")
+    assert clientalpha_reg["output_folder"] == "imperial_project_clientalpha"
 
 
 def test_sanitize_folder_strips_path_separators():
@@ -387,7 +387,7 @@ def test_main_writes_files(tmp_path):
     seg_ids = {r["segment_id"] for r in manifest_rows}
     assert "imperial" in seg_ids
     assert "metric" in seg_ids
-    assert "imperial|Kaiser" in seg_ids
+    assert "imperial|ClientAlpha" in seg_ids
 
     reg_rows = _read_csv(registry_path)
     assert all(r["status"] == "pending" for r in reg_rows)
@@ -438,22 +438,22 @@ def test_seed_only_note_set_when_segment_has_seeds_no_project():
 
 
 def test_registry_folder_merges_for_client_label_case_variants():
-    # "Kaiser" and "kaiser" are case variants of the same client, not two
+    # "ClientAlpha" and "clientalpha" are case variants of the same client, not two
     # clients — _normalize_rows() folds them together (first-seen casing)
     # before segment_id construction, so this must produce ONE registry row
     # / output_folder, not two. (Previously this scenario produced two
-    # distinct segment_ids that both sanitized to "imperial_kaiser" and had
+    # distinct segment_ids that both sanitized to "imperial_clientalpha" and had
     # to be disambiguated with a suffix — that was the bug this fix closes.)
     rows = (
-        [_meta_row(f"r{i:02d}", "imperial", "Kaiser", "Project") for i in range(3)]
-        + [_meta_row(f"r{i:02d}", "imperial", "kaiser", "Project") for i in range(10, 13)]
+        [_meta_row(f"r{i:02d}", "imperial", "ClientAlpha", "Project") for i in range(3)]
+        + [_meta_row(f"r{i:02d}", "imperial", "clientalpha", "Project") for i in range(10, 13)]
     )
     segs = _build_segments(rows, min_files=1)
     reg = _build_registry(segs)
-    kaiser_rows = [r for r in reg if r["segment_id"] == "imperial|Project|Kaiser"]
-    assert len(kaiser_rows) == 1
-    assert not any(r["segment_id"] == "imperial|Project|kaiser" for r in reg)
-    assert kaiser_rows[0]["output_folder"] == "imperial_project_kaiser"
+    clientalpha_rows = [r for r in reg if r["segment_id"] == "imperial|Project|ClientAlpha"]
+    assert len(clientalpha_rows) == 1
+    assert not any(r["segment_id"] == "imperial|Project|clientalpha" for r in reg)
+    assert clientalpha_rows[0]["output_folder"] == "imperial_project_clientalpha"
 
 
 def test_blank_client_label_no_longer_participates_in_subset():
@@ -540,7 +540,7 @@ def test_main_fails_on_missing_columns_even_with_no_data_rows(tmp_path):
 
 def test_level2_project_bundle_with_parent_bundle_runs_enabled():
     rows = (
-        [_meta_row(f"k{i:02d}", "imperial", "Kaiser", "Project") for i in range(1, 4)]
+        [_meta_row(f"k{i:02d}", "imperial", "ClientAlpha", "Project") for i in range(1, 4)]
         + [_meta_row(f"r{i:02d}", "imperial", "Renown", "Project") for i in range(1, 4)]
     )
     segs = _build_segments(rows, min_files=3, enable_parent_bundle_runs=True)
@@ -550,7 +550,7 @@ def test_level2_project_bundle_with_parent_bundle_runs_enabled():
 
 def test_level2_project_registration_without_flag():
     rows = (
-        [_meta_row(f"k{i:02d}", "imperial", "Kaiser", "Project") for i in range(1, 4)]
+        [_meta_row(f"k{i:02d}", "imperial", "ClientAlpha", "Project") for i in range(1, 4)]
         + [_meta_row(f"r{i:02d}", "imperial", "Renown", "Project") for i in range(1, 4)]
     )
     segs = _build_segments(rows, min_files=3)
@@ -560,21 +560,21 @@ def test_level2_project_registration_without_flag():
 
 def test_mixed_role_client_segment_stays_reference():
     rows = [
-        _meta_row("s01", "imperial", "Sutter", "Project"),
-        _meta_row("s02", "imperial", "Sutter", "Project"),
-        _meta_row("s03", "imperial", "Sutter", "Project"),
-        _meta_row("s04", "imperial", "Sutter", "Template"),
-        _meta_row("s05", "imperial", "Sutter", "Template"),
-        _meta_row("s06", "imperial", "Sutter", "Template"),
+        _meta_row("s01", "imperial", "ClientBeta", "Project"),
+        _meta_row("s02", "imperial", "ClientBeta", "Project"),
+        _meta_row("s03", "imperial", "ClientBeta", "Project"),
+        _meta_row("s04", "imperial", "ClientBeta", "Template"),
+        _meta_row("s05", "imperial", "ClientBeta", "Template"),
+        _meta_row("s06", "imperial", "ClientBeta", "Template"),
     ]
     segs = _build_segments(rows, min_files=3, enable_parent_bundle_runs=True)
-    mixed = next(r for r in segs if r["segment_id"] == "imperial|Sutter")
+    mixed = next(r for r in segs if r["segment_id"] == "imperial|ClientBeta")
     assert mixed["governance_role"] == ""
     assert mixed["run_type"] == "registration"
 
 
 def test_single_child_suppression_still_fires():
-    rows = [_meta_row(f"k{i:02d}", "imperial", "Kaiser", "Project") for i in range(1, 4)]
+    rows = [_meta_row(f"k{i:02d}", "imperial", "ClientAlpha", "Project") for i in range(1, 4)]
     segs = _build_segments(rows, min_files=3, enable_parent_bundle_runs=True)
     parent = next(r for r in segs if r["segment_id"] == "imperial|Project")
     assert parent["run_type"] == "registration"
@@ -588,11 +588,11 @@ def test_single_child_suppression_still_fires():
 def _disc_rows():
     """Multi-client, multi-discipline Container corpus for discipline tests."""
     return (
-        [_meta_row(f"ka{i:02d}", "imperial", "Kaiser", "Container", "Architectural") for i in range(4)]
-        + [_meta_row(f"ke{i:02d}", "imperial", "Kaiser", "Container", "Electrical") for i in range(3)]
+        [_meta_row(f"ka{i:02d}", "imperial", "ClientAlpha", "Container", "Architectural") for i in range(4)]
+        + [_meta_row(f"ke{i:02d}", "imperial", "ClientAlpha", "Container", "Electrical") for i in range(3)]
         + [_meta_row(f"ra{i:02d}", "imperial", "Renown", "Container", "Architectural") for i in range(3)]
         # rows with no discipline_label — must not generate discipline cuts
-        + [_meta_row(f"nx{i:02d}", "imperial", "Kaiser", "Project") for i in range(3)]
+        + [_meta_row(f"nx{i:02d}", "imperial", "ClientAlpha", "Project") for i in range(3)]
     )
 
 
@@ -606,8 +606,8 @@ def test_discipline_cut_level3_segment_generated():
 def test_discipline_cut_level4_segment_generated():
     segs = _build_segments(_disc_rows(), min_files=3)
     seg_ids = {r["segment_id"] for r in segs}
-    assert "imperial|Container|Kaiser|Architectural" in seg_ids
-    assert "imperial|Container|Kaiser|Electrical" in seg_ids
+    assert "imperial|Container|ClientAlpha|Architectural" in seg_ids
+    assert "imperial|Container|ClientAlpha|Electrical" in seg_ids
 
 
 def test_discipline_cut_extra_dimensions_populated():
@@ -624,20 +624,20 @@ def test_discipline_label_top_level_field_blank_for_non_discipline_segments():
     container = next(r for r in segs if r["segment_id"] == "imperial|Container")
     assert container["discipline_label"] == ""
     # A client-only cut also has no discipline.
-    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
-    assert kaiser["discipline_label"] == ""
+    clientalpha = next(r for r in segs if r["segment_id"] == "imperial|ClientAlpha")
+    assert clientalpha["discipline_label"] == ""
 
 
 def test_discipline_label_top_level_field_populated_in_mixed_cut():
     segs = _build_segments(_disc_rows(), min_files=3)
-    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|ClientAlpha|Architectural")
     assert seg["discipline_label"] == "Architectural"
-    assert seg["client_label"] == "Kaiser"
+    assert seg["client_label"] == "ClientAlpha"
 
 
 def test_discipline_cut_level3_purpose():
     # With two clients contributing, the discipline-only level-3 segment should NOT be
-    # redundant_single_child — it has two distinct child populations (Kaiser + Renown).
+    # redundant_single_child — it has two distinct child populations (ClientAlpha + Renown).
     segs = _build_segments(_disc_rows(), min_files=3)
     seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
     assert seg["segment_purpose"] == "discipline_coordination"
@@ -697,7 +697,7 @@ def test_discipline_cut_not_required_column_now_blocks(tmp_path, capsys):
 # ---------------------------------------------------------------------------
 
 def test_discipline_cut_level3_bundle_not_demoted_by_children():
-    # imperial|Container|Architectural has two client children (Kaiser + Renown).
+    # imperial|Container|Architectural has two client children (ClientAlpha + Renown).
     # The "has children → registration" logic must not fire for level-3 governance-role segments.
     segs = _build_segments(_disc_rows(), min_files=3)
     arch = next(r for r in segs if r["segment_id"] == "imperial|Container|Architectural")
@@ -710,7 +710,7 @@ def test_discipline_cut_level3_bundle_not_demoted_by_children():
 def test_discipline_cut_level4_bundle_not_affected():
     # Level-4 combined client+discipline segments have no children and must be bundle.
     segs = _build_segments(_disc_rows(), min_files=3)
-    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|ClientAlpha|Architectural")
     assert seg["run_type"] == "bundle"
 
 
@@ -719,18 +719,18 @@ def test_discipline_cut_level4_bundle_not_affected():
 # ---------------------------------------------------------------------------
 
 def test_multi_child_parent_not_demoted_redundant_single_child():
-    # imperial|Container|Kaiser has both Architectural and Electrical children.
+    # imperial|Container|ClientAlpha has both Architectural and Electrical children.
     # redundant_single_child must NOT fire.
     segs = _build_segments(_disc_rows(), min_files=3)
-    kaiser_container = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser")
-    assert "redundant_single_child" not in (kaiser_container.get("notes") or ""), (
+    clientalpha_container = next(r for r in segs if r["segment_id"] == "imperial|Container|ClientAlpha")
+    assert "redundant_single_child" not in (clientalpha_container.get("notes") or ""), (
         "Multi-child parent must not be flagged redundant_single_child"
     )
-    assert kaiser_container["run_type"] != "registration" or "redundant_single_child" not in (kaiser_container.get("notes") or "")
+    assert clientalpha_container["run_type"] != "registration" or "redundant_single_child" not in (clientalpha_container.get("notes") or "")
 
 
 def test_single_child_same_hash_still_demoted():
-    # imperial|Container|Electrical has only one child (Kaiser|Electrical) with the same population.
+    # imperial|Container|Electrical has only one child (ClientAlpha|Electrical) with the same population.
     # redundant_single_child SHOULD fire here.
     segs = _build_segments(_disc_rows(), min_files=3)
     elec = next(r for r in segs if r["segment_id"] == "imperial|Container|Electrical")
@@ -779,36 +779,36 @@ def test_matching_child_demotes_parent_even_with_other_nonmatching_children():
 
 def test_client_discipline_leaf_purpose_container():
     segs = _build_segments(_disc_rows(), min_files=3)
-    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|ClientAlpha|Architectural")
     assert seg["segment_purpose"] == "client_discipline_coordination"
 
 
 def test_client_discipline_leaf_label_container():
     segs = _build_segments(_disc_rows(), min_files=3)
-    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
-    assert seg["segment_label"] == "Kaiser Architectural coordination files"
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|ClientAlpha|Architectural")
+    assert seg["segment_label"] == "ClientAlpha Architectural coordination files"
 
 
 def test_client_discipline_leaf_purpose_template():
     rows = (
-        [_meta_row(f"t{i:02d}", "imperial", "Kaiser", "Template", "Architectural") for i in range(3)]
+        [_meta_row(f"t{i:02d}", "imperial", "ClientAlpha", "Template", "Architectural") for i in range(3)]
         + [_meta_row(f"u{i:02d}", "imperial", "Renown", "Template", "Architectural") for i in range(3)]
     )
     segs = _build_segments(rows, min_files=3)
-    seg = next(r for r in segs if r["segment_id"] == "imperial|Template|Kaiser|Architectural")
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Template|ClientAlpha|Architectural")
     assert seg["segment_purpose"] == "client_discipline_standard_anchor"
-    assert seg["segment_label"] == "Kaiser Architectural templates — standards as authored"
+    assert seg["segment_label"] == "ClientAlpha Architectural templates — standards as authored"
 
 
 def test_client_discipline_leaf_purpose_project():
     rows = (
-        [_meta_row(f"p{i:02d}", "imperial", "Kaiser", "Project", "Architectural") for i in range(3)]
+        [_meta_row(f"p{i:02d}", "imperial", "ClientAlpha", "Project", "Architectural") for i in range(3)]
         + [_meta_row(f"q{i:02d}", "imperial", "Renown", "Project", "Architectural") for i in range(3)]
     )
     segs = _build_segments(rows, min_files=3)
-    seg = next(r for r in segs if r["segment_id"] == "imperial|Project|Kaiser|Architectural")
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Project|ClientAlpha|Architectural")
     assert seg["segment_purpose"] == "client_discipline_practice"
-    assert seg["segment_label"] == "Kaiser Architectural projects — standards as practiced"
+    assert seg["segment_label"] == "ClientAlpha Architectural projects — standards as practiced"
 
 
 # ---------------------------------------------------------------------------
@@ -826,8 +826,8 @@ def test_registry_first_run_no_existing_file_unaffected():
     for r in reg_default:
         assert r["status"] == "pending"
         assert r["last_run_utc"] == ""
-    kaiser_reg = next(r for r in reg_default if r["segment_id"] == "imperial|Project|Kaiser")
-    assert kaiser_reg["output_folder"] == "imperial_project_kaiser"
+    clientalpha_reg = next(r for r in reg_default if r["segment_id"] == "imperial|Project|ClientAlpha")
+    assert clientalpha_reg["output_folder"] == "imperial_project_clientalpha"
 
 
 def test_registry_preserves_output_folder_across_runs_when_unchanged():
@@ -843,37 +843,37 @@ def test_registry_preserves_status_when_population_hash_unchanged():
     segs = _build_segments(ROWS, min_files=3)
     reg1 = _build_registry(segs)
     for r in reg1:
-        if r["segment_id"] == "imperial|Project|Kaiser":
+        if r["segment_id"] == "imperial|Project|ClientAlpha":
             r["status"] = "complete"
             r["last_run_utc"] = "2026-01-01T00:00:00Z"
 
     reg2 = _build_registry(segs, existing_registry=reg1)
-    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
-    assert kaiser2["status"] == "complete"
-    assert kaiser2["last_run_utc"] == "2026-01-01T00:00:00Z"
-    assert kaiser2["output_folder"] == "imperial_project_kaiser"
+    clientalpha2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|ClientAlpha")
+    assert clientalpha2["status"] == "complete"
+    assert clientalpha2["last_run_utc"] == "2026-01-01T00:00:00Z"
+    assert clientalpha2["output_folder"] == "imperial_project_clientalpha"
 
 
 def test_registry_resets_status_when_population_hash_changes():
     segs1 = _build_segments(ROWS, min_files=3)
     reg1 = _build_registry(segs1)
     for r in reg1:
-        if r["segment_id"] == "imperial|Project|Kaiser":
+        if r["segment_id"] == "imperial|Project|ClientAlpha":
             r["status"] = "complete"
             r["last_run_utc"] = "2026-01-01T00:00:00Z"
 
-    rows2 = ROWS + [_meta_row("r11", "imperial", "Kaiser", "Project")]
+    rows2 = ROWS + [_meta_row("r11", "imperial", "ClientAlpha", "Project")]
     segs2 = _build_segments(rows2, min_files=3)
     reg2 = _build_registry(segs2, existing_registry=reg1)
-    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
+    clientalpha2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|ClientAlpha")
 
-    kaiser1 = next(r for r in reg1 if r["segment_id"] == "imperial|Project|Kaiser")
-    assert kaiser2["population_hash"] != kaiser1["population_hash"]
-    assert kaiser2["status"] == "pending"
-    assert kaiser2["last_run_utc"] == ""
-    assert "population_changed" in kaiser2["notes"]
+    clientalpha1 = next(r for r in reg1 if r["segment_id"] == "imperial|Project|ClientAlpha")
+    assert clientalpha2["population_hash"] != clientalpha1["population_hash"]
+    assert clientalpha2["status"] == "pending"
+    assert clientalpha2["last_run_utc"] == ""
+    assert "population_changed" in clientalpha2["notes"]
     # Folder name must remain stable even though status reset.
-    assert kaiser2["output_folder"] == kaiser1["output_folder"]
+    assert clientalpha2["output_folder"] == clientalpha1["output_folder"]
 
 
 def test_registry_new_segment_gets_unique_folder_not_colliding_with_carryover():
@@ -926,29 +926,29 @@ def test_registry_resets_status_when_run_type_changes():
     # otherwise the orchestrator keeps skipping a segment that now needs a
     # different analysis to be produced.
     segs = _build_segments(ROWS, min_files=3)
-    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Project|Kaiser")
-    assert kaiser["run_type"] == "bundle"
+    clientalpha = next(r for r in segs if r["segment_id"] == "imperial|Project|ClientAlpha")
+    assert clientalpha["run_type"] == "bundle"
 
     reg1 = _build_registry(segs)
     for r in reg1:
-        if r["segment_id"] == "imperial|Project|Kaiser":
+        if r["segment_id"] == "imperial|Project|ClientAlpha":
             r["status"] = "complete"
             r["last_run_utc"] = "2026-01-01T00:00:00Z"
 
     segs2 = [dict(r) for r in segs]
     for r in segs2:
-        if r["segment_id"] == "imperial|Project|Kaiser":
+        if r["segment_id"] == "imperial|Project|ClientAlpha":
             r["run_type"] = "reference"  # same population_hash, different run_type
 
     reg2 = _build_registry(segs2, existing_registry=reg1)
-    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
-    assert kaiser2["population_hash"] == kaiser["population_hash"]
-    assert kaiser2["status"] == "pending"
-    assert kaiser2["last_run_utc"] == ""
-    assert "run_type_changed" in kaiser2["notes"]
+    clientalpha2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|ClientAlpha")
+    assert clientalpha2["population_hash"] == clientalpha["population_hash"]
+    assert clientalpha2["status"] == "pending"
+    assert clientalpha2["last_run_utc"] == ""
+    assert "run_type_changed" in clientalpha2["notes"]
     # Folder name must remain stable even though status reset.
-    kaiser1 = next(r for r in reg1 if r["segment_id"] == "imperial|Project|Kaiser")
-    assert kaiser2["output_folder"] == kaiser1["output_folder"]
+    clientalpha1 = next(r for r in reg1 if r["segment_id"] == "imperial|Project|ClientAlpha")
+    assert clientalpha2["output_folder"] == clientalpha1["output_folder"]
 
 
 def test_registry_reserves_dropped_segment_folder_from_new_reuse():
@@ -973,7 +973,7 @@ def test_registry_reserves_dropped_segment_folder_from_new_reuse():
 
 
 def test_registry_drops_removed_segment_ids_with_warning(capsys):
-    rows_full = ROWS  # includes both imperial|Kaiser and imperial|Renown
+    rows_full = ROWS  # includes both imperial|ClientAlpha and imperial|Renown
     segs1 = _build_segments(rows_full, min_files=3)
     reg1 = _build_registry(segs1)
     assert any(r["segment_id"] == "imperial|Project|Renown" for r in reg1)
@@ -1074,20 +1074,20 @@ def test_unknown_governance_role_still_warns_after_normalization_added(tmp_path,
 
 
 def test_client_label_first_seen_casing_is_canonical():
-    # "Stantec" appears first in row order — all case variants fold to it,
+    # "InternalEnterprise" appears first in row order — all case variants fold to it,
     # not to an arbitrary or alphabetically-chosen casing.
     rows = [
-        _meta_row("s01", "imperial", "Stantec", "Container"),
-        _meta_row("s02", "imperial", "stantec", "Container"),
-        _meta_row("s03", "imperial", "STANTEC", "Container"),
+        _meta_row("s01", "imperial", "InternalEnterprise", "Container"),
+        _meta_row("s02", "imperial", "internalenterprise", "Container"),
+        _meta_row("s03", "imperial", "INTERNALENTERPRISE", "Container"),
     ]
     segs = _build_segments(rows, min_files=1)
     seg_ids = {r["segment_id"] for r in segs}
-    assert "imperial|Container|Stantec" in seg_ids
-    assert "imperial|Container|stantec" not in seg_ids
-    assert "imperial|Container|STANTEC" not in seg_ids
-    merged = next(r for r in segs if r["segment_id"] == "imperial|Container|Stantec")
-    assert merged["client_label"] == "Stantec"
+    assert "imperial|Container|InternalEnterprise" in seg_ids
+    assert "imperial|Container|internalenterprise" not in seg_ids
+    assert "imperial|Container|INTERNALENTERPRISE" not in seg_ids
+    merged = next(r for r in segs if r["segment_id"] == "imperial|Container|InternalEnterprise")
+    assert merged["client_label"] == "InternalEnterprise"
     assert set(merged["export_run_ids"].split("|")) == {"s01", "s02", "s03"}
 
 
@@ -1195,7 +1195,7 @@ def test_clean_corpus_unaffected_by_normalization():
     seg_ids = {r["segment_id"] for r in segs}
     assert "imperial" in seg_ids
     assert "metric" in seg_ids
-    assert "imperial|Kaiser" in seg_ids
+    assert "imperial|ClientAlpha" in seg_ids
     assert "imperial|Renown" in seg_ids
     assert "metric|Global" in seg_ids
 
@@ -1207,16 +1207,16 @@ def test_clean_corpus_unaffected_by_normalization():
 def test_conformance_reference_mode_defaults_to_latest_for_new_segment():
     segs = _build_segments(ROWS, min_files=3)
     reg = _build_registry(segs)
-    kaiser = next(r for r in reg if r["segment_id"] == "imperial|Project|Kaiser")
-    assert kaiser["conformance_reference_mode"] == "latest"
+    clientalpha = next(r for r in reg if r["segment_id"] == "imperial|Project|ClientAlpha")
+    assert clientalpha["conformance_reference_mode"] == "latest"
 
 
 def test_conformance_reference_mode_carried_over_across_runs():
     segs = _build_segments(ROWS, min_files=3)
     reg1 = _build_registry(segs)
     reg2 = _build_registry(segs, existing_registry=reg1)
-    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
-    assert kaiser2["conformance_reference_mode"] == "latest"
+    clientalpha2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|ClientAlpha")
+    assert clientalpha2["conformance_reference_mode"] == "latest"
 
 
 def test_conformance_reference_mode_defaults_to_latest_for_old_registry_missing_field():
@@ -1227,8 +1227,8 @@ def test_conformance_reference_mode_defaults_to_latest_for_old_registry_missing_
     for r in reg1:
         r.pop("conformance_reference_mode", None)
     reg2 = _build_registry(segs, existing_registry=reg1)
-    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
-    assert kaiser2["conformance_reference_mode"] == "latest"
+    clientalpha2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|ClientAlpha")
+    assert clientalpha2["conformance_reference_mode"] == "latest"
 
 
 def test_registry_no_longer_carries_export_run_ids():
@@ -1238,8 +1238,8 @@ def test_registry_no_longer_carries_export_run_ids():
     # includes it.
     segs = _build_segments(ROWS, min_files=3)
     reg = _build_registry(segs)
-    kaiser = next(r for r in reg if r["segment_id"] == "imperial|Project|Kaiser")
-    assert "export_run_ids" not in kaiser
+    clientalpha = next(r for r in reg if r["segment_id"] == "imperial|Project|ClientAlpha")
+    assert "export_run_ids" not in clientalpha
 
 
 def test_registry_new_files_reason_when_file_added():
@@ -1247,21 +1247,21 @@ def test_registry_new_files_reason_when_file_added():
     reg1 = _build_registry(segs1)
     membership1 = _membership_by_segment(_build_membership_rows(segs1))
 
-    rows2 = ROWS + [_meta_row("r11", "imperial", "Kaiser", "Project")]
+    rows2 = ROWS + [_meta_row("r11", "imperial", "ClientAlpha", "Project")]
     segs2 = _build_segments(rows2, min_files=3)
     reg2 = _build_registry(segs2, existing_registry=reg1, existing_membership=membership1)
-    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
+    clientalpha2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|ClientAlpha")
 
-    assert "population_changed" in kaiser2["notes"]
-    assert "new_files:1" in kaiser2["notes"]
-    assert "removed_files" not in kaiser2["notes"]
+    assert "population_changed" in clientalpha2["notes"]
+    assert "new_files:1" in clientalpha2["notes"]
+    assert "removed_files" not in clientalpha2["notes"]
 
 
 def test_registry_removed_files_reason_when_file_removed():
-    # Kaiser needs more than min_files here so removing one file doesn't also
+    # ClientAlpha needs more than min_files here so removing one file doesn't also
     # cross the min_files threshold and flip run_type to "skip" (which would
     # drop the segment from the registry entirely rather than mark it stale).
-    rows1 = ROWS + [_meta_row("r12", "imperial", "Kaiser", "Project")]
+    rows1 = ROWS + [_meta_row("r12", "imperial", "ClientAlpha", "Project")]
     segs1 = _build_segments(rows1, min_files=3)
     reg1 = _build_registry(segs1)
     membership1 = _membership_by_segment(_build_membership_rows(segs1))
@@ -1269,30 +1269,30 @@ def test_registry_removed_files_reason_when_file_removed():
     rows2 = [r for r in rows1 if r["export_run_id"] != "r03"]
     segs2 = _build_segments(rows2, min_files=3)
     reg2 = _build_registry(segs2, existing_registry=reg1, existing_membership=membership1)
-    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
+    clientalpha2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|ClientAlpha")
 
-    assert "population_changed" in kaiser2["notes"]
-    assert "removed_files:1" in kaiser2["notes"]
-    assert "new_files" not in kaiser2["notes"]
+    assert "population_changed" in clientalpha2["notes"]
+    assert "removed_files:1" in clientalpha2["notes"]
+    assert "new_files" not in clientalpha2["notes"]
 
 
 def test_registry_both_new_and_removed_files_reasons_when_combined_change():
-    rows1 = ROWS + [_meta_row("r12", "imperial", "Kaiser", "Project")]
+    rows1 = ROWS + [_meta_row("r12", "imperial", "ClientAlpha", "Project")]
     segs1 = _build_segments(rows1, min_files=3)
     reg1 = _build_registry(segs1)
     membership1 = _membership_by_segment(_build_membership_rows(segs1))
 
     # Swap r03 out for a new file r11 in the same segment in one run.
     rows2 = [r for r in rows1 if r["export_run_id"] != "r03"] + [
-        _meta_row("r11", "imperial", "Kaiser", "Project")
+        _meta_row("r11", "imperial", "ClientAlpha", "Project")
     ]
     segs2 = _build_segments(rows2, min_files=3)
     reg2 = _build_registry(segs2, existing_registry=reg1, existing_membership=membership1)
-    kaiser2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|Kaiser")
+    clientalpha2 = next(r for r in reg2 if r["segment_id"] == "imperial|Project|ClientAlpha")
 
-    assert "population_changed" in kaiser2["notes"]
-    assert "new_files:1" in kaiser2["notes"]
-    assert "removed_files:1" in kaiser2["notes"]
+    assert "population_changed" in clientalpha2["notes"]
+    assert "new_files:1" in clientalpha2["notes"]
+    assert "removed_files:1" in clientalpha2["notes"]
 
 
 def test_registry_new_files_reason_does_not_cause_false_removal_warnings(capsys):
@@ -1305,7 +1305,7 @@ def test_registry_new_files_reason_does_not_cause_false_removal_warnings(capsys)
     reg1 = _build_registry(segs1)
     membership1 = _membership_by_segment(_build_membership_rows(segs1))
 
-    rows2 = ROWS + [_meta_row("r11", "imperial", "Kaiser", "Project")]
+    rows2 = ROWS + [_meta_row("r11", "imperial", "ClientAlpha", "Project")]
     segs2 = _build_segments(rows2, min_files=3)
     reg2 = _build_registry(segs2, existing_registry=reg1, existing_membership=membership1)
 
@@ -1401,9 +1401,9 @@ def test_population_hash_unchanged_by_membership_storage_migration():
     # Confirmed here by hand-tracing: it is still computed from the in-memory
     # eids list, not by re-reading any CSV (segment_membership.csv included).
     segs = _build_segments(ROWS, min_files=3)
-    kaiser = next(r for r in segs if r["segment_id"] == "imperial|Kaiser")
-    eids = [x for x in kaiser["export_run_ids"].split("|") if x]
-    assert kaiser["population_hash"] == hashlib.sha1("|".join(sorted(eids)).encode()).hexdigest()
+    clientalpha = next(r for r in segs if r["segment_id"] == "imperial|ClientAlpha")
+    eids = [x for x in clientalpha["export_run_ids"].split("|") if x]
+    assert clientalpha["population_hash"] == hashlib.sha1("|".join(sorted(eids)).encode()).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -1452,40 +1452,40 @@ def test_manifest_and_registry_fields_stay_under_size_threshold(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# PR "segment builder explicit contract" -- Enterprise (Stantec/0000) literal
+# PR "segment builder explicit contract" -- Enterprise (InternalEnterprise/0000) literal
 # preservation. No blank-to-Enterprise fallback, no bookkeeping-token fold.
 # ---------------------------------------------------------------------------
 
 def test_enterprise_bc_0000_preserved_literally_not_folded_to_blank():
     rows = [
-        _full_row(f"e{i:02d}", "imperial", "Stantec", "Container", "architectural", "0000")
+        _full_row(f"e{i:02d}", "imperial", "InternalEnterprise", "Container", "architectural", "0000")
         for i in range(3)
     ]
     segs = _build_segments(rows, min_files=3)
     # The client+bc leaf (level 4: client_label + business_center_label both
     # selected) carries "0000" literally -- it is never folded to blank.
-    leaf = next(r for r in segs if r["client_label"] == "Stantec" and r["business_center_label"] == "0000" and r["segment_level"] == "4")
+    leaf = next(r for r in segs if r["client_label"] == "InternalEnterprise" and r["business_center_label"] == "0000" and r["segment_level"] == "4")
     assert leaf["business_center_label"] == "0000"
     assert "0000" in leaf["segment_id"]
     # And its population is identical to the client-only pool (every row here
     # shares the same bc), proving "0000" wasn't silently dropped/blanked
     # anywhere along the way -- not a redundant_single_child artifact of a
     # bookkeeping-token fold.
-    client_only = next(r for r in segs if r["segment_id"] == "imperial|Container|Stantec")
+    client_only = next(r for r in segs if r["segment_id"] == "imperial|Container|InternalEnterprise")
     assert leaf["export_run_ids"] == client_only["export_run_ids"]
 
 
 def test_enterprise_identity_not_inferred_from_blank_business_center():
-    # A real (non-Stantec, non-0000) client with a genuinely blank
+    # A real (non-InternalEnterprise, non-0000) client with a genuinely blank
     # business_center_label must not be folded into or conflated with the
-    # Stantec/0000 Enterprise population -- 0000 is a literal value, not a
+    # InternalEnterprise/0000 Enterprise population -- 0000 is a literal value, not a
     # stand-in for "unspecified business center".
-    stantec_rows = [_full_row(f"s{i:02d}", "imperial", "Stantec", "Container", "architectural", "0000") for i in range(3)]
-    other_rows = [_meta_row(f"o{i:02d}", "imperial", "Kaiser", "Container", "architectural") for i in range(3)]
-    segs = _build_segments(stantec_rows + other_rows, min_files=3)
-    stantec_leaf = next(r for r in segs if r["client_label"] == "Stantec" and r["segment_level"] == "3" and r["business_center_label"] == "0000")
-    kaiser_leaf = next(r for r in segs if r["client_label"] == "Kaiser" and r["segment_level"] == "3")
-    assert set(stantec_leaf["export_run_ids"].split("|")).isdisjoint(set(kaiser_leaf["export_run_ids"].split("|")))
+    internalenterprise_rows = [_full_row(f"s{i:02d}", "imperial", "InternalEnterprise", "Container", "architectural", "0000") for i in range(3)]
+    other_rows = [_meta_row(f"o{i:02d}", "imperial", "ClientAlpha", "Container", "architectural") for i in range(3)]
+    segs = _build_segments(internalenterprise_rows + other_rows, min_files=3)
+    internalenterprise_leaf = next(r for r in segs if r["client_label"] == "InternalEnterprise" and r["segment_level"] == "3" and r["business_center_label"] == "0000")
+    clientalpha_leaf = next(r for r in segs if r["client_label"] == "ClientAlpha" and r["segment_level"] == "3")
+    assert set(internalenterprise_leaf["export_run_ids"].split("|")).isdisjoint(set(clientalpha_leaf["export_run_ids"].split("|")))
 
 
 def test_business_center_case_variants_of_0000_still_fold_by_casing_not_bookkeeping():
@@ -1493,8 +1493,8 @@ def test_business_center_case_variants_of_0000_still_fold_by_casing_not_bookkeep
     # "Bc1450"/"bc1450" should still fold via the ordinary first-seen-casing
     # rule (unrelated to the removed enterprise-bookkeeping fold).
     rows = (
-        [_full_row(f"a{i:02d}", "imperial", "Kaiser", "Container", "architectural", "BC1450") for i in range(2)]
-        + [_full_row(f"b{i:02d}", "imperial", "Kaiser", "Container", "architectural", "bc1450") for i in range(2, 4)]
+        [_full_row(f"a{i:02d}", "imperial", "ClientAlpha", "Container", "architectural", "BC1450") for i in range(2)]
+        + [_full_row(f"b{i:02d}", "imperial", "ClientAlpha", "Container", "architectural", "bc1450") for i in range(2, 4)]
     )
     segs = _build_segments(rows, min_files=1)
     bc_values = {r["business_center_label"] for r in segs if r["business_center_label"]}
@@ -1508,9 +1508,9 @@ def test_business_center_case_variants_of_0000_still_fold_by_casing_not_bookkeep
 # ---------------------------------------------------------------------------
 
 def test_collection_label_ignored_same_segments_same_membership():
-    base = dict(unit_system="imperial", governance_role="Container", client_label="Kaiser",
+    base = dict(unit_system="imperial", governance_role="Container", client_label="ClientAlpha",
                 discipline_label="architectural", business_center_label="1450")
-    rows_a = [dict(base, export_run_id=f"a{i:02d}", collection_label="Kaiser Standards") for i in range(3)]
+    rows_a = [dict(base, export_run_id=f"a{i:02d}", collection_label="ClientAlpha Standards") for i in range(3)]
     rows_b = [dict(base, export_run_id=f"b{i:02d}", collection_label="Legacy Collection") for i in range(3)]
 
     segs_with_collection = _build_segments(rows_a + rows_b, min_files=1)
@@ -1526,7 +1526,7 @@ def test_collection_label_ignored_same_segments_same_membership():
     # collection_label column is always blank.
     assert all(r.get("collection_label", "") == "" for r in segs_with_collection)
 
-    leaf = next(r for r in segs_with_collection if r["segment_id"] == "imperial|Container|Kaiser|architectural|1450")
+    leaf = next(r for r in segs_with_collection if r["segment_id"] == "imperial|Container|ClientAlpha|architectural|1450")
     assert set(leaf["export_run_ids"].split("|")) == {r["export_run_id"] for r in rows_a + rows_b}
 
 
@@ -1535,7 +1535,7 @@ def test_collection_label_column_absence_produces_identical_manifest(tmp_path):
     # it must produce byte-identical segment_manifest.csv content (ignoring
     # collection_label really means ignoring it, column present or not).
     base_rows = [
-        _full_row(f"r{i:02d}", "imperial", "Kaiser", "Container", "architectural", "1450")
+        _full_row(f"r{i:02d}", "imperial", "ClientAlpha", "Container", "architectural", "1450")
         for i in range(3)
     ]
 
@@ -1550,7 +1550,7 @@ def test_collection_label_column_absence_produces_identical_manifest(tmp_path):
             for row in base_rows:
                 r = dict(row)
                 if extra_field:
-                    r["collection_label"] = "Kaiser Standards"
+                    r["collection_label"] = "ClientAlpha Standards"
                 w.writerow(r)
         out_dir = tmp_path / out_name
         rc = main(["--metadata-file", str(meta), "--out-dir", str(out_dir), "--min-files", "1"])
@@ -1716,12 +1716,12 @@ def test_unreadable_input_reported_distinctly_not_bare_except(tmp_path, capsys):
 # ---------------------------------------------------------------------------
 
 def test_business_center_0000_is_a_valid_value_not_a_validation_failure():
-    rows = [_full_row(f"r{i:02d}", "imperial", "Stantec", "Container", "architectural", "0000") for i in range(3)]
+    rows = [_full_row(f"r{i:02d}", "imperial", "InternalEnterprise", "Container", "architectural", "0000") for i in range(3)]
     assert _validate_required_metadata(rows) == []
 
 
 def test_business_center_0000_main_succeeds(tmp_path):
-    rows = [_full_row(f"r{i:02d}", "imperial", "Stantec", "Container", "architectural", "0000") for i in range(3)]
+    rows = [_full_row(f"r{i:02d}", "imperial", "InternalEnterprise", "Container", "architectural", "0000") for i in range(3)]
     meta = tmp_path / "file_metadata.csv"
     _write_metadata_csv(meta, rows)
     out_dir = tmp_path / "out"
@@ -1823,14 +1823,14 @@ def test_former_collection_specific_rows_collapse_with_union_membership():
     # would have produced two distinct collection-scoped segments. Now they
     # collapse into a single segment whose membership is the exact union of
     # both groups' export_run_ids, with no duplicates.
-    base = dict(unit_system="imperial", governance_role="Template", client_label="Sutter",
+    base = dict(unit_system="imperial", governance_role="Template", client_label="ClientBeta",
                 discipline_label="architectural", business_center_label="1450")
-    rows_collection_a = [dict(base, export_run_id=f"a{i:02d}", collection_label="Sutter Standards") for i in range(3)]
+    rows_collection_a = [dict(base, export_run_id=f"a{i:02d}", collection_label="ClientBeta Standards") for i in range(3)]
     rows_collection_b = [dict(base, export_run_id=f"b{i:02d}", collection_label="Legacy") for i in range(2)]
     all_rows = rows_collection_a + rows_collection_b
 
     segs = _build_segments(all_rows, min_files=1)
-    leaf = next(r for r in segs if r["segment_id"] == "imperial|Template|Sutter|architectural|1450")
+    leaf = next(r for r in segs if r["segment_id"] == "imperial|Template|ClientBeta|architectural|1450")
 
     expected_eids = {r["export_run_id"] for r in all_rows}
     actual_eids = set(leaf["export_run_ids"].split("|"))
@@ -1838,7 +1838,7 @@ def test_former_collection_specific_rows_collapse_with_union_membership():
     assert len(leaf["export_run_ids"].split("|")) == len(expected_eids), "no duplicate export_run_ids in the collapsed membership"
 
     membership = _build_membership_rows(segs)
-    leaf_membership = [m for m in membership if m["segment_id"] == "imperial|Template|Sutter|architectural|1450"]
+    leaf_membership = [m for m in membership if m["segment_id"] == "imperial|Template|ClientBeta|architectural|1450"]
     assert {m["export_run_id"] for m in leaf_membership} == expected_eids
     assert len(leaf_membership) == len(expected_eids), "each file appears exactly once in segment_membership rows"
 
@@ -1848,24 +1848,24 @@ def test_former_collection_specific_rows_collapse_with_union_membership():
 # ---------------------------------------------------------------------------
 
 def test_ancestor_segment_ids_semicolon_joined_not_pipe():
-    # imperial|Container|Kaiser|Architectural has 3 non-root fields present
+    # imperial|Container|ClientAlpha|Architectural has 3 non-root fields present
     # (governance, client, discipline), so it has 3 immediate one-field-drop
     # ancestors -- a genuine multi-ancestor case, not a degenerate 1-element one.
     segs = _build_segments(_disc_rows(), min_files=3)
-    leaf = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser|Architectural")
+    leaf = next(r for r in segs if r["segment_id"] == "imperial|Container|ClientAlpha|Architectural")
     raw = leaf["ancestor_segment_ids"]
 
     expected_ancestor_ids = [
         "imperial|Container|Architectural",
-        "imperial|Container|Kaiser",
-        "imperial|Kaiser|Architectural",
+        "imperial|Container|ClientAlpha",
+        "imperial|ClientAlpha|Architectural",
     ]
-    assert raw == ";".join(expected_ancestor_ids)
+    assert raw == ";".join(sorted(expected_ancestor_ids))
 
     # Round trip: splitting on ";" recovers the exact original list, with each
     # element's own internal "|" delimiters untouched.
     recovered = raw.split(";")
-    assert recovered == expected_ancestor_ids
+    assert recovered == sorted(expected_ancestor_ids)
     for ancestor_id in recovered:
         assert "|" in ancestor_id, "each ancestor id keeps its own internal pipe delimiters intact"
 
@@ -1880,7 +1880,7 @@ def test_ancestor_segment_ids_semicolon_joined_not_pipe():
 def test_ancestor_segment_ids_two_element_roundtrip():
     # A simpler 2-ancestor case (2 non-root fields present).
     segs = _build_segments(_disc_rows(), min_files=3)
-    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|Kaiser")
-    expected = ["imperial|Container", "imperial|Kaiser"]
-    assert seg["ancestor_segment_ids"] == ";".join(expected)
-    assert seg["ancestor_segment_ids"].split(";") == expected
+    seg = next(r for r in segs if r["segment_id"] == "imperial|Container|ClientAlpha")
+    expected = ["imperial|Container", "imperial|ClientAlpha"]
+    assert seg["ancestor_segment_ids"] == ";".join(sorted(expected))
+    assert seg["ancestor_segment_ids"].split(";") == sorted(expected)

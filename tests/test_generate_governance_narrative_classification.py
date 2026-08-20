@@ -85,10 +85,10 @@ def test_load_client_sectors_empty_when_absent():
 
 def test_load_client_sectors_builds_map():
     rows = [
-        {"client_label": "Kaiser", "sector": "healthcare"},
+        {"client_label": "ClientAlpha", "sector": "healthcare"},
         {"client_label": "Intel", "sector": "semiconductor"},
     ]
-    assert load_client_sectors(rows) == {"Kaiser": "healthcare", "Intel": "semiconductor"}
+    assert load_client_sectors(rows) == {"ClientAlpha": "healthcare", "Intel": "semiconductor"}
 
 
 def _client_fixture(client_names):
@@ -112,12 +112,12 @@ def _client_fixture(client_names):
 
 
 def test_known_healthcare_client_is_flagged_healthcare():
-    summary_rows, pooled_rows = _client_fixture(["Kaiser"])
-    sector_map = {"Kaiser": "healthcare"}
+    summary_rows, pooled_rows = _client_fixture(["ClientAlpha"])
+    sector_map = {"ClientAlpha": "healthcare"}
     rows = build_client_summary(summary_rows, pooled_rows, sector_map)
-    kaiser = next(r for r in rows if r["client"] == "Kaiser")
-    assert kaiser["is_healthcare"] is True
-    assert kaiser["tier"] != "Non-comparable (different sector)"
+    clientalpha = next(r for r in rows if r["client"] == "ClientAlpha")
+    assert clientalpha["is_healthcare"] is True
+    assert clientalpha["tier"] != "Non-comparable (different sector)"
 
 
 def test_known_non_healthcare_sector_gets_non_comparable_tier():
@@ -145,24 +145,24 @@ def test_unclassified_client_falls_through_to_normal_tiering():
 def test_cascade_cross_client_jaccard_uses_sector_map():
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="sibling_projects", domain="arrowheads",
             used_union_jaccard="0.5", n_files_a="10", n_files_b="10",
         ),
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Intel",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|Intel",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Intel",
+            client_label_a="ClientAlpha", client_label_b="Intel",
             comparison_type="sibling_projects", domain="arrowheads",
             used_union_jaccard="0.9", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
-    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare", "Intel": "semiconductor"}
+    sector_map = {"ClientAlpha": "healthcare", "ClientBeta": "healthcare", "Intel": "semiconductor"}
     cascade = build_cascade(rows, sector_map)
-    # Only the Kaiser/Sutter (both healthcare) pair should count toward xc.
+    # Only the ClientAlpha/ClientBeta (both healthcare) pair should count toward xc.
     assert cascade["arrowheads"]["xc"] == 0.5
 
 
@@ -176,7 +176,7 @@ def test_default_client_sector_path_exists_and_loads():
     to None for every domain -- not just the sector/tier fields."""
     assert _DEFAULT_CLIENT_SECTOR_PATH.exists()
     sector_map = load_client_sectors(read_csv(_DEFAULT_CLIENT_SECTOR_PATH))
-    assert sector_map.get("ClientAlpha") == "healthcare"
+    assert sector_map.get("ClientBeta") == "healthcare"
     assert sector_map.get("ClientEpsilon") not in ("healthcare", None, "")
 
 
@@ -215,27 +215,27 @@ def test_unclassified_client_not_treated_as_confirmed_non_healthcare():
 def test_within_client_sibling_projects_excluded_from_cross_client_xc():
     """discover_sibling_segments() groups purely by (parent_segment_id,
     governance_role, unit_system), so two differently-scoped Project segments
-    under the SAME client (e.g. Kaiser's discipline-scoped siblings) can pair as
+    under the SAME client (e.g. ClientAlpha's discipline-scoped siblings) can pair as
     sibling_projects with client_label_a == client_label_b -- a within-client
     comparison, not cross-client convergence, and must not count toward xc."""
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser|architectural", segment_id_b="imperial|Project|Kaiser|electrical",
+            segment_id_a="imperial|Project|ClientAlpha|architectural", segment_id_b="imperial|Project|ClientAlpha|electrical",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Kaiser",
+            client_label_a="ClientAlpha", client_label_b="ClientAlpha",
             comparison_type="sibling_projects", domain="arrowheads",
             used_union_jaccard="0.95", n_files_a="5", n_files_b="5",
         ),
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="sibling_projects", domain="arrowheads",
             used_union_jaccard="0.5", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
-    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    sector_map = {"ClientAlpha": "healthcare", "ClientBeta": "healthcare"}
     cascade = build_cascade(rows, sector_map)
     assert cascade["arrowheads"]["xc"] == 0.5
 
@@ -271,15 +271,15 @@ def test_cascade_cross_client_requires_both_healthcare_like_sibling_projects():
 def test_cascade_cross_client_feeds_xc_when_both_sides_healthcare():
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="cross_client", domain="arrowheads",
             used_union_jaccard="0.7", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
-    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    sector_map = {"ClientAlpha": "healthcare", "ClientBeta": "healthcare"}
     cascade = build_cascade(rows, sector_map)
     assert cascade["arrowheads"]["xc"] == 0.7
 
@@ -287,48 +287,48 @@ def test_cascade_cross_client_feeds_xc_when_both_sides_healthcare():
 def test_cascade_cross_client_and_sibling_projects_both_feed_xc():
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="sibling_projects", domain="arrowheads",
             used_union_jaccard="0.5", n_files_a="10", n_files_b="10",
         ),
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Acme",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|Acme",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Acme",
+            client_label_a="ClientAlpha", client_label_b="Acme",
             comparison_type="cross_client", domain="arrowheads",
             used_union_jaccard="0.9", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
-    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare", "Acme": "healthcare"}
+    sector_map = {"ClientAlpha": "healthcare", "ClientBeta": "healthcare", "Acme": "healthcare"}
     cascade = build_cascade(rows, sector_map)
-    # sibling_projects (Kaiser/Sutter, both healthcare) = 0.5, cross_client
-    # (Kaiser/Acme, both healthcare) = 0.9 -- both land in the same xc bucket.
+    # sibling_projects (ClientAlpha/ClientBeta, both healthcare) = 0.5, cross_client
+    # (ClientAlpha/Acme, both healthcare) = 0.9 -- both land in the same xc bucket.
     assert cascade["arrowheads"]["xc"] == (0.5 + 0.9) / 2
 
 
 def test_cascade_cross_client_excludes_pair_with_one_non_healthcare_side():
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="sibling_projects", domain="arrowheads",
             used_union_jaccard="0.5", n_files_a="10", n_files_b="10",
         ),
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Intel",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|Intel",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Intel",
+            client_label_a="ClientAlpha", client_label_b="Intel",
             comparison_type="cross_client", domain="arrowheads",
             used_union_jaccard="0.9", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
-    # Intel is unclassified (not in sector_map) -- Kaiser/Intel must be excluded.
-    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    # Intel is unclassified (not in sector_map) -- ClientAlpha/Intel must be excluded.
+    sector_map = {"ClientAlpha": "healthcare", "ClientBeta": "healthcare"}
     cascade = build_cascade(rows, sector_map)
     assert cascade["arrowheads"]["xc"] == 0.5
 
@@ -339,19 +339,19 @@ def test_build_client_summary_xc_mean_uses_cross_client_rows():
     for these clients at all."""
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="cross_client", domain="arrowheads",
             used_union_jaccard="0.6", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
     client_rows = build_client_summary(rows, [], {})
-    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
-    sutter = next(r for r in client_rows if r["client"] == "Sutter")
-    assert kaiser["xc_mean"] == 0.6
-    assert sutter["xc_mean"] == 0.6
+    clientalpha = next(r for r in client_rows if r["client"] == "ClientAlpha")
+    clientbeta = next(r for r in client_rows if r["client"] == "ClientBeta")
+    assert clientalpha["xc_mean"] == 0.6
+    assert clientbeta["xc_mean"] == 0.6
 
 
 def test_build_client_summary_xc_mean_uses_client_label_not_segment_id_shape():
@@ -363,19 +363,19 @@ def test_build_client_summary_xc_mean_uses_client_label_not_segment_id_shape():
     non-standard segment_ids must still populate xc_mean via client_label_a/b."""
     rows = [
         _summary_row(
-            segment_id_a="p_kaiser", segment_id_b="p_sutter",
+            segment_id_a="p_clientalpha", segment_id_b="p_clientbeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="cross_client", domain="arrowheads",
             used_union_jaccard="0.6", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
     client_rows = build_client_summary(rows, [], {})
-    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
-    sutter = next(r for r in client_rows if r["client"] == "Sutter")
-    assert kaiser["xc_mean"] == 0.6
-    assert sutter["xc_mean"] == 0.6
+    clientalpha = next(r for r in client_rows if r["client"] == "ClientAlpha")
+    clientbeta = next(r for r in client_rows if r["client"] == "ClientBeta")
+    assert clientalpha["xc_mean"] == 0.6
+    assert clientbeta["xc_mean"] == 0.6
 
 
 def test_build_client_summary_backfills_n_files_for_cross_client_only_clients():
@@ -387,19 +387,19 @@ def test_build_client_summary_backfills_n_files_for_cross_client_only_clients():
     counts."""
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="cross_client", domain="arrowheads",
             used_union_jaccard="0.6", n_files_a="42", n_files_b="17",
         ),
     ]
     normalise_summary_schema(rows)
     client_rows = build_client_summary(rows, [], {})
-    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
-    sutter = next(r for r in client_rows if r["client"] == "Sutter")
-    assert kaiser["n_files"] == 42
-    assert sutter["n_files"] == 17
+    clientalpha = next(r for r in client_rows if r["client"] == "ClientAlpha")
+    clientbeta = next(r for r in client_rows if r["client"] == "ClientBeta")
+    assert clientalpha["n_files"] == 42
+    assert clientbeta["n_files"] == 17
 
 
 def test_within_client_cross_client_like_pair_excluded_from_xc_mean():
@@ -409,26 +409,26 @@ def test_within_client_cross_client_like_pair_excluded_from_xc_mean():
     now that client_label_a/b is read directly."""
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser|architectural", segment_id_b="imperial|Project|Kaiser|electrical",
+            segment_id_a="imperial|Project|ClientAlpha|architectural", segment_id_b="imperial|Project|ClientAlpha|electrical",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Kaiser",
+            client_label_a="ClientAlpha", client_label_b="ClientAlpha",
             comparison_type="sibling_projects", domain="arrowheads",
             used_union_jaccard="0.95", n_files_a="5", n_files_b="5",
         ),
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="cross_client", domain="arrowheads",
             used_union_jaccard="0.5", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
     client_rows = build_client_summary(rows, [], {})
-    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
-    # Only the Kaiser/Sutter cross_client pair (0.5) should count -- the
+    clientalpha = next(r for r in client_rows if r["client"] == "ClientAlpha")
+    # Only the ClientAlpha/ClientBeta cross_client pair (0.5) should count -- the
     # within-client 0.95 sibling_projects pair must not blend in.
-    assert kaiser["xc_mean"] == 0.5
+    assert clientalpha["xc_mean"] == 0.5
 
 
 def test_build_client_summary_excludes_confirmed_non_healthcare_partner_from_xc_mean():
@@ -442,19 +442,19 @@ def test_build_client_summary_excludes_confirmed_non_healthcare_partner_from_xc_
     either client's xc_mean."""
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Intel",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|Intel",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Intel",
+            client_label_a="ClientAlpha", client_label_b="Intel",
             comparison_type="cross_client", domain="arrowheads",
             used_union_jaccard="0.9", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
-    sector_map = {"Kaiser": "healthcare", "Intel": "semiconductor"}
+    sector_map = {"ClientAlpha": "healthcare", "Intel": "semiconductor"}
     client_rows = build_client_summary(rows, [], sector_map)
-    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    clientalpha = next(r for r in client_rows if r["client"] == "ClientAlpha")
     intel = next(r for r in client_rows if r["client"] == "Intel")
-    assert kaiser["xc_mean"] is None
+    assert clientalpha["xc_mean"] is None
     assert intel["tier"] == "Non-comparable (different sector)"
 
 
@@ -465,18 +465,18 @@ def test_build_client_summary_unclassified_partner_still_feeds_xc_mean():
     (sector in ("unknown", "healthcare"))."""
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|NewClient",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|NewClient",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="NewClient",
+            client_label_a="ClientAlpha", client_label_b="NewClient",
             comparison_type="cross_client", domain="arrowheads",
             used_union_jaccard="0.8", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
-    sector_map = {"Kaiser": "healthcare"}  # NewClient absent -- unclassified
+    sector_map = {"ClientAlpha": "healthcare"}  # NewClient absent -- unclassified
     client_rows = build_client_summary(rows, [], sector_map)
-    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
-    assert kaiser["xc_mean"] == 0.8
+    clientalpha = next(r for r in client_rows if r["client"] == "ClientAlpha")
+    assert clientalpha["xc_mean"] == 0.8
 
 
 def test_build_client_summary_excludes_policy_excluded_domain_from_xc_mean():
@@ -491,27 +491,27 @@ def test_build_client_summary_excludes_policy_excluded_domain_from_xc_mean():
     excluded_domain = next(iter(EXCLUDED_FROM_SCORING))
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="cross_client", domain=excluded_domain,
             used_union_jaccard="0.95", n_files_a="10", n_files_b="10",
         ),
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="cross_client", domain="arrowheads",
             used_union_jaccard="0.3", n_files_a="10", n_files_b="10",
         ),
     ]
     normalise_summary_schema(rows)
-    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    sector_map = {"ClientAlpha": "healthcare", "ClientBeta": "healthcare"}
     client_rows = build_client_summary(rows, [], sector_map)
-    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
+    clientalpha = next(r for r in client_rows if r["client"] == "ClientAlpha")
     # Only the non-excluded arrowheads row (0.3) should count -- the excluded
     # domain's 0.95 must not pull xc_mean up.
-    assert kaiser["xc_mean"] == 0.3
+    assert clientalpha["xc_mean"] == 0.3
 
 
 def test_non_project_within_project_rows_excluded_from_client_summary():
@@ -550,9 +550,9 @@ def test_non_project_within_project_rows_excluded_from_client_summary():
 def test_xc_mean_reads_used_union_jaccard_not_pairwise_mean():
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="cross_client", domain="arrowheads",
             # Stale pairwise fields present with a DIFFERENT value than the
             # union fields -- if the read site still resolved to these, the
@@ -563,20 +563,20 @@ def test_xc_mean_reads_used_union_jaccard_not_pairwise_mean():
         ),
     ]
     normalise_summary_schema(rows)
-    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    sector_map = {"ClientAlpha": "healthcare", "ClientBeta": "healthcare"}
     client_rows = build_client_summary(rows, [], sector_map)
-    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
-    assert kaiser["xc_mean"] == 0.75
-    assert kaiser["xc_mean_all"] == 0.40
-    assert kaiser["xc_mean"] != kaiser["xc_mean_all"]
+    clientalpha = next(r for r in client_rows if r["client"] == "ClientAlpha")
+    assert clientalpha["xc_mean"] == 0.75
+    assert clientalpha["xc_mean_all"] == 0.40
+    assert clientalpha["xc_mean"] != clientalpha["xc_mean_all"]
 
 
 def test_wp_mean_reads_used_union_jaccard_and_exposes_all_view_companion():
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Kaiser",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientAlpha",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser",
+            client_label_a="ClientAlpha",
             comparison_type="within_project", domain="arrowheads",
             all_pairwise_jaccard_mean="0.10",
             all_union_jaccard="0.30", used_union_jaccard="0.65",
@@ -585,18 +585,18 @@ def test_wp_mean_reads_used_union_jaccard_and_exposes_all_view_companion():
     ]
     normalise_summary_schema(rows)
     client_rows = build_client_summary(rows, [], {})
-    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
-    assert kaiser["wp_mean"] == 0.65
-    assert kaiser["wp_mean_all"] == 0.30
-    assert kaiser["wp_mean"] != kaiser["wp_mean_all"]
+    clientalpha = next(r for r in client_rows if r["client"] == "ClientAlpha")
+    assert clientalpha["wp_mean"] == 0.65
+    assert clientalpha["wp_mean_all"] == 0.30
+    assert clientalpha["wp_mean"] != clientalpha["wp_mean_all"]
 
 
 def test_cascade_xc_reads_used_union_jaccard_with_distinct_all_view_companion():
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="cross_client", domain="arrowheads",
             all_pairwise_jaccard_mean="0.10",
             all_union_jaccard="0.20", used_union_jaccard="0.85",
@@ -604,7 +604,7 @@ def test_cascade_xc_reads_used_union_jaccard_with_distinct_all_view_companion():
         ),
     ]
     normalise_summary_schema(rows)
-    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    sector_map = {"ClientAlpha": "healthcare", "ClientBeta": "healthcare"}
     cascade = build_cascade(rows, sector_map=sector_map)
     d = cascade["arrowheads"]
     assert d["xc"] == 0.85
@@ -619,7 +619,7 @@ def test_cascade_wp_all_and_wp_used_stay_a_true_all_used_pair_not_flipped():
     the passive_indicator (all - used) delta downstream would silently invert."""
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Kaiser",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientAlpha",
             governance_role_a="Project", governance_role_b="Project",
             comparison_type="within_project", domain="arrowheads",
             all_union_jaccard="0.90", used_union_jaccard="0.20",
@@ -646,7 +646,7 @@ def test_cascade_wp_all_and_wp_used_stay_a_true_all_used_pair_not_flipped():
 def test_cascade_wp_falls_back_to_pairwise_when_union_blank_real_producer_shape():
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Kaiser",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientAlpha",
             governance_role_a="Project", governance_role_b="Project",
             comparison_type="within_project", domain="arrowheads",
             all_pairwise_jaccard_mean="0.55", used_pairwise_jaccard_mean="0.35",
@@ -665,9 +665,9 @@ def test_cascade_wp_falls_back_to_pairwise_when_union_blank_real_producer_shape(
 def test_wp_by_client_falls_back_to_pairwise_when_union_blank_real_producer_shape():
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Kaiser",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientAlpha",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser",
+            client_label_a="ClientAlpha",
             comparison_type="within_project", domain="arrowheads",
             all_pairwise_jaccard_mean="0.60", used_pairwise_jaccard_mean="0.40",
             n_files_a="10", n_files_b="10",
@@ -675,9 +675,9 @@ def test_wp_by_client_falls_back_to_pairwise_when_union_blank_real_producer_shap
     ]
     normalise_summary_schema(rows)
     client_rows = build_client_summary(rows, [], {})
-    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
-    assert kaiser["wp_mean"] == 0.40
-    assert kaiser["wp_mean_all"] == 0.60
+    clientalpha = next(r for r in client_rows if r["client"] == "ClientAlpha")
+    assert clientalpha["wp_mean"] == 0.40
+    assert clientalpha["wp_mean_all"] == 0.60
 
 
 def test_disc_domain_wp_falls_back_to_pairwise_when_union_blank_real_producer_shape():
@@ -705,9 +705,9 @@ def test_xc_does_not_fall_back_to_pairwise_when_union_blank():
     regression on those types would be masked instead of surfaced as blank."""
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Sutter",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientBeta",
             governance_role_a="Project", governance_role_b="Project",
-            client_label_a="Kaiser", client_label_b="Sutter",
+            client_label_a="ClientAlpha", client_label_b="ClientBeta",
             comparison_type="cross_client", domain="arrowheads",
             all_pairwise_jaccard_mean="0.60",
             # all_union_jaccard/used_union_jaccard deliberately blank.
@@ -715,10 +715,10 @@ def test_xc_does_not_fall_back_to_pairwise_when_union_blank():
         ),
     ]
     normalise_summary_schema(rows)
-    sector_map = {"Kaiser": "healthcare", "Sutter": "healthcare"}
+    sector_map = {"ClientAlpha": "healthcare", "ClientBeta": "healthcare"}
     client_rows = build_client_summary(rows, [], sector_map)
-    kaiser = next(r for r in client_rows if r["client"] == "Kaiser")
-    assert kaiser["xc_mean"] is None
+    clientalpha = next(r for r in client_rows if r["client"] == "ClientAlpha")
+    assert clientalpha["xc_mean"] is None
 
 
 def test_disc_domain_wp_keeps_all_view_primary_for_non_project_within_project_rows():
@@ -776,7 +776,7 @@ def test_disc_domain_wp_labels_mixed_project_and_non_project_discipline():
     'used-view, active practice' for the whole aggregate."""
     rows = [
         _summary_row(
-            segment_id_a="imperial|Project|Kaiser", segment_id_b="imperial|Project|Kaiser",
+            segment_id_a="imperial|Project|ClientAlpha", segment_id_b="imperial|Project|ClientAlpha",
             governance_role_a="Project", governance_role_b="Project",
             discipline_label_a="architectural",
             comparison_type="within_project", domain="arrowheads",

@@ -35,14 +35,14 @@ def _synthetic_manifest():
     a matching bc/enterprise/enterprise pairing on the Project side (directed
     coverage), and one Generic population (unconditional-pairing coverage)."""
     rows = [
-        _row("ent1", "Container", "Stantec", "0000"),
-        _row("bc2014_1", "Container", "Stantec", "2014"),
-        _row("bc2270_1", "Container", "Stantec", "2270"),
-        _row("cl_sutter1", "Container", "Sutter", "0000"),
+        _row("ent1", "Container", "InternalEnterprise", "0000"),
+        _row("bc2014_1", "Container", "InternalEnterprise", "2014"),
+        _row("bc2270_1", "Container", "InternalEnterprise", "2270"),
+        _row("cl_clientbeta1", "Container", "ClientBeta", "0000"),
         _row("cl_renown1", "Container", "Renown", "0000"),
-        _row("proj_bc2014", "Project", "Stantec", "2014"),
-        _row("proj_sutter", "Project", "Sutter", "9999"),
-        _row("gen1", "Generic", "Stantec", "0000"),
+        _row("proj_bc2014", "Project", "InternalEnterprise", "2014"),
+        _row("proj_clientbeta", "Project", "ClientBeta", "9999"),
+        _row("gen1", "Generic", "InternalEnterprise", "0000"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -61,10 +61,10 @@ _JH_MAP = {
     "ent1": {"h1", "h2"},
     "bc2014_1": {"h1", "h3"},
     "bc2270_1": {"h4"},
-    "cl_sutter1": {"h1", "h5"},
+    "cl_clientbeta1": {"h1", "h5"},
     "cl_renown1": {"h6"},
     "proj_bc2014": {"h1", "h3", "h7"},
-    "proj_sutter": {"h5", "h8"},
+    "proj_clientbeta": {"h5", "h8"},
     "gen1": {"h1", "h9"},
 }
 
@@ -95,8 +95,8 @@ def test_same_role_peer_excludes_project_scoped_template_or_container():
     # the directed Template/Container -> Project containment comparison's
     # identical type name.
     rows = [
-        _row("t_proj", "Template", "Sutter", "2014"),  # scope_level "project"
-        _row("t_bc", "Template", "Stantec", "2014"),   # scope_level "bc"
+        _row("t_proj", "Template", "ClientBeta", "2014"),  # scope_level "project"
+        _row("t_bc", "Template", "InternalEnterprise", "2014"),   # scope_level "bc"
     ]
     manifest_rows, _membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -106,9 +106,9 @@ def test_same_role_peer_excludes_project_scoped_template_or_container():
 
 def test_comparison_type_still_unambiguous_with_project_scoped_template():
     rows = [
-        _row("t_proj", "Template", "Sutter", "2014"),
-        _row("t_bc", "Template", "Stantec", "2014"),
-        _row("p1", "Project", "Stantec", "2014"),
+        _row("t_proj", "Template", "ClientBeta", "2014"),
+        _row("t_bc", "Template", "InternalEnterprise", "2014"),
+        _row("p1", "Project", "InternalEnterprise", "2014"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -160,7 +160,7 @@ def test_directed_bc_to_project_matches_by_business_center_label_alone():
 
 
 def test_directed_bc_to_project_matches_regardless_of_differing_client():
-    # Regression: a bc-scoped Container (Stantec-internal, real bc) must
+    # Regression: a bc-scoped Container (InternalEnterprise-internal, real bc) must
     # still pair with an external-client Project that shares that bc — an
     # exact scope_key match would wrongly exclude this, since the Container's
     # scope_key is "bc:2014" while an external-client project in that same
@@ -168,7 +168,7 @@ def test_directed_bc_to_project_matches_regardless_of_differing_client():
     # discover_governance_chain() bc_standards loop, which matches Project
     # rows by _bc_of() alone, ignoring client_label entirely.
     rows = [
-        _row("bc1", "Container", "Stantec", "2014"),
+        _row("bc1", "Container", "InternalEnterprise", "2014"),
         _row("proj_ext", "Project", "Acme", "2014"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
@@ -205,10 +205,10 @@ def test_files_with_no_inventory_for_domain_are_excluded_not_zero_padded():
     # in n_files/n_pairs or contribute a spurious zero-overlap pair that
     # drags the Jaccard/containment mean toward 0.
     rows = [
-        _row("a1", "Container", "Stantec", "2014"),
-        _row("a2", "Container", "Stantec", "2014"),
-        _row("b1", "Container", "Stantec", "2270"),
-        _row("b2", "Container", "Stantec", "2270"),
+        _row("a1", "Container", "InternalEnterprise", "2014"),
+        _row("a2", "Container", "InternalEnterprise", "2014"),
+        _row("b1", "Container", "InternalEnterprise", "2270"),
+        _row("b2", "Container", "InternalEnterprise", "2270"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -232,8 +232,8 @@ def test_zero_inventory_domain_produces_no_row():
     # should be emitted for that (pair, domain) at all -- a row of blank/
     # zero aggregates would just be noise.
     rows = [
-        _row("a1", "Container", "Stantec", "2014"),
-        _row("b1", "Container", "Stantec", "2270"),
+        _row("a1", "Container", "InternalEnterprise", "2014"),
+        _row("b1", "Container", "InternalEnterprise", "2270"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded

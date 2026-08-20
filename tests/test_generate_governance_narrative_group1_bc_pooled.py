@@ -123,9 +123,9 @@ def test_group1_scope_pair_uses_both_sides_unlike_group2():
     fixed-role side -- a client-scoped 'a' paired with a bc-scoped 'b' must
     produce a "client::bc" key, not silently collapse to one side's label."""
     rows = [
-        _row(segment_id_a="imperial|Template|Kaiser", segment_id_b="imperial|Container|BC_1",
+        _row(segment_id_a="imperial|Template|ClientAlpha", segment_id_b="imperial|Container|BC_1",
              governance_role_a="Template", governance_role_b="Container",
-             client_label_a="Kaiser", business_center_label_b="BC_1",
+             client_label_a="ClientAlpha", business_center_label_b="BC_1",
              comparison_type="template_to_container", domain="ghost_domain",
              all_pairwise_containment_a_in_b_mean="0.33", n_files_a="2", n_files_b="3"),
     ]
@@ -147,15 +147,15 @@ def test_scope_pair_separator_does_not_collide_across_multi_dimension_labels():
     separator (a token _target_scope_label() never produces on its own) keeps
     these two semantically distinct pairs in separate buckets."""
     rows = [
-        _row(segment_id_a="imperial|Container|Kaiser|BC_1", segment_id_b="imperial|Project|architectural",
+        _row(segment_id_a="imperial|Container|ClientAlpha|BC_1", segment_id_b="imperial|Project|architectural",
              governance_role_a="Container", governance_role_b="Project",
-             client_label_a="Kaiser", business_center_label_a="BC_1",
+             client_label_a="ClientAlpha", business_center_label_a="BC_1",
              discipline_label_b="architectural",
              comparison_type="container_to_project", domain="collision_domain",
              all_pairwise_containment_a_in_b_mean="0.20", n_files_a="2", n_files_b="3"),
-        _row(segment_id_a="imperial|Container|Kaiser", segment_id_b="imperial|Project|BC_1|architectural",
+        _row(segment_id_a="imperial|Container|ClientAlpha", segment_id_b="imperial|Project|BC_1|architectural",
              governance_role_a="Container", governance_role_b="Project",
-             client_label_a="Kaiser",
+             client_label_a="ClientAlpha",
              business_center_label_b="BC_1", discipline_label_b="architectural",
              comparison_type="container_to_project", domain="collision_domain",
              all_pairwise_containment_a_in_b_mean="0.90", n_files_a="2", n_files_b="3"),
@@ -207,10 +207,10 @@ def test_group1_scope_pair_mismatched_client_bc_combo():
     """The value-match guard applies to every multi-dimension shape, not just
     bare "bc" -- a "client_bc" vs "client_bc" pair with the SAME client but
     DIFFERENT business centers must also be rejected from the plain key."""
-    row = _row(segment_id_a="imperial|Template|Kaiser|BC_1", segment_id_b="imperial|Project|Kaiser|BC_2",
+    row = _row(segment_id_a="imperial|Template|ClientAlpha|BC_1", segment_id_b="imperial|Project|ClientAlpha|BC_2",
                governance_role_a="Template", governance_role_b="Project",
-               client_label_a="Kaiser", business_center_label_a="BC_1",
-               client_label_b="Kaiser", business_center_label_b="BC_2",
+               client_label_a="ClientAlpha", business_center_label_a="BC_1",
+               client_label_b="ClientAlpha", business_center_label_b="BC_2",
                comparison_type="template_to_project", domain="combo_mismatch_domain",
                all_pairwise_containment_a_in_b_mean="0.55", n_files_a="2", n_files_b="3")
     scope_a, scope_b, scope_pair = _group1_scope_pair(row)
@@ -342,9 +342,9 @@ def test_cp_scoped_fallback_picks_bucket_with_most_rows():
     """When more than one non-enterprise scope_pair with n_files_a/b >= 5
     exists, the largest (most rows) bucket wins, deterministically."""
     rows = [
-        _row(segment_id_a="imperial|Container|Kaiser", segment_id_b="imperial|Project|Kaiser",
+        _row(segment_id_a="imperial|Container|ClientAlpha", segment_id_b="imperial|Project|ClientAlpha",
              governance_role_a="Container", governance_role_b="Project",
-             client_label_a="Kaiser", client_label_b="Kaiser",
+             client_label_a="ClientAlpha", client_label_b="ClientAlpha",
              comparison_type="container_to_project", domain="fill_patterns_model",
              all_pairwise_containment_a_in_b_mean="0.30", n_files_a="10", n_files_b="10"),
         _row(segment_id_a="imperial|Container|BC_1", segment_id_b="imperial|Project|BC_1",

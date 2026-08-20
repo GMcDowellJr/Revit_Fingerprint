@@ -94,7 +94,7 @@ _ALL_BUILTIN_VALUES = {
     FakeBuiltInParameter.PROJECT_ISSUE_DATE: "2026-08-10",
     FakeBuiltInParameter.CLIENT_NAME: "Acme Co",
     FakeBuiltInParameter.PROJECT_BUILDING_NAME: "Tower A",
-    FakeBuiltInParameter.PROJECT_ORGANIZATION_NAME: "Stantec",
+    FakeBuiltInParameter.PROJECT_ORGANIZATION_NAME: "InternalEnterprise",
     FakeBuiltInParameter.PROJECT_ORGANIZATION_DESCRIPTION: "Architecture",
     FakeBuiltInParameter.IFC_BUILDING_GUID: "1AB2c3D4e5F6G7H8I9J0Kl",
     FakeBuiltInParameter.IFC_PROJECT_GUID: "1AB2c3D4e5F6G7H8I9J0Km",
@@ -102,34 +102,48 @@ _ALL_BUILTIN_VALUES = {
 }
 
 
-_OFFICE_SHARED_PARAM_GUID = "6b61afc7-13eb-4af5-8b65-889f978af4f3"
+_BUSINESS_CENTER_SHARED_PARAM_GUID = "11111111-2222-4333-8444-555555555555"
 
 
-def _stantec_like_pi():
+def _enterprise_like_pi():
     return FakeProjectInformation(
         name="Test Project",
         builtin_values=_ALL_BUILTIN_VALUES,
-        named_present={"Office"},
-        named_values={"Office": "Denver"},
+        named_present={"Business Center"},
+        named_values={"Business Center": "BusinessCenter01"},
         # Kept consistent with named_values so the fixture behaves the same
         # whether identity_module.Guid is available (GUID-based read) or not
         # (LookupParameter-by-name fallback).
-        guid_values={_OFFICE_SHARED_PARAM_GUID: "Denver"},
+        guid_values={_BUSINESS_CENTER_SHARED_PARAM_GUID: "BusinessCenter01"},
     )
 
 
-def _non_stantec_pi():
+def _non_enterprise_pi():
     # IFC GUID fields are true BuiltInParameter members (confirmed via
     # tools/archetype/bip_lookup.json), unrelated to firm identity -- they
     # still resolve from the same _ALL_BUILTIN_VALUES here. What actually
-    # distinguishes a "non-Stantec" project is the absence of the Office
+    # distinguishes a "non-InternalEnterprise" project is the absence of the Business Center
     # shared parameter definition (named_present stays empty).
     return FakeProjectInformation(
-        name="Non-Stantec Project",
+        name="Non-InternalEnterprise Project",
         builtin_values=_ALL_BUILTIN_VALUES,
         named_present=set(),
     )
 
+
+_CONFIG_CTX = {
+    "project_info_shared_parameters": [
+        {
+            "key": "project_info.business_center",
+            "name": "Business Center",
+            "guid": _BUSINESS_CENTER_SHARED_PARAM_GUID,
+        }
+    ]
+}
+
+
+def _extract_items(doc, ctx=_CONFIG_CTX):
+    return identity_module._extract_project_info_items(doc, ctx=ctx)
 
 _EXPECTED_KEYS = {
     "project_info.name",
@@ -144,7 +158,7 @@ _EXPECTED_KEYS = {
     "project_info.ifc_building_guid",
     "project_info.ifc_project_guid",
     "project_info.ifc_site_guid",
-    "project_info.office",
+    "project_info.business_center",
 }
 
 
@@ -178,10 +192,27 @@ class FakeDoc:
 
 def test_extract_project_info_items_covers_exact_expected_keys(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    items = identity_module._extract_project_info_items(_DocForPI(_stantec_like_pi()))
+    items = _extract_items(_DocForPI(_enterprise_like_pi()))
     keys = [it["k"] for it in items]
     assert set(keys) == _EXPECTED_KEYS
     assert len(keys) == len(set(keys)), "duplicate project_info.* keys emitted"
+
+
+def test_no_deployment_configuration_emits_only_builtin_fields(monkeypatch):
+    monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
+    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(_enterprise_like_pi())))
+    assert "project_info.business_center" not in items
+    assert "project_info.client_name" in items
+
+
+def test_malformed_configured_guid_is_rejected(monkeypatch):
+    monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
+    ctx = {"project_info_shared_parameters": [
+        {"key": "project_info.business_center", "name": "Business Center", "guid": "not-a-guid"}
+    ]}
+    import pytest
+    with pytest.raises(ValueError, match="malformed GUID"):
+        identity_module._extract_project_info_items(_DocForPI(_enterprise_like_pi()), ctx=ctx)
 
 
 def test_extract_project_info_items_keys_are_registered_in_contract():
@@ -191,9 +222,9 @@ def test_extract_project_info_items_keys_are_registered_in_contract():
     assert _EXPECTED_KEYS.issubset(allowed)
 
 
-def test_builtin_fields_resolve_ok_on_a_stantec_like_project(monkeypatch):
+def test_builtin_fields_resolve_ok_on_a_enterprise_like_project(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(_stantec_like_pi())))
+    items = _as_dict(_extract_items(_DocForPI(_enterprise_like_pi())))
 
     for key, expected_v in (
         ("project_info.name", "Test Project"),
@@ -203,68 +234,68 @@ def test_builtin_fields_resolve_ok_on_a_stantec_like_project(monkeypatch):
         ("project_info.issue_date", "2026-08-10"),
         ("project_info.client_name", "Acme Co"),
         ("project_info.building_name", "Tower A"),
-        ("project_info.organization_name", "Stantec"),
+        ("project_info.organization_name", "InternalEnterprise"),
         ("project_info.organization_description", "Architecture"),
     ):
         assert items[key]["q"] == ITEM_Q_OK, "{} expected q=ok, got {}".format(key, items[key]["q"])
         assert items[key]["v"] == expected_v
 
 
-def test_office_and_ifc_guids_resolve_ok_when_present(monkeypatch):
+def test_business_center_and_ifc_guids_resolve_ok_when_present(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(_stantec_like_pi())))
+    items = _as_dict(_extract_items(_DocForPI(_enterprise_like_pi())))
 
-    assert items["project_info.office"]["q"] == ITEM_Q_OK
-    assert items["project_info.office"]["v"] == "Denver"
+    assert items["project_info.business_center"]["q"] == ITEM_Q_OK
+    assert items["project_info.business_center"]["v"] == "BusinessCenter01"
     assert items["project_info.ifc_building_guid"]["q"] == ITEM_Q_OK
     assert items["project_info.ifc_project_guid"]["q"] == ITEM_Q_OK
     assert items["project_info.ifc_site_guid"]["q"] == ITEM_Q_OK
 
 
-def test_office_is_read_via_shared_parameter_guid_when_available(monkeypatch):
-    """Office must be read via Element.get_Parameter(Guid), not LookupParameter
+def test_business_center_is_read_via_shared_parameter_guid_when_available(monkeypatch):
+    """Business Center must be read via Element.get_Parameter(Guid), not LookupParameter
     by display name -- LookupParameter can resolve to an arbitrary same-named
-    parameter if a project happens to contain more than one "Office" definition.
-    Proven here by making LookupParameter("Office") resolve to nothing while the
+    parameter if a project happens to contain more than one "Business Center" definition.
+    Proven here by making LookupParameter("Business Center") resolve to nothing while the
     confirmed GUID resolves to a real value; only the GUID-based read succeeds."""
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
     monkeypatch.setattr(identity_module, "Guid", FakeGuid)
 
     pi = FakeProjectInformation(
-        name="GUID Office Project",
+        name="GUID Business Center Project",
         builtin_values=_ALL_BUILTIN_VALUES,
-        named_present=set(),  # no "Office" resolvable by display name
-        guid_values={_OFFICE_SHARED_PARAM_GUID: "Denver"},
+        named_present=set(),  # no "Business Center" resolvable by display name
+        guid_values={_BUSINESS_CENTER_SHARED_PARAM_GUID: "BusinessCenter01"},
     )
-    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(pi)))
-    assert items["project_info.office"]["q"] == ITEM_Q_OK
-    assert items["project_info.office"]["v"] == "Denver"
+    items = _as_dict(_extract_items(_DocForPI(pi)))
+    assert items["project_info.business_center"]["q"] == ITEM_Q_OK
+    assert items["project_info.business_center"]["v"] == "BusinessCenter01"
 
 
-def test_office_falls_back_to_lookup_by_name_when_guid_type_unavailable(monkeypatch):
+def test_business_center_falls_back_to_lookup_by_name_when_guid_type_unavailable(monkeypatch):
     """Outside a .NET runtime (e.g. this pytest environment without System.Guid),
     identity_module.Guid is None and the code must fall back to LookupParameter
     by name rather than crashing or always reporting not_applicable."""
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
     monkeypatch.setattr(identity_module, "Guid", None)
 
-    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(_stantec_like_pi())))
-    assert items["project_info.office"]["q"] == ITEM_Q_OK
-    assert items["project_info.office"]["v"] == "Denver"
+    items = _as_dict(_extract_items(_DocForPI(_enterprise_like_pi())))
+    assert items["project_info.business_center"]["q"] == ITEM_Q_OK
+    assert items["project_info.business_center"]["v"] == "BusinessCenter01"
 
 
-def test_office_is_not_applicable_when_shared_param_absent_not_unreadable(monkeypatch):
+def test_business_center_is_not_applicable_when_shared_param_absent_not_unreadable(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(_non_stantec_pi())))
+    items = _as_dict(_extract_items(_DocForPI(_non_enterprise_pi())))
 
-    assert items["project_info.office"]["q"] == ITEM_Q_UNSUPPORTED_NOT_APPLICABLE, (
-        "project_info.office should be legitimately-absent not_applicable on a project "
+    assert items["project_info.business_center"]["q"] == ITEM_Q_UNSUPPORTED_NOT_APPLICABLE, (
+        "project_info.business_center should be legitimately-absent not_applicable on a project "
         "without the shared parameter loaded, not unreadable/missing"
     )
-    assert items["project_info.office"]["v"] is None
+    assert items["project_info.business_center"]["v"] is None
 
     # Built-ins -- including the IFC GUID fields, which are true BuiltInParameter
-    # members unrelated to Office/firm identity -- are unaffected by Office's
+    # members unrelated to Business Center/firm identity -- are unaffected by Business Center's
     # shared parameter definition being absent.
     assert items["project_info.client_name"]["q"] == ITEM_Q_OK
     assert items["project_info.ifc_building_guid"]["q"] == ITEM_Q_OK
@@ -276,7 +307,7 @@ def test_ifc_guid_builtins_follow_same_semantics_as_other_builtins(monkeypatch):
     """IFC GUID fields are true BuiltInParameter members (PR review follow-up),
     not shared/custom parameters -- so their absence semantics must match the
     other built-ins (missing Parameter object => unreadable, blank value =>
-    missing), not the shared-parameter not_applicable semantics Office uses."""
+    missing), not the shared-parameter not_applicable semantics Business Center uses."""
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
 
     blank_builtins = dict(_ALL_BUILTIN_VALUES)
@@ -288,7 +319,7 @@ def test_ifc_guid_builtins_follow_same_semantics_as_other_builtins(monkeypatch):
         builtin_values=blank_builtins,
         named_present=set(),
     )
-    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(pi)))
+    items = _as_dict(_extract_items(_DocForPI(pi)))
 
     assert items["project_info.ifc_building_guid"]["q"] == ITEM_Q_MISSING
     assert items["project_info.ifc_building_guid"]["v"] is None
@@ -299,19 +330,19 @@ def test_ifc_guid_builtins_follow_same_semantics_as_other_builtins(monkeypatch):
 def test_named_field_present_but_blank_is_missing_not_not_applicable(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
     pi = FakeProjectInformation(
-        name="Blank Office Project",
+        name="Blank Business Center Project",
         builtin_values=_ALL_BUILTIN_VALUES,
-        named_present={"Office"},
-        named_values={"Office": None},
+        named_present={"Business Center"},
+        named_values={"Business Center": None},
     )
-    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(pi)))
-    assert items["project_info.office"]["q"] == ITEM_Q_MISSING
-    assert items["project_info.office"]["v"] is None
+    items = _as_dict(_extract_items(_DocForPI(pi)))
+    assert items["project_info.business_center"]["q"] == ITEM_Q_MISSING
+    assert items["project_info.business_center"]["v"] is None
 
 
 def test_builtin_field_unreadable_when_no_builtinparameter_enum(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", None)
-    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(_stantec_like_pi())))
+    items = _as_dict(_extract_items(_DocForPI(_enterprise_like_pi())))
     assert items["project_info.client_name"]["q"] == ITEM_Q_UNREADABLE
     # project_info.name doesn't depend on BuiltInParameter (uses pi.Name directly).
     assert items["project_info.name"]["q"] == ITEM_Q_OK
@@ -319,22 +350,22 @@ def test_builtin_field_unreadable_when_no_builtinparameter_enum(monkeypatch):
 
 def test_project_information_missing_marks_every_field_unreadable(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(None)))
+    items = _as_dict(_extract_items(_DocForPI(None)))
     assert set(items.keys()) == _EXPECTED_KEYS
     assert all(it["q"] == ITEM_Q_UNREADABLE for it in items.values())
 
 
 def test_extract_end_to_end_includes_project_info_in_sig_hash_and_leaves_status_ok(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    doc = FakeDoc(_stantec_like_pi())
+    doc = FakeDoc(_enterprise_like_pi())
 
-    result = identity_module.extract(doc, ctx=None)
+    result = identity_module.extract(doc, ctx=_CONFIG_CTX)
     rec = result["records"][0]
 
     items_by_k = _as_dict(rec["identity_basis"]["items"])
     assert _EXPECTED_KEYS.issubset(items_by_k.keys())
 
-    # Every project_info.* field is ok on this fully-populated Stantec-like fake.
+    # Every project_info.* field is ok on this fully-populated InternalEnterprise-like fake.
     assert all(items_by_k[k]["q"] == ITEM_Q_OK for k in _EXPECTED_KEYS)
 
     # status/identity_quality remain governed by the pre-existing core items only.
@@ -353,9 +384,9 @@ def test_phase2_semantic_keys_excludes_project_info_and_stays_the_pre_d025_core(
     exception, not Phase-2-semantic content, and identity.revit_version_name
     must stay excluded exactly as it was pre-D-025 (PR review follow-up)."""
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    doc = FakeDoc(_stantec_like_pi())
+    doc = FakeDoc(_enterprise_like_pi())
 
-    result = identity_module.extract(doc, ctx=None)
+    result = identity_module.extract(doc, ctx=_CONFIG_CTX)
     rec = result["records"][0]
 
     assert rec["phase2"]["semantic_keys"] == [
@@ -372,17 +403,17 @@ def test_phase2_semantic_keys_excludes_project_info_and_stays_the_pre_d025_core(
     assert "identity.revit_version_name" not in rec["phase2"]["semantic_keys"]
 
 
-def test_extract_end_to_end_non_stantec_project_stays_status_ok(monkeypatch):
+def test_extract_end_to_end_non_enterprise_project_stays_status_ok(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    doc = FakeDoc(_non_stantec_pi())
+    doc = FakeDoc(_non_enterprise_pi())
 
-    result = identity_module.extract(doc, ctx=None)
+    result = identity_module.extract(doc, ctx=_CONFIG_CTX)
     rec = result["records"][0]
 
     items_by_k = _as_dict(rec["identity_basis"]["items"])
-    assert items_by_k["project_info.office"]["q"] == ITEM_Q_UNSUPPORTED_NOT_APPLICABLE
+    assert items_by_k["project_info.business_center"]["q"] == ITEM_Q_UNSUPPORTED_NOT_APPLICABLE
 
-    # A non-Stantec project legitimately lacking the shared parameter must not
+    # A non-InternalEnterprise project legitimately lacking the shared parameter must not
     # degrade this domain's record status -- see D-025 / domains/identity.py comments.
     assert rec["status"] == "ok"
     assert rec["identity_quality"] == "complete"
@@ -393,10 +424,10 @@ def test_join_key_and_name_key_are_unaffected_by_project_info_fields(monkeypatch
     adding it to identity_items must not change join_key/join_key_name_identity
     at all, since neither is listed as required/optional there."""
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    doc = FakeDoc(_stantec_like_pi())
+    doc = FakeDoc(_enterprise_like_pi())
 
     policies = load_join_key_policies("policies/domain_join_key_policies.json")
-    ctx = {"join_key_policies": policies, "name_key_policies": policies}
+    ctx = {"join_key_policies": policies, "name_key_policies": policies, **_CONFIG_CTX}
 
     result = identity_module.extract(doc, ctx=ctx)
     rec = result["records"][0]

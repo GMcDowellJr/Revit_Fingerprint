@@ -348,7 +348,7 @@
         "project_info.ifc_building_guid",
         "project_info.ifc_project_guid",
         "project_info.ifc_site_guid",
-        "project_info.office"
+        "project_info.business_center"
       ],
       "shape_gating": {
         "discriminator_key": "identity.is_workshared",

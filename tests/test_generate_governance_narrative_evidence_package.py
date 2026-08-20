@@ -574,7 +574,7 @@ def test_governance_relationships_resolved_beside_supplied_matrix_not_summary_di
         matrix_dir / "governance_bc_client_matrix.csv",
         ["business_center_label", "client_label", "project_count", "project_file_count",
          "percentage_of_bc", "percentage_of_client"],
-        [{"business_center_label": "2014", "client_label": "Sutter", "project_count": "16",
+        [{"business_center_label": "2014", "client_label": "ClientBeta", "project_count": "16",
           "project_file_count": "62", "percentage_of_bc": "0.446043", "percentage_of_client": "1.000000"}],
     )
     relationships_path = matrix_dir / "governance_relationships.csv"
@@ -584,7 +584,7 @@ def test_governance_relationships_resolved_beside_supplied_matrix_not_summary_di
          "business_center_label", "discipline_labels", "unit_system",
          "project_file_count", "export_run_ids"],
         [{"project_id": "proj_abc123", "project_name": "Alpha", "project_name_is_fallback": "false",
-          "client_label": "Sutter", "business_center_label": "2014", "discipline_labels": "architectural",
+          "client_label": "ClientBeta", "business_center_label": "2014", "discipline_labels": "architectural",
           "unit_system": "imperial", "project_file_count": "1", "export_run_ids": "f1"}],
     )
     # governance_relationships.csv does NOT exist beside --summary -- only in matrix_dir.

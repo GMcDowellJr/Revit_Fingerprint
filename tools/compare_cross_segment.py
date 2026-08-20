@@ -115,10 +115,10 @@ Organizational scope levels
 ----------------------------
 Scope is derived from explicit, literal client_label/business_center_label
 values (see _scope_level() / _is_client_wide_rollup()), not blank inference:
-enterprise (client_label=="Stantec", business_center_label=="0000" --
+enterprise (client_label=="InternalEnterprise", business_center_label=="0000" --
 "BC_0000"/any-case spelling variants canonicalize to "0000" via
 _normalize_bc_label(), they are not folded to blank),
-business_center (client_label=="Stantec", a real business_center_label), and
+business_center (client_label=="InternalEnterprise", a real business_center_label), and
 client_business_center (a real external client_label, a real
 business_center_label). A row where either dimension isn't cut at all
 (blank) is a roll-up pooling multiple real scopes, handled by individual
@@ -1922,7 +1922,7 @@ DIRECTED_TYPES = {
 #
 # Under the explicit-metadata contract (PR1), client_label and
 # business_center_label are real, literal, non-blank values on every
-# file_metadata.csv row -- "Stantec" / "0000" for Stantec-internal work, a
+# file_metadata.csv row -- "InternalEnterprise" / "0000" for InternalEnterprise-internal work, a
 # real client name / business center number otherwise. A blank value on a
 # segment_manifest.csv row therefore no longer means "not a client
 # engagement" -- it means this segment's subset simply did not cut on that
@@ -1932,10 +1932,10 @@ DIRECTED_TYPES = {
 # discover_cross_client() / the enterprise_to_client target logic below),
 # not by this function.
 #
-# A row is Enterprise-scoped only when BOTH client_label == "Stantec" AND
+# A row is Enterprise-scoped only when BOTH client_label == "InternalEnterprise" AND
 # business_center_label == "0000" -- either alone is not sufficient (a real
 # external client can still carry the "0000" bookkeeping tag in principle,
-# and Stantec-internal work can carry a real business center). Scope level
+# and InternalEnterprise-internal work can carry a real business center). Scope level
 # is orthogonal to governance_role -- do not encode Project into it; a
 # client+bc segment can be Template, Container, or Project.
 # ---------------------------------------------------------------------------
@@ -1968,8 +1968,12 @@ def _client_of(row: Dict[str, str]) -> str:
     return "" if is_blank_or_na(v) else v
 
 
+from enterprise_policy import DEFAULT_ENTERPRISE_LABEL, normalize_enterprise_label, write_enterprise_policy_provenance
+
+_enterprise_label = DEFAULT_ENTERPRISE_LABEL
+
 def _is_internal_client(client_label: str) -> bool:
-    return client_label.strip().lower() == "stantec"
+    return client_label.strip().lower() == normalize_enterprise_label(_enterprise_label).lower()
 
 
 def _is_enterprise_bc(bc_label: str) -> bool:
@@ -2001,7 +2005,7 @@ def _scope_level(row: Dict[str, str]) -> Optional[str]:
 
 
 def _is_client_wide_rollup(row: Dict[str, str]) -> bool:
-    """A real, non-Stantec client's row with business_center_label not cut
+    """A real, non-InternalEnterprise client's row with business_center_label not cut
     (pools that client's work across whichever real BCs it touches). This
     is the "client-wide roll-up" population -- distinct from
     _scope_level()'s "client_business_center" bucket, which requires bc to
@@ -2537,7 +2541,7 @@ def _stash_scope_override(
 
     Namespaced by comparison_type (not just resolved_sid) because the SAME
     resolved segment can legitimately appear under its own true identity in a
-    different comparison_type -- e.g. "imperial|Project|Sutter|BC_C" is
+    different comparison_type -- e.g. "imperial|Project|ClientAlpha|BC_C" is
     correctly bc-scoped when discover_client_cross_bc() uses it directly, even
     while cross_client's override for the SAME sid says otherwise.
     """
@@ -2643,7 +2647,7 @@ def _is_client_only_project_segment(row: Dict[str, str]) -> bool:
     narrowing -- the "client-level pooled vocabulary" population
     discover_cross_client() compares peer-to-peer. discipline_label is a
     grouping dimension for that comparison, not a disqualifier: a client's
-    per-discipline roll-up (e.g. "Kaiser, Architectural") is just as valid a
+    per-discipline roll-up (e.g. "ClientBeta, Architectural") is just as valid a
     client-only population as the client's fully blank-discipline portfolio,
     as long as it isn't further narrowed by business_center or collection.
 
@@ -2737,7 +2741,7 @@ def discover_cross_client(
 def discover_client_cross_bc(
     manifest: Dict[str, Dict[str, str]],
 ) -> List[ComparisonPair]:
-    """Same-client, cross-business-center comparison: for a real (non-Stantec)
+    """Same-client, cross-business-center comparison: for a real (non-InternalEnterprise)
     client whose work spans more than one real business center, compare that
     client's per-business-center populations against each other, for every
     pair of business centers the client actually appears in -- not a fixed
@@ -2780,9 +2784,9 @@ def discover_parent_siblings(
     # THIS row's own parent since the descendant's own parent_segment_id is
     # one or more levels deeper. Role is classified from the ORIGINAL
     # (level-2) row, not the resolved descendant -- a blank-role, client-only
-    # rollup (e.g. "imperial|Kaiser", pooling every role for that client) can
+    # rollup (e.g. "imperial|ClientBeta", pooling every role for that client) can
     # itself be redundant_single_child to a role-scoped descendant (e.g.
-    # "imperial|Project|Kaiser", if that client happens to have no non-Project
+    # "imperial|Project|ClientBeta", if that client happens to have no non-Project
     # files) whose OWN governance_role is "Project"; classifying by the
     # descendant's role would misfile that blank-role rollup as a genuine
     # Project sibling, which it was never scoped to be.
@@ -2861,10 +2865,10 @@ def discover_governance_chain(
         # When client_label is populated, business_center_label is folded
         # into the same key alongside it (rather than being ignored) --
         # under the explicit-metadata contract client_label is always
-        # populated for Stantec-internal rows too ("Stantec"), so without
-        # this, an Enterprise-scoped Template (Stantec/0000) and a specific
-        # business center's Template (Stantec/2270) would collapse into one
-        # "client=Stantec" bucket and incorrectly pair with that business
+        # populated for InternalEnterprise-internal rows too ("InternalEnterprise"), so without
+        # this, an Enterprise-scoped Template (InternalEnterprise/0000) and a specific
+        # business center's Template (InternalEnterprise/2270) would collapse into one
+        # "client=InternalEnterprise" bucket and incorrectly pair with that business
         # center's Projects as if they were the same governance population.
         # A populated-client, blank-bc row (a client-wide roll-up) still
         # gets its own distinct bucket via the empty bc slot.
@@ -2877,7 +2881,7 @@ def discover_governance_chain(
         # when pairs are generated — rather than as a hard partition here.
         # Hard-partitioning by collection would sever the client_label case:
         # a real client's Container/Template rows are typically tagged with
-        # that client's own collection_label (e.g. "Sutter Standards"), but
+        # that client's own collection_label (e.g. "ClientAlpha Standards"), but
         # its Project rows are typically not tagged with any collection at
         # all. Splitting on collection here would put those two populations
         # in different buckets and silently stop producing
@@ -2924,7 +2928,7 @@ def discover_governance_chain(
         return "" if is_blank_or_na(value) else value
 
     # A collection-blank row is a wildcard ONLY when its blankness means
-    # "collection is simply not tracked here" (the Sutter-shaped case: a
+    # "collection is simply not tracked here" (the ClientAlpha-shaped case: a
     # Project row that never got a collection_label). It must NOT wildcard
     # when the blankness instead means "this segment is a roll-up pooling
     # every collection under it together" — e.g. build_segment_manifest.py
@@ -3025,7 +3029,7 @@ def discover_governance_chain(
     # client standards, since any of them may or may not have adapted from
     # any other. A business_center-scoped Template/Container is meant to
     # apply across whichever clients happen to have work in that bc. An
-    # enterprise-scoped Template/Container (Stantec/"0000") has no client/bc
+    # enterprise-scoped Template/Container (InternalEnterprise/"0000") has no client/bc
     # narrowing of its own, so it is compared against every runnable Project
     # regardless of scope.
     eligible_rows = [
@@ -3278,7 +3282,7 @@ def make_comparison_run_id(
 ) -> str:
     """comparison_type is included so that two distinct comparison types for
     the exact same (seg_a, seg_b) pair and timestamp never collide on the
-    same ID. This does happen in practice: e.g. an enterprise (Stantec/0000)
+    same ID. This does happen in practice: e.g. an enterprise (InternalEnterprise/0000)
     standard and a real-BC standard of the same role can share a
     parent_segment_id, so discover_sibling_segments() pairs them as
     sibling_templates/sibling_containers *in addition to*
@@ -4774,13 +4778,21 @@ def main() -> int:
     ap.add_argument("--workers", default="auto",
                     help="Max parallel pair×domain workers, or 'auto' to derive from "
                          "CPU count (default: auto)")
+    ap.add_argument("--enterprise-label", default=DEFAULT_ENTERPRISE_LABEL,
+                    help="Deployment enterprise label (default: InternalEnterprise)")
 
     args = ap.parse_args()
+    global _enterprise_label
+    _enterprise_label = normalize_enterprise_label(args.enterprise_label)
     args.workers = resolve_worker_count(args.workers)
 
     segments_root = Path(args.segments_root).resolve()
     records_dir = Path(args.records_dir).resolve()
     out_dir = Path(args.out_dir).resolve()
+    write_enterprise_policy_provenance(
+        out_dir, _enterprise_label,
+        "cli" if args.enterprise_label != DEFAULT_ENTERPRISE_LABEL else "checked_in_default",
+    )
 
     # Default: all modes if none specified
     any_mode = any([

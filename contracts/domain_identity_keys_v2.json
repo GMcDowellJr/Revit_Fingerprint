@@ -676,7 +676,7 @@
         "project_info.ifc_building_guid",
         "project_info.ifc_project_guid",
         "project_info.ifc_site_guid",
-        "project_info.office"
+        "project_info.business_center"
       ],
       "required_keys": [
         "identity.is_workshared"
@@ -688,8 +688,8 @@
       "notes": [
         "project_info.* keys (D-025) are ProjectInformation-sourced identity items, additive to the pre-existing worksharing/version/build core -- see domains/identity.py's project_info field tables.",
         "project_info.name/number/status/address/issue_date/client_name/building_name/organization_name/organization_description/ifc_building_guid/ifc_project_guid/ifc_site_guid are all Revit built-ins (BuiltInParameter), expected on every project (q=unreadable if the Parameter object itself is absent, not q=missing). The IFC GUID fields were originally implemented as shared/custom LookupParameter reads before a PR review follow-up confirmed via tools/archetype/bip_lookup.json that they are real BuiltInParameter members (IFC_BUILDING_GUID/IFC_PROJECT_GUID/IFC_SITE_GUID).",
-        "project_info.office is the only shared/custom field: Stantec's confirmed shared parameter (GUID 6b61afc7-13eb-4af5-8b65-889f978af4f3), read via Element.get_Parameter(Guid), legitimately absent on non-Stantec documents (q=unsupported.not_applicable, not q=unreadable).",
-        "Office's Address/City/State/Zip/Country/Telephone/Fax/Legal Entity sub-fields are deliberately NOT registered here -- their exact parameter names are unconfirmed against a real Stantec-template project (see CHANGELOG.md).",
+        "project_info.business_center is a synthetic contract-registered deployment field. It is emitted only when project_info_shared_parameters configures its display name and optional GUID; an absent configured definition is q=unsupported.not_applicable.",
+        "No organization-authored parameter names or GUIDs are enabled by checked-in policy; deployments register additional project_info.* keys before emission.",
         "sig_hash_schema is pinned to identity.sig_hash.v2 (not the generator's default identity.sig_hash.v1) because D-025 changed the sig_hash preimage composition -- tools/generate_sig_hash_policy.py's build_policy() defaults any domain without this override to '<domain>.sig_hash.v1', which would silently erase the version bump on the next regeneration and make post-D-025 hashes appear compatible with the old preimage (PR review follow-up)."
       ]
     },

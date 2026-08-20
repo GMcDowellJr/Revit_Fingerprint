@@ -38,8 +38,8 @@ def test_target_scope_label_enterprise():
 
 
 def test_target_scope_label_single_dimensions():
-    client_row = _row(governance_role_b="Template", client_label_b="Kaiser",
-                       segment_id_b="imperial|Template|Kaiser")
+    client_row = _row(governance_role_b="Template", client_label_b="ClientAlpha",
+                       segment_id_b="imperial|Template|ClientAlpha")
     assert _target_scope_label(client_row, "b") == "client"
 
     bc_row = _row(governance_role_b="Template", business_center_label_b="BC_2270",
@@ -52,9 +52,9 @@ def test_target_scope_label_single_dimensions():
 
 
 def test_target_scope_label_combined_dimensions():
-    row = _row(governance_role_b="Template", client_label_b="Kaiser",
+    row = _row(governance_role_b="Template", client_label_b="ClientAlpha",
                discipline_label_b="architectural",
-               segment_id_b="imperial|Template|Kaiser|architectural")
+               segment_id_b="imperial|Template|ClientAlpha|architectural")
     assert _target_scope_label(row, "b") == "client_discipline"
 
 
@@ -75,9 +75,9 @@ def test_gt_enterprise_slice_unchanged_by_scoped_rows():
              governance_role_a="Generic", governance_role_b="Template",
              comparison_type="generic_to_template", domain="arrowheads",
              all_pairwise_containment_a_in_b_mean="0.90", n_files_a="1", n_files_b="3"),
-        _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template|Kaiser",
+        _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template|ClientAlpha",
              governance_role_a="Generic", governance_role_b="Template",
-             client_label_b="Kaiser",
+             client_label_b="ClientAlpha",
              comparison_type="generic_to_template", domain="arrowheads",
              all_pairwise_containment_a_in_b_mean="0.40", n_files_a="1", n_files_b="4"),
         _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template|architectural",
@@ -146,9 +146,9 @@ def _generic_to_template_rows(enterprise_val, client_val, domain="arrowheads"):
     ]
     if client_val is not None:
         rows.append(
-            _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template|Kaiser",
+            _row(segment_id_a="imperial|Generic", segment_id_b="imperial|Template|ClientAlpha",
                  governance_role_a="Generic", governance_role_b="Template",
-                 client_label_b="Kaiser",
+                 client_label_b="ClientAlpha",
                  comparison_type="generic_to_template", domain=domain,
                  all_pairwise_containment_a_in_b_mean=str(client_val), n_files_a="1", n_files_b="4")
         )
