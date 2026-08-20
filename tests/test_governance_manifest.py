@@ -11,6 +11,10 @@ for candidate in (str(_REPO_ROOT), str(_TOOLS_DIR)):
     if candidate not in sys.path:
         sys.path.insert(0, candidate)
 
+from tools.enterprise_policy import load_enterprise_policy
+
+POLICY = load_enterprise_policy()
+
 from tools.governance_manifest import (
     build_governance_populations,
     compute_scope_key,
@@ -84,16 +88,16 @@ def test_normalize_zero_pad_does_not_affect_bc_prefixed_values():
 
 def test_scope_key_requires_both_conditions_for_enterprise():
     # Internal client but real bc -> bc scope, not enterprise.
-    key, level, _, bc = compute_scope_key("InternalEnterprise", "2014")
+    key, level, _, bc = compute_scope_key("InternalEnterprise", "2014", POLICY)
     assert level == "bc" and key == "bc:2014" and bc == "2014"
     # External client but enterprise-bookkeeping bc -> client scope, not enterprise.
-    key, level, _, _ = compute_scope_key("ClientBeta", "0000")
+    key, level, _, _ = compute_scope_key("ClientBeta", "0000", POLICY)
     assert level == "client" and key == "client:ClientBeta"
     # Both conditions -> enterprise.
-    key, level, _, _ = compute_scope_key("InternalEnterprise", "0000")
+    key, level, _, _ = compute_scope_key("InternalEnterprise", "0000", POLICY)
     assert level == "enterprise" and key == "enterprise"
     # Neither condition -> named project.
-    key, level, _, _ = compute_scope_key("ClientBeta", "2270")
+    key, level, _, _ = compute_scope_key("ClientBeta", "2270", POLICY)
     assert level == "project" and key == "project:ClientBeta:2270"
 
 
@@ -106,7 +110,7 @@ def test_internalenterprise_and_0000_collapse_to_one_enterprise_population():
         _row("e1", "Container", "InternalEnterprise", "0000"),
         _row("e2", "Container", "InternalEnterprise", "0000"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     pop = _find(manifest_rows, scope_key="enterprise", governance_role="Container")
     assert pop["file_count"] == "2"
@@ -118,7 +122,7 @@ def test_legacy_bc_prefixed_and_bare_numeric_collapse_to_one_population():
         _row("e1", "Container", "InternalEnterprise", "BC_2014"),
         _row("e2", "Container", "InternalEnterprise", "2014"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     assert len(manifest_rows) == 1
     pop = manifest_rows[0]
@@ -136,7 +140,7 @@ def test_excel_collapsed_and_correctly_formatted_bc_collapse_to_one_population()
         _row("e1", "Container", "InternalEnterprise", "0796"),
         _row("e2", "Container", "InternalEnterprise", "796"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     assert len(manifest_rows) == 1
     pop = manifest_rows[0]
@@ -150,7 +154,7 @@ def test_generic_role_gets_no_scope_key():
         _row("e1", "Generic", "InternalEnterprise", "0000"),
         _row("e2", "Generic", "InternalEnterprise", "0000", unit="metric"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     for pop in manifest_rows:
         assert pop["scope_key"] == ""
@@ -160,7 +164,7 @@ def test_generic_role_gets_no_scope_key():
 
 def test_generic_host_role_treated_same_as_generic():
     rows = [_row("e1", "Generic-Host", "InternalEnterprise", "0000")]
-    manifest_rows, _membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, _membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     assert manifest_rows[0]["scope_level"] == "generic"
 
@@ -174,7 +178,7 @@ def test_case_variant_role_merges_into_canonical_population():
         _row("e2", "container", "InternalEnterprise", "2014"),
         _row("e3", "CONTAINER", "InternalEnterprise", "2014"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     assert len(manifest_rows) == 1
     pop = manifest_rows[0]
@@ -187,7 +191,7 @@ def test_generic_host_case_variant_folds_to_generic_role_label():
         _row("e1", "Generic", "InternalEnterprise", "0000"),
         _row("e2", "generic-host", "InternalEnterprise", "0000"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     assert len(manifest_rows) == 1
     assert manifest_rows[0]["governance_role"] == "Generic"
@@ -200,7 +204,7 @@ def test_unit_system_case_variants_merge_to_lowercase():
         _row("e2", "Container", "InternalEnterprise", "2014", unit="Imperial"),
         _row("e3", "Container", "InternalEnterprise", "2014", unit="IMPERIAL"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     assert len(manifest_rows) == 1
     assert manifest_rows[0]["unit_system"] == "imperial"
@@ -213,7 +217,7 @@ def test_client_label_case_variants_merge_to_first_seen_casing():
         _row("e2", "Container", "acme", "2014"),
         _row("e3", "Container", "ACME", "2014"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     assert len(manifest_rows) == 1
     assert manifest_rows[0]["client_label"] == "Acme"  # first occurrence wins
@@ -226,7 +230,7 @@ def test_discipline_label_case_variants_merge():
         _row("e1", "Container", "InternalEnterprise", "2014", discipline="architectural"),
         _row("e2", "Container", "InternalEnterprise", "2014", discipline="Architectural"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     assert len(manifest_rows) == 1
     assert manifest_rows[0]["discipline_label"] == "architectural"
@@ -241,7 +245,7 @@ def test_business_center_label_case_variants_merge_after_prefix_strip():
         _row("e2", "Container", "InternalEnterprise", "page"),
         _row("e3", "Container", "InternalEnterprise", "PAGE"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     assert len(manifest_rows) == 1
     assert manifest_rows[0]["business_center_label"] == "Page"  # first occurrence wins
@@ -252,7 +256,7 @@ def test_enterprise_bookkeeping_casing_still_recognized_after_normalization():
         _row("e1", "Container", "InternalEnterprise", "0000"),
         _row("e2", "Container", "InternalEnterprise", "BC_0000"),
     ]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     assert len(manifest_rows) == 1
     assert manifest_rows[0]["scope_level"] == "enterprise"
@@ -264,7 +268,7 @@ def test_unrecognized_role_excluded_with_loud_report(capsys):
         _row("e1", "Container", "InternalEnterprise", "0000"),
         _row("e2", "Mystery", "InternalEnterprise", "0000"),
     ]
-    manifest_rows, _membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, _membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert len(excluded) == 1
     assert excluded[0]["export_run_id"] == "e2"
     # The good row still resolves into a population despite the bad one existing.
@@ -277,25 +281,41 @@ def test_unrecognized_role_excluded_with_loud_report(capsys):
 def test_blank_client_label_raises_defense_in_depth():
     rows = [_row("e1", "Container", "", "2014")]
     with pytest.raises(SystemExit):
-        build_governance_populations(rows)
+        build_governance_populations(rows, POLICY)
 
 
 def test_na_business_center_label_raises_defense_in_depth():
     rows = [_row("e1", "Container", "InternalEnterprise", "N/A")]
     with pytest.raises(SystemExit):
-        build_governance_populations(rows)
+        build_governance_populations(rows, POLICY)
 
 
 def test_fully_populated_rows_build_without_raising():
     rows = [_row("e1", "Container", "InternalEnterprise", "2014")]
-    manifest_rows, membership_rows, excluded = build_governance_populations(rows)
+    manifest_rows, membership_rows, excluded = build_governance_populations(rows, POLICY)
     assert not excluded
     assert len(manifest_rows) == 1
     assert len(membership_rows) == 1
 
 
 def test_compute_scope_key_accepts_case_insensitive_deployment_override():
-    key, level, _, bc = compute_scope_key("Deployment Enterprise", "0000", "deployment enterprise")
+    key, level, _, bc = compute_scope_key("Deployment Enterprise", "0000", load_enterprise_policy(enterprise_label="deployment enterprise"))
     assert (key, level, bc) == ("enterprise", "enterprise", "")
-    key, level, _, bc = compute_scope_key("DEPLOYMENT ENTERPRISE", "2270", "deployment enterprise")
+    key, level, _, bc = compute_scope_key("DEPLOYMENT ENTERPRISE", "2270", load_enterprise_policy(enterprise_label="deployment enterprise"))
     assert (key, level, bc) == ("bc:2270", "bc", "2270")
+
+
+def test_cross_segment_and_governance_manifest_share_policy_classification():
+    from tools.compare_cross_segment import _scope_level
+    from tools.enterprise_policy import load_enterprise_policy
+
+    custom = load_enterprise_policy(enterprise_label="My Enterprise")
+    matrix = [
+        ("My Enterprise", "0000", "enterprise", "enterprise"),
+        ("MY ENTERPRISE", "2270", "bc", "business_center"),
+        ("External", "2270", "project", "client_business_center"),
+        ("External", "0000", "client", None),
+    ]
+    for client, bc, governance_level, cross_level in matrix:
+        assert compute_scope_key(client, bc, custom)[1] == governance_level
+        assert _scope_level({"client_label": client, "business_center_label": bc}, custom) == cross_level

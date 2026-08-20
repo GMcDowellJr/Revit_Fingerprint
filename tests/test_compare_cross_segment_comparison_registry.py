@@ -6,6 +6,9 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
+from enterprise_policy import load_enterprise_policy
+POLICY = load_enterprise_policy()
+
 from compare_cross_segment import (  # noqa: E402
     COMPARISON_REGISTRY_FIELDS,
     atomic_write_csv,

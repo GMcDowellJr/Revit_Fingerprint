@@ -18,6 +18,9 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
+from enterprise_policy import load_enterprise_policy  # noqa: E402
+POLICY = load_enterprise_policy()
+
 from compare_cross_segment import (  # noqa: E402
     _build_summary_row,
     _is_client_only_project_segment,
@@ -36,7 +39,7 @@ def _summary_row(seg_a, seg_b, ctype, manifest):
     bundle/metric arguments with inert defaults -- these tests only care
     about the scope-metadata columns it derives from `manifest`."""
     return _build_summary_row(
-        "crid", seg_a, seg_b, ctype, "some_domain", manifest, {},
+        POLICY, "crid", seg_a, seg_b, ctype, "some_domain", manifest, {},
         n_patterns_a=1, n_patterns_b=1, n_unique_patterns_a=1, n_unique_patterns_b=1,
         all_has_bundles_a="false", all_has_bundles_b="false",
         all_n_shared_bundle_both=0, all_n_shared_bundle_a_only=0, all_n_shared_bundle_b_only=0,
@@ -119,7 +122,7 @@ def test_discover_cross_client_pairs_distinct_clients_same_unit():
         "p_clientalpha": _seg("Project", client="ClientAlpha"),
         "p_clientbeta": _seg("Project", client="ClientBeta"),
     }
-    pairs = discover_cross_client(manifest)
+    pairs = discover_cross_client(POLICY, manifest)
     assert ("p_clientalpha", "p_clientbeta", "cross_client") in pairs
     assert len(pairs) == 1
 
@@ -129,7 +132,7 @@ def test_discover_cross_client_no_pair_across_different_unit_systems():
         "p_clientalpha": _seg("Project", client="ClientAlpha", unit="imperial"),
         "p_clientbeta": _seg("Project", client="ClientBeta", unit="metric"),
     }
-    assert discover_cross_client(manifest) == []
+    assert discover_cross_client(POLICY, manifest) == []
 
 
 def test_discover_cross_client_discipline_scoped_segment_does_not_mix_with_broader_grain():
@@ -142,7 +145,7 @@ def test_discover_cross_client_discipline_scoped_segment_does_not_mix_with_broad
         "p_clientalpha_arch": _seg("Project", client="ClientAlpha", discipline="architectural"),
         "p_clientbeta": _seg("Project", client="ClientBeta"),
     }
-    pairs = discover_cross_client(manifest)
+    pairs = discover_cross_client(POLICY, manifest)
     assert ("p_clientalpha", "p_clientbeta", "cross_client") in pairs
     assert not any("p_clientalpha_arch" in (a, b) for a, b, _ in pairs)
 
@@ -155,7 +158,7 @@ def test_discover_cross_client_matching_discipline_peers_do_pair():
         "p_clientalpha_arch": _seg("Project", client="ClientAlpha", discipline="architectural"),
         "p_clientbeta_arch": _seg("Project", client="ClientBeta", discipline="architectural"),
     }
-    pairs = discover_cross_client(manifest)
+    pairs = discover_cross_client(POLICY, manifest)
     assert ("p_clientalpha_arch", "p_clientbeta_arch", "cross_client") in pairs
     assert len(pairs) == 1
 
@@ -167,7 +170,7 @@ def test_discover_cross_client_discipline_mismatch_produces_no_pair():
         "p_clientalpha_arch": _seg("Project", client="ClientAlpha", discipline="architectural"),
         "p_clientbeta_elec": _seg("Project", client="ClientBeta", discipline="electrical"),
     }
-    assert discover_cross_client(manifest) == []
+    assert discover_cross_client(POLICY, manifest) == []
 
 
 def test_discover_cross_client_excludes_non_project_roles():
@@ -175,7 +178,7 @@ def test_discover_cross_client_excludes_non_project_roles():
         "t_clientalpha": _seg("Template", client="ClientAlpha"),
         "p_clientbeta": _seg("Project", client="ClientBeta"),
     }
-    assert discover_cross_client(manifest) == []
+    assert discover_cross_client(POLICY, manifest) == []
 
 
 def test_discover_cross_client_excludes_registration_only_segments():
@@ -183,7 +186,7 @@ def test_discover_cross_client_excludes_registration_only_segments():
         "p_clientalpha": _seg("Project", client="ClientAlpha", run_type="registration"),
         "p_clientbeta": _seg("Project", client="ClientBeta"),
     }
-    assert discover_cross_client(manifest) == []
+    assert discover_cross_client(POLICY, manifest) == []
 
 
 def test_discover_cross_client_three_clients_produces_all_pairs():
@@ -192,7 +195,7 @@ def test_discover_cross_client_three_clients_produces_all_pairs():
         "p_b": _seg("Project", client="B"),
         "p_c": _seg("Project", client="C"),
     }
-    pairs = {(a, b) for a, b, ctype in discover_cross_client(manifest) if ctype == "cross_client"}
+    pairs = {(a, b) for a, b, ctype in discover_cross_client(POLICY, manifest) if ctype == "cross_client"}
     assert pairs == {("p_a", "p_b"), ("p_a", "p_c"), ("p_b", "p_c")}
 
 
@@ -201,7 +204,7 @@ def test_discover_cross_client_no_self_pair_or_reverse_duplicate():
         "p_a": _seg("Project", client="A"),
         "p_b": _seg("Project", client="B"),
     }
-    pairs = discover_cross_client(manifest)
+    pairs = discover_cross_client(POLICY, manifest)
     assert ("p_b", "p_a", "cross_client") not in pairs
     assert ("p_a", "p_a", "cross_client") not in pairs
 
@@ -445,7 +448,7 @@ def test_discover_cross_client_rescues_single_bc_client_via_redundant_pointer():
                           notes="redundant_single_child:p_clientbeta_bc_c"),
         "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="bundle"),
     }
-    pairs = discover_cross_client(manifest)
+    pairs = discover_cross_client(POLICY, manifest)
     assert pairs == [("p_clientalpha", "p_clientbeta_bc_c", "cross_client")]
 
 
@@ -456,7 +459,7 @@ def test_discover_cross_client_no_rescue_when_pointed_to_child_also_ineligible()
                           notes="redundant_single_child:p_clientbeta_bc_c"),
         "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="registration"),
     }
-    assert discover_cross_client(manifest) == []
+    assert discover_cross_client(POLICY, manifest) == []
 
 
 # ---------------------------------------------------------------------------
@@ -473,7 +476,7 @@ def test_discover_sibling_segments_rescues_single_bc_client_under_shared_parent(
         "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="bundle",
                                parent="p_clientbeta", segment_level="4"),
     }
-    pairs = discover_sibling_segments(manifest)
+    pairs = discover_sibling_segments(POLICY, manifest)
     assert ("p_clientalpha", "p_clientbeta_bc_c", "sibling_projects") in pairs
     assert len(pairs) == 1
 
@@ -538,7 +541,7 @@ def test_discover_cross_client_rescued_pair_reports_original_blank_scope():
                           notes="redundant_single_child:p_clientbeta_bc_c"),
         "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="bundle"),
     }
-    pairs = discover_cross_client(manifest)
+    pairs = discover_cross_client(POLICY, manifest)
     seg_a, seg_b, ctype = pairs[0]
     assert seg_b == "p_clientbeta_bc_c"  # segment_id stays the resolved (data-bearing) descendant
 
@@ -559,7 +562,7 @@ def test_discover_cross_client_override_does_not_leak_into_other_comparison_type
                           notes="redundant_single_child:p_clientbeta_bc_c"),
         "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="bundle"),
     }
-    discover_cross_client(manifest)  # populates the cross_client-scoped override as a side effect
+    discover_cross_client(POLICY, manifest)  # populates the cross_client-scoped override as a side effect
 
     row = _summary_row("p_clientbeta_bc_c", "p_clientbeta_bc_c", "client_cross_bc", manifest)
     assert row["business_center_label_a"] == "BC_C"
@@ -572,7 +575,7 @@ def test_discover_cross_client_no_override_when_no_resolution_needed():
         "p_clientalpha": _seg("Project", client="ClientAlpha", run_type="bundle"),
         "p_clientbeta": _seg("Project", client="ClientBeta", run_type="bundle"),
     }
-    discover_cross_client(manifest)
+    discover_cross_client(POLICY, manifest)
     assert _scope_override_key("cross_client") not in manifest["p_clientalpha"]
     assert _scope_override_key("cross_client") not in manifest["p_clientbeta"]
 
@@ -587,7 +590,7 @@ def test_discover_sibling_segments_rescued_pair_reports_original_scope():
         "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="bundle",
                                parent="p_clientbeta", segment_level="4"),
     }
-    pairs = discover_sibling_segments(manifest)
+    pairs = discover_sibling_segments(POLICY, manifest)
     seg_a, seg_b, ctype = pairs[0]
     assert ctype == "sibling_projects"
 

@@ -23,6 +23,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
 import csv
 
+from enterprise_policy import load_enterprise_policy
+POLICY = load_enterprise_policy()
+
 from compare_cross_segment import (  # noqa: E402
     _build_ancestor_map,
     _compute_containment_thresholds,
@@ -354,7 +357,7 @@ def test_discover_sibling_segments_pre_fix_reproduces_violation():
     # Simulate pre-D-027 behavior: no lineage guard at all (empty ancestor_map,
     # no containment_map). The real violation must reproduce.
     manifest = _real_corpus_shaped_manifest()
-    pairs = discover_sibling_segments(manifest, ancestor_map={}, containment_map=None)
+    pairs = discover_sibling_segments(POLICY, manifest, ancestor_map={}, containment_map=None)
     assert ("imperial|Container|InternalEnterprise", "imperial|Container|InternalEnterprise|0000", "sibling_containers") in pairs
 
 
@@ -363,7 +366,7 @@ def test_discover_sibling_segments_post_fix_excludes_violation():
     # manifest's own ancestor_segment_ids field, and the structural guard
     # excludes the real ancestor/descendant pair.
     manifest = _real_corpus_shaped_manifest()
-    pairs = discover_sibling_segments(manifest)
+    pairs = discover_sibling_segments(POLICY, manifest)
     assert ("imperial|Container|InternalEnterprise", "imperial|Container|InternalEnterprise|0000", "sibling_containers") not in pairs
     assert not any(
         {a, b} == {"imperial|Container|InternalEnterprise", "imperial|Container|InternalEnterprise|0000"}
@@ -379,7 +382,7 @@ def test_discover_sibling_segments_unrelated_siblings_still_pair():
         "imperial|Container", "Container", client="ClientBeta",
         ancestor_ids=["imperial|Container"],
     )
-    pairs = discover_sibling_segments(manifest)
+    pairs = discover_sibling_segments(POLICY, manifest)
     assert any(
         {a, b} == {"imperial|Container|InternalEnterprise", "imperial|Container|ClientBeta"}
         for a, b, _ in pairs
@@ -397,7 +400,7 @@ def test_discover_sibling_segments_backward_compatible_without_ancestor_data():
         "a": {"parent_segment_id": "p", "governance_role": "Container", "unit_system": "imperial", "run_type": "bundle"},
         "b": {"parent_segment_id": "p", "governance_role": "Container", "unit_system": "imperial", "run_type": "bundle"},
     }
-    pairs = discover_sibling_segments(manifest)
+    pairs = discover_sibling_segments(POLICY, manifest)
     assert ("a", "b", "sibling_containers") in pairs
 
 
