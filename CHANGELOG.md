@@ -11,6 +11,17 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Changed
+- **Repository-neutral runtime and sample defaults.** Dynamo runner discovery no
+  longer searches an organization-specific user-profile path, both checked-in
+  Dynamo graphs have blank workstation inputs/hints, and the default
+  `client_sector.csv` contains synthetic examples only. Deployments using real
+  client labels must pass their approved mapping with `--client-sector`.
+  Selected-blank segment folder components now render as
+  `no_external_client` rather than an organization name; rebuilding such a
+  segment therefore changes its `output_folder`, but not its `segment_id` or
+  population membership.
+
 ### Fixed
 - **`materials`: `material.keynote` no longer silently omitted from `identity_basis.items` when blank.**
   `domains/materials.py`'s keynote emission previously used a truthy guard
@@ -199,9 +210,10 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `_diameter`/`_spot_elevation`/`_spot_coordinate`/`_spot_slope`, closing the gap
   identified in `audit_results/audit_11_domain_extractor_delta_step0_findings.md`
   §7. All fields are read via the existing `first_param(bip_names=..., ui_names=...)`
-  pattern (`core/rows.py`) and verified against the repo's already-committed probe
-  run data (`tools/probes/Exports/probes_2025_*.json`, 3 consistent runs, per-shape
-  `observed_on_shapes` breakdown) rather than a fresh live-Revit run in this pass —
+  pattern (`core/rows.py`) and verified against three consistent runs from the
+  approved external probe dataset described in `tools/probes/Exports/README.md`
+  (including its per-shape `observed_on_shapes` breakdown), rather than a fresh
+  live-Revit run in this pass —
   where the probe data corrected this area's own initial family-applicability
   guesses (Centerline/Interior Tick Mark/Equality are Linear+Angular only, **not**
   Radial/Diameter as originally guessed; Alternate Units genuinely applies to all 7

@@ -563,7 +563,7 @@ class TestNameAllOutputLocation:
 
 
 class TestStaleNameAllClearedBeforeRegenerationEvenOnFailure:
-    """PR review (chatgpt-codex-connector, #391): a failure during staging/mining/
+    """Regression scenario: a failure during staging/mining/
     provenance generation happens before the relocation step at the end of the name
     branch ever runs -- without an upfront clear, a prior successful run's name_all/
     would survive completely untouched, and Power BI would keep reading it as current

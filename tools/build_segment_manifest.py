@@ -59,33 +59,12 @@ def _population_hash(export_run_ids: List[str]) -> str:
     token="|".join(sorted(export_run_ids));return hashlib.sha1(token.encode()).hexdigest()
 
 _UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>=\s]')
-# A cut dimension explicitly selected in a subset with a blank value renders
-# in segment_id as an empty part between pipes (e.g. "imperial|Template|" or
-# "imperial|Container||architectural"). That part is rendered as this token
-# in the derived folder name — a bare "_" (or "__") there reads as a naming
-# mistake rather than the intentional "no value selected" segment it actually
-# is. Under the current explicit-metadata contract, every required dimension
-# is validated nonblank before a row reaches _build_segments() via main(), so
-# _build_segments() no longer itself produces a selected-blank subset for any
-# dimension — this handling is retained defensively for any segment_id
-# string this function is handed directly (hand-crafted fixtures, a future
-# dimension that permits blank selection, etc.).
-#
-# This used to be "enterprise", matching compare_cross_segment.py's
-# "enterprise" scope-level term. That was misleading here: this token fires
-# for every blank-selected segment regardless of whether the segment also has
-# a real business_center_label, so a Stantec-internal segment scoped to a
-# specific business center (e.g. "imperial|Container||architectural|1779")
-# rendered as "..._enterprise_architectural_1779...", implying a truly
-# enterprise-wide (no client, no bc) scope it doesn't actually have. Renamed
-# to "stantec" to describe what this token actually always means here
-# ("no external client" — governance_manifest.py's stricter enterprise
-# definition, which additionally requires no real bc, lives in that module's
-# scope_key/scope_level instead). Existing on-disk segment folders built
-# under the old token keep their old names until they are next rebuilt
-# (population change or -ForceAll); this only affects newly (re)built
-# segments going forward.
-_BLANK_SELECTED_FOLDER_TOKEN = "stantec"
+# A selected blank dimension must remain distinguishable from an unselected
+# dimension, but its folder component must describe the data state rather than a
+# particular enterprise. ``no_external_client`` means exactly that: the cut
+# selected a blank client value. It does not imply enterprise scope, because a
+# real business-center value may still be present on the same segment.
+_BLANK_SELECTED_FOLDER_TOKEN = "no_external_client"
 def _sanitize_folder(segment_id:str)->str:
     # No "+" quantifier on _UNSAFE_FOLDER_CHARS and no .strip("_") at the end:
     # both are deliberate. An empty part between/after separator pipes is
@@ -286,8 +265,8 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
     required, explicit-metadata segment dimensions validated by
     _validate_required_metadata() before this function ever sees them via
     main(). In particular, "0000"/"BC_0000" are ordinary literal
-    business_center_label values under the current contract (Stantec /
-    "0000" is the authoritative Enterprise identity), not enterprise-
+    business_center_label values under the current contract (the configured
+    internal-enterprise client label paired with "0000"), not enterprise-
     bookkeeping tokens to be folded away. Only project_label (not a
     DIMENSION_CONFIG field; not read by this file at all) may carry an
     explicit not-applicable sentinel.

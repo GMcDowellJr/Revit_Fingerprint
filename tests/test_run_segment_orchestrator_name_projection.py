@@ -541,7 +541,7 @@ class TestStaleNameBundleOutputClearedBeforeRerun:
 
 
 class TestClearStaleNameAllBeforeRun:
-    """PR review (chatgpt-codex-connector, #391, second round): a failure in step 2b
+    """Regression scenario: a failure in step 2b
     (name-pattern generation) or step 3 (config bundle, which gates step 3b even under
     comparison_target=both) skips step 3b entirely, so
     run_bundle_analysis_for_target()'s own upfront clear of name_all/ never runs. This
@@ -597,7 +597,7 @@ class TestClearStaleNameAllBeforeRun:
 
 
 class TestAnnotationFailureFailsTheSegment:
-    """PR review (chatgpt-codex-connector, #391, second round): if
+    """Regression scenario: if
     annotate_name_target_combined_files() (or merge_bi_outputs()) raises, the
     surrounding handler must not just log a warning -- _segment_has_name_leg_output()
     only checks that bundle_provenance.csv exists (already written by step 3b before
@@ -681,7 +681,7 @@ class TestAnnotationFailureFailsTheSegment:
 
 
 class TestClearStaleNameAllFailureFailsTheSegment:
-    """PR review (chatgpt-codex-connector, #391, third round): _clear_stale_name_all_
+    """Regression scenario: _clear_stale_name_all_
     before_run() is called before _run_one_segment()'s try/except machinery and its
     registry-update block. Left unguarded, a persistent failure there (retry_fs_op
     exhausting every attempt, not just a transient one) would propagate straight out of

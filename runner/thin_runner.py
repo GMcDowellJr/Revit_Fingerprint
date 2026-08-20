@@ -44,7 +44,7 @@ _thinrunner_warnings = []
 try:
     ORG_DIR = str(os.environ.get("REVIT_FINGERPRINT_ORG_DIR", "Company")).strip() or "Company"
 except Exception:
-    ORG_DIR = "Stantec"
+    ORG_DIR = "Company"
 
 APP_DIR = "RevitFingerprint"
 CHANNEL_DIR = "current"
@@ -422,16 +422,6 @@ def _candidate_repo_dirs():
     if up:
         tried.append(("userprofile:RevitFingerprint_current", os.path.join(up, "RevitFingerprint", "current")))
 
-    # 5) Network-share friendly convention used by current Dynamo deployments
-    # (user requested explicit fallback root)
-    if up:
-        tried.append(
-            (
-                "userprofile:stantec_general_code",
-                os.path.join(up, "Stantec", "Revit_Fingerprint - General", "Code"),
-            )
-        )
-
     return tried
 
 _selected = None
@@ -460,7 +450,6 @@ if _selected is None:
             "recommended_current": r"%USERPROFILE%\Documents\{ORG}\{APP}\{CH}".format(ORG=ORG_DIR, APP=APP_DIR, CH=CHANNEL_DIR),
             "zip_extract_example": r"%USERPROFILE%\Documents\{ORG}\{APP}\vX.Y.Z".format(ORG=ORG_DIR, APP=APP_DIR),
             "fallback_current_localappdata": r"%LOCALAPPDATA%\{ORG}\{APP}\{CH}".format(ORG=ORG_DIR, APP=APP_DIR, CH=CHANNEL_DIR),
-            "fallback_stantec_general_code": r"%USERPROFILE%\Stantec\Revit_Fingerprint - General\Code",
             "override_env_var": "REVIT_FINGERPRINT_ORG_DIR",
         },
         "tried": _tried,
