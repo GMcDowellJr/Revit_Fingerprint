@@ -77,11 +77,11 @@ def _seg(
 # ---------------------------------------------------------------------------
 
 def test_is_client_only_project_segment_true_for_bare_client_scope():
-    assert _is_client_only_project_segment(_seg("Project", client="Kaiser")) is True
+    assert _is_client_only_project_segment(_seg("Project", client="ClientAlpha")) is True
 
 
 def test_is_client_only_project_segment_false_for_non_project_role():
-    assert _is_client_only_project_segment(_seg("Container", client="Kaiser")) is False
+    assert _is_client_only_project_segment(_seg("Container", client="ClientAlpha")) is False
 
 
 def test_is_client_only_project_segment_false_when_client_blank():
@@ -94,19 +94,19 @@ def test_is_client_only_project_segment_true_when_further_scoped_by_discipline()
     not a disqualifier -- a client's per-discipline roll-up is still a valid
     client-only population as long as bc/collection aren't also cut."""
     assert _is_client_only_project_segment(
-        _seg("Project", client="Kaiser", discipline="architectural")
+        _seg("Project", client="ClientAlpha", discipline="architectural")
     ) is True
 
 
 def test_is_client_only_project_segment_false_when_further_scoped_by_bc():
     assert _is_client_only_project_segment(
-        _seg("Project", client="Kaiser", bc="BC_1")
+        _seg("Project", client="ClientAlpha", bc="BC_1")
     ) is False
 
 
 def test_is_client_only_project_segment_false_when_further_scoped_by_collection():
     assert _is_client_only_project_segment(
-        _seg("Project", client="Kaiser", collection="2014")
+        _seg("Project", client="ClientAlpha", collection="2014")
     ) is False
 
 
@@ -116,18 +116,18 @@ def test_is_client_only_project_segment_false_when_further_scoped_by_collection(
 
 def test_discover_cross_client_pairs_distinct_clients_same_unit():
     manifest = {
-        "p_kaiser": _seg("Project", client="Kaiser"),
-        "p_sutter": _seg("Project", client="Sutter"),
+        "p_clientalpha": _seg("Project", client="ClientAlpha"),
+        "p_clientbeta": _seg("Project", client="ClientBeta"),
     }
     pairs = discover_cross_client(manifest)
-    assert ("p_kaiser", "p_sutter", "cross_client") in pairs
+    assert ("p_clientalpha", "p_clientbeta", "cross_client") in pairs
     assert len(pairs) == 1
 
 
 def test_discover_cross_client_no_pair_across_different_unit_systems():
     manifest = {
-        "p_kaiser": _seg("Project", client="Kaiser", unit="imperial"),
-        "p_sutter": _seg("Project", client="Sutter", unit="metric"),
+        "p_clientalpha": _seg("Project", client="ClientAlpha", unit="imperial"),
+        "p_clientbeta": _seg("Project", client="ClientBeta", unit="metric"),
     }
     assert discover_cross_client(manifest) == []
 
@@ -138,13 +138,13 @@ def test_discover_cross_client_discipline_scoped_segment_does_not_mix_with_broad
     (broader) portfolio segment; mixing grains would compare a narrower
     population against a broader one."""
     manifest = {
-        "p_kaiser": _seg("Project", client="Kaiser"),
-        "p_kaiser_arch": _seg("Project", client="Kaiser", discipline="architectural"),
-        "p_sutter": _seg("Project", client="Sutter"),
+        "p_clientalpha": _seg("Project", client="ClientAlpha"),
+        "p_clientalpha_arch": _seg("Project", client="ClientAlpha", discipline="architectural"),
+        "p_clientbeta": _seg("Project", client="ClientBeta"),
     }
     pairs = discover_cross_client(manifest)
-    assert ("p_kaiser", "p_sutter", "cross_client") in pairs
-    assert not any("p_kaiser_arch" in (a, b) for a, b, _ in pairs)
+    assert ("p_clientalpha", "p_clientbeta", "cross_client") in pairs
+    assert not any("p_clientalpha_arch" in (a, b) for a, b, _ in pairs)
 
 
 def test_discover_cross_client_matching_discipline_peers_do_pair():
@@ -152,11 +152,11 @@ def test_discover_cross_client_matching_discipline_peers_do_pair():
     pair on that discipline grain -- discipline is a grouping dimension now,
     not an exclusion."""
     manifest = {
-        "p_kaiser_arch": _seg("Project", client="Kaiser", discipline="architectural"),
-        "p_sutter_arch": _seg("Project", client="Sutter", discipline="architectural"),
+        "p_clientalpha_arch": _seg("Project", client="ClientAlpha", discipline="architectural"),
+        "p_clientbeta_arch": _seg("Project", client="ClientBeta", discipline="architectural"),
     }
     pairs = discover_cross_client(manifest)
-    assert ("p_kaiser_arch", "p_sutter_arch", "cross_client") in pairs
+    assert ("p_clientalpha_arch", "p_clientbeta_arch", "cross_client") in pairs
     assert len(pairs) == 1
 
 
@@ -164,24 +164,24 @@ def test_discover_cross_client_discipline_mismatch_produces_no_pair():
     """Matching unit_system alone is not sufficient -- differing
     discipline_label values must not produce a cross_client pair."""
     manifest = {
-        "p_kaiser_arch": _seg("Project", client="Kaiser", discipline="architectural"),
-        "p_sutter_elec": _seg("Project", client="Sutter", discipline="electrical"),
+        "p_clientalpha_arch": _seg("Project", client="ClientAlpha", discipline="architectural"),
+        "p_clientbeta_elec": _seg("Project", client="ClientBeta", discipline="electrical"),
     }
     assert discover_cross_client(manifest) == []
 
 
 def test_discover_cross_client_excludes_non_project_roles():
     manifest = {
-        "t_kaiser": _seg("Template", client="Kaiser"),
-        "p_sutter": _seg("Project", client="Sutter"),
+        "t_clientalpha": _seg("Template", client="ClientAlpha"),
+        "p_clientbeta": _seg("Project", client="ClientBeta"),
     }
     assert discover_cross_client(manifest) == []
 
 
 def test_discover_cross_client_excludes_registration_only_segments():
     manifest = {
-        "p_kaiser": _seg("Project", client="Kaiser", run_type="registration"),
-        "p_sutter": _seg("Project", client="Sutter"),
+        "p_clientalpha": _seg("Project", client="ClientAlpha", run_type="registration"),
+        "p_clientbeta": _seg("Project", client="ClientBeta"),
     }
     assert discover_cross_client(manifest) == []
 
@@ -218,20 +218,20 @@ def test_drops_sibling_projects_when_same_pair_covered_by_cross_client():
     comparison_run_id. cross_client wins; the sibling_projects entry for that
     exact pair is dropped."""
     pairs = [
-        ("p_kaiser", "p_sutter", "sibling_projects"),
-        ("p_kaiser", "p_sutter", "cross_client"),
+        ("p_clientalpha", "p_clientbeta", "sibling_projects"),
+        ("p_clientalpha", "p_clientbeta", "cross_client"),
     ]
     result = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
-    assert result == [("p_kaiser", "p_sutter", "cross_client")]
+    assert result == [("p_clientalpha", "p_clientbeta", "cross_client")]
 
 
 def test_drop_legacy_sibling_projects_is_order_independent():
     pairs = [
-        ("p_sutter", "p_kaiser", "sibling_projects"),
-        ("p_kaiser", "p_sutter", "cross_client"),
+        ("p_clientbeta", "p_clientalpha", "sibling_projects"),
+        ("p_clientalpha", "p_clientbeta", "cross_client"),
     ]
     result = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
-    assert result == [("p_kaiser", "p_sutter", "cross_client")]
+    assert result == [("p_clientalpha", "p_clientbeta", "cross_client")]
 
 
 def test_drop_legacy_sibling_projects_leaves_uncovered_pairs_untouched():
@@ -239,12 +239,12 @@ def test_drop_legacy_sibling_projects_leaves_uncovered_pairs_untouched():
     discipline-scoped Project siblings, which discover_cross_client() never
     emits) must be preserved."""
     pairs = [
-        ("p_kaiser_arch", "p_kaiser_elec", "sibling_projects"),
-        ("p_kaiser", "p_sutter", "cross_client"),
+        ("p_clientalpha_arch", "p_clientalpha_elec", "sibling_projects"),
+        ("p_clientalpha", "p_clientbeta", "cross_client"),
     ]
     result = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
-    assert ("p_kaiser_arch", "p_kaiser_elec", "sibling_projects") in result
-    assert ("p_kaiser", "p_sutter", "cross_client") in result
+    assert ("p_clientalpha_arch", "p_clientalpha_elec", "sibling_projects") in result
+    assert ("p_clientalpha", "p_clientbeta", "cross_client") in result
     assert len(result) == 2
 
 
@@ -253,15 +253,15 @@ def test_drop_legacy_sibling_projects_leaves_other_types_untouched():
     comparison_types for the exact same pair (a real, expected scenario per
     deduplicate_pairs()'s own docstring) must not be touched by this function."""
     pairs = [
-        ("p_kaiser", "p_sutter", "template_to_project"),
-        ("p_kaiser", "p_sutter", "cross_client"),
+        ("p_clientalpha", "p_clientbeta", "template_to_project"),
+        ("p_clientalpha", "p_clientbeta", "cross_client"),
     ]
     result = drop_legacy_siblings_covered_by_peer_comparisons(pairs)
     assert set(result) == set(pairs)
 
 
 def test_drop_legacy_sibling_projects_noop_when_no_cross_client_rows():
-    pairs = [("p_kaiser", "p_sutter", "sibling_projects")]
+    pairs = [("p_clientalpha", "p_clientbeta", "sibling_projects")]
     assert drop_legacy_siblings_covered_by_peer_comparisons(pairs) == pairs
 
 
@@ -283,25 +283,25 @@ def test_segment_filter_before_drop_preserves_reversed_orientation_pair():
 
     Here segment_id sorts "p_zclient" < "p_akiser" is false alphabetically
     (z > a), so pick IDs that invert the client-label sort order directly:
-    client "Akiser" (segment "p_zsutter") vs client "Zsutter" (segment
+    client "Akiser" (segment "p_zclientbeta") vs client "Zclientbeta" (segment
     "p_akiser") -- sibling_projects (segment-ID order) emits
-    ("p_akiser", "p_zsutter"); cross_client (client-label order) emits
-    ("p_zsutter", "p_akiser"), the reverse.
+    ("p_akiser", "p_zclientbeta"); cross_client (client-label order) emits
+    ("p_zclientbeta", "p_akiser"), the reverse.
     """
     pairs = [
-        ("p_akiser", "p_zsutter", "sibling_projects"),  # segment-ID sorted order
-        ("p_zsutter", "p_akiser", "cross_client"),       # client-label sorted order (reversed)
+        ("p_akiser", "p_zclientbeta", "sibling_projects"),  # segment-ID sorted order
+        ("p_zclientbeta", "p_akiser", "cross_client"),       # client-label sorted order (reversed)
     ]
-    # Simulate `--segment-a p_akiser --segment-b p_zsutter`, applied BEFORE the
+    # Simulate `--segment-a p_akiser --segment-b p_zclientbeta`, applied BEFORE the
     # drop (the fixed order in main()).
-    segment_a, segment_b = "p_akiser", "p_zsutter"
+    segment_a, segment_b = "p_akiser", "p_zclientbeta"
     filtered = [(a, b, ct) for a, b, ct in pairs if a == segment_a]
     filtered = [(a, b, ct) for a, b, ct in filtered if b == segment_b]
     result = drop_legacy_siblings_covered_by_peer_comparisons(filtered)
     # Only the correctly-oriented sibling_projects row matches the filter
     # (the reversed cross_client row doesn't survive it at all), so the drop
     # sees no cross_client entry for this pair and must not remove it.
-    assert result == [("p_akiser", "p_zsutter", "sibling_projects")]
+    assert result == [("p_akiser", "p_zclientbeta", "sibling_projects")]
 
 
 def test_drops_sibling_templates_when_same_pair_covered_by_bc_to_bc():
@@ -366,36 +366,36 @@ def test_drop_leaves_sibling_generic_and_sibling_segments_untouched_when_uncover
 # ---------------------------------------------------------------------------
 
 def test_redundant_child_segment_id_extracts_pointer():
-    row = _seg("Project", client="Sutter", run_type="registration",
-                notes="redundant_single_child:imperial|Project|Sutter|BC_C")
-    assert _redundant_child_segment_id(row) == "imperial|Project|Sutter|BC_C"
+    row = _seg("Project", client="ClientBeta", run_type="registration",
+                notes="redundant_single_child:imperial|Project|ClientBeta|BC_C")
+    assert _redundant_child_segment_id(row) == "imperial|Project|ClientBeta|BC_C"
 
 
 def test_redundant_child_segment_id_survives_pipe_in_segment_id_and_prior_notes():
     """segment_id uses "|" as its own separator, and redundant_single_child
     may not be the only note -- but pass5 always appends it last, so
     everything after the marker (pipes included) belongs to the segment_id."""
-    row = _seg("Project", client="Sutter", run_type="registration",
-                notes="below_min_files|redundant_single_child:imperial|Project|Sutter|BC_C|architectural")
-    assert _redundant_child_segment_id(row) == "imperial|Project|Sutter|BC_C|architectural"
+    row = _seg("Project", client="ClientBeta", run_type="registration",
+                notes="below_min_files|redundant_single_child:imperial|Project|ClientBeta|BC_C|architectural")
+    assert _redundant_child_segment_id(row) == "imperial|Project|ClientBeta|BC_C|architectural"
 
 
 def test_redundant_child_segment_id_none_when_no_marker():
-    assert _redundant_child_segment_id(_seg("Project", client="Sutter", run_type="registration")) is None
+    assert _redundant_child_segment_id(_seg("Project", client="ClientBeta", run_type="registration")) is None
 
 
 def test_resolve_runnable_segment_returns_self_when_already_eligible():
-    manifest = {"p_kaiser": _seg("Project", client="Kaiser", run_type="bundle")}
-    assert _resolve_runnable_segment(manifest, "p_kaiser") == "p_kaiser"
+    manifest = {"p_clientalpha": _seg("Project", client="ClientAlpha", run_type="bundle")}
+    assert _resolve_runnable_segment(manifest, "p_clientalpha") == "p_clientalpha"
 
 
 def test_resolve_runnable_segment_follows_single_hop():
     manifest = {
-        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
-                          notes="redundant_single_child:p_sutter_bc_c"),
-        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="bundle"),
+        "p_clientbeta": _seg("Project", client="ClientBeta", run_type="registration",
+                          notes="redundant_single_child:p_clientbeta_bc_c"),
+        "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="bundle"),
     }
-    assert _resolve_runnable_segment(manifest, "p_sutter") == "p_sutter_bc_c"
+    assert _resolve_runnable_segment(manifest, "p_clientbeta") == "p_clientbeta_bc_c"
 
 
 def test_resolve_runnable_segment_follows_multi_hop_chain():
@@ -418,8 +418,8 @@ def test_resolve_runnable_segment_none_when_chain_dead_ends():
 
 
 def test_resolve_runnable_segment_none_when_no_pointer_and_ineligible():
-    manifest = {"p_kaiser": _seg("Project", client="Kaiser", run_type="registration")}
-    assert _resolve_runnable_segment(manifest, "p_kaiser") is None
+    manifest = {"p_clientalpha": _seg("Project", client="ClientAlpha", run_type="registration")}
+    assert _resolve_runnable_segment(manifest, "p_clientalpha") is None
 
 
 def test_resolve_runnable_segment_guards_against_cycle():
@@ -435,26 +435,26 @@ def test_resolve_runnable_segment_guards_against_cycle():
 # ---------------------------------------------------------------------------
 
 def test_discover_cross_client_rescues_single_bc_client_via_redundant_pointer():
-    """Sutter's client-only Project rollup was demoted to "registration"
-    because all of Sutter's files sit in BC_C (single-BC client); it must
-    still pair against Kaiser (a healthy, multi-BC client whose rollup was
+    """ClientBeta's client-only Project rollup was demoted to "registration"
+    because all of ClientBeta's files sit in BC_C (single-BC client); it must
+    still pair against ClientAlpha (a healthy, multi-BC client whose rollup was
     never demoted) using the population-identical BC_C-scoped segment."""
     manifest = {
-        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle"),
-        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
-                          notes="redundant_single_child:p_sutter_bc_c"),
-        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="bundle"),
+        "p_clientalpha": _seg("Project", client="ClientAlpha", run_type="bundle"),
+        "p_clientbeta": _seg("Project", client="ClientBeta", run_type="registration",
+                          notes="redundant_single_child:p_clientbeta_bc_c"),
+        "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="bundle"),
     }
     pairs = discover_cross_client(manifest)
-    assert pairs == [("p_kaiser", "p_sutter_bc_c", "cross_client")]
+    assert pairs == [("p_clientalpha", "p_clientbeta_bc_c", "cross_client")]
 
 
 def test_discover_cross_client_no_rescue_when_pointed_to_child_also_ineligible():
     manifest = {
-        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle"),
-        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
-                          notes="redundant_single_child:p_sutter_bc_c"),
-        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="registration"),
+        "p_clientalpha": _seg("Project", client="ClientAlpha", run_type="bundle"),
+        "p_clientbeta": _seg("Project", client="ClientBeta", run_type="registration",
+                          notes="redundant_single_child:p_clientbeta_bc_c"),
+        "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="registration"),
     }
     assert discover_cross_client(manifest) == []
 
@@ -465,16 +465,16 @@ def test_discover_cross_client_no_rescue_when_pointed_to_child_also_ineligible()
 
 def test_discover_sibling_segments_rescues_single_bc_client_under_shared_parent():
     manifest = {
-        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle",
+        "p_clientalpha": _seg("Project", client="ClientAlpha", run_type="bundle",
                           parent="p_root", segment_level="3"),
-        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
-                          notes="redundant_single_child:p_sutter_bc_c",
+        "p_clientbeta": _seg("Project", client="ClientBeta", run_type="registration",
+                          notes="redundant_single_child:p_clientbeta_bc_c",
                           parent="p_root", segment_level="3"),
-        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="bundle",
-                               parent="p_sutter", segment_level="4"),
+        "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="bundle",
+                               parent="p_clientbeta", segment_level="4"),
     }
     pairs = discover_sibling_segments(manifest)
-    assert ("p_kaiser", "p_sutter_bc_c", "sibling_projects") in pairs
+    assert ("p_clientalpha", "p_clientbeta_bc_c", "sibling_projects") in pairs
     assert len(pairs) == 1
 
 
@@ -505,11 +505,11 @@ def test_discover_parent_siblings_does_not_misclassify_blank_role_rollup():
     `projects` (and must not, therefore, produce a parent_sibling_roles pair
     it was never a legitimate input to)."""
     manifest = {
-        # blank-role client rollup, demoted because Kaiser has no non-Project files
-        "l2_kaiser": _seg("", client="Kaiser", run_type="registration",
-                           notes="redundant_single_child:l3_project_kaiser",
+        # blank-role client rollup, demoted because ClientAlpha has no non-Project files
+        "l2_clientalpha": _seg("", client="ClientAlpha", run_type="registration",
+                           notes="redundant_single_child:l3_project_clientalpha",
                            parent="root", segment_level="2"),
-        "l3_project_kaiser": _seg("Project", client="Kaiser", run_type="bundle",
+        "l3_project_clientalpha": _seg("Project", client="ClientAlpha", run_type="bundle",
                                    parent="l2_project", segment_level="3"),
         "l2_template": _seg("Template", run_type="bundle", parent="root", segment_level="2"),
     }
@@ -533,17 +533,17 @@ def test_discover_parent_siblings_does_not_misclassify_blank_role_rollup():
 
 def test_discover_cross_client_rescued_pair_reports_original_blank_scope():
     manifest = {
-        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle"),
-        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
-                          notes="redundant_single_child:p_sutter_bc_c"),
-        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="bundle"),
+        "p_clientalpha": _seg("Project", client="ClientAlpha", run_type="bundle"),
+        "p_clientbeta": _seg("Project", client="ClientBeta", run_type="registration",
+                          notes="redundant_single_child:p_clientbeta_bc_c"),
+        "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="bundle"),
     }
     pairs = discover_cross_client(manifest)
     seg_a, seg_b, ctype = pairs[0]
-    assert seg_b == "p_sutter_bc_c"  # segment_id stays the resolved (data-bearing) descendant
+    assert seg_b == "p_clientbeta_bc_c"  # segment_id stays the resolved (data-bearing) descendant
 
     row = _summary_row(seg_a, seg_b, ctype, manifest)
-    assert row["segment_id_b"] == "p_sutter_bc_c"
+    assert row["segment_id_b"] == "p_clientbeta_bc_c"
     assert row["business_center_label_b"] == ""
     assert row["scope_level_b"] == ""
 
@@ -554,14 +554,14 @@ def test_discover_cross_client_override_does_not_leak_into_other_comparison_type
     discover_client_cross_bc()) -- the override, namespaced by comparison_type,
     must not affect that reading."""
     manifest = {
-        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle"),
-        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
-                          notes="redundant_single_child:p_sutter_bc_c"),
-        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="bundle"),
+        "p_clientalpha": _seg("Project", client="ClientAlpha", run_type="bundle"),
+        "p_clientbeta": _seg("Project", client="ClientBeta", run_type="registration",
+                          notes="redundant_single_child:p_clientbeta_bc_c"),
+        "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="bundle"),
     }
     discover_cross_client(manifest)  # populates the cross_client-scoped override as a side effect
 
-    row = _summary_row("p_sutter_bc_c", "p_sutter_bc_c", "client_cross_bc", manifest)
+    row = _summary_row("p_clientbeta_bc_c", "p_clientbeta_bc_c", "client_cross_bc", manifest)
     assert row["business_center_label_a"] == "BC_C"
 
 
@@ -569,30 +569,30 @@ def test_discover_cross_client_no_override_when_no_resolution_needed():
     """A client-only segment that was already eligible (never demoted) must
     not carry a scope override at all -- its own row is already correct."""
     manifest = {
-        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle"),
-        "p_sutter": _seg("Project", client="Sutter", run_type="bundle"),
+        "p_clientalpha": _seg("Project", client="ClientAlpha", run_type="bundle"),
+        "p_clientbeta": _seg("Project", client="ClientBeta", run_type="bundle"),
     }
     discover_cross_client(manifest)
-    assert _scope_override_key("cross_client") not in manifest["p_kaiser"]
-    assert _scope_override_key("cross_client") not in manifest["p_sutter"]
+    assert _scope_override_key("cross_client") not in manifest["p_clientalpha"]
+    assert _scope_override_key("cross_client") not in manifest["p_clientbeta"]
 
 
 def test_discover_sibling_segments_rescued_pair_reports_original_scope():
     manifest = {
-        "p_kaiser": _seg("Project", client="Kaiser", run_type="bundle",
+        "p_clientalpha": _seg("Project", client="ClientAlpha", run_type="bundle",
                           parent="p_root", segment_level="3"),
-        "p_sutter": _seg("Project", client="Sutter", run_type="registration",
-                          notes="redundant_single_child:p_sutter_bc_c",
+        "p_clientbeta": _seg("Project", client="ClientBeta", run_type="registration",
+                          notes="redundant_single_child:p_clientbeta_bc_c",
                           parent="p_root", segment_level="3"),
-        "p_sutter_bc_c": _seg("Project", client="Sutter", bc="BC_C", run_type="bundle",
-                               parent="p_sutter", segment_level="4"),
+        "p_clientbeta_bc_c": _seg("Project", client="ClientBeta", bc="BC_C", run_type="bundle",
+                               parent="p_clientbeta", segment_level="4"),
     }
     pairs = discover_sibling_segments(manifest)
     seg_a, seg_b, ctype = pairs[0]
     assert ctype == "sibling_projects"
 
     row = _summary_row(seg_a, seg_b, ctype, manifest)
-    resolved_side = "business_center_label_a" if seg_a == "p_sutter_bc_c" else "business_center_label_b"
+    resolved_side = "business_center_label_a" if seg_a == "p_clientbeta_bc_c" else "business_center_label_b"
     assert row[resolved_side] == ""
 
 

@@ -9,7 +9,7 @@ Captures project metadata including:
 - Revit version information
 - ProjectInformation fields (project_info.*): built-in project metadata
   (number/status/address/issue date/client/building/organization/IFC GUIDs)
-  plus the Stantec "Office" shared parameter, where present.
+  plus deployment-configured optional shared parameters, where present.
 
 Despite the module summary above, this domain DOES compute a real sig_hash
 (see identity_items / build_record_v2 below) from a subset of its captured
@@ -19,6 +19,7 @@ updated here beyond this note, per this change's own scope boundary.
 
 import os
 import sys
+import uuid
 
 # Ensure repo root is importable (so `import core...` works everywhere)
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -98,32 +99,12 @@ _PROJECT_INFO_BUILTIN_FIELDS = (
     ("project_info.ifc_site_guid", "IFC_SITE_GUID"),
 )
 
-# Named (shared/custom) fields: NOT guaranteed present on every document.
-# "Office" is the only remaining entry -- a confirmed real Stantec-authored
-# shared parameter (GUID 6b61afc7-13eb-4af5-8b65-889f978af4f3, per audit 5.2),
-# read via that GUID (see _PROJECT_INFO_SHARED_GUIDS below), not by display
-# name. A missing definition is legitimate absence
-# (ITEM_Q_UNSUPPORTED_NOT_APPLICABLE), not a read failure.
-#
-# NOT implemented here: Office's Address/City/State/Zip/Country/Telephone/Fax/
-# Legal Entity sub-fields. Per this task's own instruction, their exact
-# parameter names must be confirmed against a real Stantec-template project
-# before assuming the probe-data list -- this sandbox has no live Revit/Dynamo
-# access to do that confirmation, so they are deferred rather than guessed.
-_PROJECT_INFO_NAMED_FIELDS = (
-    ("project_info.office", "Office"),
-)
-
-# GUID-based overrides for entries in _PROJECT_INFO_NAMED_FIELDS whose shared-
-# parameter GUID is confirmed (audit 5.2). Element.get_Parameter(Guid) reads
-# the exact bound definition; LookupParameter(name) instead matches by display
-# name and, per Revit API behavior, can resolve to an arbitrary same-named
-# parameter if a project happens to contain more than one definition sharing
-# that display name (e.g. a stray project/local parameter also called
-# "Office").
-_PROJECT_INFO_SHARED_GUIDS = {
-    "project_info.office": "6b61afc7-13eb-4af5-8b65-889f978af4f3",
-}
+# Optional deployment fields are deliberately absent from checked-in defaults.
+# A deployment may pass ``ctx["project_info_shared_parameters"]`` as a list of
+# mappings with ``key``, ``name``, and optional ``guid`` members. Keeping this
+# at the extraction boundary avoids embedding an organization's parameter
+# names or identifiers in production source.
+_PROJECT_INFO_SHARED_PARAMETER_CONFIG_KEY = "project_info_shared_parameters"
 
 
 def _param_raw_str(p):
@@ -175,8 +156,8 @@ def _read_project_info_named_item(pi, key, param_name, guid_str=None):
     an arbitrary same-named parameter if more than one exists in a project).
 
     Distinguishes "parameter definition not loaded on this document" (q=
-    unsupported.not_applicable -- e.g. Stantec's Office on a non-Stantec
-    project) from "parameter present but unreadable" (q=unreadable) and from
+    unsupported.not_applicable -- e.g. a configured deployment field on a
+    project where its definition is not loaded) from "parameter present but unreadable" (q=unreadable) and from
     "parameter present with no value" (q=missing, via canonicalize_str).
     """
     if pi is None:
@@ -205,7 +186,31 @@ def _read_project_info_named_item(pi, key, param_name, guid_str=None):
     return make_identity_item(key, v, q)
 
 
-def _extract_project_info_items(doc):
+def _configured_project_info_fields(ctx):
+    fields = (ctx or {}).get(_PROJECT_INFO_SHARED_PARAMETER_CONFIG_KEY, [])
+    if fields is None:
+        return []
+    if not isinstance(fields, (list, tuple)):
+        raise ValueError("project_info_shared_parameters must be a list")
+    normalized = []
+    for field in fields:
+        if not isinstance(field, dict):
+            raise ValueError("each configured project-information field must be a mapping")
+        key = safe_str(field.get("key")).strip()
+        name = safe_str(field.get("name")).strip()
+        guid = safe_str(field.get("guid")).strip() or None
+        if not key.startswith("project_info.") or not name:
+            raise ValueError("configured project-information fields require project_info.* key and name")
+        if guid:
+            try:
+                uuid.UUID(guid)
+            except (ValueError, AttributeError, TypeError):
+                raise ValueError("malformed GUID for configured project-information field: {}".format(key))
+        normalized.append((key, name, guid))
+    return normalized
+
+
+def _extract_project_info_items(doc, ctx=None):
     """Build project_info.* identity items from doc.ProjectInformation.
 
     Returns a list of IdentityItem dicts (unsorted); callers merge into the
@@ -224,7 +229,7 @@ def _extract_project_info_items(doc):
         # unreadable rather than silently omitting them.
         for key, _bip_name in _PROJECT_INFO_BUILTIN_FIELDS:
             items.append(make_identity_item(key, None, ITEM_Q_UNREADABLE))
-        for key, _param_name in _PROJECT_INFO_NAMED_FIELDS:
+        for key, _param_name, _guid in _configured_project_info_fields(ctx):
             items.append(make_identity_item(key, None, ITEM_Q_UNREADABLE))
         items.append(make_identity_item("project_info.name", None, ITEM_Q_UNREADABLE))
         return items
@@ -240,8 +245,7 @@ def _extract_project_info_items(doc):
     for key, bip_name in _PROJECT_INFO_BUILTIN_FIELDS:
         items.append(_read_project_info_builtin_item(pi, key, bip_name))
 
-    for key, param_name in _PROJECT_INFO_NAMED_FIELDS:
-        guid_str = _PROJECT_INFO_SHARED_GUIDS.get(key)
+    for key, param_name, guid_str in _configured_project_info_fields(ctx):
         items.append(_read_project_info_named_item(pi, key, param_name, guid_str=guid_str))
 
     return items
@@ -387,7 +391,7 @@ def extract(doc, ctx=None):
     # (worksharing/version/build) -- see D-025. project_info.* fields are merged
     # in afterward: they fully participate in identity_basis.items and sig_hash,
     # but blank/not-applicable ProjectInfo fields (extremely common in practice --
-    # e.g. Office is absent by design on any non-Stantec-template project) must
+    # e.g. a deployment field may be absent by design on another template) must
     # not flip this domain's record status to degraded on every ordinary export.
     status_reasons = []
     if any(it.get("q") != ITEM_Q_OK for it in identity_items):
@@ -399,7 +403,7 @@ def extract(doc, ctx=None):
 
     status = STATUS_OK if not status_reasons else STATUS_DEGRADED
 
-    identity_items = identity_items + _extract_project_info_items(doc)
+    identity_items = identity_items + _extract_project_info_items(doc, ctx=ctx)
     identity_items = sorted(identity_items, key=lambda it: safe_str(it.get("k", "")))
 
     sig_preimage = serialize_identity_items(identity_items)

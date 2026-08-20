@@ -45,7 +45,7 @@ def _lattice_manifest():
     center, discipline absent), fully populated with every one-field-drop
     ancestor at every depth -- exactly what build_segment_manifest.py's
     _build_segments() emits for a real multi-dimension-cut corpus. Segment
-    "imperial|Container|Stantec|0000" (3 non-root fields present) has 2^3 - 1
+    "imperial|Container|InternalEnterprise|0000" (3 non-root fields present) has 2^3 - 1
     = 7 true structural ancestors at the root/1-field/2-field depths, but its
     OWN ancestor_segment_ids field (the one-field-drop adjacency list
     build_segment_manifest.py writes) lists only the 3 immediate ones -- the
@@ -59,14 +59,14 @@ def _lattice_manifest():
     return {
         "imperial": row("", []),
         "imperial|Container": row("imperial", ["imperial"]),
-        "imperial|Stantec": row("imperial", ["imperial"]),
+        "imperial|InternalEnterprise": row("imperial", ["imperial"]),
         "imperial|0000": row("imperial", ["imperial"]),
-        "imperial|Container|Stantec": row("imperial|Container", ["imperial|Container", "imperial|Stantec"]),
+        "imperial|Container|InternalEnterprise": row("imperial|Container", ["imperial|Container", "imperial|InternalEnterprise"]),
         "imperial|Container|0000": row("imperial|Container", ["imperial|0000", "imperial|Container"]),
-        "imperial|Stantec|0000": row("imperial|Stantec", ["imperial|0000", "imperial|Stantec"]),
-        "imperial|Container|Stantec|0000": row(
-            "imperial|Container|Stantec",
-            ["imperial|Container|0000", "imperial|Container|Stantec", "imperial|Stantec|0000"],
+        "imperial|InternalEnterprise|0000": row("imperial|InternalEnterprise", ["imperial|0000", "imperial|InternalEnterprise"]),
+        "imperial|Container|InternalEnterprise|0000": row(
+            "imperial|Container|InternalEnterprise",
+            ["imperial|Container|0000", "imperial|Container|InternalEnterprise", "imperial|InternalEnterprise|0000"],
         ),
     }
 
@@ -75,11 +75,11 @@ def test_build_ancestor_map_full_lattice_closure():
     manifest = _lattice_manifest()
     ancestors = _build_ancestor_map(manifest)
 
-    leaf = "imperial|Container|Stantec|0000"
+    leaf = "imperial|Container|InternalEnterprise|0000"
     expected = {
         "imperial",
-        "imperial|Container", "imperial|Stantec", "imperial|0000",
-        "imperial|Container|Stantec", "imperial|Container|0000", "imperial|Stantec|0000",
+        "imperial|Container", "imperial|InternalEnterprise", "imperial|0000",
+        "imperial|Container|InternalEnterprise", "imperial|Container|0000", "imperial|InternalEnterprise|0000",
     }
     assert ancestors[leaf] == expected, (
         "must include the root and every 1-field/2-field ancestor, not just "
@@ -89,25 +89,25 @@ def test_build_ancestor_map_full_lattice_closure():
 
 def test_build_ancestor_map_superset_of_single_parent_chain():
     # The old implementation only ever recovered the parent_segment_id chain
-    # (imperial|Container|Stantec|0000 -> imperial|Container|Stantec ->
+    # (imperial|Container|InternalEnterprise|0000 -> imperial|Container|InternalEnterprise ->
     # imperial|Container -> imperial). The new closure must be a strict
     # superset of that, never a subset.
     manifest = _lattice_manifest()
     ancestors = _build_ancestor_map(manifest)
-    old_chain = {"imperial|Container|Stantec", "imperial|Container", "imperial"}
-    assert old_chain <= ancestors["imperial|Container|Stantec|0000"]
-    assert len(ancestors["imperial|Container|Stantec|0000"]) > len(old_chain)
+    old_chain = {"imperial|Container|InternalEnterprise", "imperial|Container", "imperial"}
+    assert old_chain <= ancestors["imperial|Container|InternalEnterprise|0000"]
+    assert len(ancestors["imperial|Container|InternalEnterprise|0000"]) > len(old_chain)
 
 
 def test_is_lineage_related_symmetric_across_full_closure():
     manifest = _lattice_manifest()
     ancestors = _build_ancestor_map(manifest)
     # A 2-level-removed ancestor (root) must be caught, not just the direct parent.
-    assert _is_lineage_related(ancestors, "imperial", "imperial|Container|Stantec|0000")
-    assert _is_lineage_related(ancestors, "imperial|Container|Stantec|0000", "imperial")
+    assert _is_lineage_related(ancestors, "imperial", "imperial|Container|InternalEnterprise|0000")
+    assert _is_lineage_related(ancestors, "imperial|Container|InternalEnterprise|0000", "imperial")
     # Two segments with no subset relationship at all (siblings, e.g. two
     # different 1-field cuts) must not be flagged.
-    assert not _is_lineage_related(ancestors, "imperial|Container", "imperial|Stantec")
+    assert not _is_lineage_related(ancestors, "imperial|Container", "imperial|InternalEnterprise")
 
 
 def test_build_ancestor_map_cycle_detection_still_fires():
@@ -322,30 +322,30 @@ def _sibling_row(parent, role, client="", bc="", ancestor_ids=(), run_type="bund
 def _real_corpus_shaped_manifest():
     """Reproduces the exact shape of a real, corpus-verified
     discover_sibling_segments() violation (D-027 finding 5): a client-wide
-    Container rollup ("imperial|Container|Stantec") shares its parent
+    Container rollup ("imperial|Container|InternalEnterprise") shares its parent
     ("imperial|Container") with a business-center-only Container segment
     ("imperial|Container|0000") that build_segment_manifest.py's
     redundant_single_child pass demoted (population-identical to its
-    narrower "imperial|Container|Stantec|0000" child). Both resolve into the
-    SAME sibling group even though "imperial|Container|Stantec" is a real
-    structural ancestor of "imperial|Container|Stantec|0000" (dropping
+    narrower "imperial|Container|InternalEnterprise|0000" child). Both resolve into the
+    SAME sibling group even though "imperial|Container|InternalEnterprise" is a real
+    structural ancestor of "imperial|Container|InternalEnterprise|0000" (dropping
     business_center_label from the latter's key recovers the former's).
     """
     return {
         "imperial|Container": _sibling_row("imperial", "Container"),
-        "imperial|Container|Stantec": _sibling_row(
-            "imperial|Container", "Container", client="Stantec",
+        "imperial|Container|InternalEnterprise": _sibling_row(
+            "imperial|Container", "Container", client="InternalEnterprise",
             ancestor_ids=["imperial|Container"],
         ),
         "imperial|Container|0000": _sibling_row(
             "imperial|Container", "Container", bc="0000",
             run_type="registration",
-            notes="redundant_single_child:imperial|Container|Stantec|0000",
+            notes="redundant_single_child:imperial|Container|InternalEnterprise|0000",
             ancestor_ids=["imperial|Container"],
         ),
-        "imperial|Container|Stantec|0000": _sibling_row(
-            "imperial|Container|Stantec", "Container", client="Stantec", bc="0000",
-            ancestor_ids=["imperial|Container", "imperial|Container|Stantec"],
+        "imperial|Container|InternalEnterprise|0000": _sibling_row(
+            "imperial|Container|InternalEnterprise", "Container", client="InternalEnterprise", bc="0000",
+            ancestor_ids=["imperial|Container", "imperial|Container|InternalEnterprise"],
         ),
     }
 
@@ -355,7 +355,7 @@ def test_discover_sibling_segments_pre_fix_reproduces_violation():
     # no containment_map). The real violation must reproduce.
     manifest = _real_corpus_shaped_manifest()
     pairs = discover_sibling_segments(manifest, ancestor_map={}, containment_map=None)
-    assert ("imperial|Container|Stantec", "imperial|Container|Stantec|0000", "sibling_containers") in pairs
+    assert ("imperial|Container|InternalEnterprise", "imperial|Container|InternalEnterprise|0000", "sibling_containers") in pairs
 
 
 def test_discover_sibling_segments_post_fix_excludes_violation():
@@ -364,9 +364,9 @@ def test_discover_sibling_segments_post_fix_excludes_violation():
     # excludes the real ancestor/descendant pair.
     manifest = _real_corpus_shaped_manifest()
     pairs = discover_sibling_segments(manifest)
-    assert ("imperial|Container|Stantec", "imperial|Container|Stantec|0000", "sibling_containers") not in pairs
+    assert ("imperial|Container|InternalEnterprise", "imperial|Container|InternalEnterprise|0000", "sibling_containers") not in pairs
     assert not any(
-        {a, b} == {"imperial|Container|Stantec", "imperial|Container|Stantec|0000"}
+        {a, b} == {"imperial|Container|InternalEnterprise", "imperial|Container|InternalEnterprise|0000"}
         for a, b, _ in pairs
     )
 
@@ -375,13 +375,13 @@ def test_discover_sibling_segments_unrelated_siblings_still_pair():
     # A genuine, non-structural sibling pair in the same group must still be
     # emitted -- the guard must not over-exclude.
     manifest = _real_corpus_shaped_manifest()
-    manifest["imperial|Container|Sutter"] = _sibling_row(
-        "imperial|Container", "Container", client="Sutter",
+    manifest["imperial|Container|ClientBeta"] = _sibling_row(
+        "imperial|Container", "Container", client="ClientBeta",
         ancestor_ids=["imperial|Container"],
     )
     pairs = discover_sibling_segments(manifest)
     assert any(
-        {a, b} == {"imperial|Container|Stantec", "imperial|Container|Sutter"}
+        {a, b} == {"imperial|Container|InternalEnterprise", "imperial|Container|ClientBeta"}
         for a, b, _ in pairs
     )
 
@@ -470,15 +470,15 @@ def test_validate_membership_against_manifest_zero_file_count_segment_not_flagge
 
 def test_detect_stale_ancestor_encoding_flags_pipe_joined_blob():
     manifest = {
-        "imperial|Container|Stantec|0000": {
-            "governance_role": "Container", "client_label": "Stantec", "business_center_label": "0000",
-            # pre-D-028 shape: "|".join(["imperial|0000", "imperial|Container|Stantec"])
-            "ancestor_segment_ids": "imperial|0000|imperial|Container|Stantec",
+        "imperial|Container|InternalEnterprise|0000": {
+            "governance_role": "Container", "client_label": "InternalEnterprise", "business_center_label": "0000",
+            # pre-D-028 shape: "|".join(["imperial|0000", "imperial|Container|InternalEnterprise"])
+            "ancestor_segment_ids": "imperial|0000|imperial|Container|InternalEnterprise",
         },
     }
     warnings = detect_stale_ancestor_encoding(manifest)
     assert len(warnings) == 1
-    assert "imperial|Container|Stantec|0000" in warnings[0]
+    assert "imperial|Container|InternalEnterprise|0000" in warnings[0]
 
 
 def test_detect_stale_ancestor_encoding_does_not_flag_wellformed_semicolon_data():

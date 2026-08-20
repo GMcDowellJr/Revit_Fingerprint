@@ -42,6 +42,7 @@ if _TOOLS_DIR not in sys.path:
     sys.path.insert(0, _TOOLS_DIR)
 
 from na_token import ENTERPRISE_BC_BOOKKEEPING_TOKENS
+from enterprise_policy import DEFAULT_ENTERPRISE_LABEL, normalize_enterprise_label, write_enterprise_policy_provenance
 from run_extract_all import _check_governance_field_completeness
 from bundle_analysis.common import atomic_write_csv, read_csv_rows
 
@@ -119,11 +120,11 @@ def normalize_business_center_label(raw: str) -> Tuple[str, bool]:
     return value, False
 
 
-def _is_internal_client(client_label: str) -> bool:
+def _is_internal_client(client_label: str, enterprise_label: str = DEFAULT_ENTERPRISE_LABEL) -> bool:
     # Case-insensitive fold, matching the casing convention already used
     # elsewhere in this pipeline (see build_segment_manifest.py's
     # first-seen-casing fold).
-    return client_label.strip().lower() == "stantec"
+    return client_label.strip().lower() == normalize_enterprise_label(enterprise_label).lower()
 
 
 def _governance_role_key(role: str) -> str:
@@ -138,17 +139,17 @@ def _is_generic_role(role: str) -> bool:
 # scope_key composition (Change A)
 # ---------------------------------------------------------------------------
 
-def compute_scope_key(client_label: str, business_center_label: str) -> Tuple[str, str, str, str]:
+def compute_scope_key(client_label: str, business_center_label: str, enterprise_label: str = DEFAULT_ENTERPRISE_LABEL) -> Tuple[str, str, str, str]:
     """Returns (scope_key, scope_level, normalized_client_label, normalized_bc).
 
-    A row is Enterprise-scoped only when BOTH client_label == "Stantec" AND
+    A row is Enterprise-scoped only when BOTH client_label == "InternalEnterprise" AND
     business_center_label normalizes to an enterprise-bookkeeping token —
     either condition alone is not sufficient (e.g. a real external client
-    can still be enterprise-bookkeeping-tagged; a Stantec-internal file can
+    can still be enterprise-bookkeeping-tagged; a InternalEnterprise-internal file can
     still carry a real business center).
     """
     normalized_bc, is_enterprise_bc = normalize_business_center_label(business_center_label)
-    is_internal = _is_internal_client(client_label)
+    is_internal = _is_internal_client(client_label, enterprise_label)
     client = client_label.strip()
 
     if is_internal and is_enterprise_bc:
@@ -224,6 +225,7 @@ def _normalize_manual_metadata(meta_rows: List[Dict[str, str]]) -> List[Dict[str
 
 def build_governance_populations(
     meta_rows: List[Dict[str, str]],
+    enterprise_label: str = DEFAULT_ENTERPRISE_LABEL,
 ) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]]]:
     """Group file_metadata.csv rows into disjoint governance populations.
 
@@ -261,7 +263,7 @@ def build_governance_populations(
             scope_key, norm_client, norm_bc = "", "", ""
         elif role_key in KNOWN_TCP_ROLES:
             scope_key, _scope_level, norm_client, norm_bc = compute_scope_key(
-                client_label, business_center_label
+                client_label, business_center_label, enterprise_label
             )
         else:
             excluded_rows.append({
@@ -333,6 +335,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--records-dir", required=True, help="Directory containing file_metadata.csv")
     ap.add_argument("--out-dir", default=None, help="Output directory (default: same as --records-dir)")
+    ap.add_argument("--enterprise-label", default=DEFAULT_ENTERPRISE_LABEL,
+                    help="Deployment enterprise label (default: InternalEnterprise)")
     args = ap.parse_args()
 
     records_dir = Path(args.records_dir).resolve()
@@ -343,7 +347,11 @@ def main() -> int:
         raise SystemExit(f"file_metadata.csv not found: {meta_path}")
 
     meta_rows = read_csv_rows(meta_path)
-    manifest_rows, membership_rows, excluded_rows = build_governance_populations(meta_rows)
+    manifest_rows, membership_rows, excluded_rows = build_governance_populations(meta_rows, args.enterprise_label)
+    write_enterprise_policy_provenance(
+        out_dir, args.enterprise_label,
+        "cli" if args.enterprise_label != DEFAULT_ENTERPRISE_LABEL else "checked_in_default",
+    )
 
     atomic_write_csv(out_dir / "governance_manifest.csv", MANIFEST_FIELDNAMES, manifest_rows)
     atomic_write_csv(out_dir / "governance_membership.csv", MEMBERSHIP_FIELDNAMES, membership_rows)

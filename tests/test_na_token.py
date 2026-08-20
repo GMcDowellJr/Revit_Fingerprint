@@ -18,7 +18,7 @@ class TestIsNaToken:
             assert is_na_token(value), f"expected {value!r} to be recognized as NA"
 
     def test_real_values_are_not_na(self):
-        for value in ["Sutter", "BC_2270", "imperial", "Template", "Nashville", "N/A Consulting"]:
+        for value in ["ClientBeta", "BC_2270", "imperial", "Template", "Nashville", "N/A Consulting"]:
             assert not is_na_token(value), f"expected {value!r} to NOT be recognized as NA"
 
     def test_blank_is_not_na(self):
@@ -38,5 +38,5 @@ class TestIsBlankOrNa:
         assert is_blank_or_na("  NA  ")
 
     def test_real_values_are_not_ignore(self):
-        assert not is_blank_or_na("Sutter")
+        assert not is_blank_or_na("ClientBeta")
         assert not is_blank_or_na("BC_2270")

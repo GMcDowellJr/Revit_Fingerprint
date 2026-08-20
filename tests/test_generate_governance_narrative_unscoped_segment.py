@@ -57,7 +57,7 @@ def test_blank_client_token_with_real_hidden_scope_value_is_rejected():
 
 
 def test_client_scoped_segment_is_rejected():
-    assert _is_unscoped_segment(_row("imperial|Template|Kaiser", client="Kaiser"), "a") is False
+    assert _is_unscoped_segment(_row("imperial|Template|ClientAlpha", client="ClientAlpha"), "a") is False
 
 
 def test_blank_role_rollup_is_rejected():

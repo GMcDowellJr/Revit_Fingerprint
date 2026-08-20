@@ -84,27 +84,27 @@ def test_normalize_zero_pad_does_not_affect_bc_prefixed_values():
 
 def test_scope_key_requires_both_conditions_for_enterprise():
     # Internal client but real bc -> bc scope, not enterprise.
-    key, level, _, bc = compute_scope_key("Stantec", "2014")
+    key, level, _, bc = compute_scope_key("InternalEnterprise", "2014")
     assert level == "bc" and key == "bc:2014" and bc == "2014"
     # External client but enterprise-bookkeeping bc -> client scope, not enterprise.
-    key, level, _, _ = compute_scope_key("Sutter", "0000")
-    assert level == "client" and key == "client:Sutter"
+    key, level, _, _ = compute_scope_key("ClientBeta", "0000")
+    assert level == "client" and key == "client:ClientBeta"
     # Both conditions -> enterprise.
-    key, level, _, _ = compute_scope_key("Stantec", "0000")
+    key, level, _, _ = compute_scope_key("InternalEnterprise", "0000")
     assert level == "enterprise" and key == "enterprise"
     # Neither condition -> named project.
-    key, level, _, _ = compute_scope_key("Sutter", "2270")
-    assert level == "project" and key == "project:Sutter:2270"
+    key, level, _, _ = compute_scope_key("ClientBeta", "2270")
+    assert level == "project" and key == "project:ClientBeta:2270"
 
 
 # ---------------------------------------------------------------------------
 # build_governance_populations
 # ---------------------------------------------------------------------------
 
-def test_stantec_and_0000_collapse_to_one_enterprise_population():
+def test_internalenterprise_and_0000_collapse_to_one_enterprise_population():
     rows = [
-        _row("e1", "Container", "Stantec", "0000"),
-        _row("e2", "Container", "Stantec", "0000"),
+        _row("e1", "Container", "InternalEnterprise", "0000"),
+        _row("e2", "Container", "InternalEnterprise", "0000"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -115,8 +115,8 @@ def test_stantec_and_0000_collapse_to_one_enterprise_population():
 
 def test_legacy_bc_prefixed_and_bare_numeric_collapse_to_one_population():
     rows = [
-        _row("e1", "Container", "Stantec", "BC_2014"),
-        _row("e2", "Container", "Stantec", "2014"),
+        _row("e1", "Container", "InternalEnterprise", "BC_2014"),
+        _row("e2", "Container", "InternalEnterprise", "2014"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -133,8 +133,8 @@ def test_excel_collapsed_and_correctly_formatted_bc_collapse_to_one_population()
     # collapsed to "796" -- both must fold into the SAME governance
     # population rather than fragmenting into two.
     rows = [
-        _row("e1", "Container", "Stantec", "0796"),
-        _row("e2", "Container", "Stantec", "796"),
+        _row("e1", "Container", "InternalEnterprise", "0796"),
+        _row("e2", "Container", "InternalEnterprise", "796"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -147,8 +147,8 @@ def test_excel_collapsed_and_correctly_formatted_bc_collapse_to_one_population()
 
 def test_generic_role_gets_no_scope_key():
     rows = [
-        _row("e1", "Generic", "Stantec", "0000"),
-        _row("e2", "Generic", "Stantec", "0000", unit="metric"),
+        _row("e1", "Generic", "InternalEnterprise", "0000"),
+        _row("e2", "Generic", "InternalEnterprise", "0000", unit="metric"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -159,7 +159,7 @@ def test_generic_role_gets_no_scope_key():
 
 
 def test_generic_host_role_treated_same_as_generic():
-    rows = [_row("e1", "Generic-Host", "Stantec", "0000")]
+    rows = [_row("e1", "Generic-Host", "InternalEnterprise", "0000")]
     manifest_rows, _membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
     assert manifest_rows[0]["scope_level"] == "generic"
@@ -170,9 +170,9 @@ def test_case_variant_role_merges_into_canonical_population():
     # not fragment into its own governance_id — otherwise downstream pair
     # discovery's exact-string role checks silently drop it.
     rows = [
-        _row("e1", "Container", "Stantec", "2014"),
-        _row("e2", "container", "Stantec", "2014"),
-        _row("e3", "CONTAINER", "Stantec", "2014"),
+        _row("e1", "Container", "InternalEnterprise", "2014"),
+        _row("e2", "container", "InternalEnterprise", "2014"),
+        _row("e3", "CONTAINER", "InternalEnterprise", "2014"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -184,8 +184,8 @@ def test_case_variant_role_merges_into_canonical_population():
 
 def test_generic_host_case_variant_folds_to_generic_role_label():
     rows = [
-        _row("e1", "Generic", "Stantec", "0000"),
-        _row("e2", "generic-host", "Stantec", "0000"),
+        _row("e1", "Generic", "InternalEnterprise", "0000"),
+        _row("e2", "generic-host", "InternalEnterprise", "0000"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -196,9 +196,9 @@ def test_generic_host_case_variant_folds_to_generic_role_label():
 
 def test_unit_system_case_variants_merge_to_lowercase():
     rows = [
-        _row("e1", "Container", "Stantec", "2014", unit="imperial"),
-        _row("e2", "Container", "Stantec", "2014", unit="Imperial"),
-        _row("e3", "Container", "Stantec", "2014", unit="IMPERIAL"),
+        _row("e1", "Container", "InternalEnterprise", "2014", unit="imperial"),
+        _row("e2", "Container", "InternalEnterprise", "2014", unit="Imperial"),
+        _row("e3", "Container", "InternalEnterprise", "2014", unit="IMPERIAL"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -223,8 +223,8 @@ def test_client_label_case_variants_merge_to_first_seen_casing():
 
 def test_discipline_label_case_variants_merge():
     rows = [
-        _row("e1", "Container", "Stantec", "2014", discipline="architectural"),
-        _row("e2", "Container", "Stantec", "2014", discipline="Architectural"),
+        _row("e1", "Container", "InternalEnterprise", "2014", discipline="architectural"),
+        _row("e2", "Container", "InternalEnterprise", "2014", discipline="Architectural"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -237,9 +237,9 @@ def test_business_center_label_case_variants_merge_after_prefix_strip():
     # data (no special-casing per the "no Page-specific branch" rule) -- its
     # casing must fold the same way a numeric BC's would.
     rows = [
-        _row("e1", "Container", "Stantec", "Page"),
-        _row("e2", "Container", "Stantec", "page"),
-        _row("e3", "Container", "Stantec", "PAGE"),
+        _row("e1", "Container", "InternalEnterprise", "Page"),
+        _row("e2", "Container", "InternalEnterprise", "page"),
+        _row("e3", "Container", "InternalEnterprise", "PAGE"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -249,8 +249,8 @@ def test_business_center_label_case_variants_merge_after_prefix_strip():
 
 def test_enterprise_bookkeeping_casing_still_recognized_after_normalization():
     rows = [
-        _row("e1", "Container", "Stantec", "0000"),
-        _row("e2", "Container", "Stantec", "BC_0000"),
+        _row("e1", "Container", "InternalEnterprise", "0000"),
+        _row("e2", "Container", "InternalEnterprise", "BC_0000"),
     ]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
@@ -261,8 +261,8 @@ def test_enterprise_bookkeeping_casing_still_recognized_after_normalization():
 
 def test_unrecognized_role_excluded_with_loud_report(capsys):
     rows = [
-        _row("e1", "Container", "Stantec", "0000"),
-        _row("e2", "Mystery", "Stantec", "0000"),
+        _row("e1", "Container", "InternalEnterprise", "0000"),
+        _row("e2", "Mystery", "InternalEnterprise", "0000"),
     ]
     manifest_rows, _membership_rows, excluded = build_governance_populations(rows)
     assert len(excluded) == 1
@@ -281,14 +281,21 @@ def test_blank_client_label_raises_defense_in_depth():
 
 
 def test_na_business_center_label_raises_defense_in_depth():
-    rows = [_row("e1", "Container", "Stantec", "N/A")]
+    rows = [_row("e1", "Container", "InternalEnterprise", "N/A")]
     with pytest.raises(SystemExit):
         build_governance_populations(rows)
 
 
 def test_fully_populated_rows_build_without_raising():
-    rows = [_row("e1", "Container", "Stantec", "2014")]
+    rows = [_row("e1", "Container", "InternalEnterprise", "2014")]
     manifest_rows, membership_rows, excluded = build_governance_populations(rows)
     assert not excluded
     assert len(manifest_rows) == 1
     assert len(membership_rows) == 1
+
+
+def test_compute_scope_key_accepts_case_insensitive_deployment_override():
+    key, level, _, bc = compute_scope_key("Deployment Enterprise", "0000", "deployment enterprise")
+    assert (key, level, bc) == ("enterprise", "enterprise", "")
+    key, level, _, bc = compute_scope_key("DEPLOYMENT ENTERPRISE", "2270", "deployment enterprise")
+    assert (key, level, bc) == ("bc:2270", "bc", "2270")
