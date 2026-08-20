@@ -22,7 +22,12 @@ organization.
 Counts below are literal, case-insensitive substring counts in the current
 tracked snapshot. They are an inventory aid, not a count of unique facts.
 
-## Findings
+## Baseline findings
+
+The findings and large counts in this section describe the pre-remediation
+snapshot. They are retained to explain the remediation decision and are not a
+description of the current operational tree. The final tracked-tree inventory
+is recorded below under **Final acceptance inventory**.
 
 ### 1. AI-review provenance remains in otherwise ordinary test source
 
@@ -216,14 +221,15 @@ reference from a file path and rejects every nonexistent referenced file.
   executable Dynamo entry points. Their organization-specific defaults should
   be parameterized or sanitized, but deleting them would affect operation.
 
-### Proposed removal boundary
+### Completed removal boundary
 
-The immediate removal set is therefore the nine files in
+The completed current-tree removal set was the nine files in
 `tools/probes/Exports/`, the standalone comparison HTML, and the three command
 transcripts: 13 files and approximately 81.3 MiB. The 15 audits are a second
-removal set after durable-reference cleanup. This boundary avoids deleting
-versioned contracts, executable Dynamo graphs, test fixtures, or artifacts that
-the current Graphify workflow explicitly publishes.
+set that was reviewed and deliberately retained after durable-reference
+cleanup, as documented above and in `audit_results/README.md`. This boundary
+avoids deleting versioned contracts, executable Dynamo graphs, test fixtures,
+or artifacts that the current Graphify workflow explicitly publishes.
 
 ## Immutable enterprise policy boundary
 
@@ -244,26 +250,44 @@ scope columns, promotion analysis consumes comparison classifications, and
 segment construction/extraction orchestration preserve literal identity metadata;
 these consumers do not independently classify enterprise identity.
 
-## Recommended remediation order
+## Completed remediation sequence
 
-1. **Decide whether captured probe exports may be public.** If not, remove the
-   tracked raw exports and derived inventories/crosswalks, add an appropriate
-   ignore rule, and consider history rewriting because deletion in a new commit
-   does not remove prior Git objects.
-2. **Separate configuration from organization identity.** Move enterprise
+1. **Captured probe exports:** removed the tracked raw exports and derived
+   inventories/crosswalks and added an appropriate ignore rule. No history
+   rewrite was executed; any future rewrite remains owner-gated by
+   `docs/repository-history-remediation-runbook.md`.
+2. **Configuration and organization identity:** moved enterprise
    labels, organization folders, shared-parameter names, and sector mappings
    into local or deployment configuration with documented generic defaults.
-3. **Make tests synthetic.** Replace Stantec/Sutter/Kaiser fixtures with names
+3. **Synthetic tests:** replaced organization fixtures with names
    such as `InternalEnterprise`, `ClientAlpha`, and `ClientBeta`, while keeping
    explicit enterprise/client/business-center boundary cases.
-4. **Neutralize provenance-only commentary.** Remove the four
+4. **Provenance-only commentary:** removed the four
    `chatgpt-codex-connector` attributions while preserving the useful
    regression descriptions.
-5. **Re-scan broadly.** After remediation, search for email addresses, user
+5. **Broad rescan:** searched for email addresses, user
    profile paths, project numbers/titles, URLs, company suffixes, and known
    business-center names in addition to the organization-name list used here.
 
-## Review conclusion
+## Final acceptance inventory
+
+The final case-insensitive substring inventory, reproduced from tracked files
+with `git ls-files` and excluding only `CLAUDE.md`, `.agents/skills/**`,
+`.copilot/skills/**`, and `graphify-out/**`, is:
+
+| Term | Baseline occurrences / files | Final occurrences / files |
+| --- | ---: | ---: |
+| `Stantec` | 637 / 39 | 38 / 7 |
+| `Sutter` | 266 / 20 | 7 / 3 |
+| `Kaiser` | 472 / 19 | 10 / 4 |
+| `Permanente` | 49 / 6 | 5 / 3 |
+
+Every final occurrence is in a classified retained location: the non-operational
+`CHANGELOG.md` or `DECISIONS.md`; archived `audit_results/**`; this historical
+inventory; a negative regression assertion; or archived analysis code. None is
+an executable default or maintained organization-specific production policy.
+
+## Baseline review conclusion
 
 The repository has very little non-obvious AI-assistance commentary: the only
 clear provenance annotations found outside assistant/tooling documentation are
