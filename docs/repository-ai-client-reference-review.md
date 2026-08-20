@@ -280,19 +280,44 @@ with `git ls-files` and excluding only `CLAUDE.md`, `.agents/skills/**`,
 | `Stantec` | 637 / 39 | 38 / 7 |
 | `Sutter` | 266 / 20 | 7 / 3 |
 | `Kaiser` | 472 / 19 | 10 / 4 |
-| `Permanente` | 49 / 6 | 5 / 3 |
+| `Permanente` | 49 / 6 | 6 / 3 |
 
 Every final occurrence is in a classified retained location: the non-operational
 `CHANGELOG.md` or `DECISIONS.md`; archived `audit_results/**`; this historical
 inventory; a negative regression assertion; or archived analysis code. None is
 an executable default or maintained organization-specific production policy.
 
-## Baseline review conclusion
+## Residual AI/LLM-reference classification
 
-The repository has very little non-obvious AI-assistance commentary: the only
-clear provenance annotations found outside assistant/tooling documentation are
-four test comments. In contrast, organization-specific information is deeply
-embedded in runtime assumptions, policy, tests, documentation, and captured
-data. The raw probe exports deserve immediate handling before a mechanical
-rename of source fixtures, because they contain richer client and user context
-than the named-term counts reveal.
+A current-tree review found two distinct classes of references outside the
+excluded assistant instruction files:
+
+- **Product and governance behavior (retain):** label synthesis, cache
+  provenance, prompt construction, provider configuration, and governance
+  evidence warnings intentionally describe LLM behavior. These references are
+  part of the implemented or documented product boundary, rather than comments
+  about how the repository was authored.
+- **Authorship/tooling commentary (review for removal):**
+  `REPO_OPERATIONAL_REVIEW.md` still says that 10 of the first 100 commits were
+  AI-assisted, repeats that percentage as a contributor-risk observation, and
+  refers to future AI assistants. These statements are not needed to operate
+  the code and are the only remaining non-obvious assistance commentary found
+  in an ordinary maintained document. The other provider/tool names found by
+  the scan occur in integrations, workflow configuration, historical decision
+  records, or this review itself.
+
+The retained organization-name hits similarly do not represent current client
+configuration. They are restricted to append-only history, a classified audit,
+negative regression checks, this inventory, and one archived stop-word list.
+The regression checks are deliberately literal so that organization-specific
+defaults cannot be reintroduced into runtime policy.
+
+## Review conclusion
+
+The original snapshot contained four unnecessary provenance annotations in test
+source and extensive organization-specific runtime, policy, fixture, document,
+and captured-data content. The completed remediation removed those annotations,
+neutralized maintained behavior, and removed captured probe exports. The only
+remaining actionable authorship commentary is the historical commit-attribution
+language in `REPO_OPERATIONAL_REVIEW.md`; all residual organization references
+are classified, non-operational, or protective negative assertions.
