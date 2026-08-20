@@ -7,7 +7,7 @@ export time (domains/*.py), one analysis-side, read-time, against already-export
 expected to agree by construction -- both read the same underlying identity_basis.items /
 phase2 bucket / label data, just at different pipeline stages -- but PR1 shipped without
 verifying that. This test is that verification, run before any of PR2's pattern-generation
-code is written (see audit_results/audit_7_name_key_agreement_and_cli_naming.md for the
+code is written (see DECISIONS.md D-037 for the
 narrative report of these results).
 
 No Revit-extracted corpus exists in this environment (extraction requires the Revit API,

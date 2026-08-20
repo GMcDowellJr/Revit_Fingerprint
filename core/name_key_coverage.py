@@ -2,7 +2,7 @@
 """Coverage-class registry for the Canonical Name Identity Projection (PR1/PR2).
 
 Single source of truth for the Native / Widened / Excluded classification carried
-forward from PR1's Step-0-within-PR1 audit (audit_results/audit_6_name_key_step0_within_pr1.md)
+forward from PR1's Step-0-within-PR1 audit (DECISIONS.md D-037)
 and restated in this PR's brief. Any code that reports "domains covered" under the
 name-identity projection (`join_key_name_identity`) must read this registry rather than
 re-deriving or assuming the list -- see tools/generate_name_key_patterns.py.

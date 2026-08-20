@@ -1543,12 +1543,45 @@ This is explicitly a narrower, faster fix than the "dedicated aggregate/distribu
 
 `audit_results/` is retained as clearly historical evidence for earlier releases.
 Production correctness must be justified by maintained contracts, policies, code
-comments, and tests; live tools must not require an audit file at runtime. Existing
-references are being consolidated incrementally: contract rationale belongs in
-`DECISIONS.md` or the relevant contract, implementation explanation belongs beside
-maintained code, and obsolete operator links are removed. Historical changelog and
-audit-to-audit links may remain, but are non-operational and must not be treated as
-current configuration or a deployment runbook.
+comments, and tests; live tools must not require an audit file at runtime. The consolidation is complete: current contract rationale and implementation
+explanations are maintained here and beside the relevant code; production modules,
+tests, and operator runbooks no longer depend on an audit report for correctness.
+Historical changelog and audit-to-audit links remain only where their targets exist.
+The deterministic tracked-reference check is `scripts/check_audit_references.py`.
+
+## D-037 — Consolidated name-projection and extractor rationale
+
+### Status
+Accepted (2026-08-20)
+
+### Decision
+The canonical name-identity projection has 7 native domains, 18 widened domains,
+and 12 explicitly excluded domains. Native values already occur on the canonical
+identity surface. Widened values come from a phase-2 bucket or undecorated
+`label.display`/`label.components` value; they therefore are not evidence-equivalent
+to a configuration join hash. The `phases` projection is intentionally marked
+redundant. `core/name_key_coverage.py` is the maintained registry.
+
+Bundle name-projection staging deliberately adapts its reduced schema at one
+boundary. It emits empty CAD-import evidence, uses the synthesized pattern label as
+the human label, and supplies one deterministic analysis run ID. Split export IDs
+normalize from details to index names only when the known metadata IDs support that
+choice. Provenance must continue to disclose that agreement evidence reconstructed
+the inline calculation rather than validating a live re-extracted corpus.
+
+Extractor domain differences are intentional only when encoded in maintained domain
+code and covered by selector/shape-gating tests. Canonical selectors constrain broad
+collector APIs; dimensions require subtype shape gates; system and import coercions
+are explicit; and identity-item migration rebuilds the canonical flat item surface
+rather than retaining the former monolithic representation.
+
+### Consequences
+- Historical audits 6–15 record how these conclusions were reached, but are not part
+  of the contract.
+- Tests assert current registries, schemas, provenance, selectors, and output paths
+  directly; audit prose is never needed to interpret a pass or failure.
+- Operators use maintained command help and runbooks. Historical audit shorthand is
+  not an operational reference.
 
 ## D-036 — Enterprise artifact provenance and promotion schema v2
 

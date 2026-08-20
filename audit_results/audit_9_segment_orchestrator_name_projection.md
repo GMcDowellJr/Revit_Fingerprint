@@ -41,7 +41,7 @@ mathematically identical to re-deriving from a filtered export directory.
 basename PR1 saw on disk; a segment's `export_run_ids.txt` (from `segment_membership.csv`)
 carries the canonical id (`tools/extractor.py`'s `_iter_export_files()` primary-file
 convention — the `*.index.json` name for a split-export pair, per PR3's own review fix,
-`audit_results/audit_8` item and the PR #389 review thread). Filtering
+`audit_results/audit_8_bundle_pipeline_name_projection.md` item and the PR #389 review thread). Filtering
 `name_key_results.csv` rows by raw `export_run_ids.txt` membership without normalizing
 first would reproduce exactly the bug the PR #389 review caught, one layer earlier in the
 pipeline (at segment-membership filtering instead of at bundle-input staging).

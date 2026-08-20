@@ -7,7 +7,7 @@ single extractor, `extract_browser_organization()` -> domain=
 "browser_organization": one record.v2 identity record per resolvable
 `BrowserOrganization` element.
 
-Per Step 0 (audit_results/audit_11_domain_extractor_delta_step0_findings.md
+Per Step 0 (DECISIONS.md D-037
 Sec. 4), Revit exposes THREE `BrowserOrganization` category entry points --
 `BrowserOrganization.GetCurrentBrowserOrganizationForViews(doc)`,
 `...ForSheets(doc)`, and `...ForSchedules(doc)` -- not just views/sheets.
@@ -25,7 +25,7 @@ Fields (per tools/probes/probe_browser_organization.py, confirmed at Step 0):
   identical browser organizations that differ only in whether a browser
   filter is configured do not silently collapse to the same `sig_hash` --
   the probe confirmed this read succeeds for every probed organization (see
-  audit_results/audit_11_domain_extractor_delta_step0_findings.md Sec. 4.3's
+  DECISIONS.md D-037's
   `filter_param_has_value` correction), so it is captured even though the
   task's original field list omitted it.
 - `bo.sorting_parameter_id` resolves to a human-readable parameter name via
@@ -52,7 +52,7 @@ Fields (per tools/probes/probe_browser_organization.py, confirmed at Step 0):
 
 Fields deliberately dropped from the probe's inventory (see
 `folder_items_walked_count` / `name_fallback_used_count` in the probe and in
-audit_results/audit_11_domain_extractor_delta_step0_findings.md Sec. 4.3):
+DECISIONS.md D-037):
 both are probe-only diagnostics of a capped, order-dependent `FolderItemInfo`
 tree walk (bounded by the probe's own `max_items_per_level`/`max_tree_depth`
 inputs) -- not a deterministic property of the `BrowserOrganization` element
