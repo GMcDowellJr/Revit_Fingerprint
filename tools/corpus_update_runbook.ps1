@@ -17,7 +17,7 @@ param(
     # Root containing the raw *.json exports plus the results\/segments\ folders nested
     # under it (previously hardcoded as .../Fingerprint_Out/exports; moved to OneDrive as
     # of 2026-07 -- exposed as a param so a future move is a CLI override, not a script edit).
-    [string]$ExportsRoot = "C:\Users\gmcdowell\OneDrive - Stantec\Documents\Fingerprint_Data"
+    [string]$ExportsRoot = ".\Fingerprint_Data"
 )
 
 $ErrorActionPreference = "Stop"
@@ -88,7 +88,7 @@ if ($Run -eq "") {
     Write-Host "  Edit $RECORDS\file_metadata.csv"
     Write-Host "  Set for each new file:"
     Write-Host "    governance_role       ->  Container | Template | Project | Generic"
-    Write-Host "    client_label          ->  client name or internal identifier (e.g. 'Stantec' for internal/no-external-client work)"
+    Write-Host "    client_label          ->  client name or internal identifier (e.g. 'InternalEnterprise' for enterprise work)"
     Write-Host "    business_center_label ->  bare numeric business center code (e.g. '2014'), or '0000'/'BC_0000' for enterprise-scoped work"
     Write-Host "    collection_label      ->  standards/resource collection this file belongs to (optional; independent of governance_role - see header comment)"
     Write-Host "    unit_system           ->  imperial | metric"
@@ -127,7 +127,7 @@ if ($Run -eq "A") {
     Write-Host "  File: $RECORDS\file_metadata.csv" -ForegroundColor Yellow
     Write-Host "  Set for each new file:" -ForegroundColor Yellow
     Write-Host "    governance_role       ->  Container | Template | Project | Generic" -ForegroundColor Yellow
-    Write-Host "    client_label          ->  client name or internal identifier (e.g. 'Stantec' for internal/no-external-client work)" -ForegroundColor Yellow
+    Write-Host "    client_label          ->  client name or internal identifier (e.g. 'InternalEnterprise' for enterprise work)" -ForegroundColor Yellow
     Write-Host "    business_center_label ->  bare numeric business center code (e.g. '2014'), or '0000'/'BC_0000' for enterprise-scoped work" -ForegroundColor Yellow
     Write-Host "    collection_label      ->  standards/resource collection this file belongs to (optional; independent of governance_role - see header comment)" -ForegroundColor Yellow
     Write-Host "    unit_system           ->  imperial | metric" -ForegroundColor Yellow

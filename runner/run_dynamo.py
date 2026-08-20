@@ -158,6 +158,7 @@ from core.manifest import build_manifest
 from core.features import build_features
 from core.join_key_policy import load_join_key_policies
 from core.canonical_items import canonicalize_record
+from core.deployment_config import load_deployment_config
 
 # Domain selection configuration
 # Set to None to run all domains, or provide a list of domain names to run specific domains
@@ -537,6 +538,11 @@ def run_fingerprint(doc, timing=None):
     # Populated by global domains, consumed by contextual domains
     ctx = {}
     ctx["debug_vg_details"] = False
+
+    # One operator-controlled deployment file; validation occurs before any domain runs.
+    deployment_path = str(os.environ.get("REVIT_FINGERPRINT_DEPLOYMENT_CONFIG", "")).strip() or None
+    contract_path = os.path.join(_REPO_ROOT, "contracts", "domain_identity_keys_v2.json")
+    ctx.update(load_deployment_config(deployment_path, contract_path))
 
     # Join-key policies (explicit ctx injection; no globals)
     policy_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "policies", "domain_join_key_policies.json")

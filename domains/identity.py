@@ -150,7 +150,7 @@ def _read_project_info_builtin_item(pi, key, bip_name):
 def _read_project_info_named_item(pi, key, param_name, guid_str=None):
     """Read a ProjectInformation field by display name (shared/custom
     parameters without a stable BuiltInParameter id) -- or, when guid_str is
-    given (see _PROJECT_INFO_SHARED_GUIDS), by the shared parameter's GUID via
+    given by the shared parameter's GUID via
     Element.get_Parameter(Guid), which resolves the exact bound definition
     instead of matching by display name (LookupParameter can otherwise return
     an arbitrary same-named parameter if more than one exists in a project).
@@ -163,7 +163,9 @@ def _read_project_info_named_item(pi, key, param_name, guid_str=None):
     if pi is None:
         return make_identity_item(key, None, ITEM_Q_UNREADABLE)
 
-    if guid_str and Guid is not None:
+    if guid_str and Guid is None:
+        raise RuntimeError("System.Guid is required for configured GUID lookup")
+    if guid_str:
         try:
             p = pi.get_Parameter(Guid(guid_str))
         except Exception:
@@ -186,13 +188,14 @@ def _read_project_info_named_item(pi, key, param_name, guid_str=None):
     return make_identity_item(key, v, q)
 
 
-def _configured_project_info_fields(ctx):
-    fields = (ctx or {}).get(_PROJECT_INFO_SHARED_PARAMETER_CONFIG_KEY, [])
+def validate_project_info_shared_parameters(fields, allowed_keys=None):
+    """Validate and normalize deployment fields before extraction starts."""
     if fields is None:
         return []
     if not isinstance(fields, (list, tuple)):
         raise ValueError("project_info_shared_parameters must be a list")
-    normalized = []
+    builtins = {key for key, _ in _PROJECT_INFO_BUILTIN_FIELDS} | {"project_info.name"}
+    seen_keys, seen_guids, normalized = set(), {}, []
     for field in fields:
         if not isinstance(field, dict):
             raise ValueError("each configured project-information field must be a mapping")
@@ -200,14 +203,29 @@ def _configured_project_info_fields(ctx):
         name = safe_str(field.get("name")).strip()
         guid = safe_str(field.get("guid")).strip() or None
         if not key.startswith("project_info.") or not name:
-            raise ValueError("configured project-information fields require project_info.* key and name")
+            raise ValueError("configured project-information fields require project_info.* key and non-blank name")
+        if key in builtins:
+            raise ValueError("configured key collides with a built-in field: {}".format(key))
+        if allowed_keys is not None and key not in allowed_keys:
+            raise ValueError("configured project-information key is not contract-registered: {}".format(key))
+        if key in seen_keys:
+            raise ValueError("duplicate configured project-information key: {}".format(key))
         if guid:
             try:
-                uuid.UUID(guid)
+                guid = str(uuid.UUID(guid))
             except (ValueError, AttributeError, TypeError):
                 raise ValueError("malformed GUID for configured project-information field: {}".format(key))
-        normalized.append((key, name, guid))
+            if guid in seen_guids and seen_guids[guid] != key:
+                raise ValueError("configured GUID maps to conflicting keys")
+            seen_guids[guid] = key
+        seen_keys.add(key)
+        normalized.append({"key": key, "name": name, "guid": guid})
     return normalized
+
+
+def _configured_project_info_fields(ctx):
+    fields = validate_project_info_shared_parameters((ctx or {}).get(_PROJECT_INFO_SHARED_PARAMETER_CONFIG_KEY, []))
+    return [(f["key"], f["name"], f["guid"]) for f in fields]
 
 
 def _extract_project_info_items(doc, ctx=None):

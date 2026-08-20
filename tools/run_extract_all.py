@@ -421,7 +421,7 @@ _GOVERNANCE_COMPLETENESS_COLUMNS = ("client_label", "business_center_label")
 def _check_governance_field_completeness(meta_rows: List[Dict[str, str]]) -> None:
     """Hard-fail if any file_metadata.csv row has a blank or N/A-spelled
     client_label or business_center_label. These columns are expected to carry
-    real values (e.g. "Stantec" for internal/no-external-client work, a bare
+    real values (e.g. "InternalEnterprise" for enterprise work, a bare
     numeric business-center code, or "0000"/"BC_0000" for enterprise-scoped
     rows) after the manual annotation pause between Run A and Run B — this is
     a pure completeness check, not a fallback; it does not fill in anything.

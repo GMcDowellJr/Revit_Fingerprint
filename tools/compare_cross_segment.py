@@ -162,6 +162,7 @@ if _TOOLS_DIR not in sys.path:
 
 from na_token import is_blank_or_na, ENTERPRISE_BC_BOOKKEEPING_TOKENS as _ENTERPRISE_BC_BOOKKEEPING_TOKENS
 from jenks_utils import jenks_breaks
+from enterprise_policy import DEFAULT_ENTERPRISE_LABEL, load_enterprise_policy, write_enterprise_policy_provenance
 
 
 # ---------------------------------------------------------------------------
@@ -1968,12 +1969,11 @@ def _client_of(row: Dict[str, str]) -> str:
     return "" if is_blank_or_na(v) else v
 
 
-from enterprise_policy import DEFAULT_ENTERPRISE_LABEL, normalize_enterprise_label, write_enterprise_policy_provenance
 
 _enterprise_label = DEFAULT_ENTERPRISE_LABEL
 
 def _is_internal_client(client_label: str) -> bool:
-    return client_label.strip().lower() == normalize_enterprise_label(_enterprise_label).lower()
+    return client_label.strip().casefold() == _enterprise_label.casefold()
 
 
 def _is_enterprise_bc(bc_label: str) -> bool:
@@ -4778,21 +4778,18 @@ def main() -> int:
     ap.add_argument("--workers", default="auto",
                     help="Max parallel pair×domain workers, or 'auto' to derive from "
                          "CPU count (default: auto)")
-    ap.add_argument("--enterprise-label", default=DEFAULT_ENTERPRISE_LABEL,
-                    help="Deployment enterprise label (default: InternalEnterprise)")
+    ap.add_argument("--enterprise-policy", help="Deployment-local enterprise policy JSON")
+    ap.add_argument("--enterprise-label", default=None, help="Enterprise label override (takes precedence over policy file)")
 
     args = ap.parse_args()
     global _enterprise_label
-    _enterprise_label = normalize_enterprise_label(args.enterprise_label)
+    policy = load_enterprise_policy(args.enterprise_policy, args.enterprise_label)
+    _enterprise_label = policy.enterprise_label
     args.workers = resolve_worker_count(args.workers)
 
     segments_root = Path(args.segments_root).resolve()
     records_dir = Path(args.records_dir).resolve()
     out_dir = Path(args.out_dir).resolve()
-    write_enterprise_policy_provenance(
-        out_dir, _enterprise_label,
-        "cli" if args.enterprise_label != DEFAULT_ENTERPRISE_LABEL else "checked_in_default",
-    )
 
     # Default: all modes if none specified
     any_mode = any([
@@ -4956,6 +4953,9 @@ def main() -> int:
             f"({n_stale} stale, {len(work_items) - n_stale} current)"
         )
         return 0
+
+    # Provenance is an artifact: emit it only after validation and dry-run exit.
+    write_enterprise_policy_provenance(out_dir, policy)
 
     # Run comparisons
     executed_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
