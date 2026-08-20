@@ -6,7 +6,7 @@ This is a **candidate question-route catalog** for a
 `revit_fingerprint_governance` evidence package — it answers *where to
 look*, not *how to extract* (that would be a script recipe) or *what the
 answer is* (that's the artifact itself). It follows the discovery scaffold
-in the design-reference `GMcDowellJr/llm_evidence_framework` repository
+in the design-reference `the design-reference evidence framework` repository
 (`discovery/question_route_discovery.md`); this file is this package's own
 content, not an import from that repository, and none of these routes are
 promoted past **candidate** status yet — none has a proven history of

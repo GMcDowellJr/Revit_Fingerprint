@@ -13,7 +13,7 @@ Done means the summary document gives leadership a clear, evidence-based read of
 A leadership-facing draft document for a defined analysis scope, such as:
 
 - firmwide corpus,
-- client portfolio such as Sutter,
+- a client portfolio,
 - discipline,
 - template family,
 - generic / enterprise baseline chain,
@@ -198,12 +198,12 @@ For the **firmwide version**, useful means leadership can see:
 - where serious governance work is needed,
 - and why better standards governance matters.
 
-For the **Sutter/client-specific version**, useful means leadership can see:
+For a **client-specific version**, useful means leadership can see:
 
 - how internally consistent the client portfolio is,
 - what common base a new team member can rely on,
-- which domains require Sutter-specific orientation,
-- where Sutter diverges from the broader corpus,
+- which domains require client-specific orientation,
+- where the client diverges from the broader corpus,
 - whether that divergence represents client identity, local practice, or onboarding burden,
 - and which local-active patterns may need documentation, not necessarily standardization.
 

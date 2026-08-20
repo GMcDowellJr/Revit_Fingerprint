@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 import csv
+import argparse
 import hashlib
 import re
 from collections import defaultdict, Counter
 from pathlib import Path
 
-# ---- EDIT THIS ----
-# line_patterns is a single domain, so the shard is a straight drop-in for the
-# old monolithic identity_items.csv this probe used to read (never actually
-# produced by the current pipeline, which writes identity_items_by_domain/ shards).
-PHASE0_ITEMS = Path(r"C:\Users\gmcdowell\Documents\Fingerprint_Out\domain_families\results_allpairs\Results_v21\phase0_v21\identity_items_by_domain\line_patterns.csv")
+# line_patterns is a single domain, so its shard replaces the old monolithic
+# identity_items.csv used by this diagnostic.
+parser = argparse.ArgumentParser(description="Sweep line-pattern hash precision")
+parser.add_argument("phase0_items", type=Path, help="Path to the line_patterns identity-item CSV")
+PHASE0_ITEMS = parser.parse_args().phase0_items
 PRECISIONS = [9, 8, 7, 6, 5, 4]
-# -------------------
 
 SEG_RE = re.compile(r"^line_pattern\.(?:seg|segment)\[(\d{3})\]\.(kind|length)$")
 SEG_COUNT_KEY = "line_pattern.segment_count"

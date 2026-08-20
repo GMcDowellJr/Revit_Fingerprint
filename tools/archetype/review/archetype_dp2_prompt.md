@@ -69,9 +69,9 @@ python tools/archetype/assign_archetype_classifications.py --repo-root .
 Stages 4, 5, and prepare_archetype_review do **not** need to re-run for approach_label-only changes.
 Re-run Stages 3→4→5→review only if: archetypes were added/removed, a signal join_hash changed, or governance_question was changed.
 
-## Known patterns from corpus (healthcare, imperial, Stantec)
+## Known patterns from corpus (healthcare, imperial, enterprise)
 - Line pattern signals: expect near-universal coverage (>95%) and coherence_score ≈ 0 (single standard).
 - VFD signals: expect `n_distinct_sig_hashes = 1` (standardized filter definitions); low coherence_score is good.
 - Clusters 002–005 in view_filter_strategy had identical 112-file populations — the same files use type name filter bundles across all element types simultaneously. Labels for these should read as a parallel family.
-- `view_filter_strategy` stratifies by client: Renown/Sutter/Stantec architectural projects use parameter-specific filter bundles; Page containers use function_param and stack_filter approaches.
+- `view_filter_strategy` may stratify by client: some architectural projects use parameter-specific filter bundles, while other containers use function_param and stack_filter approaches.
 - Materials signals: `coherence_score = 0.0`, `n_distinct_sig_hashes = 0` — expected until PR 5 closes. Approach_label can still be ratified from signal semantics; flag as "coherence unverifiable pending materials hash policy".
