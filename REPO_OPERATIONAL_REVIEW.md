@@ -149,7 +149,7 @@ Layer 3 — Runner (run_dynamo.py, 1301 lines)
 
 ### Operational Knowledge
 
-**Encoded in a PowerShell command reference.** `tools/Powershell Commands.txt` (12K) contains hardcoded Windows paths and real project names (Stantec directory structures). This is the closest artifact to an operator's runbook, but it is not parameterized or automated.
+**Maintained as a parameterized script.** `tools/run_discovery_sweep.ps1` is the checked-in PowerShell entry point for discovery sweeps. Workstation-specific command transcripts have been removed.
 
 ### Probe-Driven Development
 
@@ -203,7 +203,7 @@ Layer 3 — Runner (run_dynamo.py, 1301 lines)
 
 **Risk:** One developer holds all domain knowledge, operational procedures, and Revit environment context. AI-assisted commits (10%) supplement but do not replace this.
 
-**Evidence:** 90/100 commits by one author. `tools/Powershell Commands.txt` contains hardcoded paths specific to one workstation. PR templates reference verification steps that assume Revit access.
+**Evidence:** 90/100 commits were by one author at the time of this review. PR templates reference verification steps that assume Revit access; the former workstation-specific command transcript has been removed.
 
 ### 2. No Automated Quality Gate
 
@@ -229,11 +229,11 @@ Layer 3 — Runner (run_dynamo.py, 1301 lines)
 
 **Evidence:** `HASH_MODE` defaults to `"legacy"`. All domains compute both hashes. `docs/phase2-identity-and-semantic-plan.md` describes migration path but sets no timeline. No evidence of comparison runs between legacy and semantic hashes.
 
-### 6. Operational Runbook Is Informal
+### 6. Operational Runbook Coverage Is Limited
 
-**Risk:** The only operational reference is a text file of PowerShell commands with hardcoded paths. Loss of this implicit knowledge would significantly impair usage.
+**Risk:** The parameterized discovery-sweep script improves repeatability, but operational knowledge outside that workflow remains incompletely documented and could still be lost.
 
-**Evidence:** `tools/Powershell Commands.txt` (12K) contains real project paths and command sequences. No parameterized scripts, no CLI wrappers, no `--help` documentation on analysis tools.
+**Evidence:** The former command transcript contained real project paths and was removed. `tools/run_discovery_sweep.ps1` now provides a parameterized workflow, though broader CLI `--help` coverage remains limited.
 
 ---
 

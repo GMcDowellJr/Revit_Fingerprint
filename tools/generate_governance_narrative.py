@@ -532,10 +532,10 @@ def _group1_scope_pair(row: dict) -> tuple[str, str, str]:
 
 # Default location for the optional client_sector.csv, resolved relative to this
 # script's own directory (tools/) rather than the CWD -- so existing invocations
-# that don't pass --client-sector still pick up the shipped classification and
-# keep today's healthcare cross-client convergence signal, without requiring
-# every caller to learn a new flag. Passing --client-sector explicitly (a real
-# path or a nonexistent one) always overrides this default.
+# that don't pass --client-sector use the shipped synthetic example mapping.
+# Deployments must pass their approved client-sector mapping explicitly to
+# classify real client labels. An explicit path (including a nonexistent one)
+# always overrides this default.
 _DEFAULT_CLIENT_SECTOR_PATH = Path(__file__).resolve().parent.parent / "policies" / "client_sector.csv"
 
 # Interpretation-layer static reference docs (PR4 -- see D-022 and

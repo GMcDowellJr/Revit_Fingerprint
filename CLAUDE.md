@@ -143,7 +143,7 @@ policies/               Join-key, sig-hash, and governance-classification polici
   governance_role_path_patterns.json  Ordered path-substring rules that infer governance_role
                                        (Template/Container/Project/Generic) from central_path_norm
   placeholder_known_defaults.json   Per-domain known-default/placeholder name patterns used by the `placeholders` stage
-  client_sector.csv                 client_label → sector classification, used by generate_governance_narrative.py
+  client_sector.csv                 synthetic client_label → sector example; deployments pass an approved mapping to generate_governance_narrative.py
   governance/                       Externalized governance-narrative policy profiles, loaded via
                                        tools/governance_policy.py (D-021): governance_thresholds.json (tier/
                                        reliability/convergence/coherence thresholds), domain_governance_policy.json
@@ -286,8 +286,8 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                             → cluster_archetype_signals.py → generate_archetype_candidates.py → human review
                             (review/) → assign_archetype_classifications.py; validated against
                             config/archetype/archetype_definitions.json
-  compare_templates_stand-alone/   Standalone view-template comparison tool + HTML report (independent of the
-                            segment/governance pipeline above)
+  compare_templates_stand-alone/   Standalone view-template comparison tool (independent of the
+                            segment/governance pipeline above; generated HTML reports are not tracked)
   analyze_promotion_candidates.py   Standalone scope-consistency classifier: reads cross_segment_governance_states.csv
                             + pattern_reuse_distribution.csv and flags patterns whose observed reuse scope
                             (`reuse_scope`, from `reuse_bucket`) exceeds the broadest scope at which they are
@@ -310,7 +310,7 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                             root folder and writes an include-flagged manifest CSV of Revit files to fingerprint;
                             sync_dc hydrates online-only Desktop Connector stub files before the BatchExtract
                             pyRevit run consumes them
-  Powershell Commands.txt  Informal operator runbook (hardcoded paths) — closest thing to a runbook; not automated
+  run_discovery_sweep.ps1  Parameterized PowerShell entry point for discovery sweeps
 
   _archive/                Confirmed-superseded tools, pruned down to only what's still load-bearing:
                             join_key_derivation_phase05.py (still `import *`-ed live by join_key_derivation.py).

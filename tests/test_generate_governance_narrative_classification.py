@@ -176,8 +176,8 @@ def test_default_client_sector_path_exists_and_loads():
     to None for every domain -- not just the sector/tier fields."""
     assert _DEFAULT_CLIENT_SECTOR_PATH.exists()
     sector_map = load_client_sectors(read_csv(_DEFAULT_CLIENT_SECTOR_PATH))
-    assert sector_map.get("Kaiser") == "healthcare"
-    assert sector_map.get("Intel") not in ("healthcare", None, "")
+    assert sector_map.get("ClientAlpha") == "healthcare"
+    assert sector_map.get("ClientEpsilon") not in ("healthcare", None, "")
 
 
 def test_unclassified_client_not_treated_as_confirmed_non_healthcare():

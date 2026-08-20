@@ -1,0 +1,71 @@
+[
+  {
+    "a": "Floor Plan - Finish - 1/8\"",
+    "b": ["Finish Plans - Area Plans_2141", "Finish Plans - Composite_2141"]
+  },
+  {
+    "a": "Floor Plan - Demolition - 1/8\"",
+    "b": ["Floor Plans - Demo Composite_2141", "Floor Plans - Demo_2141"]
+  },
+  {
+    "a": "Floor Plan - Enlarged - 1/4\"",
+    "b": ["Floor Plans - Enlarged_2141", "Floor Plans - Area Plans_2141"]
+  },
+  {
+    "a": "Floor Plan - Simple - 1/8\"",
+    "b": ["Floor Plans - Phasing Plan_2141", "Floor Plans - Composite_2141"]
+  },
+  {
+    "a": "Floor Plan - Complex - 1/8\"",
+    "b": ["Floor Plans - Phasing Plan_2141", "Floor Plans - Composite_2141"]
+  },
+  {
+    "a": "Ceiling Plan - 1/8\"",
+    "b": ["RCP - Composite_2141"]
+  },
+  {
+    "a": "Ceiling Plan - Demolition - 1/8\"",
+    "b": ["RCP - Demo_2141"]
+  },
+  {
+    "a": "Ceiling Plan - Enlarged - 1/4\"",
+    "b": ["RCP - Enlarged Plans_2141", "RCP - Area Plans_2141"]
+  },
+  {
+    "a": "Detail - 1 1/2\"",
+    "b": [
+      "Details - Elevator & Stair Details_2141",
+      "Details - Exterior Plan Details_2141",
+      "Details - Exterior Section Details_2141",
+      "Details - Interior Plan Details_2141",
+      "Details - Interior Section Details_2141",
+      "Details - Interior Wall Profiles_2141",
+      "Details - Millwork Plans, Elev, & Details_2141",
+      "Details - Typ. Interior Door, Glazing, & Sill Dtls_2141"
+    ]
+  },
+  {
+    "a": "Section - Building - 1/8\"",
+    "b": ["Sections - Building_2141"]
+  },
+  {
+    "a": "Section - Stair - 1/4\"",
+    "b": ["Sections - Elevator & Stair Profiles_2141"]
+  },
+  {
+    "a": "Section - Wall - 1/2\"",
+    "b": ["Sections - Exterior Wall_2141", "Sections - Interior Wall_2141"]
+  },
+  {
+    "a": "Elevation - Interior - 1/4\"",
+    "b": ["Elevations - Composite Interior_2141", "Elevations - Enlarged Exterior_2141", "Elevations - Interior_2141"]
+  },
+  {
+    "a": "Elevation - Exterior - 1/8\"",
+    "b": ["Elevations - Exterior_2141", "Elevations - Composite Exterior_2141", "Elevations - Demo Exterior_2141"]
+  },
+  {
+    "a": "Site Plan - 1\"=20'",
+    "b": ["Site Plan - Composite_2141", "Site Plan - Details_2141", "Site Plan - Enlarged_2141"]
+  }
+]

@@ -145,10 +145,6 @@ def _candidate_repo_dirs(explicit_override):
 
     if up:
         tried.append(("userprofile:RevitFingerprint_current", os.path.join(up, "RevitFingerprint", "current")))
-        tried.append((
-            "userprofile:stantec_general_code",
-            os.path.join(up, "Stantec", "Revit_Fingerprint - General", "Code"),
-        ))
 
     # Last resort: this file's own location, if the host ever does expose
     # __file__ (some Dynamo hosts do for certain node types).
