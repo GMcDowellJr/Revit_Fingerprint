@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
-$REPO     = "C:\Users\gmcdowell\Documents\Revit_Fingerprint"
-$EXPORTS  = "C:\Users\gmcdowell\Documents\Fingerprint_Out\exports"
+$REPO     = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$EXPORTS  = Join-Path $REPO "Fingerprint_Data\exports"
 $RESULTS  = "$EXPORTS\results"
 $SEGMENTS = "$EXPORTS\segments"
 $RECORDS  = "$RESULTS\records"

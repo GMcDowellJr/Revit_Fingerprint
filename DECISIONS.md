@@ -1,5 +1,7 @@
 # DECISIONS
 
+> **Historical-record notice (2026-08-20):** This append-only decision log may name identities and deployment details that were accurate when recorded. Those references are non-operational and do not define current executable defaults, policy, or supported configuration.
+
 This document records **architectural and semantic decisions** that materially affect
 system behavior, evolution, or constraints.
 

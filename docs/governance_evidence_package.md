@@ -48,7 +48,7 @@ just no longer the only carrier of findings/navigation/interpretation.
 ## Design reference, not a dependency
 
 The artifact shapes and authority-level vocabulary below are modeled on the
-discovery-scaffold patterns in the `GMcDowellJr/llm_evidence_framework`
+discovery-scaffold patterns in the `the design-reference evidence framework`
 repository (`patterns/deterministic_to_llm_boundary.md`,
 `discovery/evidence_map_discovery.md`). That repository explicitly states it
 is **not yet a finalized standard, schema, or implementation contract** — it
@@ -444,7 +444,7 @@ field semantics, what `governance_tier`/`score_reliability` do and don't
 support, comparability rules (sector, unit system, all-view/used-view),
 missing-value semantics, authority ordering, and a "known bad inferences"
 section. Modeled on the "interpretation layer" concept in
-`GMcDowellJr/llm_evidence_framework`'s `notes/current_thesis.md` and
+`the design-reference evidence framework`'s `notes/current_thesis.md` and
 `patterns/deterministic_to_llm_boundary.md` — design reference only, no
 runtime dependency. Versioned via a header (`interpretation_guide_version`)
 independently of `PACKAGE_SCHEMA_VERSION`.

@@ -1067,7 +1067,7 @@ def build_cascade(
             cb = _pick(r, "client_label_b")
             # discover_sibling_segments() groups purely by (parent_segment_id,
             # governance_role, unit_system), so two DIFFERENTLY-scoped Project
-            # segments under the SAME client (e.g. Kaiser's discipline- or
+            # segments under the SAME client (e.g. a client's discipline- or
             # collection-scoped siblings sharing a client-level parent) can pair
             # as sibling_projects with ca == cb -- a within-client comparison, not
             # cross-client convergence. The old segment_id-length==3 guard

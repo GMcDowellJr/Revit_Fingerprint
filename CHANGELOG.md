@@ -1,5 +1,7 @@
 # CHANGELOG
 
+> **Historical-record notice (2026-08-20):** Entries below are an append-only account of earlier behavior and may contain former client, organization, or shared-parameter identities. They are non-operational; current configuration and policy come from maintained code and documentation.
+
 This file tracks **semantic changes only**:
 - anything that changes hashes
 - anything that changes what a hash *means*

@@ -1,8 +1,8 @@
 # collection_label vs. governance_role (manual file_metadata.csv entry)
 # ------------------------------------------------------------------------
 # collection_label answers "why was this file captured" - the standards/
-# resource collection it was pulled for (e.g. "BC_2270 Standards", "Sutter
-# Standards"). governance_role answers "what does this file do" - its
+# resource collection it was pulled for (e.g. "BC_2270 Standards" or
+# "ClientAlpha Standards"). governance_role answers "what does this file do" - its
 # behavioral function (Template / Container / Project / Generic). The two
 # are independent and must both be set on their own merits: a
 # governance_role=Project file can still carry a collection_label if it is
@@ -22,7 +22,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$REPO         = "C:\Users\gmcdowell\Documents\Revit_Fingerprint"
+$REPO         = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $EXPORTS      = "$ExportsRoot\exports"
 # $RESULTS is now an alias for $ExportsRoot itself, not a "results\" subfolder
 # -- every $RESULTS-derived path below (name_key\, records\, and whatever

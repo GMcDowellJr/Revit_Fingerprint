@@ -78,8 +78,8 @@
 #>
 
 param(
-    [string]$ExportsRoot = "C:\Users\gmcdowell\Documents\Fingerprint_Data",
-    [string]$RepoRoot    = "C:\Users\gmcdowell\Documents\Revit_Fingerprint",
+    [string]$ExportsRoot = ".\Fingerprint_Data",
+    [string]$RepoRoot    = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
     [string]$SuggestionsCsv = "",
     [string]$Domains = "",
     [switch]$SkipJoin,

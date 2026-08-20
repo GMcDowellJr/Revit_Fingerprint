@@ -21,7 +21,7 @@ Usage:
 
 Example:
     python tools/label_synthesis/build_label_population.py \\
-        --out-root "C:\\Users\\gmcdowell\\Documents\\Fingerprint_Out\\projects\\results_allpairs"
+        --out-root ".\\Fingerprint_Data\\results_allpairs"
 """
 
 from __future__ import annotations

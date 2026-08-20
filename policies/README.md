@@ -56,7 +56,7 @@ narrative evidence packages, and promotion-analysis packages use the same sorted
 UTF-8 representation and publish it after their primary artifacts succeed.
 
 Promotion-analysis schema v2 replaces
-`reuse_client_pool_is_stantec_internal` with
+the legacy organization-specific internal-pool field with
 `reuse_client_pool_is_enterprise`. No compatibility alias is emitted because all
 maintained consumers migrated in this repository. Older CSV readers must rename
 the retired field explicitly. The new value comes from EnterprisePolicy; an

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import csv
+import argparse
 from pathlib import Path
 from collections import Counter, defaultdict
 
-# --- SET THIS ---
-OUT_ROOT = Path(r"C:\Users\gmcdowell\Documents\Fingerprint_Out\domain_families\results_allpairs")
-# ---------------
+parser = argparse.ArgumentParser(description="Inspect line-pattern normalized hashes")
+parser.add_argument("out_root", type=Path, help="Results root containing Results_v21")
+OUT_ROOT = parser.parse_args().out_root
 
 phase0_dir = OUT_ROOT / "Results_v21" / "phase0_v21"
 # line_patterns is a single domain, so the shard is a straight drop-in for the

@@ -13,7 +13,7 @@ later phases -- see docs/governance_evidence_package.md.
 
 Design reference only: the authority-level vocabulary below is modeled on,
 but independently defined from, the discovery-scaffold vocabulary in the
-GMcDowellJr/llm_evidence_framework repository. That repository is explicitly
+the design-reference evidence framework repository. That repository is explicitly
 not a finalized standard or schema, and this module does not import from it
 or depend on it at runtime -- these constants are this repo's own copy,
 chosen for cross-tool legibility.

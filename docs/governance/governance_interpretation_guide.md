@@ -10,7 +10,7 @@ to read missing values and authority — the questions a reader (human or LLM)
 needs answered *before* reasoning from the raw artifacts, not after.
 
 It is modeled on the "interpretation layer" concept in the design-reference
-`GMcDowellJr/llm_evidence_framework` repository (`notes/current_thesis.md`,
+`the design-reference evidence framework` repository (`notes/current_thesis.md`,
 `patterns/deterministic_to_llm_boundary.md`) — that repository is explicitly
 provisional, and this guide is this package's own content, not an import
 from it. See `docs/governance_evidence_package.md` in the repository (a
@@ -420,7 +420,7 @@ records exactly which profile version was applied to a given run.
  
 `governance_question_routes.md` routes are versioned by maturity, per
 the design reference this package's routing layer follows
-(`GMcDowellJr/llm_evidence_framework/discovery/question_route_discovery.md`):
+(`the design-reference evidence framework/discovery/question_route_discovery.md`):
  
 ```
 candidate -> active -> recipe-backed -> extractor-backed

@@ -23,7 +23,7 @@ For each candidate in `archetype_definitions_candidates.json`:
 
 3. **What is the right `approach_label`?**
    - This is the human-readable slicer value Jon sees in Power BI.
-   - Label the governance behavior, not the signal mechanism. Use language like "Wall Fire Rating Filter Bundle", "Matched Arrowhead Standard", "Stantec Line Pattern Standard" — not technical edge IDs.
+   - Label the governance behavior, not the signal mechanism. Use language like "Wall Fire Rating Filter Bundle", "Matched Arrowhead Standard", "Enterprise Line Pattern Standard" — not technical edge IDs.
    - Treat archetypes that will likely cluster together (same target domain, overlapping signals) as a naming family so their labels read coherently side-by-side in a slicer.
 
 4. **Output**

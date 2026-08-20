@@ -8,6 +8,7 @@ import pytest
 import domains.identity as identity_module
 from core.join_key_policy import load_join_key_policies
 from core.record_v2 import ITEM_Q_MISSING, ITEM_Q_OK, ITEM_Q_UNREADABLE, ITEM_Q_UNSUPPORTED_NOT_APPLICABLE
+from tests.synthetic_governance_fixtures import BUSINESS_CENTER_01, ENTERPRISE, PROJECT_ALPHA
 
 
 class FakeParameter:
@@ -102,7 +103,7 @@ _ALL_BUILTIN_VALUES = {
     FakeBuiltInParameter.PROJECT_ISSUE_DATE: "2026-08-10",
     FakeBuiltInParameter.CLIENT_NAME: "Acme Co",
     FakeBuiltInParameter.PROJECT_BUILDING_NAME: "Tower A",
-    FakeBuiltInParameter.PROJECT_ORGANIZATION_NAME: "InternalEnterprise",
+    FakeBuiltInParameter.PROJECT_ORGANIZATION_NAME: ENTERPRISE,
     FakeBuiltInParameter.PROJECT_ORGANIZATION_DESCRIPTION: "Architecture",
     FakeBuiltInParameter.IFC_BUILDING_GUID: "1AB2c3D4e5F6G7H8I9J0Kl",
     FakeBuiltInParameter.IFC_PROJECT_GUID: "1AB2c3D4e5F6G7H8I9J0Km",
@@ -113,27 +114,26 @@ _ALL_BUILTIN_VALUES = {
 _BUSINESS_CENTER_SHARED_PARAM_GUID = "11111111-2222-4333-8444-555555555555"
 
 
-def _enterprise_like_pi():
+def _project_info_with_configured_business_center():
     return FakeProjectInformation(
-        name="Test Project",
+        name=PROJECT_ALPHA,
         builtin_values=_ALL_BUILTIN_VALUES,
         named_present={"Business Center"},
-        named_values={"Business Center": "BusinessCenter01"},
+        named_values={"Business Center": BUSINESS_CENTER_01},
         # Kept consistent with named_values so the fixture behaves the same
         # whether identity_module.Guid is available (GUID-based read) or not
         # (LookupParameter-by-name fallback).
-        guid_values={_BUSINESS_CENTER_SHARED_PARAM_GUID: "BusinessCenter01"},
+        guid_values={_BUSINESS_CENTER_SHARED_PARAM_GUID: BUSINESS_CENTER_01},
     )
 
 
-def _non_enterprise_pi():
+def _project_info_without_configured_business_center():
     # IFC GUID fields are true BuiltInParameter members (confirmed via
     # tools/archetype/bip_lookup.json), unrelated to firm identity -- they
-    # still resolve from the same _ALL_BUILTIN_VALUES here. What actually
-    # distinguishes a "non-InternalEnterprise" project is the absence of the Business Center
-    # shared parameter definition (named_present stays empty).
+    # still resolve from the same _ALL_BUILTIN_VALUES here. The only behavioral distinction in this fixture is absence of the configured
+    # Business Center shared-parameter definition (named_present stays empty).
     return FakeProjectInformation(
-        name="Non-InternalEnterprise Project",
+        name="ProjectWithoutConfiguredBusinessCenter",
         builtin_values=_ALL_BUILTIN_VALUES,
         named_present=set(),
     )
@@ -200,7 +200,7 @@ class FakeDoc:
 
 def test_extract_project_info_items_covers_exact_expected_keys(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    items = _extract_items(_DocForPI(_enterprise_like_pi()))
+    items = _extract_items(_DocForPI(_project_info_with_configured_business_center()))
     keys = [it["k"] for it in items]
     assert set(keys) == _EXPECTED_KEYS
     assert len(keys) == len(set(keys)), "duplicate project_info.* keys emitted"
@@ -208,7 +208,7 @@ def test_extract_project_info_items_covers_exact_expected_keys(monkeypatch):
 
 def test_no_deployment_configuration_emits_only_builtin_fields(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(_enterprise_like_pi())))
+    items = _as_dict(identity_module._extract_project_info_items(_DocForPI(_project_info_with_configured_business_center())))
     assert "project_info.business_center" not in items
     assert "project_info.client_name" in items
 
@@ -220,7 +220,7 @@ def test_malformed_configured_guid_is_rejected(monkeypatch):
     ]}
     import pytest
     with pytest.raises(ValueError, match="malformed GUID"):
-        identity_module._extract_project_info_items(_DocForPI(_enterprise_like_pi()), ctx=ctx)
+        identity_module._extract_project_info_items(_DocForPI(_project_info_with_configured_business_center()), ctx=ctx)
 
 
 def test_extract_project_info_items_keys_are_registered_in_contract():
@@ -230,19 +230,19 @@ def test_extract_project_info_items_keys_are_registered_in_contract():
     assert _EXPECTED_KEYS.issubset(allowed)
 
 
-def test_builtin_fields_resolve_ok_on_a_enterprise_like_project(monkeypatch):
+def test_builtin_fields_resolve_regardless_of_configured_shared_parameter(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    items = _as_dict(_extract_items(_DocForPI(_enterprise_like_pi())))
+    items = _as_dict(_extract_items(_DocForPI(_project_info_with_configured_business_center())))
 
     for key, expected_v in (
-        ("project_info.name", "Test Project"),
+        ("project_info.name", PROJECT_ALPHA),
         ("project_info.number", "2014351100"),
         ("project_info.status", "DD"),
         ("project_info.address", "123 Main St"),
         ("project_info.issue_date", "2026-08-10"),
         ("project_info.client_name", "Acme Co"),
         ("project_info.building_name", "Tower A"),
-        ("project_info.organization_name", "InternalEnterprise"),
+        ("project_info.organization_name", ENTERPRISE),
         ("project_info.organization_description", "Architecture"),
     ):
         assert items[key]["q"] == ITEM_Q_OK, "{} expected q=ok, got {}".format(key, items[key]["q"])
@@ -251,10 +251,10 @@ def test_builtin_fields_resolve_ok_on_a_enterprise_like_project(monkeypatch):
 
 def test_business_center_and_ifc_guids_resolve_ok_when_present(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    items = _as_dict(_extract_items(_DocForPI(_enterprise_like_pi())))
+    items = _as_dict(_extract_items(_DocForPI(_project_info_with_configured_business_center())))
 
     assert items["project_info.business_center"]["q"] == ITEM_Q_OK
-    assert items["project_info.business_center"]["v"] == "BusinessCenter01"
+    assert items["project_info.business_center"]["v"] == BUSINESS_CENTER_01
     assert items["project_info.ifc_building_guid"]["q"] == ITEM_Q_OK
     assert items["project_info.ifc_project_guid"]["q"] == ITEM_Q_OK
     assert items["project_info.ifc_site_guid"]["q"] == ITEM_Q_OK
@@ -273,11 +273,11 @@ def test_business_center_is_read_via_shared_parameter_guid_when_available(monkey
         name="GUID Business Center Project",
         builtin_values=_ALL_BUILTIN_VALUES,
         named_present=set(),  # no "Business Center" resolvable by display name
-        guid_values={_BUSINESS_CENTER_SHARED_PARAM_GUID: "BusinessCenter01"},
+        guid_values={_BUSINESS_CENTER_SHARED_PARAM_GUID: BUSINESS_CENTER_01},
     )
     items = _as_dict(_extract_items(_DocForPI(pi)))
     assert items["project_info.business_center"]["q"] == ITEM_Q_OK
-    assert items["project_info.business_center"]["v"] == "BusinessCenter01"
+    assert items["project_info.business_center"]["v"] == BUSINESS_CENTER_01
 
 
 def test_guid_configuration_fails_closed_when_guid_type_unavailable(monkeypatch):
@@ -286,12 +286,12 @@ def test_guid_configuration_fails_closed_when_guid_type_unavailable(monkeypatch)
     monkeypatch.setattr(identity_module, "Guid", None)
 
     with pytest.raises(RuntimeError, match="System.Guid"):
-        _extract_items(_DocForPI(_enterprise_like_pi()))
+        _extract_items(_DocForPI(_project_info_with_configured_business_center()))
 
 
 def test_business_center_is_not_applicable_when_shared_param_absent_not_unreadable(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    items = _as_dict(_extract_items(_DocForPI(_non_enterprise_pi())))
+    items = _as_dict(_extract_items(_DocForPI(_project_info_without_configured_business_center())))
 
     assert items["project_info.business_center"]["q"] == ITEM_Q_UNSUPPORTED_NOT_APPLICABLE, (
         "project_info.business_center should be legitimately-absent not_applicable on a project "
@@ -353,7 +353,7 @@ def test_named_field_read_exception_is_unreadable(monkeypatch):
         def AsString(self):
             raise RuntimeError("synthetic read failure")
 
-    pi = _enterprise_like_pi()
+    pi = _project_info_with_configured_business_center()
     original = pi.get_Parameter
     pi.get_Parameter = lambda token: ThrowingParameter(None) if isinstance(token, FakeGuid) else original(token)
     item = _as_dict(_extract_items(_DocForPI(pi)))["project_info.business_center"]
@@ -383,7 +383,7 @@ def test_configured_field_quality_states_participate_in_signature(monkeypatch, s
 
 def test_builtin_field_unreadable_when_no_builtinparameter_enum(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", None)
-    items = _as_dict(_extract_items(_DocForPI(_enterprise_like_pi())))
+    items = _as_dict(_extract_items(_DocForPI(_project_info_with_configured_business_center())))
     assert items["project_info.client_name"]["q"] == ITEM_Q_UNREADABLE
     # project_info.name doesn't depend on BuiltInParameter (uses pi.Name directly).
     assert items["project_info.name"]["q"] == ITEM_Q_OK
@@ -398,7 +398,7 @@ def test_project_information_missing_marks_every_field_unreadable(monkeypatch):
 
 def test_extract_end_to_end_includes_project_info_in_sig_hash_and_leaves_status_ok(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    doc = FakeDoc(_enterprise_like_pi())
+    doc = FakeDoc(_project_info_with_configured_business_center())
 
     result = identity_module.extract(doc, ctx=_CONFIG_CTX)
     rec = result["records"][0]
@@ -425,7 +425,7 @@ def test_phase2_semantic_keys_excludes_project_info_and_stays_the_pre_d025_core(
     exception, not Phase-2-semantic content, and identity.revit_version_name
     must stay excluded exactly as it was pre-D-025 (PR review follow-up)."""
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    doc = FakeDoc(_enterprise_like_pi())
+    doc = FakeDoc(_project_info_with_configured_business_center())
 
     result = identity_module.extract(doc, ctx=_CONFIG_CTX)
     rec = result["records"][0]
@@ -444,9 +444,9 @@ def test_phase2_semantic_keys_excludes_project_info_and_stays_the_pre_d025_core(
     assert "identity.revit_version_name" not in rec["phase2"]["semantic_keys"]
 
 
-def test_extract_end_to_end_non_enterprise_project_stays_status_ok(monkeypatch):
+def test_extract_end_to_end_without_configured_shared_parameter_stays_ok(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    doc = FakeDoc(_non_enterprise_pi())
+    doc = FakeDoc(_project_info_without_configured_business_center())
 
     result = identity_module.extract(doc, ctx=_CONFIG_CTX)
     rec = result["records"][0]
@@ -465,7 +465,7 @@ def test_join_key_and_name_key_are_unaffected_by_project_info_fields(monkeypatch
     adding it to identity_items must not change join_key/join_key_name_identity
     at all, since neither is listed as required/optional there."""
     monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
-    doc = FakeDoc(_enterprise_like_pi())
+    doc = FakeDoc(_project_info_with_configured_business_center())
 
     policies = load_join_key_policies("policies/domain_join_key_policies.json")
     ctx = {"join_key_policies": policies, "name_key_policies": policies, **_CONFIG_CTX}

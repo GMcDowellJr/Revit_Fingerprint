@@ -8,11 +8,10 @@ extraction run.  Blocks until each file is fully downloaded.
 Run this BEFORE pressing the BatchExtract button in pyRevit.
 
 Usage:
-    python acc_sync_dc.py
     python acc_sync_dc.py --manifest "C:\\path\\to\\acc_manifest.csv"
-    python acc_sync_dc.py --dry-run        # report what needs syncing, don't download
-    python acc_sync_dc.py --limit 10       # hydrate at most N files (for testing)
-    python acc_sync_dc.py --timeout 600    # override per-file timeout in seconds
+    python acc_sync_dc.py --manifest ".\acc_manifest.csv" --dry-run        # report what needs syncing, don't download
+    python acc_sync_dc.py --manifest ".\acc_manifest.csv" --limit 10       # hydrate at most N files (for testing)
+    python acc_sync_dc.py --manifest ".\acc_manifest.csv" --timeout 600    # override per-file timeout in seconds
 
 Requirements:
     Python 3.6+, Windows only.
@@ -36,7 +35,6 @@ from datetime import datetime
 # CONFIG
 # ---------------------------------------------------------------------------
 
-DEFAULT_MANIFEST = r"C:\Users\gmcdowell\Documents\Fingerprint_Out\acc_manifest.csv"
 DEFAULT_TIMEOUT  = 300               # seconds per file (5 min); override with --timeout
 
 # ---------------------------------------------------------------------------
@@ -274,8 +272,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Hydrate Desktop Connector stubs before fingerprint extraction."
     )
-    parser.add_argument("--manifest", default=DEFAULT_MANIFEST,
-                        help="Path to acc_manifest.csv (default: %(default)s)")
+    parser.add_argument("--manifest", required=True,
+                        help="Path to acc_manifest.csv")
     parser.add_argument("--dry-run",  action="store_true",
                         help="Report what needs syncing without downloading.")
     parser.add_argument("--limit",   type=int, default=None,
