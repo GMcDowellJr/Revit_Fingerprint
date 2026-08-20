@@ -49,6 +49,19 @@ is independently fixed at `0000`. Use `--enterprise-policy <local.json>` for a
 local file and `--enterprise-label` only as a higher-precedence compatibility
 override. Identity-dependent artifact directories receive deterministic
 `enterprise_policy.json` provenance only on a writing run; dry runs do not write it.
+The canonical payload contains the schema, effective label, fixed enterprise BC
+token, source, and a safe content-derived identifier; it never contains an
+absolute policy path. Governance manifests, comparisons, relationship matrices,
+narrative evidence packages, and promotion-analysis packages use the same sorted
+UTF-8 representation and publish it after their primary artifacts succeed.
+
+Promotion-analysis schema v2 replaces
+`reuse_client_pool_is_stantec_internal` with
+`reuse_client_pool_is_enterprise`. No compatibility alias is emitted because all
+maintained consumers migrated in this repository. Older CSV readers must rename
+the retired field explicitly. The new value comes from EnterprisePolicy; an
+external client is not enterprise merely because it carries BC token `0000`.
+The documented BC-grain limitation remains unchanged.
 
 ### Runner deployment configuration
 

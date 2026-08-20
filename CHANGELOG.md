@@ -2378,3 +2378,11 @@ No hash values changed within any record class — this is a structural change o
 
 ### Fixed
 - Documentation formatting made portable across GitHub Mobile + Obsidian by avoiding nested fenced blocks.
+
+## 2026-08-20
+
+### Corrected
+- Identity-aware generated packages now carry deterministic, path-safe
+  enterprise-policy provenance.
+- Removed maintained Stantec-branded narrative output and migrated the public
+  promotion flag to `reuse_client_pool_is_enterprise` without a legacy alias.

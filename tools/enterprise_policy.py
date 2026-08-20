@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import hashlib
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -36,6 +37,10 @@ class EnterprisePolicy:
             "configuration_identifier": self.configuration_identifier,
         }
         return value
+
+    def provenance_bytes(self) -> bytes:
+        """Return the canonical, path-safe representation used by artifacts."""
+        return (json.dumps(self.provenance(), indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
 def _label(value: Any) -> str:
@@ -87,5 +92,7 @@ def write_enterprise_policy_provenance(out_dir: Union[str, Path], policy: Enterp
     """Write deterministic provenance after callers have validated write intent."""
     path = Path(out_dir) / "enterprise_policy.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(policy.provenance(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp = path.with_name("." + path.name + ".tmp")
+    tmp.write_bytes(policy.provenance_bytes())
+    os.replace(tmp, path)
     return path

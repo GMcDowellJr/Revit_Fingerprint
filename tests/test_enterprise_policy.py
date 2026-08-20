@@ -28,6 +28,10 @@ def test_policy_provenance_records_effective_configuration(tmp_path):
         "enterprise_business_center_token": "0000", "enterprise_label": "Deployment Enterprise",
         "schema": "enterprise_policy.v1", "source": "cli_override",
     }
+    first = path.read_bytes()
+    write_enterprise_policy_provenance(tmp_path, policy)
+    assert path.read_bytes() == first == policy.provenance_bytes()
+    assert b"private-deployment" not in first
 
 def test_policy_instances_are_immutable_serializable_and_do_not_leak_state():
     import pickle

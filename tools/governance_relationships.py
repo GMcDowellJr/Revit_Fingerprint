@@ -32,10 +32,8 @@ project, matching _project_label_for_file()'s established behavior, not a
 new rule invented here).
 
 Project identity is (client_label, business_center_label, project_key), not
-project_key alone -- a real production file_metadata.csv can contain the
-same project_label string used by two different clients (verified against a
-real export: "MPMC" appears under both a Sutter-owned project and an
-unrelated Duke LifePoint-owned project in BC 2014). Keying on project_label
+project_key alone -- two synthetic clients may legitimately use the same
+project label. Keying on project_label
 alone would silently merge those two distinct projects' file counts into one
 row; the composite key keeps them apart without needing a special case for
 that collision.
@@ -75,6 +73,7 @@ if _TOOLS_DIR not in sys.path:
 
 from na_token import is_blank_or_na
 from bundle_analysis.common import atomic_write_csv, read_csv_rows
+from enterprise_policy import load_enterprise_policy, write_enterprise_policy_provenance
 from governance_manifest import (
     _normalize_manual_metadata,
     _governance_role_key,
@@ -299,6 +298,8 @@ def main(argv: List[str] | None = None) -> int:
     )
     parser.add_argument("--file-meta", required=True, help="Path to file_metadata.csv")
     parser.add_argument("--out-dir", required=True, help="Directory to write output files")
+    parser.add_argument("--enterprise-policy", help="Deployment-local enterprise policy JSON")
+    parser.add_argument("--enterprise-label", help="Effective enterprise label override")
     args = parser.parse_args(argv)
 
     file_meta_path = Path(args.file_meta)
@@ -313,11 +314,13 @@ def main(argv: List[str] | None = None) -> int:
 
     bc_client_rows = build_bc_client_matrix_rows(relationship_rows)
     client_bc_rows = build_client_bc_matrix_rows(bc_client_rows)
+    policy = load_enterprise_policy(args.enterprise_policy, args.enterprise_label)
 
     out_dir = Path(args.out_dir)
     atomic_write_csv(out_dir / "governance_relationships.csv", RELATIONSHIPS_FIELDNAMES, relationship_rows)
     atomic_write_csv(out_dir / "governance_bc_client_matrix.csv", BC_CLIENT_MATRIX_FIELDNAMES, bc_client_rows)
     atomic_write_csv(out_dir / "governance_client_bc_matrix.csv", CLIENT_BC_MATRIX_FIELDNAMES, client_bc_rows)
+    write_enterprise_policy_provenance(out_dir, policy)
 
     print(
         f"[governance_relationships] {len(relationship_rows)} project(s), "

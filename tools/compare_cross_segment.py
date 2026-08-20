@@ -4794,6 +4794,8 @@ def main() -> int:
     args = ap.parse_args()
     policy = load_enterprise_policy(args.enterprise_policy, args.enterprise_label)
     args.workers = resolve_worker_count(args.workers)
+    if args.workers < 1:
+        sys.exit("[error] --workers must be >= 1")
 
     segments_root = Path(args.segments_root).resolve()
     records_dir = Path(args.records_dir).resolve()
@@ -4962,9 +4964,6 @@ def main() -> int:
         )
         return 0
 
-    # Provenance is an artifact: emit it only after validation and dry-run exit.
-    write_enterprise_policy_provenance(out_dir, policy)
-
     # Run comparisons
     executed_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     summary_rows: List[Dict[str, str]] = []
@@ -4973,9 +4972,6 @@ def main() -> int:
     governance_state_summary_rows: List[Dict[str, str]] = []
     governance_combo_count = 0
     delta_combo_count = 0
-
-    if args.workers < 1:
-        sys.exit("[error] --workers must be >= 1")
 
     print(
         f"[compare] {len(runnable_pairs)} pairs × {len(active_domain_filter)} active domains = "
@@ -5375,6 +5371,10 @@ def main() -> int:
     )
     atomic_write_csv(out_dir / "comparison_registry.csv", COMPARISON_REGISTRY_FIELDS, comparison_registry_rows)
     print(f"[compare] wrote {len(comparison_registry_rows)} rows → {out_dir / 'comparison_registry.csv'}")
+
+    # Publish provenance last: a failed comparison must never advertise a new
+    # identity policy beside an incomplete/previous evidence set.
+    write_enterprise_policy_provenance(out_dir, policy)
 
     return 0
 

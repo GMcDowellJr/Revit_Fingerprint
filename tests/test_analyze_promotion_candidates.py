@@ -250,6 +250,30 @@ def _read(root, name):
     return pd.read_csv(root / "promotion_candidate_analysis" / name)
 
 
+def test_enterprise_pool_flag_is_policy_driven_and_has_no_legacy_alias():
+    policy = apc.load_enterprise_policy(enterprise_label="Enterprise Alpha")
+    rows = pd.DataFrame([
+        _reuse_row("enterprise", client_label="Enterprise Alpha"),
+        _reuse_row("external", client_label="External Client"),
+    ])
+    classified, _ = apc.compute_reuse_scope(rows, 3, policy)
+    values = dict(zip(classified["join_hash"], classified["reuse_client_pool_is_enterprise"]))
+    assert values == {"enterprise": True, "external": False}
+    assert "reuse_client_pool_is_stantec_internal" not in classified.columns
+
+
+def test_invalid_source_schema_creates_no_output_directory(tmp_path):
+    pd.DataFrame([{"wrong": "schema"}]).to_csv(
+        tmp_path / "cross_segment_governance_states.csv", index=False
+    )
+    pd.DataFrame([{"wrong": "schema"}]).to_csv(
+        tmp_path / "pattern_reuse_distribution.csv", index=False
+    )
+    with pytest.raises(ValueError, match="missing required columns"):
+        apc.main(["--root", str(tmp_path), "--domains", DOMAIN])
+    assert not (tmp_path / "promotion_candidate_analysis").exists()
+
+
 def test_scope_gap_candidate_routing(corpus_root):
     apc.main(["--root", str(corpus_root), "--domains", DOMAIN])
     candidates = _read(corpus_root, "promotion_candidates.csv")
