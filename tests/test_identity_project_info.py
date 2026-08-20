@@ -346,6 +346,41 @@ def test_named_field_present_but_blank_is_missing_not_not_applicable(monkeypatch
     assert items["project_info.business_center"]["v"] is None
 
 
+def test_named_field_read_exception_is_unreadable(monkeypatch):
+    monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
+
+    class ThrowingParameter(FakeParameter):
+        def AsString(self):
+            raise RuntimeError("synthetic read failure")
+
+    pi = _enterprise_like_pi()
+    original = pi.get_Parameter
+    pi.get_Parameter = lambda token: ThrowingParameter(None) if isinstance(token, FakeGuid) else original(token)
+    item = _as_dict(_extract_items(_DocForPI(pi)))["project_info.business_center"]
+    assert item == {"k": "project_info.business_center", "q": ITEM_Q_UNREADABLE, "v": None}
+
+
+@pytest.mark.parametrize("state, expected_q, raw", [
+    ("unsupported", ITEM_Q_UNSUPPORTED_NOT_APPLICABLE, "absent"),
+    ("missing", ITEM_Q_MISSING, None),
+    ("readable", ITEM_Q_OK, "Synthetic Value"),
+])
+def test_configured_field_quality_states_participate_in_signature(monkeypatch, state, expected_q, raw):
+    """Unconfigured is excluded; every configured q/v state is hash-significant."""
+    monkeypatch.setattr(identity_module, "BuiltInParameter", FakeBuiltInParameter)
+    guid_values = {} if state == "unsupported" else {_BUSINESS_CENTER_SHARED_PARAM_GUID: raw}
+    pi = FakeProjectInformation("Synthetic Project", _ALL_BUILTIN_VALUES, set(), guid_values=guid_values)
+    doc = FakeDoc(pi)
+    baseline = identity_module.extract(doc, ctx={})["records"][0]
+    configured = identity_module.extract(doc, ctx=_CONFIG_CTX)["records"][0]
+    baseline_keys = set(baseline["sig_basis"]["keys_used"])
+    configured_items = _as_dict(configured["identity_basis"]["items"])
+    assert "project_info.business_center" not in baseline_keys
+    assert configured_items["project_info.business_center"]["q"] == expected_q
+    assert "project_info.business_center" in configured["sig_basis"]["keys_used"]
+    assert configured["sig_hash"] != baseline["sig_hash"]
+
+
 def test_builtin_field_unreadable_when_no_builtinparameter_enum(monkeypatch):
     monkeypatch.setattr(identity_module, "BuiltInParameter", None)
     items = _as_dict(_extract_items(_DocForPI(_enterprise_like_pi())))
