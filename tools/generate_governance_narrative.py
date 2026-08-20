@@ -123,6 +123,7 @@ from governance_evidence_package import (
 # finding-rule documentation profiles in policies/governance/*.json. The
 # default profile VALUES and domain-governance business logic stay in this
 # file -- see apply_governance_policy() below and docs/governance_evidence_package.md.
+from enterprise_policy import load_enterprise_policy, write_enterprise_policy_provenance
 from governance_policy import (
     DEFAULT_POLICY_DIR as _DEFAULT_POLICY_DIR,
     load_governance_policy,
@@ -3261,7 +3262,7 @@ def render_header(analysis_date: str, corpus: dict, has_state_outputs: bool, leg
         "--no-emit-evidence-package or the source doc was not found on disk)"
     )
     return f"""# Revit Configuration Governance Analysis
-## Stantec Consulting — BIM Fingerprint System
+## Enterprise BIM Fingerprint System
 ### Analysis Date: {analysis_date}
 
 ---
@@ -3288,7 +3289,7 @@ extracts configuration fingerprints from Revit project files and measures how co
 those configurations flow from enterprise baseline content through templates, coordination
 files, and live project models.
 
-The goal is to identify which parts of Stantec's Revit configuration landscape have
+The goal is to identify which parts of the enterprise configuration landscape have
 evidence of convergence, propagation, active use, passive inheritance, local creation, or
 missing downstream content. These findings frame governance questions; they do not decide
 standards.
@@ -5962,9 +5963,12 @@ def main():
                              "map entries and copies, are unaffected.")
     parser.set_defaults(emit_interpretation_layer=True)
     parser.add_argument("--out", default="governance_narrative_context.md")
+    parser.add_argument("--enterprise-policy", help="Deployment-local enterprise policy JSON")
+    parser.add_argument("--enterprise-label", help="Effective enterprise label override")
     parser.add_argument("--date", default=str(date.today()),
                         help="Analysis date string (default: today)")
     args = parser.parse_args()
+    enterprise_policy = load_enterprise_policy(args.enterprise_policy, args.enterprise_label)
 
     policy_dir_arg = Path(args.policy_dir) if args.policy_dir else None
     governance_policy = load_governance_policy(policy_dir_arg, _POLICY_DEFAULTS)
@@ -6401,6 +6405,7 @@ def main():
 
     output = "\n\n".join(sections)
     out_path.write_text(output, encoding="utf-8")
+    write_enterprise_policy_provenance(out_dir, enterprise_policy)
     print(f"\nWrote {out_path} ({len(output):,} chars, {len(output.splitlines())} lines)")
 
     # ── Evidence-package JSON outputs ───────────────────────────────────────────

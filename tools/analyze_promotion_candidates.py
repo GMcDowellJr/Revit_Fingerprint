@@ -73,11 +73,11 @@ not just their docs):
   `(view_scope, governance_role, client_label, discipline_label, unit_system, domain)`
   -- there is no `business_center_label` in that key. `reuse_scope` can
   therefore **never** resolve to `bc`; multiple real business centers
-  sharing the same `client_label` (including every Stantec-internal bc,
-  since `client_label == "Stantec"` for all of them) collapse into one pool.
-  A `client_label == "Stantec"` reuse row is flagged via
-  `reuse_client_pool_is_stantec_internal` so a reader can see when "client"
-  scope actually means "all of Stantec's business centers pooled together,"
+  sharing the same `client_label` (including every enterprise-internal BC,
+  whose labels match the effective EnterprisePolicy) collapse into one pool.
+  A reuse row whose `client_label` matches EnterprisePolicy is flagged via
+  `reuse_client_pool_is_enterprise` so a reader can see when "client"
+  scope actually means "all of the enterprise's business centers pooled together,"
   not one real external client. This means a genuine `seeded_scope == "bc"`
   case can show up as `reuse_scope < seeded_scope` (routed to
   governed_but_underused.csv) purely because reuse breadth has no bc grain
@@ -106,6 +106,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from enterprise_policy import EnterprisePolicy, load_enterprise_policy, write_enterprise_policy_provenance
 
 
 # ============================================================
@@ -272,6 +274,8 @@ def parse_args(argv=None):
         action="store_true",
         help="Print additional diagnostics during execution.",
     )
+    parser.add_argument("--enterprise-policy", help="Deployment-local enterprise policy JSON")
+    parser.add_argument("--enterprise-label", help="Effective enterprise label override")
 
     args = parser.parse_args(argv)
 
@@ -303,6 +307,7 @@ def parse_args(argv=None):
         "enable_semantic_noise_filter": semantic_noise_filter,
         "export_top": args.export_top,
         "verbose": args.verbose,
+        "enterprise_policy": load_enterprise_policy(args.enterprise_policy, args.enterprise_label),
     }
 
 
@@ -391,7 +396,7 @@ def compute_seeded_scope(gov: pd.DataFrame) -> pd.DataFrame:
 # REUSE SCOPE (from pattern_reuse_distribution.csv)
 # ============================================================
 
-def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tuple:
+def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int, policy: EnterprisePolicy | None = None) -> tuple:
     """Broadest reuse_scope observed for a (domain, join_hash, unit_system),
     restricted to Project-role rows -- see module docstring for why
     Template/Container/Generic rows are excluded. Returns (classified,
@@ -433,6 +438,8 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
     won is recorded per output row in `reuse_view_source` ("used" /
     "all_fallback") rather than left implicit.
     """
+    policy = policy or load_enterprise_policy()
+
     project_rows = reuse[reuse["governance_role"] == "Project"].copy()
 
     identity_cols = ["domain", "join_hash", "unit_system"]
@@ -454,7 +461,7 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
         "pct_clients_present", "n_projects_present", "n_projects_denominator",
         "pct_projects_present", "n_files_present", "n_files_denominator",
         "pct_files_present", "enterprise_evidence_downgraded",
-        "reuse_client_pool_is_stantec_internal", "reuse_view_source",
+        "reuse_client_pool_is_enterprise", "reuse_view_source",
     ]
     if r.empty:
         return pd.DataFrame(columns=empty_cols), pd.DataFrame(columns=empty_cols)
@@ -467,16 +474,16 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
     r["enterprise_evidence_downgraded"] = downgrade_mask
     r.loc[downgrade_mask, "reuse_scope"] = "client"
 
-    r["_is_stantec_row"] = r["client_label"].astype(str).str.strip().str.lower() == "stantec"
+    r["_is_enterprise_row"] = r["client_label"].map(policy.is_enterprise)
 
     unclassified = r[r["reuse_scope"].isna()].copy()
     unclassified["reuse_scope"] = "unclassified"
-    unclassified["reuse_client_pool_is_stantec_internal"] = unclassified["_is_stantec_row"]
+    unclassified["reuse_client_pool_is_enterprise"] = unclassified["_is_enterprise_row"]
 
     classified = r[r["reuse_scope"].notna()].copy()
     if classified.empty:
-        classified["reuse_client_pool_is_stantec_internal"] = classified.get(
-            "_is_stantec_row", pd.Series(dtype=bool)
+        classified["reuse_client_pool_is_enterprise"] = classified.get(
+            "_is_enterprise_row", pd.Series(dtype=bool)
         )
         return classified.reindex(columns=empty_cols), unclassified.reindex(columns=empty_cols)
 
@@ -523,7 +530,7 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
             n_files_present=("n_files_present", "max"),
             n_files_denominator=("n_files_denominator", "max"),
             enterprise_evidence_downgraded=("enterprise_evidence_downgraded", "max"),
-            reuse_client_pool_is_stantec_internal=("_is_stantec_row", "max"),
+            reuse_client_pool_is_enterprise=("_is_enterprise_row", "max"),
         )
         .reset_index()
     )
@@ -546,7 +553,7 @@ def compute_reuse_scope(reuse: pd.DataFrame, min_enterprise_clients: int) -> tup
             n_files_present=("n_files_present", "sum"),
             n_files_denominator=("n_files_denominator", "sum"),
             enterprise_evidence_downgraded=("enterprise_evidence_downgraded", "max"),
-            reuse_client_pool_is_stantec_internal=("reuse_client_pool_is_stantec_internal", "max"),
+            reuse_client_pool_is_enterprise=("reuse_client_pool_is_enterprise", "max"),
         )
         .reset_index()
     )
@@ -569,8 +576,6 @@ def main(argv=None):
 
     root = cfg["root"]
     out_dir = cfg["output"]
-    out_dir.mkdir(parents=True, exist_ok=True)
-
     gov_states_path = root / "cross_segment_governance_states.csv"
     reuse_dist_path = root / "pattern_reuse_distribution.csv"
 
@@ -597,6 +602,7 @@ def main(argv=None):
         raise FileNotFoundError(f"Missing file: {gov_states_path}")
     if not reuse_dist_path.exists():
         raise FileNotFoundError(f"Missing file: {reuse_dist_path}")
+    policy = cfg["enterprise_policy"]
 
     # ========================================================
     # LOAD
@@ -632,6 +638,8 @@ def main(argv=None):
         ],
         "pattern_reuse_distribution.csv",
     )
+    # Invalid sources are non-writing operations.
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     for col in ("in_reference_all", "in_target_all", "in_target_used",
                 "in_any_template", "in_any_container", "in_any_generic",
@@ -717,7 +725,7 @@ def main(argv=None):
     join_keys = ["domain", "join_hash", "unit_system"]
 
     seeded = compute_seeded_scope(gov)
-    reuse_classified, reuse_unclassified = compute_reuse_scope(reuse, min_enterprise_clients)
+    reuse_classified, reuse_unclassified = compute_reuse_scope(reuse, min_enterprise_clients, policy)
 
     df = base.merge(seeded, on=join_keys, how="left")
     df["seeded_scope"] = df["seeded_scope"].fillna("ungoverned")
@@ -870,7 +878,7 @@ def main(argv=None):
         "pct_projects_present", "n_files_present", "n_files_denominator",
         "pct_files_present", "files_used", "max_pct_used", "project_penetration",
         "is_baseline_infrastructure", "any_template", "any_container", "any_generic",
-        "enterprise_evidence_downgraded", "reuse_client_pool_is_stantec_internal",
+        "enterprise_evidence_downgraded", "reuse_client_pool_is_enterprise",
         "seeded_scope_consistency_flag", "reuse_data_unclassified", "semantic_noise",
     ]
     audit_cols = [c for c in audit_cols if c in df.columns]
@@ -1023,6 +1031,7 @@ def main(argv=None):
     (out_dir / "promotion_candidate_summary.md").write_text(
         "\n".join(summary), encoding="utf-8"
     )
+    write_enterprise_policy_provenance(out_dir, policy)
 
     # ========================================================
     # CONSOLE SUMMARY

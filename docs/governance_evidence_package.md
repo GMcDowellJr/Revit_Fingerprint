@@ -566,3 +566,22 @@ The full evidence archive (source comparison CSVs, sibling
 in `governance_file_inventory.json`) should be pulled only when a question
 requires drill-down or verification beyond what the rollup CSVs and evidence
 map already answer.
+
+## Enterprise-policy provenance
+
+Identity-aware packages accompany their primary artifacts with
+`enterprise_policy.json`. The canonical sorted UTF-8 payload records the policy
+schema, effective enterprise label, enterprise BC token, configuration source,
+and a content-derived configuration identifier; it excludes absolute local
+paths. Governance-manifest, cross-segment comparison, relationship, narrative,
+and promotion-analysis producers publish provenance only after validation and
+primary output generation. Comparison dry runs and source/policy validation
+failures do not create it. A generation failure before publication therefore
+cannot leave new provenance that misdescribes a partial package.
+
+Promotion-analysis CSV schema v2 uses
+`reuse_client_pool_is_enterprise`. The former organization-specific field has
+no compatibility alias; pre-v2 consumers must rename it explicitly. This flag
+uses the effective EnterprisePolicy label and does not infer enterprise status
+from the `0000` bookkeeping BC token. The analysis still has no BC dimension in
+its reuse grain, so this migration does not claim broader reuse precision.

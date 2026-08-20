@@ -349,12 +349,12 @@ def main() -> int:
     meta_rows = read_csv_rows(meta_path)
     policy = load_enterprise_policy(args.enterprise_policy, args.enterprise_label)
     manifest_rows, membership_rows, excluded_rows = build_governance_populations(meta_rows, policy)
-    write_enterprise_policy_provenance(out_dir, policy)
-
     atomic_write_csv(out_dir / "governance_manifest.csv", MANIFEST_FIELDNAMES, manifest_rows)
     atomic_write_csv(out_dir / "governance_membership.csv", MEMBERSHIP_FIELDNAMES, membership_rows)
     if excluded_rows:
         atomic_write_csv(out_dir / "governance_manifest_excluded.csv", EXCLUDED_FIELDNAMES, excluded_rows)
+    # Publish provenance only after every primary artifact succeeds.
+    write_enterprise_policy_provenance(out_dir, policy)
 
     print(
         f"[governance_manifest] {len(manifest_rows)} population(s), "

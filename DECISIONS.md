@@ -1547,3 +1547,25 @@ references are being consolidated incrementally: contract rationale belongs in
 maintained code, and obsolete operator links are removed. Historical changelog and
 audit-to-audit links may remain, but are non-operational and must not be treated as
 current configuration or a deployment runbook.
+
+## D-036 — Enterprise artifact provenance and promotion schema v2
+
+### Status
+Accepted (2026-08-20)
+
+### Decision
+Every maintained artifact package whose interpretation depends on enterprise
+identity accompanies its outputs with canonical `enterprise_policy.json`.
+Sorted UTF-8 JSON excludes local paths and is published only after primary
+artifacts. Validation and dry-run paths remain non-writing.
+
+Promotion analysis now emits `reuse_client_pool_is_enterprise`. The
+organization-specific predecessor is removed rather than retained as an alias:
+no maintained external consumer requires it. Classification uses the effective
+policy label, never the enterprise BC bookkeeping token alone. Existing BC-grain
+limitations remain.
+
+### Consequences
+- Pre-v2 CSV consumers must explicitly rename the retired field.
+- Policy overrides are reproducible beside identity-aware artifacts.
+- Historical audit text remains historical; maintained prose/examples are neutral.
