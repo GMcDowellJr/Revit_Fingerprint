@@ -64,8 +64,23 @@ def _resolve_repo_root(explicit_repo_root):
     # runner/run_dynamo.py's own env-var-first / __file__-fallback resolution,
     # plus an explicit IN[2] override for exactly this "pasted into a node" case,
     # where neither the env vars nor __file__ can be relied on.
-    if explicit_repo_root and _looks_like_repo_root(explicit_repo_root):
-        return os.path.abspath(explicit_repo_root)
+    if explicit_repo_root:
+        # A caller-supplied IN[2] is an explicit selection, not a hint: if it's
+        # wrong (typo, incomplete checkout), silently falling through to the
+        # env vars or __file__ could resolve a *different* checkout than the
+        # one the caller asked for -- e.g. a stale REVIT_FINGERPRINT_REPO_ROOT_
+        # SELECTED left over from a previous run in the same persistent Dynamo
+        # session -- and apply mappings using unintended code with no error at
+        # all. Fail loudly instead of guessing.
+        if _looks_like_repo_root(explicit_repo_root):
+            return os.path.abspath(explicit_repo_root)
+        raise RuntimeError(
+            "IN[2] repo_root ({!r}) does not look like a Revit_Fingerprint checkout "
+            "(expected mapping/, core/, and domains/ subdirectories) -- not falling "
+            "back to the environment or __file__ since IN[2] was explicitly given.".format(
+                explicit_repo_root
+            )
+        )
 
     for env_key in ("REVIT_FINGERPRINT_REPO_ROOT_SELECTED", "REVIT_FINGERPRINT_REPO_DIR"):
         try:

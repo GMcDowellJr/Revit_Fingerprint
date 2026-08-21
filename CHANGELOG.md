@@ -42,6 +42,16 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   population membership.
 
 ### Fixed
+- **`mapping/create_line_pattern_mappings.py`: an explicit but invalid `IN[2]`
+  repo root now fails loudly instead of silently falling back to the
+  environment or `__file__`.** A caller-supplied `IN[2]` is an explicit
+  selection, not a hint -- previously, a typo'd or incomplete path there fell
+  through to `REVIT_FINGERPRINT_REPO_ROOT_SELECTED`/`REVIT_FINGERPRINT_REPO_DIR`
+  or `__file__`, any of which could resolve a *different* checkout than the
+  one requested (e.g. a stale env var left over from a previous run in the
+  same persistent Dynamo session), applying mappings with unintended code and
+  no error at all. Now raises immediately when `IN[2]` is given but doesn't
+  look like a checkout.
 - **`mapping/create_line_pattern_mappings.py`: cached `mapping`/`core`/`domains`
   modules from a previously-selected checkout are now always purged, and the
   resolved repo root is always promoted to the front of `sys.path`, before
