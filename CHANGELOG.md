@@ -42,6 +42,20 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   population membership.
 
 ### Fixed
+- **`mapping/create_line_pattern_mappings.py`: repo-root resolution no longer
+  depends on `__file__`.** This entry point is meant to be pasted directly
+  into a Dynamo Python Script node, where Dynamo executes the code from a
+  string (`File "<string>"`) rather than loading it from disk -- `__file__`
+  is undefined in that context, so `NameError: name '__file__' is not
+  defined` fired immediately on the first real-world run. Fixed by mirroring
+  `runner/run_dynamo.py`'s existing env-var-first resolution
+  (`REVIT_FINGERPRINT_REPO_ROOT_SELECTED`/`REVIT_FINGERPRINT_REPO_DIR`),
+  falling back to `__file__` only when it's actually available (a node that
+  loads the script from a file on disk), and otherwise requiring the
+  checkout path as a new optional `IN[2]`. No change to reconstruction,
+  hashing, or Revit-mutation behavior -- `mapping/line_pattern_reconstruction.py`
+  and `mapping/line_pattern_revit_apply.py` are unaffected (they're always
+  imported as real files, where `__file__` is defined normally).
 - **`tools/export_bundle_pattern_detail.py`: `_iter_identity_csv()` now always
   resolves item quality from `item_value_type` on the v2.1 identity-item shard
   schema, never from `item_role`.** `item_role` is not a quality field at all

@@ -419,7 +419,9 @@ mapping/                Revit-side downstream mapping utilities (model-writing; 
   line_pattern_revit_apply.py     Revit API half: read segments back off a live LinePatternElement,
                                     bounded create-then-verify-then-commit/rollback Transactions,
                                     existing-vs-create-vs-block decision per requested join_hash.
-  create_line_pattern_mappings.py Dynamo CPython3 entry point (IN[0]=input dir, IN[1]=report path),
+  create_line_pattern_mappings.py Dynamo CPython3 entry point (IN[0]=input dir, IN[1]=report path,
+                                    IN[2]=optional repo-root override -- needed when pasted into a
+                                    node, since __file__ isn't defined for exec'd-from-string code),
                                     same DocumentManager/IN/OUT convention as tools/probes/*.py.
 
 legacy/                 MVP implementation (preserved reference)

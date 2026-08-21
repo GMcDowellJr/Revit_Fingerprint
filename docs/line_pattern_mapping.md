@@ -48,9 +48,18 @@ document already open in the host session).
   create-then-verify-then-commit/rollback transactions, and the
   existing-vs-create-vs-block decision per requested join_hash.
 - `mapping/create_line_pattern_mappings.py` -- the Dynamo CPython3 entry
-  point (`IN[0]` = input directory, `IN[1]` = report path), following the
-  same `DocumentManager.Instance.CurrentDBDocument` / `IN`/`OUT` convention
-  as `tools/probes/*.py`.
+  point (`IN[0]` = input directory, `IN[1]` = report path, `IN[2]` = optional
+  repo-root override), following the same
+  `DocumentManager.Instance.CurrentDBDocument` / `IN`/`OUT` convention as
+  `tools/probes/*.py`. Because this script is meant to be pasted directly
+  into a Dynamo Python Script node (executed from a string, not loaded from
+  disk), `__file__` is not available to locate the repo checkout the way
+  every other module here can rely on -- `_resolve_repo_root()` mirrors
+  `runner/run_dynamo.py`'s env-var-first resolution
+  (`REVIT_FINGERPRINT_REPO_ROOT_SELECTED` / `REVIT_FINGERPRINT_REPO_DIR`),
+  falls back to `__file__` when it *is* available (e.g. run via a
+  "script from file" node), and otherwise requires the checkout path as
+  `IN[2]`.
 
 ## Reconstruction and evidence validation
 

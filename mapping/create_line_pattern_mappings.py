@@ -25,6 +25,12 @@
 #        whose join_hash was blank -- see mapping/line_pattern_reconstruction.py's
 #        REPORT_FIELDS).
 #
+#   IN[2] repo_root (str, optional)
+#        Absolute path to the Revit_Fingerprint checkout, needed only when
+#        __file__ can't be used to find it (see below) and neither
+#        REVIT_FINGERPRINT_REPO_ROOT_SELECTED nor REVIT_FINGERPRINT_REPO_DIR is
+#        set in the environment. Omit/None otherwise.
+#
 # Output:
 #   OUT = {
 #       "run_status": "ok" | "degraded" | "blocked",
@@ -39,8 +45,53 @@
 import os
 import sys
 
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.dirname(_THIS_DIR)
+
+def _looks_like_repo_root(p):
+    try:
+        base = os.path.abspath(str(p))
+    except Exception:
+        return False
+    return all(
+        os.path.exists(os.path.join(base, sub))
+        for sub in ("mapping", "core", "domains")
+    )
+
+
+def _resolve_repo_root(explicit_repo_root):
+    # A Dynamo Python Script node runs pasted code as a string (File "<string>"),
+    # not as a loaded .py file -- __file__ is undefined in that case, unlike every
+    # other module in this repo (which are always imported from disk). Mirrors
+    # runner/run_dynamo.py's own env-var-first / __file__-fallback resolution,
+    # plus an explicit IN[2] override for exactly this "pasted into a node" case,
+    # where neither the env vars nor __file__ can be relied on.
+    if explicit_repo_root and _looks_like_repo_root(explicit_repo_root):
+        return os.path.abspath(explicit_repo_root)
+
+    for env_key in ("REVIT_FINGERPRINT_REPO_ROOT_SELECTED", "REVIT_FINGERPRINT_REPO_DIR"):
+        try:
+            env_val = str(os.environ.get(env_key, "")).strip()
+        except Exception:
+            env_val = ""
+        if env_val and _looks_like_repo_root(env_val):
+            return os.path.abspath(env_val)
+
+    try:
+        this_dir = os.path.dirname(os.path.abspath(__file__))
+        candidate = os.path.dirname(this_dir)
+        if _looks_like_repo_root(candidate):
+            return candidate
+    except Exception:
+        pass
+
+    raise RuntimeError(
+        "Could not determine the Revit_Fingerprint repo root: this script was run "
+        "from pasted code (no __file__), and neither REVIT_FINGERPRINT_REPO_ROOT_SELECTED/"
+        "REVIT_FINGERPRINT_REPO_DIR is set nor was IN[2] given. Pass the checkout's "
+        "absolute path as IN[2]."
+    )
+
+
+_REPO_ROOT = _resolve_repo_root(IN[2] if len(IN) > 2 else None)
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
