@@ -107,13 +107,16 @@ def validate_output_dir(output_dir: Path, allow_absolute_paths: bool = False) ->
     if not res.ok:
         return res  # can't meaningfully continue without the basics
 
+    bad_header_files: set = set()  # a mismatched/missing header makes named-column access unsafe
     for filename, header in CSV_SCHEMAS.items():
         rows = _read_csv_rows(output_dir / filename)
         if not rows:
             res.error(f"{filename}: missing header row")
+            bad_header_files.add(filename)
             continue
         if tuple(rows[0]) != tuple(header):
             res.error(f"{filename}: header mismatch.\n  expected: {header}\n  actual:   {tuple(rows[0])}")
+            bad_header_files.add(filename)
 
     try:
         manifest = json.loads((output_dir / "generation_manifest.json").read_text(encoding="utf-8"))
@@ -121,20 +124,32 @@ def validate_output_dir(output_dir: Path, allow_absolute_paths: bool = False) ->
         res.error(f"generation_manifest.json is not valid JSON: {exc}")
         manifest = {}
 
+    if "file_inventory.csv" in bad_header_files:
+        res.error("file_inventory.csv header is malformed; skipping all checks that depend on its columns")
+        return res  # nearly everything below depends on relative_path/sha256/etc. by name
+
     inventory_rows = list(csv.DictReader(open(output_dir / "file_inventory.csv", encoding="utf-8", newline="")))
     inventory_by_path = {r["relative_path"]: r for r in inventory_rows}
 
-    symbol_rows = list(csv.DictReader(open(output_dir / "python_symbols.csv", encoding="utf-8", newline="")))
-    for r in symbol_rows:
-        inv = inventory_by_path.get(r["relative_path"])
-        if inv is None:
-            res.error(f"python_symbols.csv references unknown file: {r['relative_path']}")
-        elif inv["included"] != "true":
-            res.error(f"python_symbols.csv references an excluded file: {r['relative_path']}")
+    symbol_rows = []
+    if "python_symbols.csv" in bad_header_files:
+        res.error("python_symbols.csv header is malformed; skipping symbol-reference checks")
+    else:
+        symbol_rows = list(csv.DictReader(open(output_dir / "python_symbols.csv", encoding="utf-8", newline="")))
+        for r in symbol_rows:
+            inv = inventory_by_path.get(r["relative_path"])
+            if inv is None:
+                res.error(f"python_symbols.csv references unknown file: {r['relative_path']}")
+            elif inv["included"] != "true":
+                res.error(f"python_symbols.csv references an excluded file: {r['relative_path']}")
 
-    chunk_rows = list(csv.DictReader(open(output_dir / "chunk_manifest.csv", encoding="utf-8", newline="")))
     by_source: dict = {}
     malformed_sources: set = set()  # sources with an unparseable row -- coverage can't be verified for them
+    if "chunk_manifest.csv" in bad_header_files:
+        res.error("chunk_manifest.csv header is malformed; skipping chunk coverage checks")
+        chunk_rows = []
+    else:
+        chunk_rows = list(csv.DictReader(open(output_dir / "chunk_manifest.csv", encoding="utf-8", newline="")))
     for r in chunk_rows:
         src = r["source_relative_path"]
         inv = inventory_by_path.get(src)

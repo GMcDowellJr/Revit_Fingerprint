@@ -307,10 +307,20 @@ def generate_packet(opts: PacketOptions) -> Path:
         file_imports = [i for i in imports_rows if i["source_file"] == rel_path]
         if file_imports:
             out.append("Imports:\n")
+            listed = 0
             for i in file_imports:
                 target = f" -> `{i['resolved_file']}`" if i["resolved_file"] else f" ({i['resolution_status']})"
                 name = i["imported_name"] or i["imported_module"]
-                out.append(f"- line {i['line']}: `{name}`{target}")
+                line = f"- line {i['line']}: `{name}`{target}"
+                if not budget.allow(line, 1):
+                    budget.omissions.append(
+                        f"{len(file_imports) - listed} more import(s) in `{rel_path}` omitted from the "
+                        f"listing (packet size limit reached); see python_imports.csv."
+                    )
+                    break
+                out.append(line)
+                budget.spend(line, 1)
+                listed += 1
             out.append("")
 
         tests = _candidate_tests_for_file(rel_path, imports_rows, calls_rows, files_by_path)

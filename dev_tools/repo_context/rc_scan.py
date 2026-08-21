@@ -125,14 +125,17 @@ def _walk(root: Path, exclude_dir_names: set, result: ScanResult, verbose: bool,
                     if str(real) in visited_real_dirs:
                         result.dir_exclusions.append((rel_posix, name, "symlink_cycle"))
                         continue
-                    # A symlink whose real target *is* (or contains) the
-                    # output directory would otherwise bypass the
-                    # exact-path exclusion below, which only compares the
-                    # symlink's own lexical path -- walking in would
-                    # re-inventory a prior run's own generated output as
-                    # repository source.
+                    # A symlink whose real target *is* the output
+                    # directory, *contains* it, or is *contained within*
+                    # it (e.g. `alias -> out/chunks`) would otherwise
+                    # bypass the exact-path exclusion below, which only
+                    # compares the symlink's own lexical path -- walking
+                    # in would re-inventory a prior run's own generated
+                    # output as repository source.
                     if output_dir_real is not None and (
-                        real == output_dir_real or _is_ancestor(real, output_dir_real)
+                        real == output_dir_real
+                        or _is_ancestor(real, output_dir_real)
+                        or _is_ancestor(output_dir_real, real)
                     ):
                         result.dir_exclusions.append((rel_posix, name, "output_directory"))
                         continue

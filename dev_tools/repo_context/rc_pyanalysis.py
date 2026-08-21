@@ -134,6 +134,18 @@ class PyFileAnalysis:
     module_reassigned_names: set  # names with a plain assignment at module level, separate from any def
 
 
+def _lambda_param_names(node: ast.Lambda) -> frozenset:
+    args = node.args
+    names = set()
+    for a in list(getattr(args, "posonlyargs", []) or []) + list(args.args) + list(args.kwonlyargs):
+        names.add(a.arg)
+    if args.vararg:
+        names.add(args.vararg.arg)
+    if args.kwarg:
+        names.add(args.kwarg.arg)
+    return frozenset(names)
+
+
 def _collect_local_bound_names(node) -> set:
     """Parameter names plus simple assignment targets bound directly in
     this function's own body (not inside a nested function/class, which
@@ -288,24 +300,42 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
         imports.extend(new_records)
         imports_by_scope.setdefault(scope_qualname, []).extend(new_records)
 
-    def walk_body(node: ast.AST, scope_qualname: str, class_ctx: str, parent_qualname: str) -> None:
+    def walk_body(node: ast.AST, scope_qualname: str, class_ctx: str, parent_qualname: str,
+                  lambda_shadowed: frozenset = frozenset()) -> None:
         nonlocal has_main_guard
         for child in ast.iter_child_nodes(node):
             if isinstance(child, ast.Call):
-                raw_calls.append(make_call(child, scope_qualname, class_ctx))
-                walk_body(child, scope_qualname, class_ctx, parent_qualname)
+                call_rec = make_call(child, scope_qualname, class_ctx)
+                # A lambda can't be given its own tracked scope the way a
+                # def can (it's anonymous, expression-only), so rather
+                # than risk resolving a call to the wrong target when a
+                # lambda parameter shadows an outer name, conservatively
+                # leave it unresolved.
+                shadowed_name = (
+                    call_rec.callee_simple_name if call_rec.kind == "name" else call_rec.base_name
+                )
+                if lambda_shadowed and shadowed_name in lambda_shadowed:
+                    call_rec = RawCall(
+                        call_rec.line, call_rec.call_expression, call_rec.callee_simple_name,
+                        "other", "", scope_qualname, class_ctx,
+                    )
+                raw_calls.append(call_rec)
+                walk_body(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed)
+            elif isinstance(child, ast.Lambda):
+                walk_body(child, scope_qualname, class_ctx, parent_qualname,
+                          lambda_shadowed | _lambda_param_names(child))
             elif isinstance(child, ast.ClassDef):
                 handle_class(child, scope_qualname, parent_qualname)
             elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 handle_func(child, scope_qualname, class_ctx, parent_qualname)
             elif isinstance(child, ast.If) and parent_qualname == MODULE_SYMBOL and _is_main_guard(child):
                 has_main_guard = True
-                walk_body(child, scope_qualname, class_ctx, parent_qualname)
+                walk_body(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed)
             elif isinstance(child, (ast.Import, ast.ImportFrom)):
                 record_import(child, scope_qualname)
-                walk_body(child, scope_qualname, class_ctx, parent_qualname)
+                walk_body(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed)
             else:
-                walk_body(child, scope_qualname, class_ctx, parent_qualname)
+                walk_body(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed)
 
     def handle_class(node: ast.ClassDef, parent_qualname: str, grandparent_qualname: str) -> None:
         qualname = f"{parent_qualname}.{node.name}" if parent_qualname != MODULE_SYMBOL else node.name
@@ -395,6 +425,17 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
             walk_expr_for_calls(dec, parent_qualname, "", parent_qualname)
         for default in list(node.args.defaults) + list(node.args.kw_defaults):
             walk_expr_for_calls(default, parent_qualname, "", parent_qualname)
+        # Without `from __future__ import annotations`, annotation
+        # expressions execute at definition time too (e.g. `-> register():`).
+        all_args = (
+            list(getattr(node.args, "posonlyargs", []) or []) + list(node.args.args)
+            + list(node.args.kwonlyargs)
+            + ([node.args.vararg] if node.args.vararg else [])
+            + ([node.args.kwarg] if node.args.kwarg else [])
+        )
+        for a in all_args:
+            walk_expr_for_calls(a.annotation, parent_qualname, "", parent_qualname)
+        walk_expr_for_calls(node.returns, parent_qualname, "", parent_qualname)
         # class_ctx passed through for self-resolution of nested defs.
         effective_class_ctx = class_ctx if symbol_type in ("method",) else (class_ctx if symbol_type == "nested_function" else "")
         for stmt in node.body:

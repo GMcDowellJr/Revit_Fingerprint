@@ -278,6 +278,38 @@ def test_duplicate_import_resolved_by_call_site_order(repo, out):
     assert by_line[4]["candidate_file"] == "b.py"
 
 
+def test_definition_time_calls_in_decorators_defaults_and_annotations(repo, out):
+    write_files(repo, {
+        "a.py": (
+            "def register():\n"
+            "    return int\n\n\n"
+            "def f(value: int) -> register():\n"
+            "    return value\n"
+        ),
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    row = next(r for r in calls if r["call_expression"] == "register")
+    assert row["confidence"] == "high"
+    assert row["candidate_symbol"] == "register"
+    assert row["caller_symbol"] == "<module>"  # executes when `def f` is evaluated, not inside f
+
+
+def test_lambda_parameter_shadowing_is_not_confidently_resolved(repo, out):
+    write_files(repo, {
+        "a.py": "def factory():\n    return 1\n\n\nfn = lambda factory: factory()\n",
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    row = next(r for r in calls if r["call_expression"] == "factory")
+    assert row["confidence"] == "unresolved"
+    assert row["candidate_symbol"] == ""
+
+
 def test_self_method_call_within_known_class(repo, out):
     write_files(repo, {
         "widget.py": (

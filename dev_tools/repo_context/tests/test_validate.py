@@ -86,6 +86,27 @@ def test_scan_does_not_crash_on_malformed_prior_chunk_manifest(repo, out):
     assert "Traceback" not in r2.stdout and "Traceback" not in r2.stderr
 
 
+def test_validate_reports_bad_chunk_manifest_header_instead_of_crashing(repo, out):
+    lines = ["def big_func(x):"]
+    for i in range(1200):
+        lines.append(f"    y{i} = x + {i}")
+    lines.append("    return x")
+    write_files(repo, {"big.py": "\n".join(lines) + "\n"})
+    r = run_tool(["scan", str(repo), "--output", str(out)])
+    assert r.returncode == 0, r.stderr
+
+    manifest_path = out / "chunk_manifest.csv"
+    rows = list(csv.reader(open(manifest_path, newline="", encoding="utf-8")))
+    rows[0][0] = "renamed_column"  # source_relative_path -> renamed_column
+    with open(manifest_path, "w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows(rows)
+
+    v = run_tool(["validate", str(out)])
+    assert v.returncode != 0
+    assert "header mismatch" in v.stdout
+    assert "Traceback" not in v.stdout and "Traceback" not in v.stderr
+
+
 def test_validate_reports_malformed_chunk_manifest_instead_of_crashing(repo, out):
     lines = ["def big_func(x):"]
     for i in range(1200):

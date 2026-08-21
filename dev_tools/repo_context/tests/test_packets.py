@@ -93,6 +93,23 @@ def test_search_packet_skips_files_changed_since_scan(repo, out):
     assert "old" not in text.split("Omitted")[0]
 
 
+def test_file_packet_imports_respect_size_budget(repo, out):
+    lines = [f"import mod_{i}" for i in range(100)]
+    lines += ["", "def f():", "    return 1"]
+    write_files(repo, {"a.py": "\n".join(lines) + "\n"})
+    _scan(repo, out)
+
+    result = run_tool([
+        "packet", str(repo), "--output", str(out), "--file", "a.py",
+        "--max-lines", "3", "--max-characters", "200",
+    ])
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_a.py.md").read_text(encoding="utf-8")
+    assert text.count("- line ") <= 3
+    assert "Omitted" in text
+    assert len(text) < 3000
+
+
 def test_packet_by_symbol(repo, out):
     write_files(repo, {"pkg/mod.py": "def unique_symbol_name():\n    return 1\n"})
     _scan(repo, out)
