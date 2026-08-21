@@ -1,0 +1,34 @@
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+TOOL_DIR = Path(__file__).resolve().parent.parent
+TOOL_SCRIPT = TOOL_DIR / "repo_context.py"
+
+
+def run_tool(args, cwd=None):
+    cmd = [sys.executable, str(TOOL_SCRIPT)] + [str(a) for a in args]
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+
+
+def write_files(root: Path, files: dict) -> Path:
+    for rel, content in files.items():
+        p = root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(content, bytes):
+            p.write_bytes(content)
+        else:
+            p.write_text(content, encoding="utf-8")
+    return root
+
+
+@pytest.fixture
+def repo(tmp_path):
+    return tmp_path / "repo"
+
+
+@pytest.fixture
+def out(tmp_path):
+    return tmp_path / "out"
