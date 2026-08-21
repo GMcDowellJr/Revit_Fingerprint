@@ -77,21 +77,28 @@ def _load_dynamo_bootstrap(explicit_repo_root):
     found via a normal package import until AFTER a repo root is known (see
     mapping/_dynamo_bootstrap.py's own docstring for why).
 
+    Returns (module, resolved_candidate) -- resolved_candidate is the exact
+    path the returned module was loaded from, and MUST be passed as
+    bootstrap()'s explicit_repo_root (never re-derived) so the module actually
+    executing and the repo_root it resolves to always refer to the same
+    checkout. Re-deriving it -- e.g. calling bootstrap(None) and letting
+    resolve_repo_root() re-scan the environment from scratch -- can pick a
+    DIFFERENT checkout than the one whose module just loaded whenever an
+    earlier-priority candidate has valid marker directories but a bootstrap
+    module that raises on import (see PR #442 review, where this exact bug was
+    found and fixed in mapping/create_line_pattern_mappings.py).
+
     A caller-supplied explicit_repo_root (IN[2]) is an explicit selection, not
     a hint: if mapping/_dynamo_bootstrap.py can't be loaded from exactly that
     path -- missing entirely, or present but raising on import (e.g. a stale/
     partially-updated checkout) -- that failure is propagated immediately
     rather than silently trying environment-variable or __file__ candidates
-    instead (mirrors the fix applied to
-    mapping/create_line_pattern_mappings.py after PR #442 review -- falling
-    back there would resolve a *different* checkout's bootstrap code than the
-    one explicitly requested while still reporting IN[2] as the selected
-    repo_root). Only non-explicit candidates (env vars, then __file__) get
+    instead. Only non-explicit candidates (env vars, then __file__) get
     try-the-next-one-on-failure semantics, matching resolve_repo_root()'s own
     fallback order.
     """
     if explicit_repo_root:
-        return _load_bootstrap_module_from(explicit_repo_root)
+        return _load_bootstrap_module_from(explicit_repo_root), str(explicit_repo_root)
 
     candidates = []
     for env_key in ("REVIT_FINGERPRINT_REPO_ROOT_SELECTED", "REVIT_FINGERPRINT_REPO_DIR"):
@@ -109,7 +116,7 @@ def _load_dynamo_bootstrap(explicit_repo_root):
     last_error = None
     for candidate in candidates:
         try:
-            return _load_bootstrap_module_from(candidate)
+            return _load_bootstrap_module_from(candidate), candidate
         except Exception as ex:
             last_error = ex
             continue
@@ -122,8 +129,8 @@ def _load_dynamo_bootstrap(explicit_repo_root):
 
 
 _IN2 = IN[2] if len(IN) > 2 else None
-_dynamo_bootstrap = _load_dynamo_bootstrap(_IN2)
-_REPO_ROOT = _dynamo_bootstrap.bootstrap(explicit_repo_root=_IN2)
+_dynamo_bootstrap, _resolved_repo_root_candidate = _load_dynamo_bootstrap(_IN2)
+_REPO_ROOT = _dynamo_bootstrap.bootstrap(explicit_repo_root=_resolved_repo_root_candidate)
 
 from RevitServices.Persistence import DocumentManager
 
