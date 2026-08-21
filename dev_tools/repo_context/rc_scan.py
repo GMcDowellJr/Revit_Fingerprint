@@ -194,7 +194,15 @@ def scan_repository(options: ScanOptions) -> ScanResult:
         if not is_bin and included and size_bytes <= MAX_TEXT_READ_BYTES:
             try:
                 raw = abs_path.read_bytes()
-                full_text = raw.decode("utf-8")
+                # Plain "utf-8" happily decodes a leading BOM into a literal
+                # U+FEFF character instead of stripping it, which later
+                # makes ast.parse reject an otherwise-valid Python file
+                # ("invalid non-printable character U+FEFF"). Check for the
+                # BOM explicitly rather than relying on decode() to fail.
+                if raw.startswith(b"\xef\xbb\xbf"):
+                    full_text = raw.decode("utf-8-sig")
+                else:
+                    full_text = raw.decode("utf-8")
             except UnicodeDecodeError:
                 try:
                     full_text = raw.decode("utf-8-sig")
@@ -329,5 +337,6 @@ def _resolve_python_relationships(py_analyses: dict, result: ScanResult) -> None
         calls = rc_pyanalysis.resolve_calls(
             analysis.raw_calls, rel_path, analysis.top_level_index, analysis.class_info,
             bindings, all_top_level_index, all_class_info,
+            analysis.local_names_by_symbol, analysis.parent_of,
         )
         result.calls.extend(calls)

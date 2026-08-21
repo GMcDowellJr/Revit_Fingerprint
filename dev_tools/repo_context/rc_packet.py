@@ -343,10 +343,15 @@ def generate_packet(opts: PacketOptions) -> Path:
 
     if opts.search:
         matches = []
+        # A single repetitive/generated file can otherwise produce an
+        # unbounded number of matches before the next file is even
+        # considered -- cap collection itself, not just which files are
+        # rendered afterward.
+        search_collect_cap = max(1, opts.max_files) * 5
         for frow in files_rows:
             if frow.get("included") != "true" or frow.get("text_or_binary") == "binary":
                 continue
-            if len(matches) >= opts.max_files * 5:
+            if len(matches) >= search_collect_cap:
                 break
             excerpt = _safe_excerpt(opts.root, frow["relative_path"], 1, 10_000_000)
             if excerpt is None:
@@ -354,6 +359,8 @@ def generate_packet(opts: PacketOptions) -> Path:
             for ln, text in excerpt:
                 if opts.search in text:
                     matches.append((frow["relative_path"], ln, text))
+                    if len(matches) >= search_collect_cap:
+                        break
         out.append(f"\n## Search results for `{opts.search}` ({len(matches)} match(es))\n")
         files_shown = []
         for rel_path, ln, text in matches:
@@ -366,14 +373,23 @@ def generate_packet(opts: PacketOptions) -> Path:
                     break
                 files_shown.append(rel_path)
             line_text = redact_secrets(text)
-            out.append(f"- `{rel_path}:{ln}` — `{line_text.strip()[:200]}`")
+            bullet_lines = [f"- `{rel_path}:{ln}` — `{line_text.strip()[:200]}`"]
             enclosing = [
                 r for r in symbols_by_file.get(rel_path, [])
                 if int(r["start_line"]) <= ln <= int(r["end_line"]) and r["symbol_type"] != "module"
             ]
             if enclosing:
                 enclosing.sort(key=lambda r: int(r["end_line"]) - int(r["start_line"]))
-                out.append(f"  (within `{enclosing[0]['qualified_name']}`)")
+                bullet_lines.append(f"  (within `{enclosing[0]['qualified_name']}`)")
+            rendered = "\n".join(bullet_lines)
+            if not budget.allow(rendered, len(bullet_lines)):
+                budget.omissions.append(
+                    "Additional search matches omitted (packet size limit reached); "
+                    "re-run with a narrower --search or higher --max-lines/--max-characters."
+                )
+                break
+            out.extend(bullet_lines)
+            budget.spend(rendered, len(bullet_lines))
         stem_parts.append(f"search_{opts.search}")
 
     if budget.omissions:

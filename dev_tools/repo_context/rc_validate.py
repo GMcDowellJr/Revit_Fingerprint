@@ -17,7 +17,12 @@ REQUIRED_FILES = [
     "entrypoint_candidates.csv", "parse_warnings.csv",
     "chunk_manifest.csv", "generation_manifest.json",
 ]
-REQUIRED_DIRS = ["chunks", "packets"]
+# "packets" is deliberately not required: `scan` creates it, but it's
+# typically empty right after a scan (packets are only written by the
+# `packet` command), and git does not track empty directories -- requiring
+# it would make validate fail on a freshly cloned/checked-out output
+# directory that happens to have no packets yet.
+REQUIRED_DIRS = ["chunks"]
 
 ABS_PATH_PATTERN = re.compile(
     r"[A-Za-z]:\\[^\s`\"']+|/(?:home|Users|root|usr|var|opt|mnt|tmp)/[^\s`\"']+"

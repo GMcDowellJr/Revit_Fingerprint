@@ -31,6 +31,20 @@ import rc_validate
 from rc_common import TOOL_VERSION
 
 
+def _positive_int(value: str) -> int:
+    n = int(value)
+    if n <= 0:
+        raise argparse.ArgumentTypeError(f"must be a positive integer, got {n}")
+    return n
+
+
+def _non_negative_int(value: str) -> int:
+    n = int(value)
+    if n < 0:
+        raise argparse.ArgumentTypeError(f"must be a non-negative integer, got {n}")
+    return n
+
+
 def _resolve_output_dir(root: Path, output_arg: str) -> tuple[Path, "str | None"]:
     """Returns (output_dir, output_exclude_rel_path).
 
@@ -176,10 +190,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_scan.add_argument("--include-secrets", action="store_true",
                          help="Explicitly disable the default secret-file exclusion patterns "
                               "(.env, *.pem, id_rsa, etc.) -- may expose sensitive files in the output")
-    p_scan.add_argument("--chunk-line-threshold", type=int, default=1000)
-    p_scan.add_argument("--chunk-char-threshold", type=int, default=80_000)
-    p_scan.add_argument("--chunk-target-lines", type=int, default=400)
-    p_scan.add_argument("--chunk-overlap-lines", type=int, default=10)
+    p_scan.add_argument("--chunk-line-threshold", type=_positive_int, default=1000)
+    p_scan.add_argument("--chunk-char-threshold", type=_positive_int, default=80_000)
+    p_scan.add_argument("--chunk-target-lines", type=_positive_int, default=400)
+    p_scan.add_argument("--chunk-overlap-lines", type=_non_negative_int, default=10)
     p_scan.add_argument("--max-tree-depth", type=int, default=None, help="Maximum depth for repository_tree.txt")
     p_scan.add_argument("--show-excluded-dirs", action="store_true",
                          help="Mark excluded directories in the tree without recursing into them")

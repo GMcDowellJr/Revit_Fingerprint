@@ -62,3 +62,26 @@ def test_invalid_root_returns_nonzero(tmp_path):
 def test_missing_subcommand_returns_nonzero():
     result = run_tool([])
     assert result.returncode != 0
+
+
+def test_non_positive_chunk_target_lines_rejected(repo, out):
+    write_files(repo, {"a.py": "x = 1\n"})
+    result = run_tool(["scan", str(repo), "--output", str(out), "--chunk-target-lines", "0"])
+    assert result.returncode != 0
+    result_neg = run_tool(["scan", str(repo), "--output", str(out), "--chunk-target-lines", "-5"])
+    assert result_neg.returncode != 0
+
+
+def test_validate_does_not_require_packets_dir(repo, out):
+    # Git doesn't track empty directories, so a freshly checked-out
+    # repo_context/ output that hasn't had `packet` run yet has no
+    # packets/ directory at all -- validate must not treat that as an
+    # error (see PR #444 review discussion).
+    write_files(repo, {"a.py": "x = 1\n"})
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+    import shutil
+    shutil.rmtree(out / "packets")
+
+    v = run_tool(["validate", str(out)])
+    assert v.returncode == 0, v.stdout + v.stderr

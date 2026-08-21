@@ -18,6 +18,22 @@ def test_packet_by_file(repo, out):
     assert "def f():" in text
 
 
+def test_search_packet_respects_size_budget_on_repetitive_file(repo, out):
+    lines = ["needle here"] * 2000
+    write_files(repo, {"repetitive.txt": "\n".join(lines) + "\n"})
+    _scan(repo, out)
+    result = run_tool([
+        "packet", str(repo), "--output", str(out), "--search", "needle",
+        "--max-lines", "20", "--max-characters", "2000",
+    ])
+    assert result.returncode == 0, result.stderr
+    packet_files = list((out / "packets").glob("packet_search_*.md"))
+    assert packet_files
+    text = packet_files[0].read_text(encoding="utf-8")
+    assert text.count("needle here") <= 20
+    assert "Omitted" in text
+
+
 def test_packet_by_symbol(repo, out):
     write_files(repo, {"pkg/mod.py": "def unique_symbol_name():\n    return 1\n"})
     _scan(repo, out)

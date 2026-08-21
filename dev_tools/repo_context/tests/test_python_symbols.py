@@ -63,6 +63,20 @@ def test_functions_classes_methods_nested_async(repo, out):
         assert int(r["complexity_approx"]) >= 1
 
 
+def test_utf8_bom_prefixed_python_file_still_parses(repo, out):
+    (repo / "a.py").parent.mkdir(parents=True, exist_ok=True)
+    (repo / "a.py").write_bytes(b"\xef\xbb\xbf" + b"def f():\n    return 1\n")
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    with open(out / "parse_warnings.csv", newline="", encoding="utf-8") as fh:
+        warnings = list(csv.DictReader(fh))
+    assert warnings == []
+
+    rows = {r["qualified_name"] for r in _symbols(out)}
+    assert "f" in rows
+
+
 def test_syntax_error_handling_does_not_abort_scan(repo, out):
     write_files(repo, {
         "broken.py": "def broken(:\n    pass\n",

@@ -148,7 +148,7 @@ core/collect.py,_collect_id_ints_uncached,201,cctx.inc,inc,,,unresolved,attribut
 core/collect.py,_collect_id_ints_uncached,205,_safe_unique_id,_safe_unique_id,core/collect.py,_safe_unique_id,high,direct call to a function defined in the same module
 core/collect.py,_collect_id_ints_uncached,208,cctx.inc,inc,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 core/collect.py,_collect_id_ints_uncached,214,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
-core/collect.py,_collect_id_ints_uncached,214,where,where,,,unresolved,name not defined in this module and not bound via a resolvable import
+core/collect.py,_collect_id_ints_uncached,214,where,where,,,unresolved,'where' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 core/collect.py,_collect_id_ints_uncached,219,cctx.inc,inc,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 core/collect.py,_collect_id_ints_uncached,222,cctx.inc,inc,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 core/collect.py,_collect_id_ints_uncached,226,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -214,7 +214,7 @@ core/collect.py,is_type_purgeable,579,FilteredElementCollector,FilteredElementCo
 core/collect.py,is_type_purgeable,579,FilteredElementCollector(doc).OfCategory,OfCategory,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 core/collect.py,is_type_purgeable,579,FilteredElementCollector(doc).OfCategory(cat).WhereElementIsNotElementType,WhereElementIsNotElementType,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 core/collect.py,is_type_purgeable,585,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
-core/collect.py,is_type_purgeable,588,getter,getter,,,unresolved,name not defined in this module and not bound via a resolvable import
+core/collect.py,is_type_purgeable,588,getter,getter,,,unresolved,'getter' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 core/context.py,DocViewContext.view_info,72,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 core/context.py,DocViewContext.view_info,72,str(source).strip,strip,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 core/context.py,DocViewContext.view_info,72,str(source).strip().upper,upper,,,unresolved,dynamic or unsupported call expression; not statically resolvable
@@ -392,7 +392,7 @@ core/dimension_type_helpers.py,_get_dimension_shape,203,int,int,,,unresolved,nam
 core/dimension_type_helpers.py,_get_dimension_shape,204,hasattr,hasattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 core/dimension_type_helpers.py,_get_dimension_shape,205,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 core/dimension_type_helpers.py,_get_dimension_shape,206,callable,callable,,,unresolved,name not defined in this module and not bound via a resolvable import
-core/dimension_type_helpers.py,_get_dimension_shape,207,int_val,int_val,,,unresolved,name not defined in this module and not bound via a resolvable import
+core/dimension_type_helpers.py,_get_dimension_shape,207,int_val,int_val,,,unresolved,'int_val' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 core/dimension_type_helpers.py,_get_dimension_shape,221,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 core/dimension_type_helpers.py,_get_dimension_shape,221,str(shape_raw).strip,strip,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 core/dimension_type_helpers.py,_get_dimension_shape,223,SHAPE_TO_FAMILY.keys,keys,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -654,7 +654,7 @@ core/graphic_overrides.py,_read_category_line_color,147,getattr,getattr,,,unreso
 core/graphic_overrides.py,_read_category_line_color,149,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 core/graphic_overrides.py,_read_category_line_color,152,_rgb_from_color,_rgb_from_color,core/graphic_overrides.py,_rgb_from_color,high,direct call to a function defined in the same module
 core/graphic_overrides.py,_read_category_fill_pattern_id,160,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
-core/graphic_overrides.py,_read_category_fill_pattern_id,165,getter,getter,,,unresolved,name not defined in this module and not bound via a resolvable import
+core/graphic_overrides.py,_read_category_fill_pattern_id,165,getter,getter,,,unresolved,'getter' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 core/graphic_overrides.py,_read_category_fill_color,173,_read_attr,_read_attr,core/graphic_overrides.py,_read_attr,high,direct call to a function defined in the same module
 core/graphic_overrides.py,_read_category_fill_color,176,_rgb_from_color,_rgb_from_color,core/graphic_overrides.py,_rgb_from_color,high,direct call to a function defined in the same module
 core/graphic_overrides.py,_resolve_pattern_sig_hash,189,doc.GetElement,GetElement,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -682,7 +682,7 @@ core/graphic_overrides.py,_append_color_item,240,items.append,append,,,unresolve
 core/graphic_overrides.py,_append_color_item,240,make_identity_item,make_identity_item,core/record_v2.py,make_identity_item,medium,resolved via unambiguous import binding 'make_identity_item'
 core/graphic_overrides.py,_append_value_item,253,items.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 core/graphic_overrides.py,_append_value_item,253,make_identity_item,make_identity_item,core/record_v2.py,make_identity_item,medium,resolved via unambiguous import binding 'make_identity_item'
-core/graphic_overrides.py,_append_value_item,256,canonicalizer,canonicalizer,,,unresolved,name not defined in this module and not bound via a resolvable import
+core/graphic_overrides.py,_append_value_item,256,canonicalizer,canonicalizer,,,unresolved,'canonicalizer' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 core/graphic_overrides.py,_append_value_item,257,items.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 core/graphic_overrides.py,_append_value_item,257,make_identity_item,make_identity_item,core/record_v2.py,make_identity_item,medium,resolved via unambiguous import binding 'make_identity_item'
 core/graphic_overrides.py,extract_projection_graphics,278,(ctx or {}).get,get,,,unresolved,dynamic or unsupported call expression; not statically resolvable
@@ -1878,7 +1878,7 @@ domains/browser_organization.py,extract_browser_organization,504,(ctx or {}).get
 domains/browser_organization.py,extract_browser_organization,507,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/browser_organization.py,extract_browser_organization,507,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/browser_organization.py,extract_browser_organization,515,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
-domains/browser_organization.py,extract_browser_organization,516,getter,getter,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/browser_organization.py,extract_browser_organization,516,getter,getter,,,unresolved,'getter' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/browser_organization.py,extract_browser_organization,519,read_errors.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 domains/browser_organization.py,extract_browser_organization,521,orgs.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 domains/browser_organization.py,extract_browser_organization,523,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -1988,7 +1988,7 @@ domains/compound_layers.py,<module>,13,os.path.abspath,abspath,,,unresolved,dyna
 domains/compound_layers.py,<module>,13,os.path.dirname,dirname,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/compound_layers.py,<module>,14,os.path.dirname,dirname,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/compound_layers.py,<module>,16,sys.path.insert,insert,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-domains/compound_layers.py,_enum_name,72,enum_class,enum_class,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/compound_layers.py,_enum_name,72,enum_class,enum_class,,,unresolved,'enum_class' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/compound_layers.py,_enum_name,75,fallback_map.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 domains/compound_layers.py,_enum_name,75,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/compound_layers.py,_build_name_key,85,(ctx or {}).get,get,,,unresolved,dynamic or unsupported call expression; not statically resolvable
@@ -3095,7 +3095,7 @@ domains/fill_patterns.py,<module>,50,re.compile,compile,,,unresolved,attribute c
 domains/fill_patterns.py,_phase2_fill_pattern_is_import,73,hasattr,hasattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/fill_patterns.py,_phase2_fill_pattern_is_import,74,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/fill_patterns.py,_phase2_fill_pattern_is_import,75,callable,callable,,,unresolved,name not defined in this module and not bound via a resolvable import
-domains/fill_patterns.py,_phase2_fill_pattern_is_import,76,v,v,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/fill_patterns.py,_phase2_fill_pattern_is_import,76,v,v,,,unresolved,'v' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/fill_patterns.py,_phase2_fill_pattern_is_import,77,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/fill_patterns.py,_phase2_fill_pattern_is_import,77,canonicalize_bool,canonicalize_bool,core/record_v2.py,canonicalize_bool,medium,resolved via unambiguous import binding 'canonicalize_bool'
 domains/fill_patterns.py,_phase2_fill_pattern_is_import,82,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -5569,7 +5569,7 @@ domains/units.py,<module>,108,tuple,tuple,,,unresolved,name not defined in this 
 domains/units.py,<module>,109,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/units.py,extract,149,doc.GetUnits,GetUnits,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 domains/units.py,extract,156,safe_str,safe_str,core/hashing.py,safe_str,medium,resolved via unambiguous import binding 'safe_str'
-domains/units.py,extract._resolve_spec,172,path_fn,path_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/units.py,extract._resolve_spec,172,path_fn,path_fn,,,unresolved,'path_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/units.py,extract,178,_resolve_spec,_resolve_spec,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/units.py,extract,179,_resolve_spec,_resolve_spec,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/units.py,extract,180,_resolve_spec,_resolve_spec,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -5782,7 +5782,7 @@ domains/view_category_overrides_annotation.py,_phase2_partition_items,63,phase2_
 domains/view_category_overrides_annotation.py,_phase2_partition_items,63,phase2_sorted_items,phase2_sorted_items,core/phase2.py,phase2_sorted_items,medium,resolved via unambiguous import binding 'phase2_sorted_items'
 domains/view_category_overrides_annotation.py,_phase2_partition_items,63,phase2_sorted_items,phase2_sorted_items,core/phase2.py,phase2_sorted_items,medium,resolved via unambiguous import binding 'phase2_sorted_items'
 domains/view_category_overrides_annotation.py,_safe_bool,68,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
-domains/view_category_overrides_annotation.py,_safe_bool,68,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/view_category_overrides_annotation.py,_safe_bool,68,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/view_category_overrides_annotation.py,_category_hidden_item,75,hasattr,hasattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_category_overrides_annotation.py,_category_hidden_item,76,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_category_overrides_annotation.py,_category_hidden_item,76,canonicalize_bool,canonicalize_bool,core/record_v2.py,canonicalize_bool,medium,resolved via unambiguous import binding 'canonicalize_bool'
@@ -5936,7 +5936,7 @@ domains/view_category_overrides_model.py,_phase2_partition_items,87,phase2_sorte
 domains/view_category_overrides_model.py,_phase2_partition_items,87,phase2_sorted_items,phase2_sorted_items,core/phase2.py,phase2_sorted_items,medium,resolved via unambiguous import binding 'phase2_sorted_items'
 domains/view_category_overrides_model.py,_phase2_partition_items,87,phase2_sorted_items,phase2_sorted_items,core/phase2.py,phase2_sorted_items,medium,resolved via unambiguous import binding 'phase2_sorted_items'
 domains/view_category_overrides_model.py,_safe_bool,92,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
-domains/view_category_overrides_model.py,_safe_bool,92,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/view_category_overrides_model.py,_safe_bool,92,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/view_category_overrides_model.py,_category_hidden_item,99,hasattr,hasattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_category_overrides_model.py,_category_hidden_item,100,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_category_overrides_model.py,_category_hidden_item,100,canonicalize_bool,canonicalize_bool,core/record_v2.py,canonicalize_bool,medium,resolved via unambiguous import binding 'canonicalize_bool'
@@ -6445,11 +6445,11 @@ domains/view_templates.py,_append_phase_filter_value,154,phase_filter_map_v2.get
 domains/view_templates.py,_append_phase_filter_value,158,'phase_filter_hash={}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/view_templates.py,_append_phase_filter_value,158,canon_str,canon_str,core/canon.py,canon_str,medium,resolved via unambiguous import binding 'canon_str'
 domains/view_templates.py,_append_phase_filter_value,158,sig_v2.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-domains/view_templates.py,_append_phase_filter_value,160,v2_block_fn,v2_block_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/view_templates.py,_append_phase_filter_value,160,v2_block_fn,v2_block_fn,,,unresolved,'v2_block_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/view_templates.py,_append_phase_filter_value,166,debug_counters.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 domains/view_templates.py,_append_phase_filter_value,169,'phase_filter={}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/view_templates.py,_append_phase_filter_value,169,sig.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-domains/view_templates.py,_append_phase_filter_value,171,v2_block_fn,v2_block_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/view_templates.py,_append_phase_filter_value,171,v2_block_fn,v2_block_fn,,,unresolved,'v2_block_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/view_templates.py,_append_filter_stack_signature,178,hasattr,hasattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_templates.py,_append_filter_stack_signature,178,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_templates.py,_append_filter_stack_signature,178,v.GetFilters,GetFilters,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -6461,7 +6461,7 @@ domains/view_templates.py,_append_filter_stack_signature,181,canon_str,canon_str
 domains/view_templates.py,_append_filter_stack_signature,181,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_templates.py,_append_filter_stack_signature,181,sig_v2.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 domains/view_templates.py,_append_filter_stack_signature,184,sig.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-domains/view_templates.py,_append_filter_stack_signature,186,v2_block_fn,v2_block_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/view_templates.py,_append_filter_stack_signature,186,v2_block_fn,v2_block_fn,,,unresolved,'v2_block_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/view_templates.py,_append_filter_stack_signature,192,enumerate,enumerate,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_templates.py,_append_filter_stack_signature,193,'{:03d}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/view_templates.py,_append_filter_stack_signature,197,doc.GetElement,GetElement,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -6476,13 +6476,13 @@ domains/view_templates.py,_append_filter_stack_signature,207,canon_str,canon_str
 domains/view_templates.py,_append_filter_stack_signature,207,sig_v2.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 domains/view_templates.py,_append_filter_stack_signature,209,'filter[{}].def_sig=<UNREADABLE>'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/view_templates.py,_append_filter_stack_signature,209,sig.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-domains/view_templates.py,_append_filter_stack_signature,211,v2_block_fn,v2_block_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/view_templates.py,_append_filter_stack_signature,211,v2_block_fn,v2_block_fn,,,unresolved,'v2_block_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/view_templates.py,_append_filter_stack_signature,215,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_templates.py,_append_filter_stack_signature,215,hasattr,hasattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_templates.py,_append_filter_stack_signature,215,v.GetIsFilterEnabled,GetIsFilterEnabled,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 domains/view_templates.py,_append_filter_stack_signature,220,'filter[{}].enabled=<UNREADABLE>'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/view_templates.py,_append_filter_stack_signature,220,sig.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-domains/view_templates.py,_append_filter_stack_signature,222,v2_block_fn,v2_block_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/view_templates.py,_append_filter_stack_signature,222,v2_block_fn,v2_block_fn,,,unresolved,'v2_block_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/view_templates.py,_append_filter_stack_signature,225,'filter[{}].enabled={}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/view_templates.py,_append_filter_stack_signature,225,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_templates.py,_append_filter_stack_signature,225,sig.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -6494,7 +6494,7 @@ domains/view_templates.py,_append_filter_stack_signature,230,hasattr,hasattr,,,u
 domains/view_templates.py,_append_filter_stack_signature,230,v.GetFilterVisibility,GetFilterVisibility,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 domains/view_templates.py,_append_filter_stack_signature,235,'filter[{}].vis=<UNREADABLE>'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/view_templates.py,_append_filter_stack_signature,235,sig.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-domains/view_templates.py,_append_filter_stack_signature,237,v2_block_fn,v2_block_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/view_templates.py,_append_filter_stack_signature,237,v2_block_fn,v2_block_fn,,,unresolved,'v2_block_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/view_templates.py,_append_filter_stack_signature,240,'filter[{}].vis={}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/view_templates.py,_append_filter_stack_signature,240,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_templates.py,_append_filter_stack_signature,240,sig.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -6517,7 +6517,7 @@ domains/view_templates.py,_append_filter_stack_signature,264,int,int,,,unresolve
 domains/view_templates.py,_append_filter_stack_signature,264,sig_v2.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 domains/view_templates.py,_append_filter_stack_signature,266,'filter[{}].ovr=<UNREADABLE>'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/view_templates.py,_append_filter_stack_signature,266,sig.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-domains/view_templates.py,_append_filter_stack_signature,268,v2_block_fn,v2_block_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/view_templates.py,_append_filter_stack_signature,268,v2_block_fn,v2_block_fn,,,unresolved,'v2_block_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/view_templates.py,_append_workset_visibility,277,hasattr,hasattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_templates.py,_append_workset_visibility,281,FilteredWorksetCollector,FilteredWorksetCollector,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_templates.py,_append_workset_visibility,281,FilteredWorksetCollector(doc).OfKind,OfKind,,,unresolved,dynamic or unsupported call expression; not statically resolvable
@@ -6532,7 +6532,7 @@ domains/view_templates.py,_append_workset_visibility,290,safe_str,safe_str,core/
 domains/view_templates.py,_append_workset_visibility,290,safe_str,safe_str,core/hashing.py,safe_str,medium,resolved via unambiguous import binding 'safe_str'
 domains/view_templates.py,_append_workset_visibility,292,decorated.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 domains/view_templates.py,_append_workset_visibility,292,safe_str,safe_str,core/hashing.py,safe_str,medium,resolved via unambiguous import binding 'safe_str'
-domains/view_templates.py,_append_workset_visibility,294,v2_block_fn,v2_block_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+domains/view_templates.py,_append_workset_visibility,294,v2_block_fn,v2_block_fn,,,unresolved,'v2_block_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 domains/view_templates.py,_append_workset_visibility,297,enumerate,enumerate,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_templates.py,_append_workset_visibility,297,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/view_templates.py,_append_workset_visibility,298,'workset[{}].name={}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
@@ -7924,7 +7924,7 @@ legacy/fingerprint_mvp.py,get_linepattern_fingerprint,964,'uid={}'.format,format
 legacy/fingerprint_mvp.py,get_linepattern_fingerprint,964,sig.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 legacy/fingerprint_mvp.py,get_linepattern_fingerprint,964,sig_val,sig_val,legacy/fingerprint_mvp.py,sig_val,high,direct call to a function defined in the same module
 legacy/fingerprint_mvp.py,get_linepattern_fingerprint,969,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
-legacy/fingerprint_mvp.py,get_linepattern_fingerprint,971,get_segs,get_segs,,,unresolved,name not defined in this module and not bound via a resolvable import
+legacy/fingerprint_mvp.py,get_linepattern_fingerprint,971,get_segs,get_segs,,,unresolved,'get_segs' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 legacy/fingerprint_mvp.py,get_linepattern_fingerprint,971,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
 legacy/fingerprint_mvp.py,get_linepattern_fingerprint,973,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 legacy/fingerprint_mvp.py,get_linepattern_fingerprint,973,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -7949,7 +7949,7 @@ legacy/fingerprint_mvp.py,get_linepattern_fingerprint,998,'{:03d}'.format,format
 legacy/fingerprint_mvp.py,get_linepattern_fingerprint,998,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
 legacy/fingerprint_mvp.py,get_linepattern_fingerprint,1004,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 legacy/fingerprint_mvp.py,get_linepattern_fingerprint,1011,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
-legacy/fingerprint_mvp.py,get_linepattern_fingerprint,1013,m,m,,,unresolved,name not defined in this module and not bound via a resolvable import
+legacy/fingerprint_mvp.py,get_linepattern_fingerprint,1013,m,m,,,unresolved,'m' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 legacy/fingerprint_mvp.py,get_linepattern_fingerprint,1022,canon_str,canon_str,legacy/fingerprint_mvp.py,canon_str,high,direct call to a function defined in the same module
 legacy/fingerprint_mvp.py,get_linepattern_fingerprint,1022,st.ToString,ToString,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 legacy/fingerprint_mvp.py,get_linepattern_fingerprint,1024,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -8628,7 +8628,7 @@ runner/probe_thin_runner.py,<module>,218,_resolve_repo_dir,_resolve_repo_dir,run
 runner/probe_thin_runner.py,<module>,221,json.dumps,dumps,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 runner/probe_thin_runner.py,<module>,237,os.path.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 runner/probe_thin_runner.py,<module>,240,sys.path.insert,insert,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-runner/probe_thin_runner.py,_safe,248,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+runner/probe_thin_runner.py,_safe,248,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 runner/probe_thin_runner.py,_revit_version,257,_safe,_safe,runner/probe_thin_runner.py,_safe,high,direct call to a function defined in the same module
 runner/probe_thin_runner.py,_revit_version,258,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 runner/probe_thin_runner.py,_document_identity,269,_safe,_safe,runner/probe_thin_runner.py,_safe,high,direct call to a function defined in the same module
@@ -8864,7 +8864,7 @@ runner/run_dynamo.py,_domain_run,312,isinstance,isinstance,,,unresolved,name not
 runner/run_dynamo.py,_domain_run,313,'domain:{}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 runner/run_dynamo.py,_domain_run,318,_tc.set_active_domain,set_active_domain,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 runner/run_dynamo.py,_domain_run,319,_tc.start_timer,start_timer,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-runner/run_dynamo.py,_domain_run,323,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+runner/run_dynamo.py,_domain_run,323,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 runner/run_dynamo.py,_domain_run,333,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
 runner/run_dynamo.py,_domain_run,335,legacy.pop,pop,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 runner/run_dynamo.py,_domain_run,336,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -12182,8 +12182,8 @@ tests/test_compound_types_wall.py,test_stack_hash_strict_includes_material_name,
 tests/test_compound_types_wall.py,test_stack_hash_strict_includes_material_name,362,_default_ctx,_default_ctx,tests/test_compound_types_wall.py,_default_ctx,high,direct call to a function defined in the same module
 tests/test_compound_types_wall.py,test_stack_hash_strict_includes_material_name,365,m.extract_wall_types,extract_wall_types,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tests/test_compound_types_wall.py,test_stack_hash_strict_includes_material_name,366,m.extract_wall_types,extract_wall_types,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-tests/test_compound_types_wall.py,test_stack_hash_strict_includes_material_name,369,get,get,,,unresolved,name not defined in this module and not bound via a resolvable import
-tests/test_compound_types_wall.py,test_stack_hash_strict_includes_material_name,369,get,get,,,unresolved,name not defined in this module and not bound via a resolvable import
+tests/test_compound_types_wall.py,test_stack_hash_strict_includes_material_name,369,get,get,,,unresolved,'get' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+tests/test_compound_types_wall.py,test_stack_hash_strict_includes_material_name,369,get,get,,,unresolved,'get' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tests/test_compound_types_wall.py,test_stack_hash_order_sensitive,373,_setup_module,_setup_module,tests/test_compound_types_wall.py,_setup_module,high,direct call to a function defined in the same module
 tests/test_compound_types_wall.py,test_stack_hash_order_sensitive,374,_basic_wall,_basic_wall,tests/test_compound_types_wall.py,_basic_wall,high,direct call to a function defined in the same module
 tests/test_compound_types_wall.py,test_stack_hash_order_sensitive,375,_basic_wall,_basic_wall,tests/test_compound_types_wall.py,_basic_wall,high,direct call to a function defined in the same module
@@ -12196,8 +12196,8 @@ tests/test_compound_types_wall.py,test_stack_hash_order_sensitive,377,monkeypatc
 tests/test_compound_types_wall.py,test_stack_hash_order_sensitive,379,_Doc,_Doc,tests/test_compound_types_wall.py,_Doc,high,constructor call to class defined in the same module
 tests/test_compound_types_wall.py,test_stack_hash_order_sensitive,379,_default_ctx,_default_ctx,tests/test_compound_types_wall.py,_default_ctx,high,direct call to a function defined in the same module
 tests/test_compound_types_wall.py,test_stack_hash_order_sensitive,379,m.extract_wall_types,extract_wall_types,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-tests/test_compound_types_wall.py,test_stack_hash_order_sensitive,382,get,get,,,unresolved,name not defined in this module and not bound via a resolvable import
-tests/test_compound_types_wall.py,test_stack_hash_order_sensitive,382,get,get,,,unresolved,name not defined in this module and not bound via a resolvable import
+tests/test_compound_types_wall.py,test_stack_hash_order_sensitive,382,get,get,,,unresolved,'get' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+tests/test_compound_types_wall.py,test_stack_hash_order_sensitive,382,get,get,,,unresolved,'get' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tests/test_compound_types_wall.py,test_material_ctx_miss_emits_missing_sentinel,386,_setup_module,_setup_module,tests/test_compound_types_wall.py,_setup_module,high,direct call to a function defined in the same module
 tests/test_compound_types_wall.py,test_material_ctx_miss_emits_missing_sentinel,387,_basic_wall,_basic_wall,tests/test_compound_types_wall.py,_basic_wall,high,direct call to a function defined in the same module
 tests/test_compound_types_wall.py,test_material_ctx_miss_emits_missing_sentinel,387,monkeypatch.setattr,setattr,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -12261,8 +12261,8 @@ tests/test_compound_types_wall.py,test_stack_hash_preserves_zero_vs_unreadable_t
 tests/test_compound_types_wall.py,test_stack_hash_preserves_zero_vs_unreadable_thickness,494,_Doc,_Doc,tests/test_compound_types_wall.py,_Doc,high,constructor call to class defined in the same module
 tests/test_compound_types_wall.py,test_stack_hash_preserves_zero_vs_unreadable_thickness,494,_default_ctx,_default_ctx,tests/test_compound_types_wall.py,_default_ctx,high,direct call to a function defined in the same module
 tests/test_compound_types_wall.py,test_stack_hash_preserves_zero_vs_unreadable_thickness,494,m.extract_wall_types,extract_wall_types,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-tests/test_compound_types_wall.py,test_stack_hash_preserves_zero_vs_unreadable_thickness,497,get,get,,,unresolved,name not defined in this module and not bound via a resolvable import
-tests/test_compound_types_wall.py,test_stack_hash_preserves_zero_vs_unreadable_thickness,497,get,get,,,unresolved,name not defined in this module and not bound via a resolvable import
+tests/test_compound_types_wall.py,test_stack_hash_preserves_zero_vs_unreadable_thickness,497,get,get,,,unresolved,'get' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+tests/test_compound_types_wall.py,test_stack_hash_preserves_zero_vs_unreadable_thickness,497,get,get,,,unresolved,'get' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tests/test_compound_types_wall.py,test_unreadable_function_does_not_block_record,504,_setup_module,_setup_module,tests/test_compound_types_wall.py,_setup_module,high,direct call to a function defined in the same module
 tests/test_compound_types_wall.py,test_unreadable_function_does_not_block_record,505,_basic_wall,_basic_wall,tests/test_compound_types_wall.py,_basic_wall,high,direct call to a function defined in the same module
 tests/test_compound_types_wall.py,test_unreadable_function_does_not_block_record,506,RuntimeError,RuntimeError,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -15551,7 +15551,7 @@ tests/test_identity_project_info.py,test_named_field_read_exception_is_unreadabl
 tests/test_identity_project_info.py,test_named_field_read_exception_is_unreadable,356,_project_info_with_configured_business_center,_project_info_with_configured_business_center,tests/test_identity_project_info.py,_project_info_with_configured_business_center,high,direct call to a function defined in the same module
 tests/test_identity_project_info.py,test_named_field_read_exception_is_unreadable,358,ThrowingParameter,ThrowingParameter,,,unresolved,name not defined in this module and not bound via a resolvable import
 tests/test_identity_project_info.py,test_named_field_read_exception_is_unreadable,358,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-tests/test_identity_project_info.py,test_named_field_read_exception_is_unreadable,358,original,original,,,unresolved,name not defined in this module and not bound via a resolvable import
+tests/test_identity_project_info.py,test_named_field_read_exception_is_unreadable,358,original,original,,,unresolved,'original' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tests/test_identity_project_info.py,test_named_field_read_exception_is_unreadable,359,_DocForPI,_DocForPI,tests/test_identity_project_info.py,_DocForPI,high,constructor call to class defined in the same module
 tests/test_identity_project_info.py,test_named_field_read_exception_is_unreadable,359,_as_dict,_as_dict,tests/test_identity_project_info.py,_as_dict,high,direct call to a function defined in the same module
 tests/test_identity_project_info.py,test_named_field_read_exception_is_unreadable,359,_extract_items,_extract_items,tests/test_identity_project_info.py,_extract_items,high,direct call to a function defined in the same module
@@ -19732,8 +19732,8 @@ tools/archetype/generate_archetype_candidates.py,_utc_now_iso,110,datetime.now,n
 tools/archetype/generate_archetype_candidates.py,_utc_now_iso,110,datetime.now(timezone.utc).strftime,strftime,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/archetype/generate_archetype_candidates.py,_governance_question_hint,128,_is_vfd_related,_is_vfd_related,tools/archetype/generate_archetype_candidates.py,_is_vfd_related,high,direct call to a function defined in the same module
 tools/archetype/generate_archetype_candidates.py,_governance_question_hint,128,_is_vfd_related,_is_vfd_related,tools/archetype/generate_archetype_candidates.py,_is_vfd_related,high,direct call to a function defined in the same module
-tools/archetype/generate_archetype_candidates.py,_governance_question_hint,131,predicate,predicate,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/archetype/generate_archetype_candidates.py,_governance_question_hint,131,predicate,predicate,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/archetype/generate_archetype_candidates.py,_governance_question_hint,131,predicate,predicate,,,unresolved,'predicate' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+tools/archetype/generate_archetype_candidates.py,_governance_question_hint,131,predicate,predicate,,,unresolved,'predicate' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/archetype/generate_archetype_candidates.py,_signal_coverage_pct,144,alias_of.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/archetype/generate_archetype_candidates.py,_signal_coverage_pct,145,covered_files_by_edge.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/archetype/generate_archetype_candidates.py,_signal_coverage_pct,145,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -21072,7 +21072,7 @@ tools/build_segment_manifest.py,main,881,_print_summary,_print_summary,tools/bui
 tools/build_segment_manifest.py,<module>,886,main,main,tools/build_segment_manifest.py,main,high,direct call to a function defined in the same module
 tools/build_segment_manifest.py,<module>,886,sys.exit,exit,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/bundle_analysis/common.py,retry_fs_op,31,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/bundle_analysis/common.py,retry_fs_op,33,op,op,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/bundle_analysis/common.py,retry_fs_op,33,op,op,,,unresolved,'op' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/bundle_analysis/common.py,retry_fs_op,38,time.sleep,sleep,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/bundle_analysis/common.py,read_csv_rows,43,path.open,open,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/bundle_analysis/common.py,read_csv_rows,44,csv.DictReader,DictReader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -25630,7 +25630,7 @@ tools/compute_latent_purgeable.py,_load_records,261,dict,dict,,,unresolved,name 
 tools/compute_latent_purgeable.py,_accumulate_item_rows,278,csv.DictReader,DictReader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/compute_latent_purgeable.py,_accumulate_item_rows,280,row.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/compute_latent_purgeable.py,_accumulate_item_rows,283,row.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-tools/compute_latent_purgeable.py,_accumulate_item_rows,284,matcher,matcher,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/compute_latent_purgeable.py,_accumulate_item_rows,284,matcher,matcher,,,unresolved,'matcher' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/compute_latent_purgeable.py,_accumulate_item_rows,287,row.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/compute_latent_purgeable.py,_accumulate_item_rows,291,row.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/compute_latent_purgeable.py,_accumulate_item_rows,295,row.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -25658,7 +25658,7 @@ tools/compute_latent_purgeable.py,_load_chain_ref_data,378,open,open,,,unresolve
 tools/compute_latent_purgeable.py,_load_chain_ref_data,379,csv.DictReader,DictReader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/compute_latent_purgeable.py,_load_chain_ref_data,381,row.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/compute_latent_purgeable.py,_load_chain_ref_data,385,row.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-tools/compute_latent_purgeable.py,_load_chain_ref_data,386,matcher,matcher,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/compute_latent_purgeable.py,_load_chain_ref_data,386,matcher,matcher,,,unresolved,'matcher' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/compute_latent_purgeable.py,_load_chain_ref_data,389,row.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/compute_latent_purgeable.py,_load_chain_ref_data,393,row.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/compute_latent_purgeable.py,_load_chain_ref_data,397,row.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -29838,32 +29838,32 @@ tools/generate_governance_narrative.py,build_structured_findings.add_domain_find
 tools/generate_governance_narrative.py,build_structured_findings.add_domain_finding,5237,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/generate_governance_narrative.py,build_structured_findings,5240,DOMAIN_LABELS.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/generate_governance_narrative.py,build_structured_findings,5243,add_domain_finding,add_domain_finding,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/generate_governance_narrative.py,build_structured_findings,5245,label,label,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/generate_governance_narrative.py,build_structured_findings,5245,label,label,,,unresolved,'label' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/generate_governance_narrative.py,build_structured_findings,5248,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/generate_governance_narrative.py,build_structured_findings,5251,(state_summary or {}).get,get,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/generate_governance_narrative.py,build_structured_findings,5251,assign_tier,assign_tier,tools/generate_governance_narrative.py,assign_tier,high,direct call to a function defined in the same module
 tools/generate_governance_narrative.py,build_structured_findings,5252,add_domain_finding,add_domain_finding,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/generate_governance_narrative.py,build_structured_findings,5254,label,label,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/generate_governance_narrative.py,build_structured_findings,5254,label,label,,,unresolved,'label' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/generate_governance_narrative.py,build_structured_findings,5256,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/generate_governance_narrative.py,build_structured_findings,5259,(state_summary or {}).get,get,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/generate_governance_narrative.py,build_structured_findings,5259,assign_tier,assign_tier,tools/generate_governance_narrative.py,assign_tier,high,direct call to a function defined in the same module
 tools/generate_governance_narrative.py,build_structured_findings,5260,add_domain_finding,add_domain_finding,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/generate_governance_narrative.py,build_structured_findings,5262,label,label,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/generate_governance_narrative.py,build_structured_findings,5262,label,label,,,unresolved,'label' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/generate_governance_narrative.py,build_structured_findings,5265,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/generate_governance_narrative.py,build_structured_findings,5268,(state_summary or {}).get,get,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/generate_governance_narrative.py,build_structured_findings,5268,assign_tier,assign_tier,tools/generate_governance_narrative.py,assign_tier,high,direct call to a function defined in the same module
 tools/generate_governance_narrative.py,build_structured_findings,5269,add_domain_finding,add_domain_finding,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/generate_governance_narrative.py,build_structured_findings,5271,label,label,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/generate_governance_narrative.py,build_structured_findings,5271,label,label,,,unresolved,'label' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/generate_governance_narrative.py,build_structured_findings,5277,add_domain_finding,add_domain_finding,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/generate_governance_narrative.py,build_structured_findings,5279,label,label,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/generate_governance_narrative.py,build_structured_findings,5279,label,label,,,unresolved,'label' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/generate_governance_narrative.py,build_structured_findings,5282,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/generate_governance_narrative.py,build_structured_findings,5285,(state_summary or {}).get,get,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/generate_governance_narrative.py,build_structured_findings,5285,assign_tier,assign_tier,tools/generate_governance_narrative.py,assign_tier,high,direct call to a function defined in the same module
 tools/generate_governance_narrative.py,build_structured_findings,5286,add_domain_finding,add_domain_finding,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/generate_governance_narrative.py,build_structured_findings,5288,label,label,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/generate_governance_narrative.py,build_structured_findings,5288,label,label,,,unresolved,'label' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/generate_governance_narrative.py,build_structured_findings,5296,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/generate_governance_narrative.py,build_structured_findings,5299,add_domain_finding,add_domain_finding,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/generate_governance_narrative.py,build_structured_findings,5301,label,label,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/generate_governance_narrative.py,build_structured_findings,5301,label,label,,,unresolved,'label' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/generate_governance_narrative.py,build_structured_findings,5302,pct,pct,tools/generate_governance_narrative.py,pct,high,direct call to a function defined in the same module
 tools/generate_governance_narrative.py,build_structured_findings,5308,(state_summary or {}).get,get,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/generate_governance_narrative.py,build_structured_findings,5308,_state_value,_state_value,tools/generate_governance_narrative.py,_state_value,high,direct call to a function defined in the same module
@@ -29874,7 +29874,7 @@ tools/generate_governance_narrative.py,build_structured_findings,5312,fmt,fmt,to
 tools/generate_governance_narrative.py,build_structured_findings,5314,d.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/generate_governance_narrative.py,build_structured_findings,5314,fmt,fmt,tools/generate_governance_narrative.py,fmt,high,direct call to a function defined in the same module
 tools/generate_governance_narrative.py,build_structured_findings,5315,add_domain_finding,add_domain_finding,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/generate_governance_narrative.py,build_structured_findings,5317,label,label,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/generate_governance_narrative.py,build_structured_findings,5317,label,label,,,unresolved,'label' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/generate_governance_narrative.py,build_structured_findings,5325,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/generate_governance_narrative.py,build_structured_findings,5326,findings.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/generate_governance_narrative.py,build_structured_findings,5327,next_id,next_id,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -31844,7 +31844,7 @@ tools/join_key_discovery/materials_joinkey_discover.py,_load_class_map,170,print
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,184,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,185,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,186,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,190,key_fn,key_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,190,key_fn,key_fn,,,unresolved,'key_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,191,(r.get('export_run_id') or r.get('file_id') or '').strip,strip,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,191,r.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,191,r.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -31869,14 +31869,14 @@ tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,212,sum,
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,213,sum,sum,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,214,sum,sum,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,215,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,216,key_fn,key_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,216,key_fn,key_fn,,,unresolved,'key_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,216,sum,sum,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,217,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,218,_extract_sig,_extract_sig,tools/join_key_discovery/materials_joinkey_discover.py,_extract_sig,high,direct call to a function defined in the same module
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,218,sum,sum,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/join_key_discovery/materials_joinkey_discover.py,_compute_metrics,219,round,round,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/join_key_discovery/materials_joinkey_discover.py,_top_patterns,230,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/join_key_discovery/materials_joinkey_discover.py,_top_patterns,233,key_fn,key_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/join_key_discovery/materials_joinkey_discover.py,_top_patterns,233,key_fn,key_fn,,,unresolved,'key_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/join_key_discovery/materials_joinkey_discover.py,_top_patterns,236,(r.get('export_run_id') or r.get('file_id') or '').strip,strip,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/join_key_discovery/materials_joinkey_discover.py,_top_patterns,236,key_files[k].add,add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/join_key_discovery/materials_joinkey_discover.py,_top_patterns,236,r.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -31892,7 +31892,7 @@ tools/join_key_discovery/materials_joinkey_discover.py,_top_patterns,242,key_fil
 tools/join_key_discovery/materials_joinkey_discover.py,_top_patterns,242,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/join_key_discovery/materials_joinkey_discover.py,_top_patterns,242,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/join_key_discovery/materials_joinkey_discover.py,_build_key_files,260,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/join_key_discovery/materials_joinkey_discover.py,_build_key_files,263,key_fn,key_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/join_key_discovery/materials_joinkey_discover.py,_build_key_files,263,key_fn,key_fn,,,unresolved,'key_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/join_key_discovery/materials_joinkey_discover.py,_build_key_files,266,(r.get('export_run_id') or r.get('file_id') or '').strip,strip,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/join_key_discovery/materials_joinkey_discover.py,_build_key_files,266,key_files[k].add,add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/join_key_discovery/materials_joinkey_discover.py,_build_key_files,266,r.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -33085,7 +33085,7 @@ tools/label_synthesis/label_resolver.py,_within_tolerance,246,abs,abs,,,unresolv
 tools/label_synthesis/label_resolver.py,_within_tolerance,246,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/label_synthesis/label_resolver.py,_within_tolerance,247,abs,abs,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/label_synthesis/label_resolver.py,_try_synopsis,256,_get_synopsis_formatter,_get_synopsis_formatter,tools/label_synthesis/label_resolver.py,_get_synopsis_formatter,high,direct call to a function defined in the same module
-tools/label_synthesis/label_resolver.py,_try_synopsis,259,formatter,formatter,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/label_synthesis/label_resolver.py,_try_synopsis,259,formatter,formatter,,,unresolved,'formatter' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/label_synthesis/label_resolver.py,_get_synopsis_formatter,268,importlib.import_module,import_module,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/label_synthesis/label_resolver.py,_get_synopsis_formatter,271,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/label_synthesis/label_resolver.py,_try_modal,289,r.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -33821,7 +33821,7 @@ tools/label_synthesis/synthesize_fragmented_labels.py,synthesize,707,int,int,,,u
 tools/label_synthesis/synthesize_fragmented_labels.py,synthesize,707,r.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/label_synthesis/synthesize_fragmented_labels.py,synthesize,707,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/label_synthesis/synthesize_fragmented_labels.py,synthesize,708,_load_representative_identity_items,_load_representative_identity_items,tools/label_synthesis/synthesize_fragmented_labels.py,_load_representative_identity_items,high,direct call to a function defined in the same module
-tools/label_synthesis/synthesize_fragmented_labels.py,synthesize,711,build_prompt_fn,build_prompt_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/label_synthesis/synthesize_fragmented_labels.py,synthesize,711,build_prompt_fn,build_prompt_fn,,,unresolved,'build_prompt_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/label_synthesis/synthesize_fragmented_labels.py,synthesize,716,prompt_exports.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/label_synthesis/synthesize_fragmented_labels.py,synthesize,722,os.makedirs,makedirs,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/label_synthesis/synthesize_fragmented_labels.py,synthesize,722,os.path.abspath,abspath,,,unresolved,dynamic or unsupported call expression; not statically resolvable
@@ -33842,7 +33842,7 @@ tools/label_synthesis/synthesize_fragmented_labels.py,synthesize._process_join_h
 tools/label_synthesis/synthesize_fragmented_labels.py,synthesize._process_join_hash,742,r.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/label_synthesis/synthesize_fragmented_labels.py,synthesize._process_join_hash,742,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/label_synthesis/synthesize_fragmented_labels.py,synthesize._process_join_hash,743,_load_representative_identity_items,_load_representative_identity_items,tools/label_synthesis/synthesize_fragmented_labels.py,_load_representative_identity_items,high,direct call to a function defined in the same module
-tools/label_synthesis/synthesize_fragmented_labels.py,synthesize._process_join_hash,746,build_prompt_fn,build_prompt_fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/label_synthesis/synthesize_fragmented_labels.py,synthesize._process_join_hash,746,build_prompt_fn,build_prompt_fn,,,unresolved,'build_prompt_fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/label_synthesis/synthesize_fragmented_labels.py,synthesize._process_join_hash,757,r.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/label_synthesis/synthesize_fragmented_labels.py,synthesize._process_join_hash,762,_call_llm,_call_llm,tools/label_synthesis/synthesize_fragmented_labels.py,_call_llm,high,direct call to a function defined in the same module
 tools/label_synthesis/synthesize_fragmented_labels.py,synthesize,771,ThreadPoolExecutor,ThreadPoolExecutor,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -35769,7 +35769,7 @@ tools/patterns_analysis/_archive/domain_identity_contract.py,<module>,4,Path,Pat
 tools/patterns_analysis/_archive/domain_identity_contract.py,DomainIdentityContract.load,13,_CONTRACT_PATH.exists,exists,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/patterns_analysis/_archive/domain_identity_contract.py,DomainIdentityContract.load,14,FileNotFoundError,FileNotFoundError,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/patterns_analysis/_archive/domain_identity_contract.py,DomainIdentityContract.load,15,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/patterns_analysis/_archive/domain_identity_contract.py,DomainIdentityContract.load,16,cls,cls,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/patterns_analysis/_archive/domain_identity_contract.py,DomainIdentityContract.load,16,cls,cls,,,unresolved,'cls' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/patterns_analysis/_archive/domain_identity_contract.py,DomainIdentityContract.load,16,json.load,load,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/patterns_analysis/_archive/domain_identity_contract.py,DomainIdentityContract.allowed_keys_for_domain,19,self.data.get,get,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/patterns_analysis/_archive/domain_identity_contract.py,DomainIdentityContract.allowed_keys_for_domain,21,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -36786,7 +36786,7 @@ tools/patterns_analysis/_archive/run_dimension_types_by_family.py,_prepare_filte
 tools/patterns_analysis/_archive/run_dimension_types_by_family.py,_prepare_filtered_dirs,189,SystemExit,SystemExit,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/patterns_analysis/_archive/run_dimension_types_by_family.py,_prepare_filtered_dirs,192,os.path.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/patterns_analysis/_archive/run_dimension_types_by_family.py,_prepare_filtered_dirs._on_rm_error,197,os.chmod,chmod,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-tools/patterns_analysis/_archive/run_dimension_types_by_family.py,_prepare_filtered_dirs._on_rm_error,201,func,func,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/patterns_analysis/_archive/run_dimension_types_by_family.py,_prepare_filtered_dirs._on_rm_error,201,func,func,,,unresolved,'func' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/patterns_analysis/_archive/run_dimension_types_by_family.py,_prepare_filtered_dirs,205,os.path.isdir,isdir,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/patterns_analysis/_archive/run_dimension_types_by_family.py,_prepare_filtered_dirs,207,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/patterns_analysis/_archive/run_dimension_types_by_family.py,_prepare_filtered_dirs,209,shutil.rmtree,rmtree,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -36849,7 +36849,7 @@ tools/patterns_analysis/_archive/run_dimension_types_by_family.py,main,384,print
 tools/patterns_analysis/_archive/run_dimension_types_by_family.py,main,386,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/patterns_analysis/_archive/run_dimension_types_by_family.py,main,387,os.path.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/patterns_analysis/_archive/run_dimension_types_by_family.py,main._on_rm_error,391,os.chmod,chmod,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-tools/patterns_analysis/_archive/run_dimension_types_by_family.py,main._on_rm_error,395,func,func,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/patterns_analysis/_archive/run_dimension_types_by_family.py,main._on_rm_error,395,func,func,,,unresolved,'func' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/patterns_analysis/_archive/run_dimension_types_by_family.py,main,399,os.path.isdir,isdir,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/patterns_analysis/_archive/run_dimension_types_by_family.py,main,401,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/patterns_analysis/_archive/run_dimension_types_by_family.py,main,403,shutil.rmtree,rmtree,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -39127,7 +39127,7 @@ tools/probes/probe_arrowheads.py,<module>,66,len,len,,,unresolved,name not defin
 tools/probes/probe_arrowheads.py,<module>,67,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_arrowheads.py,<module>,68,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_arrowheads.py,<module>,69,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_arrowheads.py,_safe,77,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_arrowheads.py,_safe,77,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_arrowheads.py,_safe_type_name,84,elem.get_Parameter,get_Parameter,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_arrowheads.py,_safe_type_name,86,p.AsString,AsString,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_arrowheads.py,_safe_get_datatype,108,d.GetDataType,GetDataType,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -39411,7 +39411,7 @@ tools/probes/probe_browser_organization.py,<module>,105,len,len,,,unresolved,nam
 tools/probes/probe_browser_organization.py,<module>,106,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_browser_organization.py,<module>,107,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_browser_organization.py,<module>,108,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_browser_organization.py,_safe,117,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_browser_organization.py,_safe,117,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_browser_organization.py,_safe_str,124,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_browser_organization.py,_int_enum,131,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_browser_organization.py,_int_enum,131,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -39432,7 +39432,7 @@ tools/probes/probe_browser_organization.py,_resolve_similar_type,194,doc.GetElem
 tools/probes/probe_browser_organization.py,_resolve_similar_type,197,_safe,_safe,tools/probes/probe_browser_organization.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_browser_organization.py,_try_get_definition_record,205,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_browser_organization.py,_try_get_definition_record,206,callable,callable,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_browser_organization.py,_try_get_definition_record,207,get_definition,get_definition,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_browser_organization.py,_try_get_definition_record,207,get_definition,get_definition,,,unresolved,'get_definition' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_browser_organization.py,_try_get_definition_record,209,type,type,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_browser_organization.py,_try_get_definition_record,210,_clean_name,_clean_name,tools/probes/probe_browser_organization.py,_clean_name,high,direct call to a function defined in the same module
 tools/probes/probe_browser_organization.py,_try_get_definition_record,210,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -39682,8 +39682,8 @@ tools/probes/probe_ceiling_types.py,<module>,87,len,len,,,unresolved,name not de
 tools/probes/probe_ceiling_types.py,<module>,88,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_ceiling_types.py,<module>,89,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_ceiling_types.py,<module>,90,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_ceiling_types.py,_safe,99,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_ceiling_types.py,_safe_capture,105,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_ceiling_types.py,_safe,99,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+tools/probes/probe_ceiling_types.py,_safe_capture,105,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_ceiling_types.py,_safe_capture,107,'{}: {}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/probes/probe_ceiling_types.py,_safe_capture,107,type,type,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_ceiling_types.py,_multi_repr,112,type,type,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -39968,7 +39968,7 @@ tools/probes/probe_dimension_types.py,<module>,70,len,len,,,unresolved,name not 
 tools/probes/probe_dimension_types.py,<module>,71,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_dimension_types.py,<module>,72,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_dimension_types.py,<module>,73,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_dimension_types.py,_safe,81,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_dimension_types.py,_safe,81,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_dimension_types.py,_safe_type_name,88,elem.get_Parameter,get_Parameter,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_dimension_types.py,_safe_type_name,90,p.AsString,AsString,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_dimension_types.py,_get_family_name_param._normalize_param_string,115,p.AsString,AsString,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -40105,7 +40105,7 @@ tools/probes/probe_dimension_types.py,_md5,609,h.hexdigest,hexdigest,,,unresolve
 tools/probes/probe_dimension_types.py,_try_call,617,hasattr,hasattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_dimension_types.py,_try_call,618,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_dimension_types.py,_try_call,619,callable,callable,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_dimension_types.py,_try_call,630,v,v,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_dimension_types.py,_try_call,630,v,v,,,unresolved,'v' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_dimension_types.py,_try_call,632,'{}: {}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/probes/probe_dimension_types.py,_try_call,632,type,type,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_dimension_types.py,_try_call,635,'{}: {}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
@@ -40336,7 +40336,7 @@ tools/probes/probe_fill_patterns.py,<module>,72,len,len,,,unresolved,name not de
 tools/probes/probe_fill_patterns.py,<module>,73,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_fill_patterns.py,<module>,74,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_fill_patterns.py,<module>,75,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_fill_patterns.py,_safe,84,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_fill_patterns.py,_safe,84,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_fill_patterns.py,_safe_type_name,92,elem.get_Parameter,get_Parameter,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_fill_patterns.py,_safe_type_name,94,p.AsString,AsString,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_fill_patterns.py,_safe_get_datatype,116,d.GetDataType,GetDataType,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -40655,8 +40655,8 @@ tools/probes/probe_floor_types.py,<module>,79,len,len,,,unresolved,name not defi
 tools/probes/probe_floor_types.py,<module>,80,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_floor_types.py,<module>,81,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_floor_types.py,<module>,82,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_floor_types.py,_safe,91,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_floor_types.py,_safe_capture,97,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_floor_types.py,_safe,91,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+tools/probes/probe_floor_types.py,_safe_capture,97,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_floor_types.py,_safe_capture,99,'{}: {}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/probes/probe_floor_types.py,_safe_capture,99,type,type,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_floor_types.py,_multi_repr,104,type,type,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -40944,7 +40944,7 @@ tools/probes/probe_identity.py,<module>,66,len,len,,,unresolved,name not defined
 tools/probes/probe_identity.py,<module>,67,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_identity.py,<module>,68,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_identity.py,<module>,69,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_identity.py,_safe,77,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_identity.py,_safe,77,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_identity.py,_as_str,85,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_identity.py,_safe_defn_builtin,99,_safe,_safe,tools/probes/probe_identity.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_identity.py,_definition_origin,109,_safe,_safe,tools/probes/probe_identity.py,_safe,high,direct call to a function defined in the same module
@@ -41214,7 +41214,7 @@ tools/probes/probe_line_patterns.py,<module>,65,len,len,,,unresolved,name not de
 tools/probes/probe_line_patterns.py,<module>,66,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_line_patterns.py,<module>,67,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_line_patterns.py,<module>,68,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_line_patterns.py,_safe,76,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_line_patterns.py,_safe,76,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_line_patterns.py,_safe_get_datatype,99,d.GetDataType,GetDataType,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_line_patterns.py,_fmt_display,122,_safe_get_datatype,_safe_get_datatype,tools/probes/probe_line_patterns.py,_safe_get_datatype,high,direct call to a function defined in the same module
 tools/probes/probe_line_patterns.py,_fmt_display,124,UnitFormatUtils.Format,Format,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -41513,7 +41513,7 @@ tools/probes/probe_line_styles.py,<module>,106,len,len,,,unresolved,name not def
 tools/probes/probe_line_styles.py,<module>,107,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_line_styles.py,<module>,108,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_line_styles.py,<module>,109,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_line_styles.py,_safe,118,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_line_styles.py,_safe,118,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_line_styles.py,_safe_get_datatype,134,d.GetDataType,GetDataType,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_line_styles.py,_fmt_display_param,157,_safe_get_datatype,_safe_get_datatype,tools/probes/probe_line_styles.py,_safe_get_datatype,high,direct call to a function defined in the same module
 tools/probes/probe_line_styles.py,_fmt_display_param,159,UnitFormatUtils.Format,Format,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -41815,7 +41815,7 @@ tools/probes/probe_loaded_family_types.py,<module>,68,len,len,,,unresolved,name 
 tools/probes/probe_loaded_family_types.py,<module>,69,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_loaded_family_types.py,<module>,70,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_loaded_family_types.py,<module>,71,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_loaded_family_types.py,_safe,80,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_loaded_family_types.py,_safe,80,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_loaded_family_types.py,_element_name,93,_safe,_safe,tools/probes/probe_loaded_family_types.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_loaded_family_types.py,_element_name,98,e.get_Parameter,get_Parameter,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_loaded_family_types.py,_element_name,100,p.AsString,AsString,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -42071,7 +42071,7 @@ tools/probes/probe_materials.py,<module>,73,len,len,,,unresolved,name not define
 tools/probes/probe_materials.py,<module>,74,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_materials.py,<module>,75,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_materials.py,<module>,76,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_materials.py,_safe,84,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_materials.py,_safe,84,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_materials.py,_safe_name,89,_safe,_safe,tools/probes/probe_materials.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_materials.py,_safe_get_datatype,103,d.GetDataType,GetDataType,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_materials.py,_fmt_display,118,_safe_get_datatype,_safe_get_datatype,tools/probes/probe_materials.py,_safe_get_datatype,high,direct call to a function defined in the same module
@@ -42340,7 +42340,7 @@ tools/probes/probe_object_styles.py,<module>,52,len,len,,,unresolved,name not de
 tools/probes/probe_object_styles.py,<module>,53,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_object_styles.py,<module>,54,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_object_styles.py,<module>,55,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_object_styles.py,_safe,63,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_object_styles.py,_safe,63,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_object_styles.py,_color_hex,71,'#{:02X}{:02X}{:02X}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/probes/probe_object_styles.py,_color_hex,71,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_object_styles.py,_color_hex,71,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -42651,7 +42651,7 @@ tools/probes/probe_phase_filters.py,<module>,78,len,len,,,unresolved,name not de
 tools/probes/probe_phase_filters.py,<module>,79,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_phase_filters.py,<module>,80,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_phase_filters.py,<module>,81,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_phase_filters.py,_safe,90,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_phase_filters.py,_safe,90,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_phase_filters.py,_safe_elem_name,105,elem.get_Parameter,get_Parameter,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_phase_filters.py,_safe_elem_name,107,p.AsString,AsString,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_phase_filters.py,_safe_get_datatype,126,d.GetDataType,GetDataType,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -42919,7 +42919,7 @@ tools/probes/probe_phase_graphics.py,<module>,88,len,len,,,unresolved,name not d
 tools/probes/probe_phase_graphics.py,<module>,89,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_phase_graphics.py,<module>,90,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_phase_graphics.py,<module>,91,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_phase_graphics.py,_safe,100,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_phase_graphics.py,_safe,100,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_phase_graphics.py,_safe_get_datatype,124,d.GetDataType,GetDataType,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_phase_graphics.py,_fmt_display,147,_safe_get_datatype,_safe_get_datatype,tools/probes/probe_phase_graphics.py,_safe_get_datatype,high,direct call to a function defined in the same module
 tools/probes/probe_phase_graphics.py,_fmt_display,149,UnitFormatUtils.Format,Format,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -43223,7 +43223,7 @@ tools/probes/probe_phases.py,<module>,85,len,len,,,unresolved,name not defined i
 tools/probes/probe_phases.py,<module>,86,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_phases.py,<module>,88,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_phases.py,<module>,89,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_phases.py,_safe,98,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_phases.py,_safe,98,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_phases.py,_safe_get_datatype,114,d.GetDataType,GetDataType,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_phases.py,_fmt_display,137,_safe_get_datatype,_safe_get_datatype,tools/probes/probe_phases.py,_safe_get_datatype,high,direct call to a function defined in the same module
 tools/probes/probe_phases.py,_fmt_display,139,UnitFormatUtils.Format,Format,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -43483,8 +43483,8 @@ tools/probes/probe_roof_types.py,<module>,69,len,len,,,unresolved,name not defin
 tools/probes/probe_roof_types.py,<module>,70,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_roof_types.py,<module>,71,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_roof_types.py,<module>,72,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_roof_types.py,_safe,81,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_roof_types.py,_safe_capture,87,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_roof_types.py,_safe,81,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+tools/probes/probe_roof_types.py,_safe_capture,87,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_roof_types.py,_safe_capture,89,'{}: {}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/probes/probe_roof_types.py,_safe_capture,89,type,type,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_roof_types.py,_multi_repr,94,type,type,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -43769,7 +43769,7 @@ tools/probes/probe_text_types.py,<module>,77,len,len,,,unresolved,name not defin
 tools/probes/probe_text_types.py,<module>,78,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_text_types.py,<module>,79,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_text_types.py,<module>,80,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_text_types.py,_safe,89,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_text_types.py,_safe,89,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_text_types.py,_safe_type_name,96,elem.get_Parameter,get_Parameter,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_text_types.py,_safe_type_name,98,p.AsString,AsString,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_text_types.py,_safe_get_datatype,120,d.GetDataType,GetDataType,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -44090,8 +44090,8 @@ tools/probes/probe_units.py,<module>,63,len,len,,,unresolved,name not defined in
 tools/probes/probe_units.py,<module>,64,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_units.py,<module>,65,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_units.py,<module>,66,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_units.py,_safe,75,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_units.py,_try,81,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_units.py,_safe,75,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+tools/probes/probe_units.py,_try,81,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_units.py,_try,83,'{}: {}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 tools/probes/probe_units.py,_try,83,type,type,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_units.py,_safe_str,87,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -44113,18 +44113,18 @@ tools/probes/probe_units.py,_pv_from_enum,149,_safe_str,_safe_str,tools/probes/p
 tools/probes/probe_units.py,_unitutils_get_discipline_id,158,_safe,_safe,tools/probes/probe_units.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_units.py,_unitutils_get_discipline_id,158,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_units.py,_unitutils_get_discipline_id,161,_try,_try,tools/probes/probe_units.py,_try,high,direct call to a function defined in the same module
-tools/probes/probe_units.py,_unitutils_get_discipline_id,161,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_units.py,_unitutils_get_discipline_id,161,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_units.py,_unitutils_get_discipline_id,163,_is_forge_type_id,_is_forge_type_id,tools/probes/probe_units.py,_is_forge_type_id,high,direct call to a function defined in the same module
 tools/probes/probe_units.py,_unitutils_get_discipline_id,164,_forge_id_string,_forge_id_string,tools/probes/probe_units.py,_forge_id_string,high,direct call to a function defined in the same module
 tools/probes/probe_units.py,_unitutils_get_discipline_id,165,_safe_str,_safe_str,tools/probes/probe_units.py,_safe_str,high,direct call to a function defined in the same module
 tools/probes/probe_units.py,_label_for_spec_id,178,_safe,_safe,tools/probes/probe_units.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_units.py,_label_for_spec_id,178,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_units.py,_label_for_spec_id,181,_try,_try,tools/probes/probe_units.py,_try,high,direct call to a function defined in the same module
-tools/probes/probe_units.py,_label_for_spec_id,181,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_units.py,_label_for_spec_id,181,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_units.py,_label_for_discipline_id,196,_safe,_safe,tools/probes/probe_units.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_units.py,_label_for_discipline_id,196,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_units.py,_label_for_discipline_id,199,_try,_try,tools/probes/probe_units.py,_try,high,direct call to a function defined in the same module
-tools/probes/probe_units.py,_label_for_discipline_id,199,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_units.py,_label_for_discipline_id,199,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_units.py,_units_get_format_options,208,_try,_try,tools/probes/probe_units.py,_try,high,direct call to a function defined in the same module
 tools/probes/probe_units.py,_units_get_format_options,208,units_obj.GetFormatOptions,GetFormatOptions,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_units.py,_units_get_format_options,210,'unreadable:{}'.format,format,,,unresolved,dynamic or unsupported call expression; not statically resolvable
@@ -44148,7 +44148,7 @@ tools/probes/probe_units.py,_pv_from_format_surface,274,_safe,_safe,tools/probes
 tools/probes/probe_units.py,_pv_from_format_surface,274,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_units.py,_pv_from_format_surface,276,_pv_missing,_pv_missing,tools/probes/probe_units.py,_pv_missing,high,direct call to a function defined in the same module
 tools/probes/probe_units.py,_pv_from_format_surface,277,_try,_try,tools/probes/probe_units.py,_try,high,direct call to a function defined in the same module
-tools/probes/probe_units.py,_pv_from_format_surface,277,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_units.py,_pv_from_format_surface,277,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_units.py,_pv_from_format_surface,279,_pv_unreadable,_pv_unreadable,tools/probes/probe_units.py,_pv_unreadable,high,direct call to a function defined in the same module
 tools/probes/probe_units.py,_pv_from_format_surface,281,_pv_missing,_pv_missing,tools/probes/probe_units.py,_pv_missing,high,direct call to a function defined in the same module
 tools/probes/probe_units.py,_pv_from_format_surface,282,_is_forge_type_id,_is_forge_type_id,tools/probes/probe_units.py,_is_forge_type_id,high,direct call to a function defined in the same module
@@ -44356,7 +44356,7 @@ tools/probes/probe_view_category_overrides.py,<module>,70,len,len,,,unresolved,n
 tools/probes/probe_view_category_overrides.py,<module>,71,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_category_overrides.py,<module>,72,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_category_overrides.py,<module>,73,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_view_category_overrides.py,_safe,82,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_view_category_overrides.py,_safe,82,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_view_category_overrides.py,_get_name,87,_safe,_safe,tools/probes/probe_view_category_overrides.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_view_category_overrides.py,_eid_int,93,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_category_overrides.py,_eid_int,96,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -44696,7 +44696,7 @@ tools/probes/probe_view_filter_applications.py,<module>,65,len,len,,,unresolved,
 tools/probes/probe_view_filter_applications.py,<module>,66,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_applications.py,<module>,67,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_applications.py,<module>,68,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_view_filter_applications.py,_safe,77,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_view_filter_applications.py,_safe,77,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_view_filter_applications.py,_safe_type_name,84,elem.get_Parameter,get_Parameter,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_view_filter_applications.py,_safe_type_name,86,p.AsString,AsString,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_view_filter_applications.py,_eid_int,104,_safe,_safe,tools/probes/probe_view_filter_applications.py,_safe,high,direct call to a function defined in the same module
@@ -45042,7 +45042,7 @@ tools/probes/probe_view_filter_definitions.py,<module>,91,len,len,,,unresolved,n
 tools/probes/probe_view_filter_definitions.py,<module>,92,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,<module>,93,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,<module>,94,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_view_filter_definitions.py,_safe,103,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_view_filter_definitions.py,_safe,103,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_view_filter_definitions.py,_sha1,109,s.encode,encode,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_view_filter_definitions.py,_sha1,110,hashlib.sha1,sha1,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_view_filter_definitions.py,_sha1,110,hashlib.sha1(b).hexdigest,hexdigest,,,unresolved,dynamic or unsupported call expression; not statically resolvable
@@ -45087,25 +45087,25 @@ tools/probes/probe_view_filter_definitions.py,_get_rules_from_element_parameter_
 tools/probes/probe_view_filter_definitions.py,_get_rules_from_element_parameter_filter,216,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,_get_rules_from_element_parameter_filter,222,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,_get_rules_from_element_parameter_filter,223,callable,callable,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_view_filter_definitions.py,_get_rules_from_element_parameter_filter,224,v,v,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_view_filter_definitions.py,_get_rules_from_element_parameter_filter,224,v,v,,,unresolved,'v' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_view_filter_definitions.py,_get_rules_from_element_parameter_filter,225,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,_get_rules_from_element_parameter_filter,226,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,_rule_parameter_id,235,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,_rule_parameter_id,236,callable,callable,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_view_filter_definitions.py,_rule_parameter_id,237,v,v,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_view_filter_definitions.py,_rule_parameter_id,237,v,v,,,unresolved,'v' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_view_filter_definitions.py,_rule_parameter_id,240,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,_rule_parameter_id,241,_safe,_safe,tools/probes/probe_view_filter_definitions.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_view_filter_definitions.py,_rule_parameter_id,244,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,_rule_evaluator_name,253,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,_rule_evaluator_name,254,callable,callable,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_view_filter_definitions.py,_rule_evaluator_name,254,v,v,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_view_filter_definitions.py,_rule_evaluator_name,254,v,v,,,unresolved,'v' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_view_filter_definitions.py,_rule_evaluator_name,257,_safe,_safe,tools/probes/probe_view_filter_definitions.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_view_filter_definitions.py,_rule_evaluator_name,257,_safe,_safe,tools/probes/probe_view_filter_definitions.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_view_filter_definitions.py,_rule_evaluator_name,257,ev.GetType,GetType,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_view_filter_definitions.py,_rule_evaluator_name,257,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,_rule_value_best_effort,266,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,_rule_value_best_effort,267,callable,callable,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_view_filter_definitions.py,_rule_value_best_effort,267,v,v,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_view_filter_definitions.py,_rule_value_best_effort,267,v,v,,,unresolved,'v' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_view_filter_definitions.py,_rule_value_best_effort,273,_safe,_safe,tools/probes/probe_view_filter_definitions.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_view_filter_definitions.py,_rule_value_best_effort,273,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_filter_definitions.py,_flatten_element_filter,284,_element_filter_kind,_element_filter_kind,tools/probes/probe_view_filter_definitions.py,_element_filter_kind,high,direct call to a function defined in the same module
@@ -45393,7 +45393,7 @@ tools/probes/probe_view_templates.py,<module>,76,len,len,,,unresolved,name not d
 tools/probes/probe_view_templates.py,<module>,77,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_templates.py,<module>,78,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_view_templates.py,<module>,79,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_view_templates.py,_safe,88,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_view_templates.py,_safe,88,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_view_templates.py,_safe_view_name,95,v.get_Parameter,get_Parameter,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_view_templates.py,_safe_view_name,97,p.AsString,AsString,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_view_templates.py,_safe_view_name,102,_safe,_safe,tools/probes/probe_view_templates.py,_safe,high,direct call to a function defined in the same module
@@ -45672,7 +45672,7 @@ tools/probes/probe_views.py,<module>,112,len,len,,,unresolved,name not defined i
 tools/probes/probe_views.py,<module>,113,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_views.py,<module>,114,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_views.py,<module>,115,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_views.py,_safe,126,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_views.py,_safe,126,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_views.py,_safe_elem_name,140,elem.get_Parameter,get_Parameter,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_views.py,_safe_elem_name,142,p.AsString,AsString,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_views.py,_safe_get_datatype,163,d.GetDataType,GetDataType,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -45957,7 +45957,7 @@ tools/probes/probe_wall_types.py,<module>,77,len,len,,,unresolved,name not defin
 tools/probes/probe_wall_types.py,<module>,78,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_wall_types.py,<module>,79,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_wall_types.py,<module>,80,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_wall_types.py,_safe,88,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_wall_types.py,_safe,88,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_wall_types.py,_safe_name,93,_safe,_safe,tools/probes/probe_wall_types.py,_safe,high,direct call to a function defined in the same module
 tools/probes/probe_wall_types.py,_safe_type_name,98,elem.get_Parameter,get_Parameter,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/probes/probe_wall_types.py,_safe_type_name,100,p.AsString,AsString,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -46257,7 +46257,7 @@ tools/probes/probe_worksets.py,<module>,87,len,len,,,unresolved,name not defined
 tools/probes/probe_worksets.py,<module>,88,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_worksets.py,<module>,89,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_worksets.py,<module>,90,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-tools/probes/probe_worksets.py,_safe,99,fn,fn,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/probes/probe_worksets.py,_safe,99,fn,fn,,,unresolved,'fn' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/probes/probe_worksets.py,_pv._coerce,116,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_worksets.py,_pv._coerce,119,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/probes/probe_worksets.py,_pv,122,_coerce,_coerce,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -47721,7 +47721,7 @@ tools/run_segment_orchestrator.py,validate_membership_against_manifest,938,hashl
 tools/run_segment_orchestrator.py,validate_membership_against_manifest,938,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/run_segment_orchestrator.py,validate_membership_against_manifest,940,errors.append,append,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 tools/run_segment_orchestrator.py,_clear_stale_name_all_before_run,963,stale_name_all.is_dir,is_dir,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-tools/run_segment_orchestrator.py,_clear_stale_name_all_before_run,964,log,log,,,unresolved,name not defined in this module and not bound via a resolvable import
+tools/run_segment_orchestrator.py,_clear_stale_name_all_before_run,964,log,log,,,unresolved,'log' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 tools/run_segment_orchestrator.py,_clear_stale_name_all_before_run,965,retry_fs_op,retry_fs_op,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/run_segment_orchestrator.py,_clear_stale_name_all_before_run,965,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 tools/run_segment_orchestrator.py,_run_one_segment,1006,reg_row.get,get,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)

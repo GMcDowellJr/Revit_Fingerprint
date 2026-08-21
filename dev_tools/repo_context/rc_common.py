@@ -128,31 +128,6 @@ def sniff_binary(sample: bytes) -> bool:
     return (nontext / len(sample)) > 0.30
 
 
-def read_text_best_effort(path: Path, max_bytes: int = 20_000_000):
-    """Return (text, encoding, encoding_fallback: bool, is_binary: bool)."""
-    try:
-        raw = path.read_bytes()
-    except OSError:
-        return None, None, False, False
-    if len(raw) > max_bytes:
-        raw = raw[:max_bytes]
-    sample = raw[:8192]
-    if sniff_binary(sample):
-        return None, None, False, True
-    try:
-        text = raw.decode("utf-8")
-        return text, "utf-8", False, False
-    except UnicodeDecodeError:
-        pass
-    try:
-        text = raw.decode("utf-8-sig")
-        return text, "utf-8-sig", True, False
-    except UnicodeDecodeError:
-        pass
-    text = raw.decode("latin-1", errors="replace")
-    return text, "latin-1-fallback", True, False
-
-
 @dataclass
 class FileRecord:
     relative_path: str

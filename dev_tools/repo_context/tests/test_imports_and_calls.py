@@ -137,6 +137,25 @@ def test_imports_in_nested_scopes_are_recorded(repo, out):
     assert by_line[14]["imported_name"] == "OrderedDict"
 
 
+def test_call_shadowed_by_parameter_is_not_resolved_to_module_function(repo, out):
+    write_files(repo, {
+        "a.py": (
+            "def target():\n"
+            "    return 1\n\n\n"
+            "def caller(target):\n"
+            "    return target()\n"
+        ),
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    row = next(r for r in calls if r["call_expression"] == "target")
+    assert row["confidence"] == "unresolved"
+    assert row["candidate_symbol"] == ""
+    assert "shadow" in row["explanation"].lower()
+
+
 def test_self_method_call_within_known_class(repo, out):
     write_files(repo, {
         "widget.py": (

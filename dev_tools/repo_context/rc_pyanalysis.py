@@ -127,6 +127,38 @@ class PyFileAnalysis:
     has_main_guard: bool
     top_level_index: dict  # simple name -> qualified name (module-level classes/functions)
     class_info: dict  # class qualified name -> ClassInfo
+    local_names_by_symbol: dict  # function-type qualified name -> set of locally-bound simple names
+    parent_of: dict  # qualified name -> parent qualified name, for every symbol in this file
+
+
+def _collect_local_bound_names(node) -> set:
+    """Parameter names plus simple assignment targets bound directly in
+    this function's own body (not inside a nested function/class, which
+    has its own scope). Used to avoid resolving a bare call to a
+    module-level function/class when the name is actually shadowed by a
+    parameter or local variable in the enclosing scope."""
+    names = set()
+    args = node.args
+    for a in list(getattr(args, "posonlyargs", []) or []) + list(args.args) + list(args.kwonlyargs):
+        names.add(a.arg)
+    if args.vararg:
+        names.add(args.vararg.arg)
+    if args.kwarg:
+        names.add(args.kwarg.arg)
+
+    def walk(n):
+        for child in ast.iter_child_nodes(n):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue  # nested scope binds its own names
+            if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store):
+                names.add(child.id)  # also catches walrus (:=) targets, one level deeper
+            elif isinstance(child, ast.ExceptHandler) and child.name:
+                names.add(child.name)
+            walk(child)
+
+    for stmt in node.body:
+        walk(stmt)
+    return names
 
 
 def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
@@ -137,6 +169,7 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
     raw_calls: list[RawCall] = []
     top_level_index: dict = {}
     class_info: dict = {}
+    local_names_by_symbol: dict = {}
     has_main_guard = False
 
     source_module = dotted_module_path(rel_path)
@@ -295,6 +328,7 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
         symbols.append(rec)
         if parent_qualname == MODULE_SYMBOL:
             top_level_index[node.name] = qualname
+        local_names_by_symbol[qualname] = _collect_local_bound_names(node)
         # class_ctx passed through for self-resolution of nested defs.
         effective_class_ctx = class_ctx if symbol_type in ("method",) else (class_ctx if symbol_type == "nested_function" else "")
         for stmt in node.body:
@@ -321,10 +355,12 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
         else:
             walk_body(stmt, MODULE_SYMBOL, "", MODULE_SYMBOL)
 
+    parent_of = {s.qualified_name: s.parent_symbol for s in symbols}
     return PyFileAnalysis(
         symbols=symbols, imports=imports, raw_calls=raw_calls,
         has_main_guard=has_main_guard, top_level_index=top_level_index,
-        class_info=class_info,
+        class_info=class_info, local_names_by_symbol=local_names_by_symbol,
+        parent_of=parent_of,
     )
 
 
@@ -398,9 +434,26 @@ def build_import_bindings(imports: list) -> dict:
     return bindings
 
 
+def _is_shadowed(name: str, caller_symbol: str, parent_of: dict, local_names_by_symbol: dict) -> bool:
+    """True if `name` is bound as a parameter or local variable somewhere
+    in caller_symbol's own lexical scope chain (its own body, or an
+    enclosing function's), which would shadow a same-named module-level
+    function/class or import for a bare `name(...)` call."""
+    current = caller_symbol
+    seen = set()
+    while current and current not in seen:
+        seen.add(current)
+        local_names = local_names_by_symbol.get(current)
+        if local_names and name in local_names:
+            return True
+        current = parent_of.get(current)
+    return False
+
+
 def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
                    class_info: dict, import_bindings: dict,
-                   all_top_level_index: dict, all_class_info: dict) -> list:
+                   all_top_level_index: dict, all_class_info: dict,
+                   local_names_by_symbol: dict, parent_of: dict) -> list:
     results = []
     for rc in raw_calls:
         candidate_file = ""
@@ -410,7 +463,12 @@ def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
 
         if rc.kind == "name":
             name = rc.callee_simple_name
-            if name in top_level_index:
+            if _is_shadowed(name, rc.caller_symbol, parent_of, local_names_by_symbol):
+                explanation = (
+                    f"'{name}' is shadowed by a parameter or local variable in the enclosing "
+                    f"scope; not statically resolvable to the module-level definition"
+                )
+            elif name in top_level_index:
                 candidate_file = caller_file
                 candidate_symbol = top_level_index[name]
                 is_class = candidate_symbol in class_info
