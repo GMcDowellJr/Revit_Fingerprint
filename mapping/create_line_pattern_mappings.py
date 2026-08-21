@@ -91,7 +91,33 @@ def _resolve_repo_root(explicit_repo_root):
     )
 
 
+def _purge_stale_repo_modules(repo_root):
+    # A persistent Dynamo CPython session keeps its interpreter (and sys.modules)
+    # alive across node re-runs. If a prior run already imported mapping.*/core.*/
+    # domains.* from a different checkout, inserting the newly-resolved repo_root
+    # into sys.path does nothing to those already-cached entries -- Python's import
+    # system checks sys.modules first, so this script would keep silently using
+    # the stale checkout's reconstruction code/policies while reporting repo_root
+    # as the one in effect. Mirrors runner/thin_runner.py's identical
+    # checkout-switch handling (_purge_repo_modules there).
+    existing = sys.modules.get("mapping.line_pattern_reconstruction")
+    if existing is None:
+        return
+    try:
+        existing_file = os.path.abspath(str(getattr(existing, "__file__", "") or ""))
+    except Exception:
+        existing_file = ""
+    if existing_file.startswith(os.path.abspath(repo_root) + os.sep):
+        return  # already resolves under the selected checkout; nothing stale
+
+    prefixes = ("mapping", "core", "domains")
+    for name in list(sys.modules.keys()):
+        if name in prefixes or any(name.startswith(p + ".") for p in prefixes):
+            sys.modules.pop(name, None)
+
+
 _REPO_ROOT = _resolve_repo_root(IN[2] if len(IN) > 2 else None)
+_purge_stale_repo_modules(_REPO_ROOT)
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 

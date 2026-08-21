@@ -42,6 +42,18 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   population membership.
 
 ### Fixed
+- **`mapping/create_line_pattern_mappings.py`: stale cached `mapping`/`core`/
+  `domains` modules from a previously-selected checkout are now purged when
+  the resolved repo root changes.** A persistent Dynamo CPython session keeps
+  its interpreter (and `sys.modules`) alive across node re-runs; adding a
+  newly-resolved `IN[2]`/env-var repo root to `sys.path` does nothing to
+  entries already cached in `sys.modules` from an earlier checkout, since
+  Python's import system checks the cache first. Without a purge, a later run
+  against a different checkout would silently keep executing the first
+  checkout's reconstruction code and join-key policy while reporting the new
+  root as the one in effect. Mirrors `runner/thin_runner.py`'s identical
+  existing handling for the same class of bug. Found via automated PR review
+  on the `__file__` fix below.
 - **`mapping/create_line_pattern_mappings.py`: repo-root resolution no longer
   depends on `__file__`.** This entry point is meant to be pasted directly
   into a Dynamo Python Script node, where Dynamo executes the code from a
