@@ -44,6 +44,17 @@ _REPO_ROOT = os.path.dirname(_THIS_DIR)
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
+# A fresh Dynamo CPython3 Python Script node does not expose RevitServices/
+# RevitAPI to pythonnet until these assemblies are explicitly referenced --
+# same convention as tools/probes/*.py (e.g. probe_line_patterns.py) and
+# runner/run_dynamo.py's own clr.AddReference("RevitServices") before
+# importing DocumentManager. Must happen before importing DocumentManager
+# below and before importing mapping.line_pattern_revit_apply (which imports
+# Autodesk.Revit.DB symbols at module load time).
+import clr
+clr.AddReference("RevitServices")
+clr.AddReference("RevitAPI")
+
 from RevitServices.Persistence import DocumentManager
 
 from mapping.line_pattern_reconstruction import (

@@ -42,19 +42,23 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   population membership.
 
 ### Fixed
-- **`tools/export_bundle_pattern_detail.py`: `_iter_identity_csv()` now correctly
-  falls back to `item_value_type` for item quality on the v2.1 identity-item
-  shard schema.** `tools/extractor.py`'s shard writer always emits an
-  `item_role` column but leaves it blank, writing the actual item quality into
-  `item_value_type` instead. `_iter_identity_csv()`'s fallback,
-  `row.get("item_role", row.get("item_value_type", ""))`, only falls through
-  on a *missing* key -- since `item_role` is present (just empty), this
-  returned `""` for every row sourced from a real v2.1 export, leaving
-  `pattern_settings.csv`'s `q` column blank domain-wide regardless of the
-  item's actual quality. Fixed by treating a present-but-blank `item_role` the
-  same as a missing one. Found via automated PR review while validating the
-  new `mapping/` line_patterns utility (which depends on `q` to gate
-  reconstruction) against a realistic v2.1 export shape; the bug is not
+- **`tools/export_bundle_pattern_detail.py`: `_iter_identity_csv()` now always
+  resolves item quality from `item_value_type` on the v2.1 identity-item shard
+  schema, never from `item_role`.** `item_role` is not a quality field at all
+  on this schema -- it is a separate, unrelated tag: blank for a normal row
+  written by `tools/extractor.py`'s shard writer, but populated with a
+  non-quality marker (e.g. `"synthetic"`) for `tools/run_extract_all.py`'s
+  synthetic `line_pattern.segments_norm_hash` row. The original code,
+  `row.get("item_role", row.get("item_value_type", ""))`, only fell through to
+  `item_value_type` on a *missing* key -- since `item_role` is always present
+  (just usually empty), this returned `""` for every normal row (leaving
+  `pattern_settings.csv`'s `q` column blank domain-wide) and, after a first
+  attempted fix that preferred `item_role` whenever non-empty, would have
+  returned the literal string `"synthetic"` as `q` for norm-hash rows instead
+  of their real quality. Fixed by reading `q` from `item_value_type`
+  unconditionally on this schema. Found via automated PR review while
+  validating the new `mapping/` line_patterns utility (which depends on `q` to
+  gate reconstruction) against a realistic v2.1 export shape; the bug is not
   specific to that consumer -- it affected `q` resolution for every domain
   read through `export_bundle_pattern_detail.py`'s v2.1 code path. Does not
   affect the legacy `k`/`v`/`q` schema path, `sig_hash`/`join_hash`

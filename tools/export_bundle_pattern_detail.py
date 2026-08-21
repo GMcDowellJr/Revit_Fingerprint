@@ -294,7 +294,8 @@ def _iter_identity_csv(path: Path) -> Iterator[Dict[str, str]]:
     Yield rows normalised to {k, v, q, export_run_id, record_pk, ...}.
 
     Handles both legacy schema (k/v/q columns) and v2.1 schema
-    (item_key / item_value / item_role columns).
+    (item_key / item_value / item_value_type columns; item_role is a
+    separate, non-quality tag and is never used for q).
     """
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
@@ -303,13 +304,13 @@ def _iter_identity_csv(path: Path) -> Iterator[Dict[str, str]]:
             if "k" not in row and "item_key" in row:
                 row["k"] = row.get("item_key", "")
                 row["v"] = row.get("item_value", "")
-                # item_role is always present as a column in the v2.1 shard schema but
-                # is left blank by the current shard writer (tools/extractor.py, which
-                # writes quality into item_value_type instead) -- dict.get()'s default
-                # only fires on a missing key, not a blank value, so prefer item_role
-                # only when it actually carries a value.
-                item_role = row.get("item_role", "")
-                row["q"] = item_role if item_role else row.get("item_value_type", "")
+                # item_role is NOT a quality field in the v2.1 shard schema -- it's an
+                # unrelated tag (blank for a normal extractor.py-written row, but e.g.
+                # "synthetic" for tools/run_extract_all.py's synthetic
+                # line_pattern.segments_norm_hash row). Quality always lives in
+                # item_value_type (see tools/extractor.py's own item_role/item_value_type
+                # split at its identity-item CSV read site); never read q from item_role.
+                row["q"] = row.get("item_value_type", "")
             yield row
 
 
