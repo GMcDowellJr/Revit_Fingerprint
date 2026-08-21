@@ -65,6 +65,12 @@ is for validating that automation itself, not a substitute for it.
    `mapping/create_line_pattern_mappings.py` with:
    - `IN[0]` = `<export_out_dir>` from step 3
    - `IN[1]` = a report path of your choosing
+   - `IN[2]` = the absolute path to your Revit_Fingerprint checkout (required
+     when pasting the script directly into the node, since `__file__` isn't
+     available in that context -- omit only if
+     `REVIT_FINGERPRINT_REPO_ROOT_SELECTED`/`REVIT_FINGERPRINT_REPO_DIR` is
+     already set in the environment, or the node loads the script from a file
+     on disk rather than pasted text)
 
    Confirm the pattern's row in the report has `status="ok"` (or
    `"degraded"` with an expected, non-blocking reason such as

@@ -25,6 +25,12 @@
 #        whose join_hash was blank -- see mapping/line_pattern_reconstruction.py's
 #        REPORT_FIELDS).
 #
+#   IN[2] repo_root (str, optional)
+#        Absolute path to the Revit_Fingerprint checkout, needed only when
+#        __file__ can't be used to find it (see below) and neither
+#        REVIT_FINGERPRINT_REPO_ROOT_SELECTED nor REVIT_FINGERPRINT_REPO_DIR is
+#        set in the environment. Omit/None otherwise.
+#
 # Output:
 #   OUT = {
 #       "run_status": "ok" | "degraded" | "blocked",
@@ -39,10 +45,100 @@
 import os
 import sys
 
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.dirname(_THIS_DIR)
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
+
+def _looks_like_repo_root(p):
+    try:
+        base = os.path.abspath(str(p))
+    except Exception:
+        return False
+    return all(
+        os.path.exists(os.path.join(base, sub))
+        for sub in ("mapping", "core", "domains")
+    )
+
+
+def _resolve_repo_root(explicit_repo_root):
+    # A Dynamo Python Script node runs pasted code as a string (File "<string>"),
+    # not as a loaded .py file -- __file__ is undefined in that case, unlike every
+    # other module in this repo (which are always imported from disk). Mirrors
+    # runner/run_dynamo.py's own env-var-first / __file__-fallback resolution,
+    # plus an explicit IN[2] override for exactly this "pasted into a node" case,
+    # where neither the env vars nor __file__ can be relied on.
+    if explicit_repo_root:
+        # A caller-supplied IN[2] is an explicit selection, not a hint: if it's
+        # wrong (typo, incomplete checkout), silently falling through to the
+        # env vars or __file__ could resolve a *different* checkout than the
+        # one the caller asked for -- e.g. a stale REVIT_FINGERPRINT_REPO_ROOT_
+        # SELECTED left over from a previous run in the same persistent Dynamo
+        # session -- and apply mappings using unintended code with no error at
+        # all. Fail loudly instead of guessing.
+        if _looks_like_repo_root(explicit_repo_root):
+            return os.path.abspath(explicit_repo_root)
+        raise RuntimeError(
+            "IN[2] repo_root ({!r}) does not look like a Revit_Fingerprint checkout "
+            "(expected mapping/, core/, and domains/ subdirectories) -- not falling "
+            "back to the environment or __file__ since IN[2] was explicitly given.".format(
+                explicit_repo_root
+            )
+        )
+
+    for env_key in ("REVIT_FINGERPRINT_REPO_ROOT_SELECTED", "REVIT_FINGERPRINT_REPO_DIR"):
+        try:
+            env_val = str(os.environ.get(env_key, "")).strip()
+        except Exception:
+            env_val = ""
+        if env_val and _looks_like_repo_root(env_val):
+            return os.path.abspath(env_val)
+
+    try:
+        this_dir = os.path.dirname(os.path.abspath(__file__))
+        candidate = os.path.dirname(this_dir)
+        if _looks_like_repo_root(candidate):
+            return candidate
+    except Exception:
+        pass
+
+    raise RuntimeError(
+        "Could not determine the Revit_Fingerprint repo root: this script was run "
+        "from pasted code (no __file__), and neither REVIT_FINGERPRINT_REPO_ROOT_SELECTED/"
+        "REVIT_FINGERPRINT_REPO_DIR is set nor was IN[2] given. Pass the checkout's "
+        "absolute path as IN[2]."
+    )
+
+
+def _purge_repo_modules():
+    # A persistent Dynamo CPython session keeps its interpreter (and sys.modules)
+    # alive across node re-runs. Two failure modes if this isn't unconditional:
+    # (1) a "purge only if stale" check keyed on a single representative module
+    #     (e.g. mapping.line_pattern_reconstruction) misses core.*/domains.* left
+    #     cached by an entirely different script -- e.g. the extraction runner --
+    #     that was run earlier in the same interpreter and never touched
+    #     mapping.* at all, so that check's "nothing cached yet" early-return
+    #     would leave those stale modules in place;
+    # (2) sys.modules staleness and sys.path ordering are separate problems --
+    #     purging alone doesn't fix an already-present-but-not-first sys.path
+    #     entry (see the promotion below).
+    # An unconditional purge is cheap (dict pops) and sidesteps needing a
+    # staleness heuristic at all. Mirrors runner/thin_runner.py's
+    # _purge_repo_modules(), generalized to always run rather than only on a
+    # detected mismatch.
+    prefixes = ("mapping", "core", "domains")
+    for name in list(sys.modules.keys()):
+        if name in prefixes or any(name.startswith(p + ".") for p in prefixes):
+            sys.modules.pop(name, None)
+
+
+_REPO_ROOT = _resolve_repo_root(IN[2] if len(IN) > 2 else None)
+_purge_repo_modules()
+# Promote (not just ensure-present): if _REPO_ROOT is already in sys.path but
+# not first -- e.g. a prior run in this same persistent interpreter selected a
+# different checkout that inserted itself ahead -- a plain "insert if absent"
+# would leave that other checkout's directory earlier in sys.path, so the
+# purged modules above would simply re-resolve from there instead of
+# _REPO_ROOT. Mirrors runner/thin_runner.py's identical remove-then-reinsert.
+if _REPO_ROOT in sys.path:
+    sys.path.remove(_REPO_ROOT)
+sys.path.insert(0, _REPO_ROOT)
 
 # A fresh Dynamo CPython3 Python Script node does not expose RevitServices/
 # RevitAPI to pythonnet until these assemblies are explicitly referenced --
