@@ -31,7 +31,15 @@ import rc_validate
 from rc_common import TOOL_VERSION
 
 
-def _resolve_output_dir(root: Path, output_arg: str) -> tuple[Path, set]:
+def _resolve_output_dir(root: Path, output_arg: str) -> tuple[Path, "str | None"]:
+    """Returns (output_dir, output_exclude_rel_path).
+
+    output_exclude_rel_path is the exact repo-relative POSIX path of the
+    output directory when it is nested inside root, or None otherwise. It
+    must be matched by full path, not by its bare directory name -- a
+    name-based match (e.g. just "docs" for ``--output docs/context``)
+    would incorrectly exclude every other directory sharing that name.
+    """
     output_dir = Path(output_arg)
     output_resolved = output_dir.resolve()
     root_resolved = root.resolve()
@@ -40,15 +48,13 @@ def _resolve_output_dir(root: Path, output_arg: str) -> tuple[Path, set]:
         print("error: --output must not be the repository root itself", file=sys.stderr)
         sys.exit(2)
 
-    extra_exclude_dirs: set = set()
     try:
         rel = output_resolved.relative_to(root_resolved)
     except ValueError:
         rel = None
-    if rel is not None and rel.parts:
-        extra_exclude_dirs.add(rel.parts[0])
 
-    return output_dir, extra_exclude_dirs
+    output_exclude_rel_path = rel.as_posix() if rel is not None and rel.parts else None
+    return output_dir, output_exclude_rel_path
 
 
 def cmd_scan(args: argparse.Namespace) -> int:
@@ -57,17 +63,18 @@ def cmd_scan(args: argparse.Namespace) -> int:
         print(f"error: ROOT is not a directory: {root}", file=sys.stderr)
         return 2
 
-    output_dir, auto_exclude = _resolve_output_dir(root, args.output)
+    output_dir, output_exclude_rel_path = _resolve_output_dir(root, args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "chunks").mkdir(parents=True, exist_ok=True)
     (output_dir / "packets").mkdir(parents=True, exist_ok=True)
 
-    extra_exclude_dirs = auto_exclude | set(args.exclude_dir or [])
+    extra_exclude_dirs = set(args.exclude_dir or [])
 
     options = rc_scan.ScanOptions(
         root=root,
         output_dir=output_dir,
         extra_exclude_dirs=extra_exclude_dirs,
+        output_exclude_rel_path=output_exclude_rel_path,
         exclude_globs=list(args.exclude_glob or []),
         include_globs=list(args.include_glob or []),
         include_secrets=args.include_secrets,

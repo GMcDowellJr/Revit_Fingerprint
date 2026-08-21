@@ -111,6 +111,32 @@ def test_ambiguous_import_resolution(repo, out):
     assert row["resolved_file"] == ""
 
 
+def test_imports_in_nested_scopes_are_recorded(repo, out):
+    write_files(repo, {
+        "a.py": (
+            "from typing import TYPE_CHECKING\n\n"
+            "if TYPE_CHECKING:\n"
+            "    import json as type_only_json\n\n\n"
+            "def run():\n"
+            "    import os\n"
+            "    return os.getcwd()\n\n\n"
+            "class Widget:\n"
+            "    def method(self):\n"
+            "        from collections import OrderedDict\n"
+            "        return OrderedDict()\n"
+        ),
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    imports = _read(out, "python_imports.csv")
+    by_line = {int(r["line"]): r for r in imports}
+    assert by_line[1]["imported_name"] == "TYPE_CHECKING"
+    assert by_line[4]["alias"] == "type_only_json"
+    assert by_line[8]["imported_module"] == "os"
+    assert by_line[14]["imported_name"] == "OrderedDict"
+
+
 def test_self_method_call_within_known_class(repo, out):
     write_files(repo, {
         "widget.py": (

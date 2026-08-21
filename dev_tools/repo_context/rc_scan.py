@@ -15,7 +15,7 @@ from typing import Optional
 
 from rc_common import (
     FileRecord, ChunkRecord, DEFAULT_EXCLUDE_DIRS, DEFAULT_EXCLUDE_FILE_GLOBS,
-    BINARY_EXTENSIONS, match_any_glob, sniff_binary, sha256_file,
+    BINARY_EXTENSIONS, match_any_glob, sniff_binary, sha256_file, count_lines_streaming,
 )
 import rc_classify
 import rc_pyanalysis
@@ -29,6 +29,7 @@ class ScanOptions:
     root: Path
     output_dir: Path
     extra_exclude_dirs: set = field(default_factory=set)
+    output_exclude_rel_path: Optional[str] = None  # exact repo-relative posix path, not a bare name
     exclude_globs: list = field(default_factory=list)
     include_globs: list = field(default_factory=list)
     include_secrets: bool = False
@@ -55,6 +56,7 @@ class ScanResult:
     dir_exclusions: list = field(default_factory=list)  # (rel, name, reason)
     reused_count: int = 0
     regenerated_count: int = 0
+    stale_chunks_removed: int = 0
 
 
 def _sort_key(name: str):
@@ -75,7 +77,8 @@ def _should_exclude_file(rel_posix: str, filename: str, options: ScanOptions) ->
     return None
 
 
-def _walk(root: Path, exclude_dir_names: set, result: ScanResult, verbose: bool):
+def _walk(root: Path, exclude_dir_names: set, result: ScanResult, verbose: bool,
+          output_exclude_rel_path: Optional[str] = None):
     """Yield (abs_path, rel_posix) for every file found, honoring hard
     directory exclusions and symlink-escape safety. Directories themselves
     are reported via result.dir_exclusions when skipped."""
@@ -124,6 +127,9 @@ def _walk(root: Path, exclude_dir_names: set, result: ScanResult, verbose: bool)
                 if name in exclude_dir_names:
                     result.dir_exclusions.append((rel_posix, name, "excluded_directory_name"))
                     continue
+                if output_exclude_rel_path is not None and rel_posix == output_exclude_rel_path:
+                    result.dir_exclusions.append((rel_posix, name, "output_directory"))
+                    continue
                 yield from recurse(entry_path, rel_posix)
             else:
                 yield (entry_path, rel_posix, None)
@@ -137,7 +143,9 @@ def scan_repository(options: ScanOptions) -> ScanResult:
 
     py_analyses: dict[str, rc_pyanalysis.PyFileAnalysis] = {}
 
-    for abs_path, rel_posix, forced_reason in _walk(options.root, exclude_dir_names, result, options.verbose):
+    for abs_path, rel_posix, forced_reason in _walk(
+        options.root, exclude_dir_names, result, options.verbose, options.output_exclude_rel_path,
+    ):
         filename = abs_path.name
         ext = abs_path.suffix.lower()
 
@@ -172,6 +180,7 @@ def scan_repository(options: ScanOptions) -> ScanResult:
         full_text = None
         line_count = None
         char_count = 0
+        parse_status = "n/a"
 
         if not is_bin:
             try:
@@ -205,11 +214,27 @@ def scan_repository(options: ScanOptions) -> ScanResult:
             except OSError:
                 sample_text = None
             line_count = None
+        elif not is_bin and included:
+            # size_bytes > MAX_TEXT_READ_BYTES: too large to safely hold in
+            # memory whole. Still stream a small sample for classification
+            # and a full line count without loading the whole file, but
+            # skip symbol/import/call analysis and chunking -- and say so
+            # explicitly via parse_status rather than looking like an
+            # ordinary fully-processed file.
+            parse_status = "skipped_too_large"
+            try:
+                with open(abs_path, "rb") as fh:
+                    sample_text = fh.read(2000).decode("utf-8", errors="replace")
+            except OSError:
+                sample_text = None
+            try:
+                line_count = count_lines_streaming(abs_path)
+            except OSError:
+                line_count = None
 
         category, class_reason = rc_classify.classify_file(rel_posix, filename, ext, sample_text)
         gen_vendor = rc_classify.detect_generated_or_vendor(rel_posix, sample_text)
 
-        parse_status = "n/a"
         chunked = False
 
         if included and ext == ".py" and full_text is not None:
@@ -259,7 +284,27 @@ def scan_repository(options: ScanOptions) -> ScanResult:
         ))
 
     _resolve_python_relationships(py_analyses, result)
+    result.stale_chunks_removed = _cleanup_stale_chunks(options.output_dir, result)
     return result
+
+
+def _cleanup_stale_chunks(output_dir: Path, result: ScanResult) -> int:
+    """Remove chunk files left over from a prior run that this run's final
+    chunk_manifest no longer references (source deleted, excluded, or no
+    longer large enough to need chunking)."""
+    chunks_dir = output_dir / "chunks"
+    if not chunks_dir.exists():
+        return 0
+    referenced = {(output_dir / c.chunk_relative_path).resolve() for c in result.chunks}
+    removed = 0
+    for entry in chunks_dir.iterdir():
+        if entry.is_file() and entry.resolve() not in referenced:
+            try:
+                entry.unlink()
+                removed += 1
+            except OSError:
+                pass
+    return removed
 
 
 def _resolve_python_relationships(py_analyses: dict, result: ScanResult) -> None:

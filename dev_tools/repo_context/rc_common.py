@@ -86,6 +86,22 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def count_lines_streaming(path: Path, chunk_size: int = 1 << 20) -> int:
+    """Count newline-terminated lines without holding the file in memory."""
+    count = 0
+    last_byte = b""
+    with open(path, "rb") as fh:
+        while True:
+            block = fh.read(chunk_size)
+            if not block:
+                break
+            count += block.count(b"\n")
+            last_byte = block[-1:]
+    if last_byte and last_byte != b"\n":
+        count += 1
+    return count
+
+
 def stable_path_id(rel_path: str, length: int = 12) -> str:
     return hashlib.sha1(rel_path.encode("utf-8")).hexdigest()[:length]
 

@@ -138,6 +138,7 @@ def write_manifest(output_dir: Path, options, result, root: Path, started_at_utc
             "reuse_active": reuse_active,
             "chunks_reused_for_files": result.reused_count,
             "chunks_regenerated_for_files": result.regenerated_count,
+            "stale_chunks_removed": result.stale_chunks_removed,
         },
     }
     manifest.update(extra)

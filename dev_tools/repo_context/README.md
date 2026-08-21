@@ -92,7 +92,11 @@ python repo_context.py validate C:\path\to\repo_context
 - `file_inventory.csv` / `file_inventory.jsonl` — one row per considered
   file: path, extension, category, size, text/binary, line count,
   SHA-256, included/excluded (+ reason), chunked, parse status, and a
-  generated/vendor flag.
+  generated/vendor flag. `parse_status` is `ok`/`failed` for Python files,
+  `n/a` for everything else, or `skipped_too_large` for an included text
+  file bigger than the 30 MB in-memory read cap — it still gets a
+  streamed line count and SHA-256, but no symbol/import/call analysis or
+  chunking (nothing is silently dropped without a visible reason).
 - `python_symbols.csv` / `python_symbols.jsonl` — one row per Python
   module, class, function, async function, method, or nested function,
   with qualified name, line range, parent, decorators, parameters, base
@@ -156,7 +160,10 @@ call resolution is deliberately conservative — a target is only marked
   run, and cross-file resolution always runs against the current full
   file set — because a change elsewhere in the repo can change what an
   unchanged file's imports/calls resolve to. `--force` bypasses chunk
-  reuse entirely.
+  reuse entirely. Every run also removes any `chunks/` file left over
+  from a previous run that the current `chunk_manifest.csv` no longer
+  references (source deleted, newly excluded, or no longer large enough
+  to need chunking), so stale content never lingers on disk.
 - `--include-glob` can rescue a file matched by the default secret
   patterns or `--exclude-glob`, but it cannot pull files out of a
   hard-excluded directory (e.g. `.git/`, `node_modules/`) — those are

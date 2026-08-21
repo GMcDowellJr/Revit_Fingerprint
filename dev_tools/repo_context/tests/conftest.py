@@ -7,6 +7,11 @@ import pytest
 TOOL_DIR = Path(__file__).resolve().parent.parent
 TOOL_SCRIPT = TOOL_DIR / "repo_context.py"
 
+# Lets white-box tests `import rc_scan`, `import rc_common`, etc. directly
+# (the CLI-level tests below use subprocess via run_tool() instead).
+if str(TOOL_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOL_DIR))
+
 
 def run_tool(args, cwd=None):
     cmd = [sys.executable, str(TOOL_SCRIPT)] + [str(a) for a in args]

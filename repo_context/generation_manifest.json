@@ -14,7 +14,7 @@
     "excluded_directories": 21,
     "files_excluded": 3,
     "files_included": 621,
-    "imports": 4001,
+    "imports": 4466,
     "parse_failures": 0,
     "python_files": 355,
     "symbols": 4774
@@ -106,19 +106,19 @@
       "reason": "excluded_directory_name"
     }
   ],
-  "generated_at_utc": "2026-08-21T22:51:26Z",
+  "generated_at_utc": "2026-08-21T22:59:17Z",
   "incremental": {
     "chunks_regenerated_for_files": 37,
     "chunks_reused_for_files": 0,
-    "reuse_active": false
+    "reuse_active": false,
+    "stale_chunks_removed": 0
   },
   "options": {
     "exclude_globs": [
       "domains/graph_202*.json"
     ],
     "extra_exclude_dirs": [
-      "graphify-out",
-      "repo_context"
+      "graphify-out"
     ],
     "include_globs": [],
     "include_secrets": false,

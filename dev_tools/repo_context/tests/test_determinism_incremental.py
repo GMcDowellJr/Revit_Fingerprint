@@ -58,6 +58,29 @@ def test_incremental_regeneration_reuses_unchanged_chunk_output(repo, out):
     assert manifest3["incremental"]["chunks_regenerated_for_files"] >= 1
 
 
+def test_stale_chunks_removed_when_source_deleted(repo, out):
+    lines = ["def big_func(x):"]
+    for i in range(1200):
+        lines.append(f"    y{i} = x + {i}")
+    lines.append("    return x")
+    write_files(repo, {"big.py": "\n".join(lines) + "\n"})
+
+    r1 = run_tool(["scan", str(repo), "--output", str(out)])
+    assert r1.returncode == 0, r1.stderr
+    chunk_files_before = list((out / "chunks").glob("*"))
+    assert chunk_files_before
+
+    (repo / "big.py").unlink()
+    r2 = run_tool(["scan", str(repo), "--output", str(out)])
+    assert r2.returncode == 0, r2.stderr
+    chunk_files_after = list((out / "chunks").glob("*"))
+    assert chunk_files_after == []
+
+    import json
+    manifest = json.loads((out / "generation_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["incremental"]["stale_chunks_removed"] == len(chunk_files_before)
+
+
 def test_force_bypasses_incremental_reuse(repo, out):
     write_files(repo, {"a.py": "x = 1\n"})
     r1 = run_tool(["scan", str(repo), "--output", str(out)])

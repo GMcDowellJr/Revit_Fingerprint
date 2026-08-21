@@ -178,6 +178,27 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
             return RawCall(node.lineno, _unparse_safe(func), simple, "other", "", caller_symbol, class_ctx)
         return RawCall(node.lineno, _unparse_safe(func), "", "other", "", caller_symbol, class_ctx)
 
+    def record_import(stmt) -> None:
+        """Record an Import/ImportFrom statement found anywhere in the tree
+        -- not just at true module top level. Catches lazy imports inside
+        functions/methods, imports under `if TYPE_CHECKING:`, etc., so that
+        every import statement is reported per the documented contract."""
+        if isinstance(stmt, ast.Import):
+            for alias in stmt.names:
+                imports.append(ImportRecord(
+                    source_file=rel_path, source_module=source_module, line=stmt.lineno,
+                    import_type="import", imported_module=alias.name, imported_name="",
+                    alias=alias.asname or "", level=0, resolved_file="", resolution_status="",
+                ))
+        elif isinstance(stmt, ast.ImportFrom):
+            for alias in stmt.names:
+                imports.append(ImportRecord(
+                    source_file=rel_path, source_module=source_module, line=stmt.lineno,
+                    import_type="from_import", imported_module=stmt.module or "",
+                    imported_name=alias.name, alias=alias.asname or "",
+                    level=stmt.level or 0, resolved_file="", resolution_status="",
+                ))
+
     def walk_body(node: ast.AST, scope_qualname: str, class_ctx: str, parent_qualname: str) -> None:
         nonlocal has_main_guard
         for child in ast.iter_child_nodes(node):
@@ -190,6 +211,9 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
                 handle_func(child, scope_qualname, class_ctx, parent_qualname)
             elif isinstance(child, ast.If) and parent_qualname == MODULE_SYMBOL and _is_main_guard(child):
                 has_main_guard = True
+                walk_body(child, scope_qualname, class_ctx, parent_qualname)
+            elif isinstance(child, (ast.Import, ast.ImportFrom)):
+                record_import(child)
                 walk_body(child, scope_qualname, class_ctx, parent_qualname)
             else:
                 walk_body(child, scope_qualname, class_ctx, parent_qualname)
@@ -230,6 +254,8 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
                 handle_class(stmt, qualname, parent_qualname)
             elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 handle_func(stmt, qualname, qualname, parent_qualname)
+            elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
+                record_import(stmt)
             else:
                 walk_body(stmt, qualname, qualname, parent_qualname)
 
@@ -276,6 +302,8 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
                 handle_class(stmt, qualname, parent_qualname)
             elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 handle_func(stmt, qualname, effective_class_ctx, parent_qualname)
+            elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
+                record_import(stmt)
             else:
                 walk_body(stmt, qualname, effective_class_ctx, parent_qualname)
 
@@ -287,22 +315,8 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
         elif isinstance(stmt, ast.If) and _is_main_guard(stmt):
             has_main_guard = True
             walk_body(stmt, MODULE_SYMBOL, "", MODULE_SYMBOL)
-        elif isinstance(stmt, ast.Import):
-            for alias in stmt.names:
-                imports.append(ImportRecord(
-                    source_file=rel_path, source_module=source_module, line=stmt.lineno,
-                    import_type="import", imported_module=alias.name, imported_name="",
-                    alias=alias.asname or "", level=0, resolved_file="", resolution_status="",
-                ))
-            walk_body(stmt, MODULE_SYMBOL, "", MODULE_SYMBOL)
-        elif isinstance(stmt, ast.ImportFrom):
-            for alias in stmt.names:
-                imports.append(ImportRecord(
-                    source_file=rel_path, source_module=source_module, line=stmt.lineno,
-                    import_type="from_import", imported_module=stmt.module or "",
-                    imported_name=alias.name, alias=alias.asname or "",
-                    level=stmt.level or 0, resolved_file="", resolution_status="",
-                ))
+        elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
+            record_import(stmt)
             walk_body(stmt, MODULE_SYMBOL, "", MODULE_SYMBOL)
         else:
             walk_body(stmt, MODULE_SYMBOL, "", MODULE_SYMBOL)
