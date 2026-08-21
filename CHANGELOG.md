@@ -13,6 +13,23 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Added
+- **`mapping/` line_patterns Revit mapping utility (D-038).** New downstream,
+  Revit-writing package (separate from `core/`/`domains/`/`runner/`/`tools/`)
+  that reads `tools/export_bundle_pattern_detail.py`'s
+  `bundle_pattern_inventory.csv`/`pattern_settings.csv`/`pattern_names.csv`
+  and materializes representative `LinePatternElement` objects in the
+  currently open Revit document for a mapping/configuration RVT. Every
+  requested `(domain="line_patterns", join_hash)` is reconstructed from
+  evidence and blocked (never inferred) on incomplete/inconsistent data;
+  creation happens inside a per-configuration `Transaction` that is only
+  committed after the created element is read back and its `join_hash`
+  (via the existing `line_patterns.join_key.v3` policy -- not `sig_hash`)
+  is verified to match the request, with rollback on any mismatch or
+  exception. No existing extraction, join-key, bundle-analysis, or
+  `export_bundle_pattern_detail.py` semantics change -- this is purely
+  additive. See `docs/line_pattern_mapping.md` and D-038.
+
 ### Changed
 - **Repository-neutral runtime and sample defaults.** Dynamo runner discovery no
   longer searches an organization-specific user-profile path, both checked-in
@@ -25,6 +42,28 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   population membership.
 
 ### Fixed
+- **`tools/export_bundle_pattern_detail.py`: `_iter_identity_csv()` now always
+  resolves item quality from `item_value_type` on the v2.1 identity-item shard
+  schema, never from `item_role`.** `item_role` is not a quality field at all
+  on this schema -- it is a separate, unrelated tag: blank for a normal row
+  written by `tools/extractor.py`'s shard writer, but populated with a
+  non-quality marker (e.g. `"synthetic"`) for `tools/run_extract_all.py`'s
+  synthetic `line_pattern.segments_norm_hash` row. The original code,
+  `row.get("item_role", row.get("item_value_type", ""))`, only fell through to
+  `item_value_type` on a *missing* key -- since `item_role` is always present
+  (just usually empty), this returned `""` for every normal row (leaving
+  `pattern_settings.csv`'s `q` column blank domain-wide) and, after a first
+  attempted fix that preferred `item_role` whenever non-empty, would have
+  returned the literal string `"synthetic"` as `q` for norm-hash rows instead
+  of their real quality. Fixed by reading `q` from `item_value_type`
+  unconditionally on this schema. Found via automated PR review while
+  validating the new `mapping/` line_patterns utility (which depends on `q` to
+  gate reconstruction) against a realistic v2.1 export shape; the bug is not
+  specific to that consumer -- it affected `q` resolution for every domain
+  read through `export_bundle_pattern_detail.py`'s v2.1 code path. Does not
+  affect the legacy `k`/`v`/`q` schema path, `sig_hash`/`join_hash`
+  computation (which reads identity items via a different path), or any other
+  exported artifact.
 - **`materials`: `material.keynote` no longer silently omitted from `identity_basis.items` when blank.**
   `domains/materials.py`'s keynote emission previously used a truthy guard
   (`if keynote and keynote[0]:`) with no `else` branch, so materials with a blank
