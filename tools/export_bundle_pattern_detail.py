@@ -303,7 +303,13 @@ def _iter_identity_csv(path: Path) -> Iterator[Dict[str, str]]:
             if "k" not in row and "item_key" in row:
                 row["k"] = row.get("item_key", "")
                 row["v"] = row.get("item_value", "")
-                row["q"] = row.get("item_role", row.get("item_value_type", ""))
+                # item_role is always present as a column in the v2.1 shard schema but
+                # is left blank by the current shard writer (tools/extractor.py, which
+                # writes quality into item_value_type instead) -- dict.get()'s default
+                # only fires on a missing key, not a blank value, so prefer item_role
+                # only when it actually carries a value.
+                item_role = row.get("item_role", "")
+                row["q"] = item_role if item_role else row.get("item_value_type", "")
             yield row
 
 
