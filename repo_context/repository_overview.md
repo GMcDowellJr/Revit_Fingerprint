@@ -1,16 +1,16 @@
 # Repository Overview: Revit_Fingerprint
 
-- Scan time (UTC): 2026-08-21T23:06:43Z
+- Scan time (UTC): 2026-08-21T23:16:55Z
 - Generator: repo_context.py v0.1.0
-- Total files considered: 624
-- Included: 621
+- Total files considered: 648
+- Included: 645
 - Excluded: 3
 
 ## Files by extension
 
-- `.py`: 355
+- `.py`: 378
 - `.cs`: 118
-- `.md`: 98
+- `.md`: 99
 - `.json`: 27
 - `(none)`: 6
 - `.csv`: 6
@@ -22,10 +22,10 @@
 
 ## Files by classification
 
-- python_source: 245
+- python_source: 257
 - unsupported_text: 127
-- test: 110
-- documentation: 98
+- test: 121
+- documentation: 99
 - data: 32
 - script_powershell: 3
 - script_shell: 3
@@ -91,8 +91,9 @@
 
 - (none)
 
-## Likely entry points (102)
+## Likely entry points (103)
 
+- `dev_tools/repo_context/repo_context.py` — contains `if __name__ == "__main__":` guard
 - `scripts/check_audit_references.py` — contains `if __name__ == "__main__":` guard
 - `sync_revitlookup_reference.py` — contains `if __name__ == "__main__":` guard
 - `tests/revit/revit_test_runner_pyrevit.py` — contains `if __name__ == "__main__":` guard
@@ -200,15 +201,15 @@
 
 _Derived only from file classification counts in each top-level directory; not a claim about architecture._
 
-- test: tests, tools
-- documentation: (repository root), .agents, .codex, .copilot, .github, audit_results, contracts, docs, policies, reference, tests, tools
+- test: dev_tools, tests, tools
+- documentation: (repository root), .agents, .codex, .copilot, .github, audit_results, contracts, dev_tools, docs, policies, reference, tests, tools
 - configuration: .github
 - json_schema: contracts
 - script_shell: .claude, .codex
 - script_powershell: tools
-- python_source: (repository root), core, domains, legacy, mapping, runner, scripts, tools, validators
+- python_source: (repository root), core, dev_tools, domains, legacy, mapping, runner, scripts, tools, validators
 
-## Unusually large or structurally complex Python modules (169)
+## Unusually large or structurally complex Python modules (177)
 
 _Heuristic only: line count > 800 or any symbol with approximate cyclomatic complexity > 15._
 
@@ -224,8 +225,8 @@ _Heuristic only: line count > 800 or any symbol with approximate cyclomatic comp
 - `core/rows.py` — 333 lines, max symbol complexity ~16
 - `core/sig_hash_builder.py` — 123 lines, max symbol complexity ~25
 - `core/vg_sig.py` — 462 lines, max symbol complexity ~18
-- `domains/arrowheads.py` — 667 lines, max symbol complexity ~52
-- `domains/browser_organization.py` — 573 lines, max symbol complexity ~36
-- `domains/ceiling_types.py` — 221 lines, max symbol complexity ~25
-- ... and 154 more
+- `dev_tools/repo_context/rc_chunking.py` — 199 lines, max symbol complexity ~24
+- `dev_tools/repo_context/rc_classify.py` — 106 lines, max symbol complexity ~21
+- `dev_tools/repo_context/rc_overview.py` — 245 lines, max symbol complexity ~42
+- ... and 162 more
 

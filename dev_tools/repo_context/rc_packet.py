@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from rc_common import atomic_write_text, sanitize_stem, redact_secrets
+from rc_common import atomic_write_text, sanitize_stem, redact_secrets, sha256_file
 
 
 def _load_csv(path: Path) -> list:
@@ -23,6 +23,31 @@ def _load_csv(path: Path) -> list:
 
 def _norm_rel(path_str: str) -> str:
     return path_str.replace("\\", "/").lstrip("/")
+
+
+def _file_is_fresh(root: Path, rel_path: str, expected_sha256: str) -> bool:
+    """True if rel_path's current on-disk content still matches the
+    SHA-256 recorded for it in file_inventory.csv at the last `scan`. If
+    the source changed since then (or a different ROOT with a
+    coincidentally matching relative path was passed to `packet`), the
+    line ranges/symbol identities in the index no longer describe what's
+    actually on disk -- rendering an excerpt under those stale claims
+    could silently combine correct-looking metadata with unrelated
+    current content."""
+    if not expected_sha256:
+        return True  # nothing recorded to check against; don't block
+    abs_path = root / rel_path
+    try:
+        resolved = abs_path.resolve()
+        resolved.relative_to(root.resolve())
+    except (OSError, ValueError):
+        return False
+    if not resolved.exists():
+        return False
+    try:
+        return sha256_file(resolved) == expected_sha256
+    except OSError:
+        return False
 
 
 def _safe_excerpt(root: Path, rel_path: str, start: int, end: int) -> Optional[list]:
@@ -165,11 +190,20 @@ def _candidate_tests_for_file(target_file: str, imports: list, calls: list, file
     return sorted(out)
 
 
-def _render_symbol_block(root: Path, row: dict, budget: Budget, out: list, note_prefix: str = "") -> None:
+def _render_symbol_block(root: Path, row: dict, budget: Budget, out: list,
+                          note_prefix: str = "", expected_sha256: str = "") -> None:
     start, end = int(row["start_line"]), int(row["end_line"])
-    excerpt = _safe_excerpt(root, row["relative_path"], start, end)
     header = f"\n### {note_prefix}`{row['qualified_name']}` ({row['symbol_type']}) — `{row['relative_path']}:{start}-{end}`\n"
     out.append(header)
+    if not _file_is_fresh(root, row["relative_path"], expected_sha256):
+        msg = (f"_Source excerpt withheld: `{row['relative_path']}` has changed on disk since the last "
+               f"`scan` (SHA-256 mismatch), so the line range above may no longer describe this symbol "
+               f"accurately. Re-run `scan` for an up-to-date packet._\n")
+        out.append(msg)
+        budget.omissions.append(f"`{row['relative_path']}` changed since the last scan; excerpt for "
+                                 f"`{row['qualified_name']}` withheld. Re-run scan.")
+        return
+    excerpt = _safe_excerpt(root, row["relative_path"], start, end)
     if excerpt is None:
         out.append("_Source excerpt unavailable (file missing or unreadable)._\n")
         return
@@ -205,15 +239,25 @@ def generate_packet(opts: PacketOptions) -> Path:
     out.append("# Repo Context Packet\n")
     out.append(f"- Root: `{opts.root.resolve().name}`")
     if opts.file:
-        out.append(f"- Requested file: `{opts.file}`")
+        # Normalized (forward-slash) form -- keeps this header consistent
+        # with the repo-relative paths used everywhere else in the output,
+        # so `validate`'s cross-check against file_inventory.csv matches
+        # even when the user passed a Windows-style path.
+        out.append(f"- Requested file: `{_norm_rel(opts.file)}`")
     if opts.symbol:
         out.append(f"- Requested symbol: `{opts.symbol}`")
     if opts.search:
         out.append(f"- Requested search text: `{opts.search}`")
     if opts.line:
-        out.append(f"- Requested line: `{opts.line}`")
+        try:
+            _line_file, _line_no = opts.line.rsplit(":", 1)
+            normalized_line = f"{_norm_rel(_line_file)}:{_line_no}"
+        except ValueError:
+            normalized_line = opts.line
+        out.append(f"- Requested line: `{normalized_line}`")
     if opts.changed:
-        out.append(f"- Requested changed files: {', '.join('`' + c + '`' for c in opts.changed)}")
+        normalized_changed = [_norm_rel(c) for c in opts.changed]
+        out.append(f"- Requested changed files: {', '.join('`' + c + '`' for c in normalized_changed)}")
     out.append(f"- caller_depth={opts.caller_depth}, callee_depth={opts.callee_depth}, "
                f"max_files={opts.max_files}, max_lines={opts.max_lines}, max_characters={opts.max_characters}\n")
 
@@ -260,7 +304,7 @@ def generate_packet(opts: PacketOptions) -> Path:
             out.append("")
 
         for r in top_level:
-            _render_symbol_block(opts.root, r, budget, out)
+            _render_symbol_block(opts.root, r, budget, out, expected_sha256=frow.get("sha256", ""))
 
     def add_symbol_section(row: dict) -> None:
         stem_parts.append(row["qualified_name"])
@@ -269,7 +313,8 @@ def generate_packet(opts: PacketOptions) -> Path:
         if enclosing:
             out.append(f"Enclosing scope: `{enclosing['qualified_name']}` ({enclosing['symbol_type']}, "
                         f"lines {enclosing['start_line']}-{enclosing['end_line']})\n")
-        _render_symbol_block(opts.root, row, budget, out)
+        expected_sha256 = files_by_path.get(row["relative_path"], {}).get("sha256", "")
+        _render_symbol_block(opts.root, row, budget, out, expected_sha256=expected_sha256)
 
         callers = _bfs_callers(row["relative_path"], row["qualified_name"], calls_rows, opts.caller_depth)
         callees = _bfs_callees(row["relative_path"], row["qualified_name"], calls_rows, opts.callee_depth)

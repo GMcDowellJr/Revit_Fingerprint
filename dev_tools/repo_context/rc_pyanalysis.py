@@ -53,7 +53,8 @@ def _is_main_guard(node: ast.AST) -> bool:
         return False
     test = node.test
     return (isinstance(test, ast.Compare) and isinstance(test.left, ast.Name)
-            and test.left.id == "__name__" and len(test.comparators) == 1
+            and test.left.id == "__name__" and len(test.ops) == 1
+            and isinstance(test.ops[0], ast.Eq) and len(test.comparators) == 1
             and isinstance(test.comparators[0], ast.Constant)
             and test.comparators[0].value == "__main__")
 
@@ -129,6 +130,7 @@ class PyFileAnalysis:
     class_info: dict  # class qualified name -> ClassInfo
     local_names_by_symbol: dict  # function-type qualified name -> set of locally-bound simple names
     parent_of: dict  # qualified name -> parent qualified name, for every symbol in this file
+    imports_by_scope: dict  # qualified name -> list[ImportRecord] declared directly in that scope
 
 
 def _collect_local_bound_names(node) -> set:
@@ -170,6 +172,7 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
     top_level_index: dict = {}
     class_info: dict = {}
     local_names_by_symbol: dict = {}
+    imports_by_scope: dict = {}
     has_main_guard = False
 
     source_module = dotted_module_path(rel_path)
@@ -211,26 +214,48 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
             return RawCall(node.lineno, _unparse_safe(func), simple, "other", "", caller_symbol, class_ctx)
         return RawCall(node.lineno, _unparse_safe(func), "", "other", "", caller_symbol, class_ctx)
 
-    def record_import(stmt) -> None:
+    def walk_expr_for_calls(expr, scope_qualname: str, class_ctx: str, parent_qualname: str) -> None:
+        """Harvest calls from a definition-time expression (a decorator, a
+        default argument value, a base-class expression, ...). These
+        execute in the *enclosing* scope when the def/class statement
+        itself runs, not inside the function/class body's own scope.
+        Unlike a body statement, `expr` is not wrapped in an ast.Expr, so
+        it can itself directly be the Call node -- walk_body alone would
+        only see its children."""
+        if expr is None:
+            return
+        if isinstance(expr, ast.Call):
+            raw_calls.append(make_call(expr, scope_qualname, class_ctx))
+        walk_body(expr, scope_qualname, class_ctx, parent_qualname)
+
+    def record_import(stmt, scope_qualname: str) -> None:
         """Record an Import/ImportFrom statement found anywhere in the tree
         -- not just at true module top level. Catches lazy imports inside
         functions/methods, imports under `if TYPE_CHECKING:`, etc., so that
-        every import statement is reported per the documented contract."""
+        every import statement is reported per the documented contract.
+
+        Also indexes the record under the scope it lexically belongs to
+        (imports_by_scope), so call resolution can treat a function-local
+        import as visible only within that function's own scope chain --
+        not file-wide."""
+        new_records = []
         if isinstance(stmt, ast.Import):
             for alias in stmt.names:
-                imports.append(ImportRecord(
+                new_records.append(ImportRecord(
                     source_file=rel_path, source_module=source_module, line=stmt.lineno,
                     import_type="import", imported_module=alias.name, imported_name="",
                     alias=alias.asname or "", level=0, resolved_file="", resolution_status="",
                 ))
         elif isinstance(stmt, ast.ImportFrom):
             for alias in stmt.names:
-                imports.append(ImportRecord(
+                new_records.append(ImportRecord(
                     source_file=rel_path, source_module=source_module, line=stmt.lineno,
                     import_type="from_import", imported_module=stmt.module or "",
                     imported_name=alias.name, alias=alias.asname or "",
                     level=stmt.level or 0, resolved_file="", resolution_status="",
                 ))
+        imports.extend(new_records)
+        imports_by_scope.setdefault(scope_qualname, []).extend(new_records)
 
     def walk_body(node: ast.AST, scope_qualname: str, class_ctx: str, parent_qualname: str) -> None:
         nonlocal has_main_guard
@@ -246,7 +271,7 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
                 has_main_guard = True
                 walk_body(child, scope_qualname, class_ctx, parent_qualname)
             elif isinstance(child, (ast.Import, ast.ImportFrom)):
-                record_import(child)
+                record_import(child, scope_qualname)
                 walk_body(child, scope_qualname, class_ctx, parent_qualname)
             else:
                 walk_body(child, scope_qualname, class_ctx, parent_qualname)
@@ -278,6 +303,12 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
         symbols.append(rec)
         if parent_qualname == MODULE_SYMBOL:
             top_level_index[node.name] = qualname
+        for dec in node.decorator_list:
+            walk_expr_for_calls(dec, parent_qualname, "", parent_qualname)
+        for base in node.bases:
+            walk_expr_for_calls(base, parent_qualname, "", parent_qualname)
+        for kw in node.keywords:
+            walk_expr_for_calls(kw.value, parent_qualname, "", parent_qualname)
         info = class_info.setdefault(qualname, ClassInfo(qualified_name=qualname, bases=bases))
         for n in node.body:
             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -288,7 +319,7 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
             elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 handle_func(stmt, qualname, qualname, parent_qualname)
             elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
-                record_import(stmt)
+                record_import(stmt, qualname)
             else:
                 walk_body(stmt, qualname, qualname, parent_qualname)
 
@@ -329,6 +360,10 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
         if parent_qualname == MODULE_SYMBOL:
             top_level_index[node.name] = qualname
         local_names_by_symbol[qualname] = _collect_local_bound_names(node)
+        for dec in node.decorator_list:
+            walk_expr_for_calls(dec, parent_qualname, "", parent_qualname)
+        for default in list(node.args.defaults) + list(node.args.kw_defaults):
+            walk_expr_for_calls(default, parent_qualname, "", parent_qualname)
         # class_ctx passed through for self-resolution of nested defs.
         effective_class_ctx = class_ctx if symbol_type in ("method",) else (class_ctx if symbol_type == "nested_function" else "")
         for stmt in node.body:
@@ -337,7 +372,7 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
             elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 handle_func(stmt, qualname, effective_class_ctx, parent_qualname)
             elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
-                record_import(stmt)
+                record_import(stmt, qualname)
             else:
                 walk_body(stmt, qualname, effective_class_ctx, parent_qualname)
 
@@ -350,7 +385,7 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
             has_main_guard = True
             walk_body(stmt, MODULE_SYMBOL, "", MODULE_SYMBOL)
         elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
-            record_import(stmt)
+            record_import(stmt, MODULE_SYMBOL)
             walk_body(stmt, MODULE_SYMBOL, "", MODULE_SYMBOL)
         else:
             walk_body(stmt, MODULE_SYMBOL, "", MODULE_SYMBOL)
@@ -360,7 +395,7 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
         symbols=symbols, imports=imports, raw_calls=raw_calls,
         has_main_guard=has_main_guard, top_level_index=top_level_index,
         class_info=class_info, local_names_by_symbol=local_names_by_symbol,
-        parent_of=parent_of,
+        parent_of=parent_of, imports_by_scope=imports_by_scope,
     )
 
 
@@ -434,24 +469,49 @@ def build_import_bindings(imports: list) -> dict:
     return bindings
 
 
-def _is_shadowed(name: str, caller_symbol: str, parent_of: dict, local_names_by_symbol: dict) -> bool:
-    """True if `name` is bound as a parameter or local variable somewhere
-    in caller_symbol's own lexical scope chain (its own body, or an
-    enclosing function's), which would shadow a same-named module-level
-    function/class or import for a bare `name(...)` call."""
+def build_bindings_by_scope(imports_by_scope: dict) -> dict:
+    """qualified scope name -> import-bindings dict for imports declared
+    directly in that scope (see build_import_bindings). Keeping this
+    per-scope, rather than one file-wide dict, is what stops a
+    function-local `import` from being treated as visible to unrelated
+    functions elsewhere in the same file."""
+    return {scope: build_import_bindings(recs) for scope, recs in imports_by_scope.items()}
+
+
+def _lookup_in_scope_chain(name: str, caller_symbol: str, parent_of: dict,
+                            local_names_by_symbol: dict, bindings_by_scope: dict,
+                            class_info: dict):
+    """Walk caller_symbol's lexical scope chain (its own scope, then each
+    enclosing function/module scope) looking for `name`. Returns
+    ("shadowed", None) if a parameter/local variable binds it first,
+    ("import", binding_tuple) if an import binds it first, or (None, None)
+    if neither -- in which case the caller should fall back to
+    module-level top_level_index (same-module function/class defs, which
+    aren't scope-restricted the way local imports are).
+
+    A class body's own bindings only count for calls made directly in
+    that class body (the first scope checked); they're skipped while
+    climbing past a class on the way to an outer scope, matching real
+    Python scoping (methods/nested defs don't see class-body names)."""
     current = caller_symbol
     seen = set()
+    is_own_scope = True
     while current and current not in seen:
         seen.add(current)
         local_names = local_names_by_symbol.get(current)
         if local_names and name in local_names:
-            return True
+            return "shadowed", None
+        if is_own_scope or current not in class_info:
+            scope_bindings = bindings_by_scope.get(current)
+            if scope_bindings and name in scope_bindings:
+                return "import", scope_bindings[name]
+        is_own_scope = False
         current = parent_of.get(current)
-    return False
+    return None, None
 
 
 def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
-                   class_info: dict, import_bindings: dict,
+                   class_info: dict, bindings_by_scope: dict,
                    all_top_level_index: dict, all_class_info: dict,
                    local_names_by_symbol: dict, parent_of: dict) -> list:
     results = []
@@ -463,22 +523,16 @@ def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
 
         if rc.kind == "name":
             name = rc.callee_simple_name
-            if _is_shadowed(name, rc.caller_symbol, parent_of, local_names_by_symbol):
+            lookup_kind, binding = _lookup_in_scope_chain(
+                name, rc.caller_symbol, parent_of, local_names_by_symbol, bindings_by_scope, class_info,
+            )
+            if lookup_kind == "shadowed":
                 explanation = (
                     f"'{name}' is shadowed by a parameter or local variable in the enclosing "
                     f"scope; not statically resolvable to the module-level definition"
                 )
-            elif name in top_level_index:
-                candidate_file = caller_file
-                candidate_symbol = top_level_index[name]
-                is_class = candidate_symbol in class_info
-                confidence = "high"
-                explanation = (
-                    "constructor call to class defined in the same module"
-                    if is_class else "direct call to a function defined in the same module"
-                )
-            elif name in import_bindings:
-                target_file, target_symbol, kind = import_bindings[name]
+            elif lookup_kind == "import":
+                target_file, target_symbol, kind = binding
                 if target_file and target_file in all_top_level_index and name_in_index(
                         all_top_level_index[target_file], target_symbol if kind == "imported_name" else name):
                     lookup_name = target_symbol if kind == "imported_name" else name
@@ -492,6 +546,15 @@ def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
                     )
                 else:
                     explanation = f"name '{name}' is bound by an import that could not be resolved to a single repo file"
+            elif name in top_level_index:
+                candidate_file = caller_file
+                candidate_symbol = top_level_index[name]
+                is_class = candidate_symbol in class_info
+                confidence = "high"
+                explanation = (
+                    "constructor call to class defined in the same module"
+                    if is_class else "direct call to a function defined in the same module"
+                )
             else:
                 explanation = "name not defined in this module and not bound via a resolvable import"
 
@@ -516,21 +579,26 @@ def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
                             explanation = f"resolved via base class '{base}' defined in the same file"
                             found = True
                             break
-                    elif base in import_bindings:
-                        target_file, _, _ = import_bindings[base]
-                        base_info_map = all_class_info.get(target_file, {})
-                        base_qual = None
-                        for qn in base_info_map:
-                            if qn.split(".")[-1] == base:
-                                base_qual = qn
+                    else:
+                        base_lookup_kind, base_binding = _lookup_in_scope_chain(
+                            base, parent_of.get(ctx, ctx), parent_of, local_names_by_symbol,
+                            bindings_by_scope, class_info,
+                        )
+                        if base_lookup_kind == "import":
+                            target_file, _, _ = base_binding
+                            base_info_map = all_class_info.get(target_file, {})
+                            base_qual = None
+                            for qn in base_info_map:
+                                if qn.split(".")[-1] == base:
+                                    base_qual = qn
+                                    break
+                            if base_qual and method in base_info_map[base_qual].methods:
+                                candidate_file = target_file
+                                candidate_symbol = f"{base_qual}.{method}"
+                                confidence = "medium"
+                                explanation = f"resolved via imported base class '{base}'"
+                                found = True
                                 break
-                        if base_qual and method in base_info_map[base_qual].methods:
-                            candidate_file = target_file
-                            candidate_symbol = f"{base_qual}.{method}"
-                            confidence = "medium"
-                            explanation = f"resolved via imported base class '{base}'"
-                            found = True
-                            break
                 if not found:
                     explanation = "self.<method>() not found on the class or its statically known bases"
             else:
@@ -538,8 +606,13 @@ def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
 
         elif rc.kind == "attribute_on_name":
             base = rc.base_name
-            if base in import_bindings:
-                target_file, _, kind = import_bindings[base]
+            base_lookup_kind, base_binding = _lookup_in_scope_chain(
+                base, rc.caller_symbol, parent_of, local_names_by_symbol, bindings_by_scope, class_info,
+            )
+            if base_lookup_kind == "shadowed":
+                explanation = f"'{base}' is shadowed by a parameter or local variable in the enclosing scope"
+            elif base_lookup_kind == "import":
+                target_file, _, kind = base_binding
                 if kind == "module_alias" and target_file and target_file in all_top_level_index:
                     idx = all_top_level_index[target_file]
                     if rc.callee_simple_name in idx:

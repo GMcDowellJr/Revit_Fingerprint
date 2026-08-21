@@ -1,4 +1,5 @@
 relative_path,reason
+dev_tools/repo_context/repo_context.py,"contains `if __name__ == ""__main__"":` guard"
 scripts/check_audit_references.py,"contains `if __name__ == ""__main__"":` guard"
 sync_revitlookup_reference.py,"contains `if __name__ == ""__main__"":` guard"
 tests/revit/revit_test_runner_pyrevit.py,"contains `if __name__ == ""__main__"":` guard"

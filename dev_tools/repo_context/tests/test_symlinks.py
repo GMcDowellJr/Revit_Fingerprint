@@ -33,6 +33,23 @@ def test_symlink_escaping_root_is_excluded(tmp_path, repo, out):
         assert "do-not-leak" not in csv_path.read_text(encoding="utf-8")
 
 
+def test_file_symlink_escaping_root_is_excluded_without_being_read(tmp_path, repo, out):
+    write_files(repo, {"normal.py": "x = 1\n"})
+    outside_file = tmp_path / "outside_secret.py"
+    write_files(tmp_path, {"outside_secret.py": "SUPER_SECRET_OUTSIDE_CONTENT = 1\n"})
+
+    (repo / "leaked.py").symlink_to(outside_file)
+
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    with open(out / "file_inventory.csv", newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    assert not any("leaked" in r["relative_path"] for r in rows)
+    for csv_path in (out / "file_inventory.csv", out / "python_symbols.csv"):
+        assert "SUPER_SECRET_OUTSIDE_CONTENT" not in csv_path.read_text(encoding="utf-8")
+
+
 def test_symlink_cycle_inside_root_does_not_hang(repo, out):
     write_files(repo, {"inside.py": "x = 1\n"})
     (repo / "cycle").mkdir()

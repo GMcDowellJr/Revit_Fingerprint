@@ -23,8 +23,14 @@ DEFAULT_EXCLUDE_DIRS = {
     "dist", "build",
     "coverage", "htmlcov",
     ".idea", ".vscode",
-    "repo_context", "_copilot_context",
 }
+# Deliberately NOT here by bare name: "repo_context" / "_copilot_context".
+# The actual output directory is excluded by its exact repo-relative path
+# (see repo_context.py's _resolve_output_dir / ScanOptions.output_exclude_rel_path),
+# not by name -- a name-based entry here would silently exclude any
+# legitimately-named source directory sharing one of these names anywhere
+# in the tree (e.g. this very tool's own dev_tools/repo_context/), with no
+# way to rescue it via --include-glob.
 
 DEFAULT_EXCLUDE_FILE_GLOBS = [
     ".env", ".env.*",

@@ -107,10 +107,11 @@ def _walk(root: Path, exclude_dir_names: set, result: ScanResult, verbose: bool,
                 except ValueError:
                     inside = False
                 if not inside:
-                    if entry.is_dir(follow_symlinks=True):
-                        result.dir_exclusions.append((rel_posix, name, "symlink_outside_root"))
-                        continue
-                    yield (entry_path, rel_posix, "symlink_outside_root")
+                    # Never yield an escaping symlink for normal processing --
+                    # scan_repository's per-file pipeline stat()s and hashes
+                    # the path, which follows symlinks and would read (or,
+                    # for a FIFO/device file, hang on) content outside root.
+                    result.dir_exclusions.append((rel_posix, name, "symlink_outside_root"))
                     continue
                 if entry.is_dir(follow_symlinks=True):
                     if str(real) in visited_real_dirs:
@@ -333,10 +334,10 @@ def _resolve_python_relationships(py_analyses: dict, result: ScanResult) -> None
         result.symbols.extend(analysis.symbols)
 
     for rel_path, analysis in py_analyses.items():
-        bindings = rc_pyanalysis.build_import_bindings(analysis.imports)
+        bindings_by_scope = rc_pyanalysis.build_bindings_by_scope(analysis.imports_by_scope)
         calls = rc_pyanalysis.resolve_calls(
             analysis.raw_calls, rel_path, analysis.top_level_index, analysis.class_info,
-            bindings, all_top_level_index, all_class_info,
+            bindings_by_scope, all_top_level_index, all_class_info,
             analysis.local_names_by_symbol, analysis.parent_of,
         )
         result.calls.extend(calls)

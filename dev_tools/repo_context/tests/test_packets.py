@@ -34,6 +34,20 @@ def test_search_packet_respects_size_budget_on_repetitive_file(repo, out):
     assert "Omitted" in text
 
 
+def test_packet_withholds_excerpt_when_source_changed_since_scan(repo, out):
+    write_files(repo, {"a.py": "def f():\n    return 1\n"})
+    _scan(repo, out)
+    # Change the file after scanning, without rescanning.
+    write_files(repo, {"a.py": "def f():\n    return 'changed'\n"})
+
+    result = run_tool(["packet", str(repo), "--output", str(out), "--symbol", "f"])
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_f.md").read_text(encoding="utf-8")
+    assert "withheld" in text
+    assert "return 1" not in text
+    assert "return 'changed'" not in text
+
+
 def test_packet_by_symbol(repo, out):
     write_files(repo, {"pkg/mod.py": "def unique_symbol_name():\n    return 1\n"})
     _scan(repo, out)

@@ -156,6 +156,29 @@ def test_call_shadowed_by_parameter_is_not_resolved_to_module_function(repo, out
     assert "shadow" in row["explanation"].lower()
 
 
+def test_function_local_import_does_not_leak_into_unrelated_function(repo, out):
+    write_files(repo, {
+        "lib.py": "def helper():\n    return 1\n",
+        "a.py": (
+            "def a():\n"
+            "    from lib import helper\n"
+            "    return helper()\n\n\n"
+            "def b():\n"
+            "    return helper()\n"
+        ),
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    row_a = next(r for r in calls if r["caller_symbol"] == "a")
+    row_b = next(r for r in calls if r["caller_symbol"] == "b")
+    assert row_a["confidence"] == "medium"
+    assert row_a["candidate_file"] == "lib.py"
+    assert row_b["confidence"] == "unresolved"
+    assert row_b["candidate_file"] == ""
+
+
 def test_self_method_call_within_known_class(repo, out):
     write_files(repo, {
         "widget.py": (
