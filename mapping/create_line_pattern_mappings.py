@@ -91,25 +91,22 @@ def _resolve_repo_root(explicit_repo_root):
     )
 
 
-def _purge_stale_repo_modules(repo_root):
+def _purge_repo_modules():
     # A persistent Dynamo CPython session keeps its interpreter (and sys.modules)
-    # alive across node re-runs. If a prior run already imported mapping.*/core.*/
-    # domains.* from a different checkout, inserting the newly-resolved repo_root
-    # into sys.path does nothing to those already-cached entries -- Python's import
-    # system checks sys.modules first, so this script would keep silently using
-    # the stale checkout's reconstruction code/policies while reporting repo_root
-    # as the one in effect. Mirrors runner/thin_runner.py's identical
-    # checkout-switch handling (_purge_repo_modules there).
-    existing = sys.modules.get("mapping.line_pattern_reconstruction")
-    if existing is None:
-        return
-    try:
-        existing_file = os.path.abspath(str(getattr(existing, "__file__", "") or ""))
-    except Exception:
-        existing_file = ""
-    if existing_file.startswith(os.path.abspath(repo_root) + os.sep):
-        return  # already resolves under the selected checkout; nothing stale
-
+    # alive across node re-runs. Two failure modes if this isn't unconditional:
+    # (1) a "purge only if stale" check keyed on a single representative module
+    #     (e.g. mapping.line_pattern_reconstruction) misses core.*/domains.* left
+    #     cached by an entirely different script -- e.g. the extraction runner --
+    #     that was run earlier in the same interpreter and never touched
+    #     mapping.* at all, so that check's "nothing cached yet" early-return
+    #     would leave those stale modules in place;
+    # (2) sys.modules staleness and sys.path ordering are separate problems --
+    #     purging alone doesn't fix an already-present-but-not-first sys.path
+    #     entry (see the promotion below).
+    # An unconditional purge is cheap (dict pops) and sidesteps needing a
+    # staleness heuristic at all. Mirrors runner/thin_runner.py's
+    # _purge_repo_modules(), generalized to always run rather than only on a
+    # detected mismatch.
     prefixes = ("mapping", "core", "domains")
     for name in list(sys.modules.keys()):
         if name in prefixes or any(name.startswith(p + ".") for p in prefixes):
@@ -117,9 +114,16 @@ def _purge_stale_repo_modules(repo_root):
 
 
 _REPO_ROOT = _resolve_repo_root(IN[2] if len(IN) > 2 else None)
-_purge_stale_repo_modules(_REPO_ROOT)
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
+_purge_repo_modules()
+# Promote (not just ensure-present): if _REPO_ROOT is already in sys.path but
+# not first -- e.g. a prior run in this same persistent interpreter selected a
+# different checkout that inserted itself ahead -- a plain "insert if absent"
+# would leave that other checkout's directory earlier in sys.path, so the
+# purged modules above would simply re-resolve from there instead of
+# _REPO_ROOT. Mirrors runner/thin_runner.py's identical remove-then-reinsert.
+if _REPO_ROOT in sys.path:
+    sys.path.remove(_REPO_ROOT)
+sys.path.insert(0, _REPO_ROOT)
 
 # A fresh Dynamo CPython3 Python Script node does not expose RevitServices/
 # RevitAPI to pythonnet until these assemblies are explicitly referenced --

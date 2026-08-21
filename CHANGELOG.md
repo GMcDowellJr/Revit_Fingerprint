@@ -42,18 +42,30 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   population membership.
 
 ### Fixed
-- **`mapping/create_line_pattern_mappings.py`: stale cached `mapping`/`core`/
-  `domains` modules from a previously-selected checkout are now purged when
-  the resolved repo root changes.** A persistent Dynamo CPython session keeps
-  its interpreter (and `sys.modules`) alive across node re-runs; adding a
-  newly-resolved `IN[2]`/env-var repo root to `sys.path` does nothing to
-  entries already cached in `sys.modules` from an earlier checkout, since
-  Python's import system checks the cache first. Without a purge, a later run
-  against a different checkout would silently keep executing the first
-  checkout's reconstruction code and join-key policy while reporting the new
-  root as the one in effect. Mirrors `runner/thin_runner.py`'s identical
-  existing handling for the same class of bug. Found via automated PR review
-  on the `__file__` fix below.
+- **`mapping/create_line_pattern_mappings.py`: cached `mapping`/`core`/`domains`
+  modules from a previously-selected checkout are now always purged, and the
+  resolved repo root is always promoted to the front of `sys.path`, before
+  (re-)importing.** A persistent Dynamo CPython session keeps its interpreter
+  (and `sys.modules`/`sys.path`) alive across node re-runs, which surfaced two
+  compounding bugs found across two rounds of automated PR review:
+  1. A first fix purged stale modules only when a check keyed on a single
+     representative module (`mapping.line_pattern_reconstruction`) detected a
+     mismatch -- but if a *different* script (the extraction runner) had
+     already cached `core.*`/`domains.*` from another checkout in the same
+     interpreter without ever importing `mapping.*`, that check saw "nothing
+     cached yet" and skipped the purge entirely, so reconstruction would
+     still silently reuse the other checkout's hashing/domain code.
+  2. Even with modules purged, `sys.path.insert(0, repo_root)` guarded by
+     `if repo_root not in sys.path` does nothing when `repo_root` is already
+     present but not first (e.g. checkout B ran, then A ran and inserted
+     itself ahead, then B runs again) -- imports would still resolve from
+     whichever checkout sits earlier in `sys.path`.
+  Fixed by dropping the staleness heuristic entirely (an unconditional purge
+  of every `mapping`/`core`/`domains`-prefixed `sys.modules` entry is cheap)
+  and by removing-then-reinserting the resolved root at `sys.path[0]`
+  unconditionally, exactly mirroring `runner/thin_runner.py`'s existing
+  `_purge_repo_modules()` / checkout-promotion handling for the same class of
+  bug.
 - **`mapping/create_line_pattern_mappings.py`: repo-root resolution no longer
   depends on `__file__`.** This entry point is meant to be pasted directly
   into a Dynamo Python Script node, where Dynamo executes the code from a
