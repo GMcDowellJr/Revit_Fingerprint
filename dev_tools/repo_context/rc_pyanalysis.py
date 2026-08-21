@@ -148,18 +148,25 @@ def _collect_local_bound_names(node) -> set:
     if args.kwarg:
         names.add(args.kwarg.arg)
 
-    def walk(n):
-        for child in ast.iter_child_nodes(n):
-            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                continue  # nested scope binds its own names
-            if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Store):
-                names.add(child.id)  # also catches walrus (:=) targets, one level deeper
-            elif isinstance(child, ast.ExceptHandler) and child.name:
-                names.add(child.name)
-            walk(child)
+    def walk_stmts(stmts) -> None:
+        # Operates on an *iterable of nodes* and checks each one directly
+        # (not just its children) before recursing into its children --
+        # otherwise a node passed in as the traversal root would never be
+        # checked against itself, only its own children would.
+        for stmt in stmts:
+            if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                # Its body is a separate scope (don't descend), but its own
+                # name is still bound in *this* scope for the whole
+                # function, Python-style -- def/class is just an assignment.
+                names.add(stmt.name)
+                continue
+            if isinstance(stmt, ast.Name) and isinstance(stmt.ctx, ast.Store):
+                names.add(stmt.id)  # also catches walrus (:=) targets
+            elif isinstance(stmt, ast.ExceptHandler) and stmt.name:
+                names.add(stmt.name)
+            walk_stmts(ast.iter_child_nodes(stmt))
 
-    for stmt in node.body:
-        walk(stmt)
+    walk_stmts(node.body)
     return names
 
 
@@ -585,18 +592,27 @@ def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
                             bindings_by_scope, class_info,
                         )
                         if base_lookup_kind == "import":
-                            target_file, _, _ = base_binding
+                            target_file, target_symbol, kind = base_binding
+                            # For `from base import Parent as Alias`, the
+                            # binding's target_symbol is the real name
+                            # ("Parent") -- `base` is only the local alias
+                            # ("Alias") used in this file's class header,
+                            # and won't match anything in the target file.
+                            lookup_name = target_symbol if (kind == "imported_name" and target_symbol) else base
                             base_info_map = all_class_info.get(target_file, {})
                             base_qual = None
                             for qn in base_info_map:
-                                if qn.split(".")[-1] == base:
+                                if qn.split(".")[-1] == lookup_name:
                                     base_qual = qn
                                     break
                             if base_qual and method in base_info_map[base_qual].methods:
                                 candidate_file = target_file
                                 candidate_symbol = f"{base_qual}.{method}"
                                 confidence = "medium"
-                                explanation = f"resolved via imported base class '{base}'"
+                                explanation = (
+                                    f"resolved via imported base class '{base}'"
+                                    + (f" (imported as '{lookup_name}')" if lookup_name != base else "")
+                                )
                                 found = True
                                 break
                 if not found:

@@ -179,6 +179,48 @@ def test_function_local_import_does_not_leak_into_unrelated_function(repo, out):
     assert row_b["candidate_file"] == ""
 
 
+def test_nested_def_name_shadows_module_level_symbol_throughout_function(repo, out):
+    # Python scoping isn't source-order-sensitive: a name def'd anywhere in
+    # a function is local to that function for its entire body.
+    write_files(repo, {
+        "a.py": (
+            "def target():\n"
+            "    return 1\n\n\n"
+            "def outer():\n"
+            "    target()\n\n"
+            "    def target():\n"
+            "        return 2\n"
+        ),
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    row = next(r for r in calls if r["caller_symbol"] == "outer")
+    assert row["confidence"] == "unresolved"
+    assert "shadow" in row["explanation"].lower()
+
+
+def test_aliased_base_class_import_resolves_inherited_method(repo, out):
+    write_files(repo, {
+        "base.py": "class Parent:\n    def inherited(self):\n        return 1\n",
+        "a.py": (
+            "from base import Parent as Alias\n\n\n"
+            "class Child(Alias):\n"
+            "    def run(self):\n"
+            "        return self.inherited()\n"
+        ),
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    row = next(r for r in calls if r["call_expression"] == "self.inherited")
+    assert row["confidence"] == "medium"
+    assert row["candidate_file"] == "base.py"
+    assert row["candidate_symbol"] == "Parent.inherited"
+
+
 def test_self_method_call_within_known_class(repo, out):
     write_files(repo, {
         "widget.py": (

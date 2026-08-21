@@ -194,7 +194,14 @@ def _render_symbol_block(root: Path, row: dict, budget: Budget, out: list,
                           note_prefix: str = "", expected_sha256: str = "") -> None:
     start, end = int(row["start_line"]), int(row["end_line"])
     header = f"\n### {note_prefix}`{row['qualified_name']}` ({row['symbol_type']}) — `{row['relative_path']}:{start}-{end}`\n"
+    if not budget.allow(header, 2):
+        budget.omissions.append(
+            f"Section for `{row['qualified_name']}` in `{row['relative_path']}` omitted entirely "
+            f"(packet size limit reached); see python_symbols.csv."
+        )
+        return
     out.append(header)
+    budget.spend(header, 2)
     if not _file_is_fresh(root, row["relative_path"], expected_sha256):
         msg = (f"_Source excerpt withheld: `{row['relative_path']}` has changed on disk since the last "
                f"`scan` (SHA-256 mismatch), so the line range above may no longer describe this symbol "
@@ -283,8 +290,18 @@ def generate_packet(opts: PacketOptions) -> Path:
         top_level = [r for r in file_symbols if r["parent_symbol"] == "<module>" and r["symbol_type"] != "module"]
         if top_level:
             out.append("Top-level symbols:\n")
+            listed = 0
             for r in top_level:
-                out.append(f"- `{r['qualified_name']}` ({r['symbol_type']}, lines {r['start_line']}-{r['end_line']})")
+                line = f"- `{r['qualified_name']}` ({r['symbol_type']}, lines {r['start_line']}-{r['end_line']})"
+                if not budget.allow(line, 1):
+                    budget.omissions.append(
+                        f"{len(top_level) - listed} more top-level symbol(s) in `{rel_path}` omitted "
+                        f"from the listing (packet size limit reached); see python_symbols.csv."
+                    )
+                    break
+                out.append(line)
+                budget.spend(line, 1)
+                listed += 1
             out.append("")
 
         file_imports = [i for i in imports_rows if i["source_file"] == rel_path]
@@ -303,7 +320,13 @@ def generate_packet(opts: PacketOptions) -> Path:
                 out.append(f"- `{t}`")
             out.append("")
 
-        for r in top_level:
+        for idx, r in enumerate(top_level):
+            if budget.lines_used >= budget.max_lines or budget.chars_used >= budget.max_characters:
+                budget.omissions.append(
+                    f"{len(top_level) - idx} more symbol section(s) in `{rel_path}` omitted "
+                    f"(packet size limit reached); see python_symbols.csv."
+                )
+                break
             _render_symbol_block(opts.root, r, budget, out, expected_sha256=frow.get("sha256", ""))
 
     def add_symbol_section(row: dict) -> None:

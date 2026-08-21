@@ -48,6 +48,25 @@ def test_packet_withholds_excerpt_when_source_changed_since_scan(repo, out):
     assert "return 'changed'" not in text
 
 
+def test_file_packet_respects_tiny_size_budget(repo, out):
+    lines = []
+    for i in range(200):
+        lines += [f"def func_{i}():", f"    return {i}", ""]
+    write_files(repo, {"big.py": "\n".join(lines) + "\n"})
+    _scan(repo, out)
+
+    result = run_tool([
+        "packet", str(repo), "--output", str(out), "--file", "big.py",
+        "--max-lines", "1", "--max-characters", "100",
+    ])
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_big.py.md").read_text(encoding="utf-8")
+    assert text.count("(function, lines") <= 1
+    assert text.count("### `func_") <= 1
+    assert "Omitted" in text
+    assert len(text) < 3000
+
+
 def test_packet_by_symbol(repo, out):
     write_files(repo, {"pkg/mod.py": "def unique_symbol_name():\n    return 1\n"})
     _scan(repo, out)

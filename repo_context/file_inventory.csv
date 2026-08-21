@@ -96,8 +96,8 @@ dev_tools/repo_context/rc_classify.py,rc_classify.py,.py,python_source,4387,text
 dev_tools/repo_context/rc_common.py,rc_common.py,.py,python_source,7712,text,266,42a6acf77d68e39178bdde1e58b7acc15cb40aa9378221d6feb5d5345abd007e,true,,false,ok,no
 dev_tools/repo_context/rc_manifest.py,rc_manifest.py,.py,python_source,5953,text,149,9a49a5c351ee5f7dfbda8eb21bd996f930f2a78227d2c075d8b5a6f6fcc9a597,true,,false,ok,no
 dev_tools/repo_context/rc_overview.py,rc_overview.py,.py,python_source,10821,text,245,32060399c7e77ec5666cfefba044cb302be11c7a74f4fc9506f9ae45b122a614,true,,false,ok,no
-dev_tools/repo_context/rc_packet.py,rc_packet.py,.py,python_source,20089,text,458,df2f9e46ac365b0f2c4d8d3baa168b101fbe909d2c753a869d6e085245009988,true,,false,ok,no
-dev_tools/repo_context/rc_pyanalysis.py,rc_pyanalysis.py,.py,python_source,29592,text,642,c644dd471a00a2b473308fbf440bfd8ee0bab3c87731bced9325bb1869387150,true,,false,ok,no
+dev_tools/repo_context/rc_packet.py,rc_packet.py,.py,python_source,21201,text,481,80ccceb0b37b944e281fcf266b1c8ca3cbec58d5186f5ecb652a7ec251602338,true,,false,ok,no
+dev_tools/repo_context/rc_pyanalysis.py,rc_pyanalysis.py,.py,python_source,30759,text,658,281726194905e57f40bc9827b975520521068223555fc2cd020324f0a31ad860,true,,false,ok,no
 dev_tools/repo_context/rc_scan.py,rc_scan.py,.py,python_source,14468,text,343,42067c05f9bc3038962458766e5cf3ba2c2ed057dc58ce85dc171bd3da30f400,true,,false,ok,no
 dev_tools/repo_context/rc_tree.py,rc_tree.py,.py,python_source,2990,text,84,fcff5535df129fa55ba1f83e32324008bec54f77cea553a3a4d16f27d2dcc466,true,,false,ok,no
 dev_tools/repo_context/rc_validate.py,rc_validate.py,.py,python_source,10570,text,243,461fd7620c91d275b9f7ffc765672574a6ac707d60b53d584a584158b053b9b2,true,,false,ok,no
@@ -106,10 +106,10 @@ dev_tools/repo_context/repo_context.py,repo_context.py,.py,python_source,10816,t
 dev_tools/repo_context/tests/conftest.py,conftest.py,.py,test,1008,text,39,a0decd3efa19bd7ff13f9274f5cb27561987359af17b4dac30330fbaf5e26808,true,,false,ok,no
 dev_tools/repo_context/tests/test_chunking.py,test_chunking.py,.py,test,3317,text,88,d48d2d9c1e75bace018f3f3f068d1fc80d7893ede95efbb7b47aa087210182f4,true,,false,ok,no
 dev_tools/repo_context/tests/test_determinism_incremental.py,test_determinism_incremental.py,.py,test,3796,text,92,98d136e8697aea432fad13a222b9d41fed7f8aedaa18012c7930afe220a0585b,true,,false,ok,no
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_imports_and_calls.py,.py,test,7028,text,198,49a0c651534387b6ed67e0812bbdf21a7a7a5b388065ed701fc0bbc210c6c1d4,true,,false,ok,no
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_imports_and_calls.py,.py,test,8592,text,240,586f7b94536adff98f4b8acde717998d4424b52de5567cb4dd8df871c00f78fb,true,,false,ok,no
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_inventory_and_exclusions.py,.py,test,4253,text,108,0c8b03fad8f40e30c198ad14aff3e80b29ce3b0ee76e40ce56f76aab2ff058ed,true,,false,ok,no
 dev_tools/repo_context/tests/test_large_file_cap.py,test_large_file_cap.py,.py,test,1152,text,27,b087219944d90cec15355c860f7b2673785afe7386bfc5ed2e5eedb922db26c6,true,,false,ok,no
-dev_tools/repo_context/tests/test_packets.py,test_packets.py,.py,test,5226,text,126,bd0ca47352b1a845c839d16901644b0abb7bc4f4defce25d3c7646f7fe2370d1,true,,false,ok,no
+dev_tools/repo_context/tests/test_packets.py,test_packets.py,.py,test,5898,text,145,e64268b869594675a213fa5874add7fdcd385a7b7f2c0f0264d4c036396144b2,true,,false,ok,no
 dev_tools/repo_context/tests/test_python_symbols.py,test_python_symbols.py,.py,test,3125,text,98,e0662e729b61a221c252f594828066ff13102b540709dbc38ab96185e7035254,true,,false,ok,no
 dev_tools/repo_context/tests/test_safety.py,test_safety.py,.py,test,3391,text,87,e590c0f4e1f1802a9e6136576e30e32d2b916b41597971c52401ffdf7cf03fd2,true,,false,ok,no
 dev_tools/repo_context/tests/test_symlinks.py,test_symlinks.py,.py,test,2311,text,59,04429995bdbe85ae093ea1623cb9bf71950ace2ff2beaca13cb214670659d3f5,true,,false,ok,no
