@@ -2037,53 +2037,58 @@ dev_tools/repo_context/rc_packet.py,generate_packet,397,symbols_by_file.get,get,
 dev_tools/repo_context/rc_packet.py,generate_packet,398,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_packet.py,generate_packet,398,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_packet.py,generate_packet,401,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,403,_safe_excerpt,_safe_excerpt,dev_tools/repo_context/rc_packet.py,_safe_excerpt,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_packet.py,generate_packet,403,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,405,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_packet.py,generate_packet,403,stem_parts.append,append,,,unresolved,'stem_parts' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,404,files_by_path.get,get,,,unresolved,'files_by_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,404,"files_by_path.get(target_file, {}).get",get,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_packet.py,generate_packet,405,_file_is_fresh,_file_is_fresh,dev_tools/repo_context/rc_packet.py,_file_is_fresh,high,direct call to a function defined in the same module
 dev_tools/repo_context/rc_packet.py,generate_packet,406,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,406,redact_secrets,redact_secrets,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,407,stem_parts.append,append,,,unresolved,'stem_parts' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,409,enclosing.sort,sort,,,unresolved,'enclosing' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,409,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,409,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,410,add_symbol_section,add_symbol_section,,,unresolved,'add_symbol_section' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_packet.py,generate_packet,418,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,420,frow.get,get,,,unresolved,'frow' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,420,frow.get,get,,,unresolved,'frow' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,422,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,424,_safe_excerpt,_safe_excerpt,dev_tools/repo_context/rc_packet.py,_safe_excerpt,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_packet.py,generate_packet,429,matches.append,append,,,unresolved,'matches' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,430,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,432,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,432,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,436,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,437,budget.omissions.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_packet.py,generate_packet,442,files_shown.append,append,,,unresolved,'files_shown' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,443,redact_secrets,redact_secrets,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,444,line_text.strip,strip,,,unresolved,'line_text' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,446,symbols_by_file.get,get,,,unresolved,'symbols_by_file' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,447,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,447,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,450,enclosing.sort,sort,,,unresolved,'enclosing' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,450,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,450,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,451,bullet_lines.append,append,,,unresolved,'bullet_lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,452,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_packet.py,generate_packet,453,budget.allow,allow,,,unresolved,'budget' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,453,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,454,budget.omissions.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_packet.py,generate_packet,459,out.extend,extend,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,460,budget.spend,spend,,,unresolved,'budget' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,460,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,461,stem_parts.append,append,,,unresolved,'stem_parts' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,464,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,466,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,468,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_packet.py,generate_packet,471,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_packet.py,generate_packet,474,sanitize_stem,sanitize_stem,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,476,'_'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_packet.py,generate_packet,476,sanitize_stem,sanitize_stem,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_packet.py,generate_packet,480,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,410,budget.omissions.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_packet.py,generate_packet,413,_safe_excerpt,_safe_excerpt,dev_tools/repo_context/rc_packet.py,_safe_excerpt,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_packet.py,generate_packet,413,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,415,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_packet.py,generate_packet,416,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,416,redact_secrets,redact_secrets,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,418,enclosing.sort,sort,,,unresolved,'enclosing' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,418,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,418,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,419,add_symbol_section,add_symbol_section,,,unresolved,'add_symbol_section' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_packet.py,generate_packet,427,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,429,frow.get,get,,,unresolved,'frow' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,429,frow.get,get,,,unresolved,'frow' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,431,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,433,_safe_excerpt,_safe_excerpt,dev_tools/repo_context/rc_packet.py,_safe_excerpt,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_packet.py,generate_packet,438,matches.append,append,,,unresolved,'matches' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,439,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,441,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,441,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,445,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,446,budget.omissions.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_packet.py,generate_packet,451,files_shown.append,append,,,unresolved,'files_shown' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,452,redact_secrets,redact_secrets,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,453,line_text.strip,strip,,,unresolved,'line_text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,455,symbols_by_file.get,get,,,unresolved,'symbols_by_file' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,456,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,456,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,459,enclosing.sort,sort,,,unresolved,'enclosing' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,459,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,459,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,460,bullet_lines.append,append,,,unresolved,'bullet_lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,461,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_packet.py,generate_packet,462,budget.allow,allow,,,unresolved,'budget' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,462,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,463,budget.omissions.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_packet.py,generate_packet,468,out.extend,extend,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,469,budget.spend,spend,,,unresolved,'budget' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,469,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,470,stem_parts.append,append,,,unresolved,'stem_parts' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,473,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,475,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,477,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_packet.py,generate_packet,480,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_packet.py,generate_packet,483,sanitize_stem,sanitize_stem,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,485,'_'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_packet.py,generate_packet,485,sanitize_stem,sanitize_stem,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_packet.py,generate_packet,489,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_pyanalysis.py,dotted_module_path,23,rel_posix.endswith,endswith,,,unresolved,'rel_posix' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_pyanalysis.py,dotted_module_path,24,p.split,split,,,unresolved,'p' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_pyanalysis.py,dotted_module_path,27,'.'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
@@ -2131,179 +2136,190 @@ dev_tools/repo_context/rc_pyanalysis.py,format_params,101,parts.append,append,,,
 dev_tools/repo_context/rc_pyanalysis.py,format_params,102,"', '.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 dev_tools/repo_context/rc_pyanalysis.py,ClassInfo,119,field,field,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_pyanalysis.py,ClassInfo,120,field,field,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,142,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,144,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,144,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,144,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,144,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,145,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,147,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,149,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,157,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,161,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,163,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,163,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,164,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,165,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,166,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,167,ast.iter_child_nodes,iter_child_nodes,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,167,walk_stmts,walk_stmts,,,unresolved,'walk_stmts' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,169,walk_stmts,walk_stmts,,,unresolved,'walk_stmts' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,174,ast.parse,parse,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,185,dotted_module_path,dotted_module_path,dev_tools/repo_context/rc_pyanalysis.py,dotted_module_path,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,186,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,186,source.splitlines,splitlines,,,unresolved,'source' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,188,SymbolRecord,SymbolRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,199,ast.get_docstring,get_docstring,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,199,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,200,"(ast.get_docstring(tree, clean=True) or '').splitlines",splitlines,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,200,ast.get_docstring,get_docstring,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,201,ast.get_docstring,get_docstring,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,203,complexity_approx,complexity_approx,dev_tools/repo_context/rc_pyanalysis.py,complexity_approx,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,204,"','.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,206,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,209,symbols.append,append,,,unresolved,'symbols' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,213,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,214,RawCall,RawCall,dev_tools/repo_context/rc_pyanalysis.py,RawCall,high,constructor call to class defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,214,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,215,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,217,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,220,RawCall,RawCall,dev_tools/repo_context/rc_pyanalysis.py,RawCall,high,constructor call to class defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,220,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,221,RawCall,RawCall,dev_tools/repo_context/rc_pyanalysis.py,RawCall,high,constructor call to class defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,221,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,222,RawCall,RawCall,dev_tools/repo_context/rc_pyanalysis.py,RawCall,high,constructor call to class defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,222,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_expr_for_calls,234,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_expr_for_calls,235,make_call,make_call,,,unresolved,'make_call' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_expr_for_calls,235,raw_calls.append,append,,,unresolved,'raw_calls' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_expr_for_calls,236,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,249,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,251,ImportRecord,ImportRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,251,new_records.append,append,,,unresolved,'new_records' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,256,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,258,ImportRecord,ImportRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,258,new_records.append,append,,,unresolved,'new_records' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,264,imports.extend,extend,,,unresolved,'imports' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,265,imports_by_scope.setdefault,setdefault,,,unresolved,'imports_by_scope' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,265,"imports_by_scope.setdefault(scope_qualname, []).extend",extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,269,ast.iter_child_nodes,iter_child_nodes,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,270,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,271,make_call,make_call,,,unresolved,'make_call' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,271,raw_calls.append,append,,,unresolved,'raw_calls' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,272,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,273,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,274,handle_class,handle_class,,,unresolved,'handle_class' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,275,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,276,handle_func,handle_func,,,unresolved,'handle_func' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,277,_is_main_guard,_is_main_guard,dev_tools/repo_context/rc_pyanalysis.py,_is_main_guard,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,277,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,279,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,280,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,281,record_import,record_import,,,unresolved,'record_import' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,282,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,284,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,288,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,289,ast.get_docstring,get_docstring,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,290,SymbolRecord,SymbolRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,295,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,297,"','.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,297,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,299,"', '.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,301,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,302,(docstring or '').splitlines,splitlines,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,303,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,304,complexity_approx,complexity_approx,dev_tools/repo_context/rc_pyanalysis.py,complexity_approx,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,305,"','.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,307,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,310,symbols.append,append,,,unresolved,'symbols' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,314,walk_expr_for_calls,walk_expr_for_calls,,,unresolved,'walk_expr_for_calls' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,316,walk_expr_for_calls,walk_expr_for_calls,,,unresolved,'walk_expr_for_calls' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,318,walk_expr_for_calls,walk_expr_for_calls,,,unresolved,'walk_expr_for_calls' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,319,ClassInfo,ClassInfo,dev_tools/repo_context/rc_pyanalysis.py,ClassInfo,high,constructor call to class defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,319,class_info.setdefault,setdefault,,,unresolved,'class_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,321,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,322,info.methods.add,add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,324,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,325,handle_class,handle_class,,,unresolved,'handle_class' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,326,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,327,handle_func,handle_func,,,unresolved,'handle_func' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,328,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,329,record_import,record_import,,,unresolved,'record_import' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,331,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,335,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,344,ast.get_docstring,get_docstring,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,345,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,346,SymbolRecord,SymbolRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,353,"','.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,353,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,354,format_params,format_params,dev_tools/repo_context/rc_pyanalysis.py,format_params,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,356,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,357,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,358,(docstring or '').splitlines,splitlines,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,360,complexity_approx,complexity_approx,dev_tools/repo_context/rc_pyanalysis.py,complexity_approx,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,361,"','.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,363,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,366,symbols.append,append,,,unresolved,'symbols' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,369,_collect_local_bound_names,_collect_local_bound_names,dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,371,walk_expr_for_calls,walk_expr_for_calls,,,unresolved,'walk_expr_for_calls' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,372,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,372,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,373,walk_expr_for_calls,walk_expr_for_calls,,,unresolved,'walk_expr_for_calls' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,377,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,378,handle_class,handle_class,,,unresolved,'handle_class' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,379,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,380,handle_func,handle_func,,,unresolved,'handle_func' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,381,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,382,record_import,record_import,,,unresolved,'record_import' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,384,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,387,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,388,handle_class,handle_class,,,unresolved,'handle_class' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,389,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,390,handle_func,handle_func,,,unresolved,'handle_func' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,391,_is_main_guard,_is_main_guard,dev_tools/repo_context/rc_pyanalysis.py,_is_main_guard,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,391,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,393,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,394,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,395,record_import,record_import,,,unresolved,'record_import' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,396,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,398,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,401,PyFileAnalysis,PyFileAnalysis,dev_tools/repo_context/rc_pyanalysis.py,PyFileAnalysis,high,constructor call to class defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,421,module_index.get,get,,,unresolved,'module_index' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,422,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,424,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,428,imp.source_file.split,split,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,430,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,430,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,432,'.'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,436,module_index.get,get,,,unresolved,'module_index' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,438,module_index.get,get,,,unresolved,'module_index' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,440,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,440,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,443,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,443,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,445,all_top_level_index.get,get,,,unresolved,'all_top_level_index' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,450,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,453,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,485,build_import_bindings,build_import_bindings,dev_tools/repo_context/rc_pyanalysis.py,build_import_bindings,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,485,imports_by_scope.items,items,,,unresolved,'imports_by_scope' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,504,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,507,seen.add,add,,,unresolved,'seen' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,508,local_names_by_symbol.get,get,,,unresolved,'local_names_by_symbol' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,512,bindings_by_scope.get,get,,,unresolved,'bindings_by_scope' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,516,parent_of.get,get,,,unresolved,'parent_of' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,533,_lookup_in_scope_chain,_lookup_in_scope_chain,dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,543,name_in_index,name_in_index,dev_tools/repo_context/rc_pyanalysis.py,name_in_index,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,548,all_class_info.get,get,,,unresolved,'all_class_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,571,class_info.get,get,,,unresolved,'class_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,590,_lookup_in_scope_chain,_lookup_in_scope_chain,dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,591,parent_of.get,get,,,unresolved,'parent_of' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,602,all_class_info.get,get,,,unresolved,'all_class_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,605,qn.split,split,,,unresolved,'qn' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,625,_lookup_in_scope_chain,_lookup_in_scope_chain,dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,648,CallRecord,CallRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,648,results.append,append,,,unresolved,'results' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,name_in_index,658,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,143,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,145,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,145,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,145,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,145,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,146,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,148,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,150,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,158,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,162,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,164,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,164,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,165,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,166,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,167,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,168,ast.iter_child_nodes,iter_child_nodes,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,168,walk_stmts,walk_stmts,,,unresolved,'walk_stmts' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,170,walk_stmts,walk_stmts,,,unresolved,'walk_stmts' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names,181,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names.walk_stmts,185,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names.walk_stmts,187,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names.walk_stmts,187,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names.walk_stmts,188,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names.walk_stmts,189,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names.walk_stmts,190,names.add,add,,,unresolved,'names' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names.walk_stmts,191,ast.iter_child_nodes,iter_child_nodes,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names.walk_stmts,191,walk_stmts,walk_stmts,,,unresolved,'walk_stmts' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names,193,walk_stmts,walk_stmts,,,unresolved,'walk_stmts' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,198,ast.parse,parse,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,209,dotted_module_path,dotted_module_path,dev_tools/repo_context/rc_pyanalysis.py,dotted_module_path,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,210,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,210,source.splitlines,splitlines,,,unresolved,'source' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,212,SymbolRecord,SymbolRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,223,ast.get_docstring,get_docstring,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,223,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,224,"(ast.get_docstring(tree, clean=True) or '').splitlines",splitlines,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,224,ast.get_docstring,get_docstring,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,225,ast.get_docstring,get_docstring,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,227,complexity_approx,complexity_approx,dev_tools/repo_context/rc_pyanalysis.py,complexity_approx,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,228,"','.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,230,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,233,symbols.append,append,,,unresolved,'symbols' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,237,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,238,RawCall,RawCall,dev_tools/repo_context/rc_pyanalysis.py,RawCall,high,constructor call to class defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,238,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,239,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,241,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,244,RawCall,RawCall,dev_tools/repo_context/rc_pyanalysis.py,RawCall,high,constructor call to class defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,244,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,245,RawCall,RawCall,dev_tools/repo_context/rc_pyanalysis.py,RawCall,high,constructor call to class defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,245,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,246,RawCall,RawCall,dev_tools/repo_context/rc_pyanalysis.py,RawCall,high,constructor call to class defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,246,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_expr_for_calls,258,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_expr_for_calls,259,make_call,make_call,,,unresolved,'make_call' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_expr_for_calls,259,raw_calls.append,append,,,unresolved,'raw_calls' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_expr_for_calls,260,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,273,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,275,ImportRecord,ImportRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,275,new_records.append,append,,,unresolved,'new_records' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,280,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,282,ImportRecord,ImportRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,282,new_records.append,append,,,unresolved,'new_records' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,288,imports.extend,extend,,,unresolved,'imports' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,289,imports_by_scope.setdefault,setdefault,,,unresolved,'imports_by_scope' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,289,"imports_by_scope.setdefault(scope_qualname, []).extend",extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,293,ast.iter_child_nodes,iter_child_nodes,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,294,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,295,make_call,make_call,,,unresolved,'make_call' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,295,raw_calls.append,append,,,unresolved,'raw_calls' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,296,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,297,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,298,handle_class,handle_class,,,unresolved,'handle_class' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,299,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,300,handle_func,handle_func,,,unresolved,'handle_func' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,301,_is_main_guard,_is_main_guard,dev_tools/repo_context/rc_pyanalysis.py,_is_main_guard,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,301,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,303,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,304,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,305,record_import,record_import,,,unresolved,'record_import' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,306,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,308,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,312,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,313,ast.get_docstring,get_docstring,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,314,SymbolRecord,SymbolRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,319,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,321,"','.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,321,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,323,"', '.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,325,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,326,(docstring or '').splitlines,splitlines,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,327,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,328,complexity_approx,complexity_approx,dev_tools/repo_context/rc_pyanalysis.py,complexity_approx,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,329,"','.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,331,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,334,symbols.append,append,,,unresolved,'symbols' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,338,walk_expr_for_calls,walk_expr_for_calls,,,unresolved,'walk_expr_for_calls' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,340,walk_expr_for_calls,walk_expr_for_calls,,,unresolved,'walk_expr_for_calls' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,342,walk_expr_for_calls,walk_expr_for_calls,,,unresolved,'walk_expr_for_calls' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,343,ClassInfo,ClassInfo,dev_tools/repo_context/rc_pyanalysis.py,ClassInfo,high,constructor call to class defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,343,class_info.setdefault,setdefault,,,unresolved,'class_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,345,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,346,info.methods.add,add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,348,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,349,handle_class,handle_class,,,unresolved,'handle_class' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,350,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,351,handle_func,handle_func,,,unresolved,'handle_func' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,352,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,353,record_import,record_import,,,unresolved,'record_import' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,355,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,359,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,368,ast.get_docstring,get_docstring,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,369,getattr,getattr,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,370,SymbolRecord,SymbolRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,377,"','.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,377,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,378,format_params,format_params,dev_tools/repo_context/rc_pyanalysis.py,format_params,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,380,_unparse_safe,_unparse_safe,dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,381,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,382,(docstring or '').splitlines,splitlines,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,384,complexity_approx,complexity_approx,dev_tools/repo_context/rc_pyanalysis.py,complexity_approx,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,385,"','.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,387,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,390,symbols.append,append,,,unresolved,'symbols' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,393,_collect_local_bound_names,_collect_local_bound_names,dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,395,walk_expr_for_calls,walk_expr_for_calls,,,unresolved,'walk_expr_for_calls' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,396,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,396,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,397,walk_expr_for_calls,walk_expr_for_calls,,,unresolved,'walk_expr_for_calls' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,401,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,402,handle_class,handle_class,,,unresolved,'handle_class' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,403,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,404,handle_func,handle_func,,,unresolved,'handle_func' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,405,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,406,record_import,record_import,,,unresolved,'record_import' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,408,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,411,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,412,handle_class,handle_class,,,unresolved,'handle_class' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,413,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,414,handle_func,handle_func,,,unresolved,'handle_func' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,415,_is_main_guard,_is_main_guard,dev_tools/repo_context/rc_pyanalysis.py,_is_main_guard,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,415,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,417,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,418,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,419,record_import,record_import,,,unresolved,'record_import' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,420,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,422,walk_body,walk_body,,,unresolved,'walk_body' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,425,PyFileAnalysis,PyFileAnalysis,dev_tools/repo_context/rc_pyanalysis.py,PyFileAnalysis,high,constructor call to class defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,430,_collect_module_reassigned_names,_collect_module_reassigned_names,dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,446,module_index.get,get,,,unresolved,'module_index' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,447,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,449,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,453,imp.source_file.split,split,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,455,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,455,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,457,'.'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,461,module_index.get,get,,,unresolved,'module_index' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,463,module_index.get,get,,,unresolved,'module_index' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,465,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,465,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,468,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,468,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,470,all_top_level_index.get,get,,,unresolved,'all_top_level_index' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,475,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,478,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,510,build_import_bindings,build_import_bindings,dev_tools/repo_context/rc_pyanalysis.py,build_import_bindings,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,510,imports_by_scope.items,items,,,unresolved,'imports_by_scope' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,529,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,532,seen.add,add,,,unresolved,'seen' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,533,local_names_by_symbol.get,get,,,unresolved,'local_names_by_symbol' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,537,bindings_by_scope.get,get,,,unresolved,'bindings_by_scope' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,541,parent_of.get,get,,,unresolved,'parent_of' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,559,_lookup_in_scope_chain,_lookup_in_scope_chain,dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,569,name_in_index,name_in_index,dev_tools/repo_context/rc_pyanalysis.py,name_in_index,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,574,all_class_info.get,get,,,unresolved,'all_class_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,602,class_info.get,get,,,unresolved,'class_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,621,_lookup_in_scope_chain,_lookup_in_scope_chain,dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,622,parent_of.get,get,,,unresolved,'parent_of' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,633,all_class_info.get,get,,,unresolved,'all_class_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,636,qn.split,split,,,unresolved,'qn' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,656,_lookup_in_scope_chain,_lookup_in_scope_chain,dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,679,CallRecord,CallRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,679,results.append,append,,,unresolved,'results' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,name_in_index,689,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_scan.py,ScanOptions,31,field,field,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_scan.py,ScanOptions,33,field,field,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_scan.py,ScanOptions,34,field,field,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -2338,77 +2354,79 @@ dev_tools/repo_context/rc_scan.py,_walk.recurse,123,entry.is_dir,is_dir,,,unreso
 dev_tools/repo_context/rc_scan.py,_walk.recurse,129,result.dir_exclusions.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 dev_tools/repo_context/rc_scan.py,_walk.recurse,132,result.dir_exclusions.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 dev_tools/repo_context/rc_scan.py,_walk.recurse,134,recurse,recurse,,,unresolved,'recurse' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_scan.py,_walk,138,recurse,recurse,,,unresolved,'recurse' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_scan.py,scan_repository,142,ScanResult,ScanResult,dev_tools/repo_context/rc_scan.py,ScanResult,high,constructor call to class defined in the same module
-dev_tools/repo_context/rc_scan.py,scan_repository,143,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,143,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,147,_walk,_walk,dev_tools/repo_context/rc_scan.py,_walk,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_scan.py,scan_repository,151,abs_path.suffix.lower,lower,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,scan_repository,154,print,print,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,157,abs_path.stat,stat,,,unresolved,'abs_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,159,FileRecord,FileRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,159,result.files.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,scan_repository,166,_should_exclude_file,_should_exclude_file,dev_tools/repo_context/rc_scan.py,_should_exclude_file,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_scan.py,scan_repository,170,sha256_file,sha256_file,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,172,FileRecord,FileRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,172,result.files.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,scan_repository,188,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,189,fh.read,read,,,unresolved,'fh' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,192,sniff_binary,sniff_binary,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,197,abs_path.read_bytes,read_bytes,,,unresolved,'abs_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,203,raw.startswith,startswith,,,unresolved,'raw' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,204,raw.decode,decode,,,unresolved,'raw' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,206,raw.decode,decode,,,unresolved,'raw' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,209,raw.decode,decode,,,unresolved,'raw' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,211,raw.decode,decode,,,unresolved,'raw' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,215,full_text.count,count,,,unresolved,'full_text' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,215,full_text.endswith,endswith,,,unresolved,'full_text' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,216,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,221,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,222,fh.read,read,,,unresolved,'fh' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,222,fh.read(2000).decode,decode,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,scan_repository,235,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,236,fh.read,read,,,unresolved,'fh' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,236,fh.read(2000).decode,decode,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,scan_repository,240,count_lines_streaming,count_lines_streaming,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,244,rc_classify.classify_file,classify_file,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_scan.py,scan_repository,245,rc_classify.detect_generated_or_vendor,detect_generated_or_vendor,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_scan.py,scan_repository,251,rc_pyanalysis.analyze_python_source,analyze_python_source,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_scan.py,scan_repository,254,rc_classify.detect_entrypoint_reason,detect_entrypoint_reason,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_scan.py,scan_repository,256,result.entrypoints.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,scan_repository,259,result.parse_warnings.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,scan_repository,259,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,262,result.parse_warnings.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,scan_repository,262,type,type,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,271,options.chunk_reuse_provider,chunk_reuse_provider,,,unresolved,'options' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,scan_repository,273,result.chunks.extend,extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,scan_repository,274,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,278,rc_chunking.chunk_file,chunk_file,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_scan.py,scan_repository,281,result.chunks.extend,extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,scan_repository,282,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,286,FileRecord,FileRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_scan.py,scan_repository,286,result.files.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,scan_repository,295,_resolve_python_relationships,_resolve_python_relationships,dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_scan.py,scan_repository,296,_cleanup_stale_chunks,_cleanup_stale_chunks,dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,305,chunks_dir.exists,exists,,,unresolved,'chunks_dir' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,307,(output_dir / c.chunk_relative_path).resolve,resolve,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,309,chunks_dir.iterdir,iterdir,,,unresolved,'chunks_dir' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,310,entry.is_file,is_file,,,unresolved,'entry' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,310,entry.resolve,resolve,,,unresolved,'entry' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,312,entry.unlink,unlink,,,unresolved,'entry' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,322,rc_pyanalysis.dotted_module_path,dotted_module_path,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,323,module_index.setdefault,setdefault,,,unresolved,'module_index' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,323,"module_index.setdefault(dotted, []).append",append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,325,py_analyses.items,items,,,unresolved,'py_analyses' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,326,py_analyses.items,items,,,unresolved,'py_analyses' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,328,py_analyses.items,items,,,unresolved,'py_analyses' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,330,rc_pyanalysis.resolve_import_record,resolve_import_record,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,333,result.imports.extend,extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,334,result.symbols.extend,extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,336,py_analyses.items,items,,,unresolved,'py_analyses' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,337,rc_pyanalysis.build_bindings_by_scope,build_bindings_by_scope,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,338,rc_pyanalysis.resolve_calls,resolve_calls,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,343,result.calls.extend,extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,_walk.recurse,142,entry.is_file,is_file,,,unresolved,'entry' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,_walk.recurse,146,result.dir_exclusions.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,_walk,150,recurse,recurse,,,unresolved,'recurse' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_scan.py,scan_repository,154,ScanResult,ScanResult,dev_tools/repo_context/rc_scan.py,ScanResult,high,constructor call to class defined in the same module
+dev_tools/repo_context/rc_scan.py,scan_repository,155,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,155,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,159,_walk,_walk,dev_tools/repo_context/rc_scan.py,_walk,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_scan.py,scan_repository,163,abs_path.suffix.lower,lower,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,scan_repository,166,print,print,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,169,abs_path.stat,stat,,,unresolved,'abs_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,171,FileRecord,FileRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,171,result.files.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,scan_repository,178,_should_exclude_file,_should_exclude_file,dev_tools/repo_context/rc_scan.py,_should_exclude_file,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_scan.py,scan_repository,182,sha256_file,sha256_file,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,184,FileRecord,FileRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,184,result.files.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,scan_repository,200,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,201,fh.read,read,,,unresolved,'fh' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,204,sniff_binary,sniff_binary,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,209,abs_path.read_bytes,read_bytes,,,unresolved,'abs_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,215,raw.startswith,startswith,,,unresolved,'raw' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,216,raw.decode,decode,,,unresolved,'raw' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,218,raw.decode,decode,,,unresolved,'raw' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,221,raw.decode,decode,,,unresolved,'raw' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,223,raw.decode,decode,,,unresolved,'raw' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,227,full_text.count,count,,,unresolved,'full_text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,227,full_text.endswith,endswith,,,unresolved,'full_text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,228,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,233,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,234,fh.read,read,,,unresolved,'fh' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,234,fh.read(2000).decode,decode,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,scan_repository,247,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,248,fh.read,read,,,unresolved,'fh' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,248,fh.read(2000).decode,decode,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,scan_repository,252,count_lines_streaming,count_lines_streaming,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,256,rc_classify.classify_file,classify_file,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_scan.py,scan_repository,257,rc_classify.detect_generated_or_vendor,detect_generated_or_vendor,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_scan.py,scan_repository,263,rc_pyanalysis.analyze_python_source,analyze_python_source,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_scan.py,scan_repository,266,rc_classify.detect_entrypoint_reason,detect_entrypoint_reason,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_scan.py,scan_repository,268,result.entrypoints.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,scan_repository,271,result.parse_warnings.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,scan_repository,271,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,274,result.parse_warnings.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,scan_repository,274,type,type,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,283,options.chunk_reuse_provider,chunk_reuse_provider,,,unresolved,'options' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,scan_repository,285,result.chunks.extend,extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,scan_repository,286,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,290,rc_chunking.chunk_file,chunk_file,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_scan.py,scan_repository,293,result.chunks.extend,extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,scan_repository,294,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,298,FileRecord,FileRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_scan.py,scan_repository,298,result.files.append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,scan_repository,307,_resolve_python_relationships,_resolve_python_relationships,dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_scan.py,scan_repository,308,_cleanup_stale_chunks,_cleanup_stale_chunks,dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,317,chunks_dir.exists,exists,,,unresolved,'chunks_dir' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,319,(output_dir / c.chunk_relative_path).resolve,resolve,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,321,chunks_dir.iterdir,iterdir,,,unresolved,'chunks_dir' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,322,entry.is_file,is_file,,,unresolved,'entry' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,322,entry.resolve,resolve,,,unresolved,'entry' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,324,entry.unlink,unlink,,,unresolved,'entry' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,334,rc_pyanalysis.dotted_module_path,dotted_module_path,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,335,module_index.setdefault,setdefault,,,unresolved,'module_index' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,335,"module_index.setdefault(dotted, []).append",append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,337,py_analyses.items,items,,,unresolved,'py_analyses' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,338,py_analyses.items,items,,,unresolved,'py_analyses' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,340,py_analyses.items,items,,,unresolved,'py_analyses' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,342,rc_pyanalysis.resolve_import_record,resolve_import_record,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,345,result.imports.extend,extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,346,result.symbols.extend,extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,348,py_analyses.items,items,,,unresolved,'py_analyses' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,349,rc_pyanalysis.build_bindings_by_scope,build_bindings_by_scope,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,350,rc_pyanalysis.resolve_calls,resolve_calls,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,356,result.calls.extend,extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 dev_tools/repo_context/rc_tree.py,_sort_key,8,name.lower,lower,,,unresolved,'name' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_tree.py,_build_tree,30,_Node,_Node,dev_tools/repo_context/rc_tree.py,_Node,high,constructor call to class defined in the same module
 dev_tools/repo_context/rc_tree.py,_build_tree,34,f.relative_path.split,split,,,unresolved,dynamic or unsupported call expression; not statically resolvable
@@ -2480,77 +2498,85 @@ dev_tools/repo_context/rc_validate.py,validate_output_dir,133,res.error,error,,,
 dev_tools/repo_context/rc_validate.py,validate_output_dir,135,csv.DictReader,DictReader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 dev_tools/repo_context/rc_validate.py,validate_output_dir,135,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_validate.py,validate_output_dir,135,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,139,inventory_by_path.get,get,,,unresolved,'inventory_by_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,141,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,144,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,146,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,148,by_source.setdefault,setdefault,,,unresolved,'by_source' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,148,"by_source.setdefault(src, []).append",append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_validate.py,validate_output_dir,137,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,140,inventory_by_path.get,get,,,unresolved,'inventory_by_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,142,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,145,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,147,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_validate.py,validate_output_dir,151,chunk_path.exists,exists,,,unresolved,'chunk_path' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_validate.py,validate_output_dir,152,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,154,chunk_path.read_bytes,read_bytes,,,unresolved,'chunk_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,154,hashlib.sha256,sha256,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_validate.py,validate_output_dir,154,hashlib.sha256(chunk_path.read_bytes()).hexdigest,hexdigest,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_validate.py,validate_output_dir,156,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,159,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,159,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,161,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,162,inv.get,get,,,unresolved,'inv' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,163,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,163,line_count.isdigit,isdigit,,,unresolved,'line_count' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,164,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,166,by_source.items,items,,,unresolved,'by_source' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,167,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,167,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,168,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,153,malformed_sources.add,add,,,unresolved,'malformed_sources' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,155,chunk_path.read_bytes,read_bytes,,,unresolved,'chunk_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,155,hashlib.sha256,sha256,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_validate.py,validate_output_dir,155,hashlib.sha256(chunk_path.read_bytes()).hexdigest,hexdigest,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_validate.py,validate_output_dir,157,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,161,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,161,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,161,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,163,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,164,r.get,get,,,unresolved,'r' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,164,r.get,get,,,unresolved,'r' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,165,r.get,get,,,unresolved,'r' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,166,malformed_sources.add,add,,,unresolved,'malformed_sources' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_validate.py,validate_output_dir,169,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,171,zip,zip,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,172,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,172,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,174,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,176,inventory_by_path.get,get,,,unresolved,'inventory_by_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,176,"inventory_by_path.get(src, {}).get",get,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_validate.py,validate_output_dir,177,line_count.isdigit,isdigit,,,unresolved,'line_count' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,178,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,170,inv.get,get,,,unresolved,'inv' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,171,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,171,line_count.isdigit,isdigit,,,unresolved,'line_count' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,172,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,174,by_source.setdefault,setdefault,,,unresolved,'by_source' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,174,"by_source.setdefault(src, []).append",append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_validate.py,validate_output_dir,176,by_source.items,items,,,unresolved,'by_source' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_validate.py,validate_output_dir,179,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,180,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,185,packets_dir.glob,glob,,,unresolved,'packets_dir' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,185,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,187,packet_file.read_text,read_text,,,unresolved,'packet_file' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,189,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,191,text.strip,strip,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,179,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,180,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,181,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,183,zip,zip,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,184,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,184,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,186,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,188,inventory_by_path.get,get,,,unresolved,'inventory_by_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,188,"inventory_by_path.get(src, {}).get",get,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_validate.py,validate_output_dir,189,line_count.isdigit,isdigit,,,unresolved,'line_count' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,190,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,191,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_validate.py,validate_output_dir,192,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,194,re.search,search,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_validate.py,validate_output_dir,195,m.group,group,,,unresolved,'m' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,196,m.group,group,,,unresolved,'m' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,196,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,197,re.search,search,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_validate.py,validate_output_dir,199,m.group,group,,,unresolved,'m' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,200,_symbol_name_matches,_symbol_name_matches,dev_tools/repo_context/rc_validate.py,_symbol_name_matches,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_validate.py,validate_output_dir,200,any,any,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,201,res.warn,warn,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,206,path.exists,exists,,,unresolved,'path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,208,path.read_text,read_text,,,unresolved,'path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,209,ABS_PATH_PATTERN.search,search,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_validate.py,validate_output_dir,211,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,212,m.group,group,,,unresolved,'m' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,214,PATH_COLUMNS.items,items,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_validate.py,validate_output_dir,216,path.exists,exists,,,unresolved,'path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,218,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,validate_output_dir,219,csv.DictReader,DictReader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_validate.py,validate_output_dir,221,row.get,get,,,unresolved,'row' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,validate_output_dir,222,_looks_absolute_or_backslashed,_looks_absolute_or_backslashed,dev_tools/repo_context/rc_validate.py,_looks_absolute_or_backslashed,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_validate.py,validate_output_dir,197,packets_dir.glob,glob,,,unresolved,'packets_dir' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,197,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,199,packet_file.read_text,read_text,,,unresolved,'packet_file' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,201,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,203,text.strip,strip,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,204,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,206,re.search,search,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_validate.py,validate_output_dir,207,m.group,group,,,unresolved,'m' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,208,m.group,group,,,unresolved,'m' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,208,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,209,re.search,search,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_validate.py,validate_output_dir,211,m.group,group,,,unresolved,'m' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,212,_symbol_name_matches,_symbol_name_matches,dev_tools/repo_context/rc_validate.py,_symbol_name_matches,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_validate.py,validate_output_dir,212,any,any,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,213,res.warn,warn,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,218,path.exists,exists,,,unresolved,'path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,220,path.read_text,read_text,,,unresolved,'path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,221,ABS_PATH_PATTERN.search,search,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 dev_tools/repo_context/rc_validate.py,validate_output_dir,223,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,_symbol_name_matches,231,qualified.endswith,endswith,,,unresolved,'qualified' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,_symbol_name_matches,231,qualified.split,split,,,unresolved,'qualified' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,format_report,236,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,format_report,236,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,format_report,237,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_validate.py,format_report,237,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,format_report,239,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,format_report,241,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,format_report,242,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_validate.py,format_report,243,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_validate.py,validate_output_dir,224,m.group,group,,,unresolved,'m' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,226,PATH_COLUMNS.items,items,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_validate.py,validate_output_dir,228,path.exists,exists,,,unresolved,'path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,230,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,validate_output_dir,231,csv.DictReader,DictReader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_validate.py,validate_output_dir,233,row.get,get,,,unresolved,'row' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,validate_output_dir,234,_looks_absolute_or_backslashed,_looks_absolute_or_backslashed,dev_tools/repo_context/rc_validate.py,_looks_absolute_or_backslashed,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_validate.py,validate_output_dir,235,res.error,error,,,unresolved,'res' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,_symbol_name_matches,243,qualified.endswith,endswith,,,unresolved,'qualified' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,_symbol_name_matches,243,qualified.split,split,,,unresolved,'qualified' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,format_report,248,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,format_report,248,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,format_report,249,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_validate.py,format_report,249,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,format_report,251,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,format_report,253,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,format_report,254,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_validate.py,format_report,255,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 dev_tools/repo_context/rc_writers.py,_rows_to_csv_text,17,io.StringIO,StringIO,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 dev_tools/repo_context/rc_writers.py,_rows_to_csv_text,18,csv.writer,writer,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 dev_tools/repo_context/rc_writers.py,_rows_to_csv_text,19,writer.writerow,writerow,,,unresolved,'writer' is shadowed by a parameter or local variable in the enclosing scope
@@ -2704,12 +2730,12 @@ dev_tools/repo_context/tests/conftest.py,<module>,13,str,str,,,unresolved,name n
 dev_tools/repo_context/tests/conftest.py,<module>,13,sys.path.insert,insert,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 dev_tools/repo_context/tests/conftest.py,run_tool,17,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/conftest.py,run_tool,17,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/conftest.py,run_tool,18,subprocess.run,run,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/tests/conftest.py,write_files,22,files.items,items,,,unresolved,'files' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/tests/conftest.py,write_files,24,p.parent.mkdir,mkdir,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/conftest.py,write_files,25,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/conftest.py,write_files,26,p.write_bytes,write_bytes,,,unresolved,'p' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/tests/conftest.py,write_files,28,p.write_text,write_text,,,unresolved,'p' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/conftest.py,run_tool,20,subprocess.run,run,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/tests/conftest.py,write_files,24,files.items,items,,,unresolved,'files' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/conftest.py,write_files,26,p.parent.mkdir,mkdir,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/conftest.py,write_files,27,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/conftest.py,write_files,28,p.write_bytes,write_bytes,,,unresolved,'p' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/conftest.py,write_files,30,p.write_text,write_text,,,unresolved,'p' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/tests/test_chunking.py,_chunk_rows,7,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_chunking.py,_chunk_rows,8,csv.DictReader,DictReader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 dev_tools/repo_context/tests/test_chunking.py,_chunk_rows,8,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -2885,12 +2911,20 @@ dev_tools/repo_context/tests/test_imports_and_calls.py,test_aliased_base_class_i
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_aliased_base_class_import_resolves_inherited_method,214,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_aliased_base_class_import_resolves_inherited_method,217,_read,_read,dev_tools/repo_context/tests/test_imports_and_calls.py,_read,high,direct call to a function defined in the same module
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_aliased_base_class_import_resolves_inherited_method,218,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,225,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,234,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,234,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,234,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,237,_read,_read,dev_tools/repo_context/tests/test_imports_and_calls.py,_read,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,238,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebinding_is_not_confidently_resolved,225,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebinding_is_not_confidently_resolved,235,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebinding_is_not_confidently_resolved,235,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebinding_is_not_confidently_resolved,235,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebinding_is_not_confidently_resolved,238,_read,_read,dev_tools/repo_context/tests/test_imports_and_calls.py,_read,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebinding_is_not_confidently_resolved,239,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebinding_is_not_confidently_resolved,240,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebinding_is_not_confidently_resolved,243,target_call['explanation'].lower,lower,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,247,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,256,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,256,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,256,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,259,_read,_read,dev_tools/repo_context/tests/test_imports_and_calls.py,_read,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,260,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,_read_csv,7,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,_read_csv,8,csv.DictReader,DictReader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,_read_csv,8,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -2979,56 +3013,63 @@ dev_tools/repo_context/tests/test_packets.py,test_file_packet_respects_tiny_size
 dev_tools/repo_context/tests/test_packets.py,test_file_packet_respects_tiny_size_budget,64,text.count,count,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/tests/test_packets.py,test_file_packet_respects_tiny_size_budget,65,text.count,count,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/tests/test_packets.py,test_file_packet_respects_tiny_size_budget,67,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,71,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,72,_scan,_scan,dev_tools/repo_context/tests/test_packets.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,73,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,73,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,73,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,75,(out / 'packets' / 'packet_unique_symbol_name.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,81,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,82,_scan,_scan,dev_tools/repo_context/tests/test_packets.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,83,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,83,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,83,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,85,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,85,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,87,packet_files[0].read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,92,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,93,_scan,_scan,dev_tools/repo_context/tests/test_packets.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,94,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,94,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,94,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,96,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,96,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,97,packet_files[-1].read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,102,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,106,_scan,_scan,dev_tools/repo_context/tests/test_packets.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,108,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,108,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,108,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,110,(out / 'packets' / 'packet_ambig1.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,115,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,116,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,116,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,119,(out / 'packets' / 'packet_ambig2.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,122,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,123,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,123,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,126,(out / 'packets' / 'packet_ambig3.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,127,text3.count,count,,,unresolved,'text3' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,131,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,132,_scan,_scan,dev_tools/repo_context/tests/test_packets.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,133,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,133,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,133,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,135,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,135,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,136,packet_files[-1].read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,142,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,143,out.mkdir,mkdir,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,144,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,144,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,144,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_line_packet_raw_fallback_withholds_stale_excerpt,71,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_line_packet_raw_fallback_withholds_stale_excerpt,72,_scan,_scan,dev_tools/repo_context/tests/test_packets.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_packets.py,test_line_packet_raw_fallback_withholds_stale_excerpt,73,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_line_packet_raw_fallback_withholds_stale_excerpt,75,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_line_packet_raw_fallback_withholds_stale_excerpt,75,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_line_packet_raw_fallback_withholds_stale_excerpt,75,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_line_packet_raw_fallback_withholds_stale_excerpt,77,(out / 'packets' / 'packet_notes.txt_1.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,84,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,85,_scan,_scan,dev_tools/repo_context/tests/test_packets.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,86,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,86,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,86,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,88,(out / 'packets' / 'packet_unique_symbol_name.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,94,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,95,_scan,_scan,dev_tools/repo_context/tests/test_packets.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,96,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,96,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,96,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,98,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,98,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,100,packet_files[0].read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,105,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,106,_scan,_scan,dev_tools/repo_context/tests/test_packets.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,107,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,107,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,107,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,109,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,109,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,110,packet_files[-1].read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,115,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,119,_scan,_scan,dev_tools/repo_context/tests/test_packets.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,121,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,121,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,121,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,123,(out / 'packets' / 'packet_ambig1.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,128,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,129,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,129,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,132,(out / 'packets' / 'packet_ambig2.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,135,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,136,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,136,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,139,(out / 'packets' / 'packet_ambig3.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,140,text3.count,count,,,unresolved,'text3' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,144,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,145,_scan,_scan,dev_tools/repo_context/tests/test_packets.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,146,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,146,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,146,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,148,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,148,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,149,packet_files[-1].read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,155,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,156,out.mkdir,mkdir,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,157,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,157,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,157,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_python_symbols.py,_symbols,31,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_python_symbols.py,_symbols,32,csv.DictReader,DictReader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 dev_tools/repo_context/tests/test_python_symbols.py,_symbols,32,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -3141,6 +3182,16 @@ dev_tools/repo_context/tests/test_symlinks.py,test_symlink_cycle_inside_root_doe
 dev_tools/repo_context/tests/test_symlinks.py,test_symlink_cycle_inside_root_does_not_hang,58,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_symlinks.py,test_symlink_cycle_inside_root_does_not_hang,58,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_symlinks.py,test_symlink_cycle_inside_root_does_not_hang,58,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,65,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,66,os.mkfifo,mkfifo,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,68,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,68,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,68,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,71,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,72,csv.DictReader,DictReader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,72,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,73,any,any,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,74,any,any,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_validate.py,_big_text,7,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 dev_tools/repo_context/tests/test_validate.py,_big_text,7,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_validate.py,test_validate_passes_on_freshly_generated_output,11,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -3174,13 +3225,30 @@ dev_tools/repo_context/tests/test_validate.py,test_validate_detects_missing_chun
 dev_tools/repo_context/tests/test_validate.py,test_validate_detects_missing_chunk,49,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_validate.py,test_validate_detects_missing_chunk,49,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_validate.py,test_validate_detects_missing_chunk,51,v.stdout.lower,lower,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,55,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,56,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,56,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,56,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,58,(out / 'python_imports.csv').unlink,unlink,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,59,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,59,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,56,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,57,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,58,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,59,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,59,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,60,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,60,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,60,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,64,csv.reader,reader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,64,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,64,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,66,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,67,csv.writer,writer,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,67,csv.writer(fh).writerows,writerows,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,69,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,69,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,71,v.stdout.lower,lower,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,76,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,77,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,77,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,77,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,79,(out / 'python_imports.csv').unlink,unlink,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,80,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,80,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 domains/arrowheads.py,<module>,19,os.path.abspath,abspath,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/arrowheads.py,<module>,19,os.path.dirname,dirname,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 domains/arrowheads.py,<module>,20,os.path.dirname,dirname,,,unresolved,dynamic or unsupported call expression; not statically resolvable

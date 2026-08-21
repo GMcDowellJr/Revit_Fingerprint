@@ -51,6 +51,27 @@ def test_validate_detects_missing_chunk(repo, out):
     assert "missing" in v.stdout.lower()
 
 
+def test_validate_reports_malformed_chunk_manifest_instead_of_crashing(repo, out):
+    lines = ["def big_func(x):"]
+    for i in range(1200):
+        lines.append(f"    y{i} = x + {i}")
+    lines.append("    return x")
+    write_files(repo, {"big.py": "\n".join(lines) + "\n"})
+    r = run_tool(["scan", str(repo), "--output", str(out)])
+    assert r.returncode == 0, r.stderr
+
+    manifest_path = out / "chunk_manifest.csv"
+    rows = list(csv.reader(open(manifest_path, newline="", encoding="utf-8")))
+    rows[1][3] = "NOT_A_NUMBER"  # start_line column
+    with open(manifest_path, "w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows(rows)
+
+    v = run_tool(["validate", str(out)])
+    assert v.returncode != 0
+    assert "malformed" in v.stdout.lower()
+    assert "Traceback" not in v.stdout and "Traceback" not in v.stderr
+
+
 def test_validate_fails_on_missing_required_file(repo, out):
     write_files(repo, {"a.py": "x = 1\n"})
     r = run_tool(["scan", str(repo), "--output", str(out)])

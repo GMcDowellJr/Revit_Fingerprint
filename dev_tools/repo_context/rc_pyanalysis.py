@@ -131,6 +131,7 @@ class PyFileAnalysis:
     local_names_by_symbol: dict  # function-type qualified name -> set of locally-bound simple names
     parent_of: dict  # qualified name -> parent qualified name, for every symbol in this file
     imports_by_scope: dict  # qualified name -> list[ImportRecord] declared directly in that scope
+    module_reassigned_names: set  # names with a plain assignment at module level, separate from any def
 
 
 def _collect_local_bound_names(node) -> set:
@@ -167,6 +168,29 @@ def _collect_local_bound_names(node) -> set:
             walk_stmts(ast.iter_child_nodes(stmt))
 
     walk_stmts(node.body)
+    return names
+
+
+def _collect_module_reassigned_names(tree: ast.Module) -> set:
+    """Plain assignment targets (not def/class statements themselves)
+    found directly at module level, opaque at nested function/class
+    boundaries. Used to flag `def target(): ...` followed later by
+    `target = something_else()` -- top_level_index alone can't tell us
+    the name was rebound, so a bare `target()` call shouldn't be
+    confidently resolved to the original def."""
+    names = set()
+
+    def walk_stmts(stmts) -> None:
+        for stmt in stmts:
+            if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue  # the def/class binding itself isn't a "rebinding"
+            if isinstance(stmt, ast.Name) and isinstance(stmt.ctx, ast.Store):
+                names.add(stmt.id)
+            elif isinstance(stmt, ast.ExceptHandler) and stmt.name:
+                names.add(stmt.name)
+            walk_stmts(ast.iter_child_nodes(stmt))
+
+    walk_stmts(tree.body)
     return names
 
 
@@ -403,6 +427,7 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
         has_main_guard=has_main_guard, top_level_index=top_level_index,
         class_info=class_info, local_names_by_symbol=local_names_by_symbol,
         parent_of=parent_of, imports_by_scope=imports_by_scope,
+        module_reassigned_names=_collect_module_reassigned_names(tree),
     )
 
 
@@ -520,7 +545,8 @@ def _lookup_in_scope_chain(name: str, caller_symbol: str, parent_of: dict,
 def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
                    class_info: dict, bindings_by_scope: dict,
                    all_top_level_index: dict, all_class_info: dict,
-                   local_names_by_symbol: dict, parent_of: dict) -> list:
+                   local_names_by_symbol: dict, parent_of: dict,
+                   module_reassigned_names: set) -> list:
     results = []
     for rc in raw_calls:
         candidate_file = ""
@@ -553,6 +579,11 @@ def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
                     )
                 else:
                     explanation = f"name '{name}' is bound by an import that could not be resolved to a single repo file"
+            elif name in top_level_index and name in module_reassigned_names:
+                explanation = (
+                    f"'{name}' is reassigned elsewhere at module level (in addition to its def), "
+                    f"so which definition is bound at this call site can't be determined statically"
+                )
             elif name in top_level_index:
                 candidate_file = caller_file
                 candidate_symbol = top_level_index[name]

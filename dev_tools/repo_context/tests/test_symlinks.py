@@ -57,3 +57,18 @@ def test_symlink_cycle_inside_root_does_not_hang(repo, out):
 
     result = run_tool(["scan", str(repo), "--output", str(out)])
     assert result.returncode == 0, result.stderr
+
+
+def test_fifo_directly_under_root_does_not_hang(repo, out):
+    # No symlink involved -- a bare FIFO (no writer) would block forever
+    # if the walker ever opened it for hashing.
+    write_files(repo, {"normal.py": "x = 1\n"})
+    os.mkfifo(repo / "pipe.txt")
+
+    result = run_tool(["scan", str(repo), "--output", str(out)], timeout=20)
+    assert result.returncode == 0, result.stderr
+
+    with open(out / "file_inventory.csv", newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    assert not any("pipe" in r["relative_path"] for r in rows)
+    assert any(r["relative_path"] == "normal.py" for r in rows)

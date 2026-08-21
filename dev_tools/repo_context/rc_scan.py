@@ -133,6 +133,18 @@ def _walk(root: Path, exclude_dir_names: set, result: ScanResult, verbose: bool,
                     continue
                 yield from recurse(entry_path, rel_posix)
             else:
+                # A FIFO, socket, device file, etc. directly under ROOT
+                # (no symlink involved) would otherwise be opened by
+                # sha256_file() downstream -- a FIFO with no writer hangs
+                # the scan indefinitely. Only regular files are yielded
+                # for normal processing.
+                try:
+                    is_regular = entry.is_file(follow_symlinks=True)
+                except OSError:
+                    is_regular = False
+                if not is_regular:
+                    result.dir_exclusions.append((rel_posix, name, "not_a_regular_file"))
+                    continue
                 yield (entry_path, rel_posix, None)
 
     yield from recurse(root, "")
@@ -339,5 +351,6 @@ def _resolve_python_relationships(py_analyses: dict, result: ScanResult) -> None
             analysis.raw_calls, rel_path, analysis.top_level_index, analysis.class_info,
             bindings_by_scope, all_top_level_index, all_class_info,
             analysis.local_names_by_symbol, analysis.parent_of,
+            analysis.module_reassigned_names,
         )
         result.calls.extend(calls)

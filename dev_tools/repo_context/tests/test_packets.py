@@ -67,6 +67,19 @@ def test_file_packet_respects_tiny_size_budget(repo, out):
     assert len(text) < 3000
 
 
+def test_line_packet_raw_fallback_withholds_stale_excerpt(repo, out):
+    write_files(repo, {"notes.txt": "line 1 no symbol here\n"})
+    _scan(repo, out)
+    write_files(repo, {"notes.txt": "changed content now\n"})
+
+    result = run_tool(["packet", str(repo), "--output", str(out), "--line", "notes.txt:1"])
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_notes.txt_1.md").read_text(encoding="utf-8")
+    assert "withheld" in text
+    assert "changed content now" not in text
+    assert "no symbol here" not in text
+
+
 def test_packet_by_symbol(repo, out):
     write_files(repo, {"pkg/mod.py": "def unique_symbol_name():\n    return 1\n"})
     _scan(repo, out)

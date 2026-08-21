@@ -400,11 +400,20 @@ def generate_packet(opts: PacketOptions) -> Path:
             if not enclosing:
                 out.append(f"\n_No symbol in `{target_file}` encloses line {target_line}. "
                             f"Showing raw excerpt instead._\n")
-                excerpt = _safe_excerpt(opts.root, target_file, max(1, target_line - 10), target_line + 10)
-                if excerpt:
-                    body = "\n".join(f"{ln:>6}| {t}" for ln, t in excerpt)
-                    out.append("```\n" + redact_secrets(body) + "\n```\n")
                 stem_parts.append(f"{target_file}_{target_line}")
+                expected_sha256 = files_by_path.get(target_file, {}).get("sha256", "")
+                if not _file_is_fresh(opts.root, target_file, expected_sha256):
+                    out.append(f"_Excerpt withheld: `{target_file}` has changed on disk since the last "
+                               f"`scan` (SHA-256 mismatch) -- the \"no enclosing symbol\" determination "
+                               f"above is also based on that stale index. Re-run `scan` for an up-to-date "
+                               f"packet._\n")
+                    budget.omissions.append(f"`{target_file}` changed since the last scan; raw excerpt "
+                                             f"around line {target_line} withheld. Re-run scan.")
+                else:
+                    excerpt = _safe_excerpt(opts.root, target_file, max(1, target_line - 10), target_line + 10)
+                    if excerpt:
+                        body = "\n".join(f"{ln:>6}| {t}" for ln, t in excerpt)
+                        out.append("```\n" + redact_secrets(body) + "\n```\n")
             else:
                 enclosing.sort(key=lambda r: int(r["end_line"]) - int(r["start_line"]))
                 add_symbol_section(enclosing[0])

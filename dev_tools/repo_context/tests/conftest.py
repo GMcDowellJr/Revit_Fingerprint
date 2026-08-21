@@ -13,9 +13,11 @@ if str(TOOL_DIR) not in sys.path:
     sys.path.insert(0, str(TOOL_DIR))
 
 
-def run_tool(args, cwd=None):
+def run_tool(args, cwd=None, timeout=60):
     cmd = [sys.executable, str(TOOL_SCRIPT)] + [str(a) for a in args]
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    # A bounded timeout so a hang-regression fails the test instead of
+    # stalling the whole suite/CI run indefinitely.
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
 
 
 def write_files(root: Path, files: dict) -> Path:

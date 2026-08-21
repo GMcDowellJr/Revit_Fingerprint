@@ -134,6 +134,7 @@ def validate_output_dir(output_dir: Path, allow_absolute_paths: bool = False) ->
 
     chunk_rows = list(csv.DictReader(open(output_dir / "chunk_manifest.csv", encoding="utf-8", newline="")))
     by_source: dict = {}
+    malformed_sources: set = set()  # sources with an unparseable row -- coverage can't be verified for them
     for r in chunk_rows:
         src = r["source_relative_path"]
         inv = inventory_by_path.get(src)
@@ -145,25 +146,36 @@ def validate_output_dir(output_dir: Path, allow_absolute_paths: bool = False) ->
         if inv["sha256"] != r["source_sha256"]:
             res.error(f"chunk_manifest.csv source_sha256 stale for {src} "
                       f"(chunk: {r['source_sha256']}, current: {inv['sha256']})")
-        by_source.setdefault(src, []).append(r)
 
         chunk_path = output_dir / r["chunk_relative_path"]
         if not chunk_path.exists():
             res.error(f"Chunk file missing: {r['chunk_relative_path']}")
+            malformed_sources.add(src)
             continue
         actual_hash = hashlib.sha256(chunk_path.read_bytes()).hexdigest()
         if actual_hash != r["chunk_sha256"]:
             res.error(f"Chunk hash mismatch for {r['chunk_relative_path']} "
                       f"(manifest: {r['chunk_sha256']}, actual: {actual_hash})")
 
-        start, end = int(r["start_line"]), int(r["end_line"])
+        try:
+            start, end, _chunk_number = int(r["start_line"]), int(r["end_line"]), int(r["chunk_number"])
+        except (ValueError, TypeError):
+            res.error(f"chunk_manifest.csv row for {r['chunk_relative_path']} has a malformed numeric "
+                      f"field (start_line={r.get('start_line')!r}, end_line={r.get('end_line')!r}, "
+                      f"chunk_number={r.get('chunk_number')!r})")
+            malformed_sources.add(src)  # can't safely order/verify this file's coverage anymore
+            continue
         if start < 1 or end < start:
             res.error(f"Invalid chunk line range for {r['chunk_relative_path']}: {start}-{end}")
         line_count = inv.get("line_count")
         if line_count and line_count.isdigit() and end > int(line_count):
             res.error(f"Chunk {r['chunk_relative_path']} end line {end} exceeds source line count {line_count}")
 
+        by_source.setdefault(src, []).append(r)
+
     for src, rows in by_source.items():
+        if src in malformed_sources:
+            continue
         rows_sorted = sorted(rows, key=lambda r: int(r["chunk_number"]))
         if int(rows_sorted[0]["start_line"]) != 1:
             res.error(f"Chunked file {src} does not start coverage at line 1 "

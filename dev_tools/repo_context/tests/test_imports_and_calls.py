@@ -221,6 +221,28 @@ def test_aliased_base_class_import_resolves_inherited_method(repo, out):
     assert row["candidate_symbol"] == "Parent.inherited"
 
 
+def test_module_level_rebinding_is_not_confidently_resolved(repo, out):
+    write_files(repo, {
+        "a.py": (
+            "def target():\n"
+            "    return 1\n\n\n"
+            "def factory():\n"
+            "    return 2\n\n\n"
+            "target = factory()\n"
+            "target()\n"
+        ),
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    factory_call = next(r for r in calls if r["call_expression"] == "factory")
+    target_call = next(r for r in calls if r["call_expression"] == "target")
+    assert factory_call["confidence"] == "high"
+    assert target_call["confidence"] == "unresolved"
+    assert "reassigned" in target_call["explanation"].lower()
+
+
 def test_self_method_call_within_known_class(repo, out):
     write_files(repo, {
         "widget.py": (
