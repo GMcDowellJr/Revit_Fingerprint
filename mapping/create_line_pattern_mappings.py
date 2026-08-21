@@ -54,20 +54,42 @@ import importlib.util
 import os
 
 
+def _load_bootstrap_module_from(candidate):
+    module_path = os.path.join(os.path.abspath(str(candidate)), "mapping", "_dynamo_bootstrap.py")
+    spec = importlib.util.spec_from_file_location("mapping._dynamo_bootstrap", module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError("no loadable module at {}".format(module_path))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load_dynamo_bootstrap(explicit_repo_root):
     """Locate and load mapping/_dynamo_bootstrap.py directly from disk, without
     relying on sys.path -- this script may be pasted into a Dynamo Python
     Script node with no __file__, so the shared bootstrap module cannot be
     found via a normal package import until AFTER a repo root is known (see
-    mapping/_dynamo_bootstrap.py's own docstring for why). Tries the same
-    candidates, in the same priority order, that the module's own
-    resolve_repo_root() uses once loaded; that function re-validates and is
-    the actual source of truth for the resolved repo root returned by
-    bootstrap() below.
+    mapping/_dynamo_bootstrap.py's own docstring for why).
+
+    A caller-supplied explicit_repo_root (IN[2]) is an explicit selection, not
+    a hint: if mapping/_dynamo_bootstrap.py can't be loaded from exactly that
+    path -- missing entirely, or present but raising on import (e.g. a stale/
+    partially-updated checkout) -- that failure is propagated immediately
+    rather than silently trying environment-variable or __file__ candidates
+    instead. Falling back there would resolve a *different* checkout's
+    bootstrap code than the one explicitly requested while still reporting
+    IN[2] as the selected repo_root (resolve_repo_root() validates
+    explicit_repo_root by path, not by which module instance is running) --
+    exactly the "explicit-but-wrong falls through silently" failure mode
+    resolve_repo_root() itself already guards against for a structurally
+    invalid explicit root (see PR #442 review). Only non-explicit candidates
+    (env vars, then __file__) get try-the-next-one-on-failure semantics,
+    matching resolve_repo_root()'s own fallback order.
     """
-    candidates = []
     if explicit_repo_root:
-        candidates.append(str(explicit_repo_root))
+        return _load_bootstrap_module_from(explicit_repo_root)
+
+    candidates = []
     for env_key in ("REVIT_FINGERPRINT_REPO_ROOT_SELECTED", "REVIT_FINGERPRINT_REPO_DIR"):
         try:
             env_val = str(os.environ.get(env_key, "")).strip()
@@ -82,22 +104,16 @@ def _load_dynamo_bootstrap(explicit_repo_root):
 
     last_error = None
     for candidate in candidates:
-        module_path = os.path.join(os.path.abspath(str(candidate)), "mapping", "_dynamo_bootstrap.py")
-        if not os.path.isfile(module_path):
-            continue
         try:
-            spec = importlib.util.spec_from_file_location("mapping._dynamo_bootstrap", module_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            return module
+            return _load_bootstrap_module_from(candidate)
         except Exception as ex:
             last_error = ex
             continue
 
     raise RuntimeError(
         "Could not locate/load mapping/_dynamo_bootstrap.py from any candidate repo root "
-        "(IN[2], REVIT_FINGERPRINT_REPO_ROOT_SELECTED/REVIT_FINGERPRINT_REPO_DIR, or "
-        "__file__). Pass the checkout's absolute path as IN[2]. Last error: {}".format(last_error)
+        "(REVIT_FINGERPRINT_REPO_ROOT_SELECTED/REVIT_FINGERPRINT_REPO_DIR, or __file__). "
+        "Pass the checkout's absolute path as IN[2]. Last error: {}".format(last_error)
     )
 
 
