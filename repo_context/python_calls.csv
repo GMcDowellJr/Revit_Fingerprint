@@ -1642,48 +1642,48 @@ dev_tools/repo_context/rc_chunking.py,_pack_units,70,int,int,,,unresolved,name n
 dev_tools/repo_context/rc_chunking.py,_pack_units,73,current_labels.append,append,,,unresolved,'current_labels' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_chunking.py,_pack_units,75,flush,flush,,,unresolved,'flush' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
 dev_tools/repo_context/rc_chunking.py,_pack_units,78,flush,flush,,,unresolved,'flush' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_chunking.py,_find_logical_boundary,85,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,_find_logical_boundary,90,text.strip,strip,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_chunking.py,_find_logical_boundary,90,text.strip,strip,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_chunking.py,_find_logical_boundary,90,text.strip().startswith,startswith,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,99,min,min,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,103,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,103,min,min,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,104,_find_logical_boundary,_find_logical_boundary,dev_tools/repo_context/rc_chunking.py,_find_logical_boundary,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,109,chunks.append,append,,,unresolved,'chunks' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,112,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,117,text.split,split,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_chunking.py,chunk_file,118,text.endswith,endswith,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_chunking.py,chunk_file,120,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,124,rel_path.endswith,endswith,,,unresolved,'rel_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_chunking.py,chunk_file,126,_build_python_units,_build_python_units,dev_tools/repo_context/rc_chunking.py,_build_python_units,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_chunking.py,chunk_file,127,_pack_units,_pack_units,dev_tools/repo_context/rc_chunking.py,_pack_units,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_chunking.py,chunk_file,128,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,130,_pack_generic_lines,_pack_generic_lines,dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_chunking.py,chunk_file,132,enumerate,enumerate,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,134,overlap_per_chunk.append,append,,,unresolved,'overlap_per_chunk' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_chunking.py,chunk_file,137,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,_find_logical_boundary,88,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,_find_logical_boundary,93,text.strip,strip,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_chunking.py,_find_logical_boundary,93,text.strip,strip,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_chunking.py,_find_logical_boundary,93,text.strip().startswith,startswith,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,102,min,min,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,106,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,106,min,min,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,107,_find_logical_boundary,_find_logical_boundary,dev_tools/repo_context/rc_chunking.py,_find_logical_boundary,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,112,chunks.append,append,,,unresolved,'chunks' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,115,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,120,text.split,split,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_chunking.py,chunk_file,121,text.endswith,endswith,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_chunking.py,chunk_file,123,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,127,rel_path.endswith,endswith,,,unresolved,'rel_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_chunking.py,chunk_file,129,_build_python_units,_build_python_units,dev_tools/repo_context/rc_chunking.py,_build_python_units,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_chunking.py,chunk_file,130,_pack_units,_pack_units,dev_tools/repo_context/rc_chunking.py,_pack_units,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_chunking.py,chunk_file,131,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,133,_pack_generic_lines,_pack_generic_lines,dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_chunking.py,chunk_file,135,enumerate,enumerate,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_chunking.py,chunk_file,137,overlap_per_chunk.append,append,,,unresolved,'overlap_per_chunk' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_chunking.py,chunk_file,139,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,140,stable_path_id,stable_path_id,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,141,Path,Path,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,141,sanitize_stem,sanitize_stem,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,146,enumerate,enumerate,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,151,overlapping.sort,sort,,,unresolved,'overlapping' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_chunking.py,chunk_file,154,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,140,max,max,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,140,overlap_per_chunk.append,append,,,unresolved,'overlap_per_chunk' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_chunking.py,chunk_file,142,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,143,stable_path_id,stable_path_id,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,144,Path,Path,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,144,sanitize_stem,sanitize_stem,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,149,enumerate,enumerate,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,154,overlapping.sort,sort,,,unresolved,'overlapping' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_chunking.py,chunk_file,157,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,161,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,162,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_chunking.py,chunk_file,164,redact_secrets,redact_secrets,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,172,"', '.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_chunking.py,chunk_file,184,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,186,ChunkRecord,ChunkRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,186,records.append,append,,,unresolved,'records' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_chunking.py,chunk_file,193,';'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_chunking.py,chunk_file,195,sha256_text,sha256_text,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,196,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,197,estimate_tokens,estimate_tokens,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_chunking.py,chunk_file,197,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,160,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,164,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,165,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_chunking.py,chunk_file,167,redact_secrets,redact_secrets,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,175,"', '.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_chunking.py,chunk_file,187,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,189,ChunkRecord,ChunkRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,189,records.append,append,,,unresolved,'records' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_chunking.py,chunk_file,196,';'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_chunking.py,chunk_file,198,sha256_text,sha256_text,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,199,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,200,estimate_tokens,estimate_tokens,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_chunking.py,chunk_file,200,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_classify.py,is_test_path,31,rel_posix.lower,lower,,,unresolved,'rel_posix' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_classify.py,is_test_path,32,filename.lower,lower,,,unresolved,'filename' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_classify.py,is_test_path,33,lower.startswith,startswith,,,unresolved,'lower' is shadowed by a parameter or local variable in the enclosing scope
@@ -2301,25 +2301,31 @@ dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,468,len,len,,,unre
 dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,470,all_top_level_index.get,get,,,unresolved,'all_top_level_index' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,475,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,478,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,510,build_import_bindings,build_import_bindings,dev_tools/repo_context/rc_pyanalysis.py,build_import_bindings,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,510,imports_by_scope.items,items,,,unresolved,'imports_by_scope' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,529,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,532,seen.add,add,,,unresolved,'seen' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,533,local_names_by_symbol.get,get,,,unresolved,'local_names_by_symbol' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,537,bindings_by_scope.get,get,,,unresolved,'bindings_by_scope' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,541,parent_of.get,get,,,unresolved,'parent_of' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,559,_lookup_in_scope_chain,_lookup_in_scope_chain,dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,569,name_in_index,name_in_index,dev_tools/repo_context/rc_pyanalysis.py,name_in_index,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,574,all_class_info.get,get,,,unresolved,'all_class_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,602,class_info.get,get,,,unresolved,'class_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,621,_lookup_in_scope_chain,_lookup_in_scope_chain,dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,622,parent_of.get,get,,,unresolved,'parent_of' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,633,all_class_info.get,get,,,unresolved,'all_class_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,636,qn.split,split,,,unresolved,'qn' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,656,_lookup_in_scope_chain,_lookup_in_scope_chain,dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,679,CallRecord,CallRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,679,results.append,append,,,unresolved,'results' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_pyanalysis.py,name_in_index,689,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,build_import_bindings,506,bindings.setdefault,setdefault,,,unresolved,'bindings' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,build_import_bindings,506,"bindings.setdefault(local, []).append",append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_pyanalysis.py,build_import_bindings,507,bindings.values,values,,,unresolved,'bindings' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,build_import_bindings,508,entries.sort,sort,,,unresolved,'entries' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,518,build_import_bindings,build_import_bindings,dev_tools/repo_context/rc_pyanalysis.py,build_import_bindings,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,518,imports_by_scope.items,items,,,unresolved,'imports_by_scope' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,547,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,550,seen.add,add,,,unresolved,'seen' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,551,local_names_by_symbol.get,get,,,unresolved,'local_names_by_symbol' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,555,bindings_by_scope.get,get,,,unresolved,'bindings_by_scope' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,556,scope_bindings.get,get,,,unresolved,'scope_bindings' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,568,parent_of.get,get,,,unresolved,'parent_of' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,586,_lookup_in_scope_chain,_lookup_in_scope_chain,dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,596,name_in_index,name_in_index,dev_tools/repo_context/rc_pyanalysis.py,name_in_index,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,601,all_class_info.get,get,,,unresolved,'all_class_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,629,class_info.get,get,,,unresolved,'class_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,655,base.rsplit,rsplit,,,unresolved,'base' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,658,_lookup_in_scope_chain,_lookup_in_scope_chain,dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,659,parent_of.get,get,,,unresolved,'parent_of' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,673,all_class_info.get,get,,,unresolved,'all_class_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,676,qn.split,split,,,unresolved,'qn' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,696,_lookup_in_scope_chain,_lookup_in_scope_chain,dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,719,CallRecord,CallRecord,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,719,results.append,append,,,unresolved,'results' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_pyanalysis.py,name_in_index,729,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_scan.py,ScanOptions,31,field,field,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_scan.py,ScanOptions,33,field,field,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_scan.py,ScanOptions,34,field,field,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -2777,19 +2783,30 @@ dev_tools/repo_context/tests/test_chunking.py,test_single_oversized_function_is_
 dev_tools/repo_context/tests/test_chunking.py,test_single_oversized_function_is_split_by_line_range,64,_chunk_rows,_chunk_rows,dev_tools/repo_context/tests/test_chunking.py,_chunk_rows,high,direct call to a function defined in the same module
 dev_tools/repo_context/tests/test_chunking.py,test_single_oversized_function_is_split_by_line_range,65,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_chunking.py,test_single_oversized_function_is_split_by_line_range,66,_assert_full_contiguous_coverage,_assert_full_contiguous_coverage,dev_tools/repo_context/tests/test_chunking.py,_assert_full_contiguous_coverage,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,73,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,74,paragraphs.append,append,,,unresolved,'paragraphs' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,75,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,76,text.count,count,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,77,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,78,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,79,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,79,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,85,_chunk_rows,_chunk_rows,dev_tools/repo_context/tests/test_chunking.py,_chunk_rows,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,86,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,87,_assert_full_contiguous_coverage,_assert_full_contiguous_coverage,dev_tools/repo_context/tests/test_chunking.py,_assert_full_contiguous_coverage,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,88,any,any,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,88,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_chunk_target_lines_one_does_not_hang,76,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_chunk_target_lines_one_does_not_hang,77,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_chunking.py,test_chunk_target_lines_one_does_not_hang,79,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_chunking.py,test_chunk_target_lines_one_does_not_hang,80,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_chunking.py,test_chunk_target_lines_one_does_not_hang,81,text.count,count,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_chunking.py,test_chunk_target_lines_one_does_not_hang,82,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_chunk_target_lines_one_does_not_hang,84,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_chunk_target_lines_one_does_not_hang,85,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_chunk_target_lines_one_does_not_hang,85,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_chunk_target_lines_one_does_not_hang,90,_chunk_rows,_chunk_rows,dev_tools/repo_context/tests/test_chunking.py,_chunk_rows,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_chunking.py,test_chunk_target_lines_one_does_not_hang,92,_assert_full_contiguous_coverage,_assert_full_contiguous_coverage,dev_tools/repo_context/tests/test_chunking.py,_assert_full_contiguous_coverage,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,97,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,98,paragraphs.append,append,,,unresolved,'paragraphs' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,99,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,100,text.count,count,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,101,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,102,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,103,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,103,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,109,_chunk_rows,_chunk_rows,dev_tools/repo_context/tests/test_chunking.py,_chunk_rows,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,110,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,111,_assert_full_contiguous_coverage,_assert_full_contiguous_coverage,dev_tools/repo_context/tests/test_chunking.py,_assert_full_contiguous_coverage,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,112,any,any,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,112,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_determinism_incremental.py,_make_repo,7,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_determinism_incremental.py,test_deterministic_output_across_identical_runs,16,_make_repo,_make_repo,dev_tools/repo_context/tests/test_determinism_incremental.py,_make_repo,high,direct call to a function defined in the same module
 dev_tools/repo_context/tests/test_determinism_incremental.py,test_deterministic_output_across_identical_runs,19,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -2919,12 +2936,24 @@ dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebindi
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebinding_is_not_confidently_resolved,239,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebinding_is_not_confidently_resolved,240,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebinding_is_not_confidently_resolved,243,target_call['explanation'].lower,lower,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,247,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,256,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,256,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,256,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,259,_read,_read,dev_tools/repo_context/tests/test_imports_and_calls.py,_read,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,260,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_qualified_base_class_resolves_inherited_method,247,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_qualified_base_class_resolves_inherited_method,256,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_qualified_base_class_resolves_inherited_method,256,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_qualified_base_class_resolves_inherited_method,256,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_qualified_base_class_resolves_inherited_method,259,_read,_read,dev_tools/repo_context/tests/test_imports_and_calls.py,_read,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_qualified_base_class_resolves_inherited_method,260,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_duplicate_import_resolved_by_call_site_order,267,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_duplicate_import_resolved_by_call_site_order,272,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_duplicate_import_resolved_by_call_site_order,272,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_duplicate_import_resolved_by_call_site_order,272,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_duplicate_import_resolved_by_call_site_order,275,_read,_read,dev_tools/repo_context/tests/test_imports_and_calls.py,_read,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_duplicate_import_resolved_by_call_site_order,276,int,int,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,282,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,291,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,291,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,291,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,294,_read,_read,dev_tools/repo_context/tests/test_imports_and_calls.py,_read,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,295,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,_read_csv,7,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,_read_csv,8,csv.DictReader,DictReader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,_read_csv,8,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import

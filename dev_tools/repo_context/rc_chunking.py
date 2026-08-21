@@ -79,13 +79,16 @@ def _pack_units(units, target_lines: int):
     return chunks
 
 
-def _find_logical_boundary(lines: list, ideal_end: int, total_lines: int, window: int):
+def _find_logical_boundary(lines: list, ideal_end: int, total_lines: int, window: int, min_end: int):
     """Search outward from ideal_end for a blank or heading line. Returns the
-    adjusted end line, or None if no boundary was found in the window."""
+    adjusted end line, or None if no boundary was found in the window.
+    Never returns a value below min_end (the current chunk's start) --
+    otherwise the caller could produce an inverted (end < start) range
+    that never advances, hanging on e.g. --chunk-target-lines 1."""
     for offset in range(0, window + 1):
         candidates = [ideal_end] if offset == 0 else [ideal_end - offset, ideal_end + offset]
         for cand in candidates:
-            if 1 <= cand <= total_lines:
+            if min_end <= cand <= total_lines:
                 text = lines[cand - 1]
                 if text.strip() == "" or text.strip().startswith(HEADING_HINT_PREFIXES):
                     return cand
@@ -101,7 +104,7 @@ def _pack_generic_lines(total_lines: int, target_lines: int, overlap: int, lines
         boundary_found = True
         if end < total_lines:
             window = min(15, max(1, target_lines // 4))
-            adjusted = _find_logical_boundary(lines, ideal_end, total_lines, window)
+            adjusted = _find_logical_boundary(lines, ideal_end, total_lines, window, start)
             if adjusted is not None:
                 end = adjusted
             else:

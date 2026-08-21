@@ -68,6 +68,30 @@ def test_single_oversized_function_is_split_by_line_range(repo, out):
         assert "big_func" in r["symbols"]
 
 
+def test_chunk_target_lines_one_does_not_hang(repo, out):
+    # A blank line just before the ideal boundary could previously send
+    # _find_logical_boundary below the current chunk's start, producing
+    # an inverted range that never advanced (infinite loop).
+    lines = []
+    for i in range(60):
+        lines.append(f"line {i}")
+        if i % 5 == 0:
+            lines.append("")
+    text = "\n".join(lines) + "\n"
+    total_lines = text.count("\n")
+    write_files(repo, {"notes.txt": text})
+
+    result = run_tool([
+        "scan", str(repo), "--output", str(out),
+        "--chunk-target-lines", "1", "--chunk-line-threshold", "10", "--chunk-char-threshold", "10000",
+    ], timeout=20)
+    assert result.returncode == 0, result.stderr
+
+    rows = _chunk_rows(out, "notes.txt")
+    assert rows
+    _assert_full_contiguous_coverage(rows, total_lines)
+
+
 def test_generic_text_chunking_has_overlap_and_full_coverage(repo, out):
     paragraphs = []
     for i in range(400):

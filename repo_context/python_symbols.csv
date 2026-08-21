@@ -199,13 +199,13 @@ core/vg_sig.py,_canonical_identity_items_from_signature,function,335,355,<module
 core/vg_sig.py,_semantic_keys_from_identity_items,function,358,404,<module>,,identity_items,,,true,Semantic selector list over canonical evidence.,47,17,
 core/vg_sig.py,_traceability_unknown_items,function,407,429,<module>,,elem,,,true,Build traceability unknown_items for a view element (metadata only).,23,5,
 core/vg_sig.py,_compute_delta_items,function,432,462,<module>,,"override_items, baseline_record",,,true,"Compare override to baseline, return only changed properties.",31,8,
-dev_tools/repo_context/rc_chunking.py,<module>,module,1,199,,,,,,true,Line-numbered chunk generation for oversized text files.,199,1,"_build_python_units,_pack_units,_find_logical_boundary,_pack_generic_lines,chunk_file"
+dev_tools/repo_context/rc_chunking.py,<module>,module,1,202,,,,,,true,Line-numbered chunk generation for oversized text files.,202,1,"_build_python_units,_pack_units,_find_logical_boundary,_pack_generic_lines,chunk_file"
 dev_tools/repo_context/rc_chunking.py,_build_python_units,function,20,37,<module>,,"total_lines: int, symbols",,,true,"Return ordered (start, end, label_or_None) covering 1..total_lines,",18,9,
 dev_tools/repo_context/rc_chunking.py,_pack_units,function,40,79,<module>,,"units, target_lines: int",,,true,Group small consecutive units into chunks near target_lines; split any,40,7,flush
 dev_tools/repo_context/rc_chunking.py,_pack_units.flush,nested_function,48,54,_pack_units,,,,,false,,7,2,
-dev_tools/repo_context/rc_chunking.py,_find_logical_boundary,function,82,92,<module>,,"lines: list, ideal_end: int, total_lines: int, window: int",,,true,Search outward from ideal_end for a blank or heading line. Returns the,11,6,
-dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,function,95,113,<module>,,"total_lines: int, target_lines: int, overlap: int, lines: list",,,false,,19,5,
-dev_tools/repo_context/rc_chunking.py,chunk_file,function,116,199,<module>,,"rel_path: str, text: str, source_sha: str, symbols, output_dir: Path, options",,list,false,,84,24,
+dev_tools/repo_context/rc_chunking.py,_find_logical_boundary,function,82,95,<module>,,"lines: list, ideal_end: int, total_lines: int, window: int, min_end: int",,,true,Search outward from ideal_end for a blank or heading line. Returns the,14,6,
+dev_tools/repo_context/rc_chunking.py,_pack_generic_lines,function,98,116,<module>,,"total_lines: int, target_lines: int, overlap: int, lines: list",,,false,,19,5,
+dev_tools/repo_context/rc_chunking.py,chunk_file,function,119,202,<module>,,"rel_path: str, text: str, source_sha: str, symbols, output_dir: Path, options",,list,false,,84,24,
 dev_tools/repo_context/rc_classify.py,<module>,module,1,106,,,,,,true,Explainable file-classification heuristics.,106,1,"is_test_path,classify_file,detect_generated_or_vendor,detect_entrypoint_reason"
 dev_tools/repo_context/rc_classify.py,is_test_path,function,30,39,<module>,,"rel_posix: str, filename: str",,bool,false,,10,8,
 dev_tools/repo_context/rc_classify.py,classify_file,function,42,81,<module>,,"rel_posix: str, filename: str, ext: str, sample_text: str | None",,"tuple[str, str]",true,"Return (category, reason). sample_text is a small text prefix, or None for binary.",40,21,
@@ -262,7 +262,7 @@ dev_tools/repo_context/rc_packet.py,_render_symbol_block,function,193,227,<modul
 dev_tools/repo_context/rc_packet.py,generate_packet,function,230,490,<module>,,opts: PacketOptions,,Path,false,,261,52,"add_file_section,add_symbol_section"
 dev_tools/repo_context/rc_packet.py,generate_packet.add_file_section,nested_function,271,330,generate_packet,,rel_path: str,,None,false,,60,20,
 dev_tools/repo_context/rc_packet.py,generate_packet.add_symbol_section,nested_function,332,365,generate_packet,,row: dict,,None,false,,34,15,
-dev_tools/repo_context/rc_pyanalysis.py,<module>,module,1,689,,,,,,true,AST-based Python symbol / import / call extraction.,689,1,"dotted_module_path,_complexity_count,complexity_approx,_is_main_guard,_unparse_safe,format_params,RawCall,ClassInfo,PyFileAnalysis,_collect_local_bound_names,_collect_module_reassigned_names,analyze_python_source,resolve_import_record,build_import_bindings,build_bindings_by_scope,_lookup_in_scope_chain,resolve_calls,name_in_index"
+dev_tools/repo_context/rc_pyanalysis.py,<module>,module,1,729,,,,,,true,AST-based Python symbol / import / call extraction.,729,1,"dotted_module_path,_complexity_count,complexity_approx,_is_main_guard,_unparse_safe,format_params,RawCall,ClassInfo,PyFileAnalysis,_collect_local_bound_names,_collect_module_reassigned_names,analyze_python_source,resolve_import_record,build_import_bindings,build_bindings_by_scope,_lookup_in_scope_chain,resolve_calls,name_in_index"
 dev_tools/repo_context/rc_pyanalysis.py,dotted_module_path,function,22,27,<module>,,rel_posix: str,,str,false,,6,5,
 dev_tools/repo_context/rc_pyanalysis.py,_complexity_count,function,30,44,<module>,,node: ast.AST,,int,false,,15,7,
 dev_tools/repo_context/rc_pyanalysis.py,complexity_approx,function,47,48,<module>,,node: ast.AST,,int,false,,2,1,
@@ -285,11 +285,11 @@ dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,nested_f
 dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,nested_function,310,355,analyze_python_source,,"node: ast.ClassDef, parent_qualname: str, grandparent_qualname: str",,None,false,,46,16,
 dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,nested_function,357,408,analyze_python_source,,"node, parent_qualname: str, class_ctx: str, grandparent_qualname: str",,None,false,,52,15,
 dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,function,434,481,<module>,,"imp: ImportRecord, module_index: dict, all_top_level_index: dict",,"tuple[str, str]",true,Conservative import resolution.,48,14,
-dev_tools/repo_context/rc_pyanalysis.py,build_import_bindings,function,484,501,<module>,,imports: list,,dict,true,"local_name -> (target_file_or_'', target_symbol_simple_name_or_'', kind)",18,7,
-dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,function,504,510,<module>,,imports_by_scope: dict,,dict,true,qualified scope name -> import-bindings dict for imports declared,7,2,
-dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,function,513,542,<module>,,"name: str, caller_symbol: str, parent_of: dict, local_names_by_symbol: dict, bindings_by_scope: dict, class_info: dict",,,true,"Walk caller_symbol's lexical scope chain (its own scope, then each",30,9,
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,function,545,685,<module>,,"raw_calls: list, caller_file: str, top_level_index: dict, class_info: dict, bindings_by_scope: dict, all_top_level_index: dict, all_class_info: dict, local_names_by_symbol: dict, parent_of: dict, module_reassigned_names: set",,list,false,,141,33,
-dev_tools/repo_context/rc_pyanalysis.py,name_in_index,function,688,689,<module>,,"index: dict, name: str",,bool,false,,2,2,
+dev_tools/repo_context/rc_pyanalysis.py,build_import_bindings,function,484,509,<module>,,imports: list,,dict,true,"local_name -> [(line, target_file, target_symbol, kind), ...], sorted",26,8,
+dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,function,512,518,<module>,,imports_by_scope: dict,,dict,true,qualified scope name -> import-bindings dict for imports declared,7,2,
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,function,521,569,<module>,,"name: str, caller_symbol: str, parent_of: dict, local_names_by_symbol: dict, bindings_by_scope: dict, class_info: dict, call_line: int",,,true,"Walk caller_symbol's lexical scope chain (its own scope, then each",49,11,
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,function,572,725,<module>,,"raw_calls: list, caller_file: str, top_level_index: dict, class_info: dict, bindings_by_scope: dict, all_top_level_index: dict, all_class_info: dict, local_names_by_symbol: dict, parent_of: dict, module_reassigned_names: set",,list,false,,154,34,
+dev_tools/repo_context/rc_pyanalysis.py,name_in_index,function,728,729,<module>,,"index: dict, name: str",,bool,false,,2,2,
 dev_tools/repo_context/rc_scan.py,<module>,module,1,356,,,,,,true,Filesystem walk + inventory + Python analysis orchestration.,356,1,"ScanOptions,ScanResult,_sort_key,_should_exclude_file,_walk,scan_repository,_cleanup_stale_chunks,_resolve_python_relationships"
 dev_tools/repo_context/rc_scan.py,ScanOptions,class,28,44,<module>,dataclass,,,,false,,17,1,
 dev_tools/repo_context/rc_scan.py,ScanResult,class,48,59,<module>,dataclass,,,,false,,12,1,
@@ -345,20 +345,21 @@ dev_tools/repo_context/tests/conftest.py,run_tool,function,16,20,<module>,,"args
 dev_tools/repo_context/tests/conftest.py,write_files,function,23,31,<module>,,"root: Path, files: dict",,Path,false,,9,3,
 dev_tools/repo_context/tests/conftest.py,repo,function,35,36,<module>,pytest.fixture,tmp_path,,,false,,2,1,
 dev_tools/repo_context/tests/conftest.py,out,function,40,41,<module>,pytest.fixture,tmp_path,,,false,,2,1,
-dev_tools/repo_context/tests/test_chunking.py,<module>,module,1,88,,,,,,false,,88,1,"_chunk_rows,_assert_full_contiguous_coverage,_make_big_python_file,test_large_python_file_gets_chunked,test_single_oversized_function_is_split_by_line_range,test_generic_text_chunking_has_overlap_and_full_coverage"
+dev_tools/repo_context/tests/test_chunking.py,<module>,module,1,112,,,,,,false,,112,1,"_chunk_rows,_assert_full_contiguous_coverage,_make_big_python_file,test_large_python_file_gets_chunked,test_single_oversized_function_is_split_by_line_range,test_chunk_target_lines_one_does_not_hang,test_generic_text_chunking_has_overlap_and_full_coverage"
 dev_tools/repo_context/tests/test_chunking.py,_chunk_rows,function,6,9,<module>,,"out, source",,,false,,4,4,
 dev_tools/repo_context/tests/test_chunking.py,_assert_full_contiguous_coverage,function,12,17,<module>,,"rows, total_lines",,,false,,6,6,
 dev_tools/repo_context/tests/test_chunking.py,_make_big_python_file,function,20,27,<module>,,n_funcs = 80,,str,false,,8,3,
 dev_tools/repo_context/tests/test_chunking.py,test_large_python_file_gets_chunked,function,30,50,<module>,,"repo, out",,,false,,21,8,
 dev_tools/repo_context/tests/test_chunking.py,test_single_oversized_function_is_split_by_line_range,function,53,68,<module>,,"repo, out",,,false,,16,6,
-dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,function,71,88,<module>,,"repo, out",,,false,,18,6,
+dev_tools/repo_context/tests/test_chunking.py,test_chunk_target_lines_one_does_not_hang,function,71,92,<module>,,"repo, out",,,false,,22,5,
+dev_tools/repo_context/tests/test_chunking.py,test_generic_text_chunking_has_overlap_and_full_coverage,function,95,112,<module>,,"repo, out",,,false,,18,6,
 dev_tools/repo_context/tests/test_determinism_incremental.py,<module>,module,1,92,,,,,,false,,92,1,"_make_repo,test_deterministic_output_across_identical_runs,test_incremental_regeneration_reuses_unchanged_chunk_output,test_stale_chunks_removed_when_source_deleted,test_force_bypasses_incremental_reuse"
 dev_tools/repo_context/tests/test_determinism_incremental.py,_make_repo,function,6,12,<module>,,repo,,,false,,7,1,
 dev_tools/repo_context/tests/test_determinism_incremental.py,test_deterministic_output_across_identical_runs,function,15,25,<module>,,"repo, tmp_path",,,false,,11,5,
 dev_tools/repo_context/tests/test_determinism_incremental.py,test_incremental_regeneration_reuses_unchanged_chunk_output,function,28,58,<module>,,"repo, out",,,false,,31,12,
 dev_tools/repo_context/tests/test_determinism_incremental.py,test_stale_chunks_removed_when_source_deleted,function,61,81,<module>,,"repo, out",,,false,,21,7,
 dev_tools/repo_context/tests/test_determinism_incremental.py,test_force_bypasses_incremental_reuse,function,84,92,<module>,,"repo, out",,,false,,9,4,
-dev_tools/repo_context/tests/test_imports_and_calls.py,<module>,module,1,262,,,,,,false,,262,1,"_read,test_absolute_and_relative_imports,test_same_module_and_imported_function_calls,test_unresolved_call_is_preserved_not_guessed,test_ambiguous_import_resolution,test_imports_in_nested_scopes_are_recorded,test_call_shadowed_by_parameter_is_not_resolved_to_module_function,test_function_local_import_does_not_leak_into_unrelated_function,test_nested_def_name_shadows_module_level_symbol_throughout_function,test_aliased_base_class_import_resolves_inherited_method,test_module_level_rebinding_is_not_confidently_resolved,test_self_method_call_within_known_class"
+dev_tools/repo_context/tests/test_imports_and_calls.py,<module>,module,1,297,,,,,,false,,297,1,"_read,test_absolute_and_relative_imports,test_same_module_and_imported_function_calls,test_unresolved_call_is_preserved_not_guessed,test_ambiguous_import_resolution,test_imports_in_nested_scopes_are_recorded,test_call_shadowed_by_parameter_is_not_resolved_to_module_function,test_function_local_import_does_not_leak_into_unrelated_function,test_nested_def_name_shadows_module_level_symbol_throughout_function,test_aliased_base_class_import_resolves_inherited_method,test_module_level_rebinding_is_not_confidently_resolved,test_module_qualified_base_class_resolves_inherited_method,test_duplicate_import_resolved_by_call_site_order,test_self_method_call_within_known_class"
 dev_tools/repo_context/tests/test_imports_and_calls.py,_read,function,6,8,<module>,,"out, name",,,false,,3,2,
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_absolute_and_relative_imports,function,11,44,<module>,,"repo, out",,,false,,34,11,
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_same_module_and_imported_function_calls,function,47,74,<module>,,"repo, out",,,false,,28,9,
@@ -370,7 +371,9 @@ dev_tools/repo_context/tests/test_imports_and_calls.py,test_function_local_impor
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_nested_def_name_shadows_module_level_symbol_throughout_function,function,182,201,<module>,,"repo, out",,,false,,20,6,
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_aliased_base_class_import_resolves_inherited_method,function,204,221,<module>,,"repo, out",,,false,,18,7,
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebinding_is_not_confidently_resolved,function,224,243,<module>,,"repo, out",,,false,,20,9,
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,function,246,262,<module>,,"repo, out",,,false,,17,6,
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_qualified_base_class_resolves_inherited_method,function,246,263,<module>,,"repo, out",,,false,,18,7,
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_duplicate_import_resolved_by_call_site_order,function,266,278,<module>,,"repo, out",,,false,,13,6,
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,function,281,297,<module>,,"repo, out",,,false,,17,6,
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,<module>,module,1,108,,,,,,false,,108,1,"_read_csv,test_basic_repository_inventory,test_default_exclusions,test_binary_file_detection,test_duplicate_filenames_in_different_directories,test_secret_files_excluded_by_default"
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,_read_csv,function,6,8,<module>,,path,,,false,,3,2,
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_basic_repository_inventory,function,11,32,<module>,,"repo, out",,,false,,22,14,

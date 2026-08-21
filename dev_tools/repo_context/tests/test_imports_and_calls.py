@@ -243,6 +243,41 @@ def test_module_level_rebinding_is_not_confidently_resolved(repo, out):
     assert "reassigned" in target_call["explanation"].lower()
 
 
+def test_module_qualified_base_class_resolves_inherited_method(repo, out):
+    write_files(repo, {
+        "base.py": "class Parent:\n    def inherited(self):\n        return 1\n",
+        "a.py": (
+            "import base\n\n\n"
+            "class Child(base.Parent):\n"
+            "    def run(self):\n"
+            "        return self.inherited()\n"
+        ),
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    row = next(r for r in calls if r["call_expression"] == "self.inherited")
+    assert row["confidence"] == "medium"
+    assert row["candidate_file"] == "base.py"
+    assert row["candidate_symbol"] == "Parent.inherited"
+
+
+def test_duplicate_import_resolved_by_call_site_order(repo, out):
+    write_files(repo, {
+        "a.py": "def f():\n    return 1\n",
+        "b.py": "def f():\n    return 2\n",
+        "main.py": "from a import f\nf()\nfrom b import f\nf()\n",
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    by_line = {int(r["line"]): r for r in calls if r["call_expression"] == "f"}
+    assert by_line[2]["candidate_file"] == "a.py"
+    assert by_line[4]["candidate_file"] == "b.py"
+
+
 def test_self_method_call_within_known_class(repo, out):
     write_files(repo, {
         "widget.py": (

@@ -482,7 +482,12 @@ def resolve_import_record(imp: ImportRecord, module_index: dict, all_top_level_i
 
 
 def build_import_bindings(imports: list) -> dict:
-    """local_name -> (target_file_or_'', target_symbol_simple_name_or_'', kind)"""
+    """local_name -> [(line, target_file, target_symbol, kind), ...], sorted
+    by line. A list rather than a single overwritten value, so that
+    re-importing the same local name later in the same scope (`from a
+    import f; f(); from b import f; f()`) doesn't retroactively change
+    which binding an earlier call resolves through -- the caller picks
+    the entry active at its own line (see _lookup_in_scope_chain)."""
     bindings: dict = {}
     for imp in imports:
         if imp.resolution_status != "resolved":
@@ -494,10 +499,13 @@ def build_import_bindings(imports: list) -> dict:
                 local = imp.imported_module
             else:
                 continue
-            bindings[local] = (imp.resolved_file, "", "module_alias")
+            entry = (imp.line, imp.resolved_file, "", "module_alias")
         else:
             local = imp.alias or imp.imported_name
-            bindings[local] = (imp.resolved_file, imp.imported_name, "imported_name")
+            entry = (imp.line, imp.resolved_file, imp.imported_name, "imported_name")
+        bindings.setdefault(local, []).append(entry)
+    for entries in bindings.values():
+        entries.sort(key=lambda e: e[0])
     return bindings
 
 
@@ -512,7 +520,7 @@ def build_bindings_by_scope(imports_by_scope: dict) -> dict:
 
 def _lookup_in_scope_chain(name: str, caller_symbol: str, parent_of: dict,
                             local_names_by_symbol: dict, bindings_by_scope: dict,
-                            class_info: dict):
+                            class_info: dict, call_line: int):
     """Walk caller_symbol's lexical scope chain (its own scope, then each
     enclosing function/module scope) looking for `name`. Returns
     ("shadowed", None) if a parameter/local variable binds it first,
@@ -524,7 +532,17 @@ def _lookup_in_scope_chain(name: str, caller_symbol: str, parent_of: dict,
     A class body's own bindings only count for calls made directly in
     that class body (the first scope checked); they're skipped while
     climbing past a class on the way to an outer scope, matching real
-    Python scoping (methods/nested defs don't see class-body names)."""
+    Python scoping (methods/nested defs don't see class-body names).
+
+    If `name` is imported more than once in the same scope (e.g. `from a
+    import f; f(); from b import f; f()`), the binding used is whichever
+    import's line is the latest one at or before call_line -- so an
+    earlier call keeps resolving through the import that was actually
+    active for it, not whichever import happens to appear last in the
+    file. If every import of `name` in this scope comes *after*
+    call_line, Python still treats `name` as local to the whole scope
+    (import is just an assignment), so this is "used before bound"
+    rather than a hit in an enclosing scope -- reported as shadowed."""
     current = caller_symbol
     seen = set()
     is_own_scope = True
@@ -535,8 +553,17 @@ def _lookup_in_scope_chain(name: str, caller_symbol: str, parent_of: dict,
             return "shadowed", None
         if is_own_scope or current not in class_info:
             scope_bindings = bindings_by_scope.get(current)
-            if scope_bindings and name in scope_bindings:
-                return "import", scope_bindings[name]
+            entries = scope_bindings.get(name) if scope_bindings else None
+            if entries:
+                active = None
+                for line, target_file, target_symbol, kind in entries:
+                    if line <= call_line:
+                        active = (target_file, target_symbol, kind)
+                    else:
+                        break
+                if active is not None:
+                    return "import", active
+                return "shadowed", None
         is_own_scope = False
         current = parent_of.get(current)
     return None, None
@@ -557,7 +584,7 @@ def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
         if rc.kind == "name":
             name = rc.callee_simple_name
             lookup_kind, binding = _lookup_in_scope_chain(
-                name, rc.caller_symbol, parent_of, local_names_by_symbol, bindings_by_scope, class_info,
+                name, rc.caller_symbol, parent_of, local_names_by_symbol, bindings_by_scope, class_info, rc.line,
             )
             if lookup_kind == "shadowed":
                 explanation = (
@@ -618,9 +645,19 @@ def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
                             found = True
                             break
                     else:
+                        # `base` may be a plain name (`Alias`, possibly
+                        # itself an import alias) or a module-qualified
+                        # expression (`base.Parent` from `import base`).
+                        # The scope-bound identifier to resolve is always
+                        # the part before the last dot; the class name to
+                        # look for in the target file is whatever's left.
+                        if "." in base:
+                            module_part, dotted_class_name = base.rsplit(".", 1)
+                        else:
+                            module_part, dotted_class_name = base, base
                         base_lookup_kind, base_binding = _lookup_in_scope_chain(
-                            base, parent_of.get(ctx, ctx), parent_of, local_names_by_symbol,
-                            bindings_by_scope, class_info,
+                            module_part, parent_of.get(ctx, ctx), parent_of, local_names_by_symbol,
+                            bindings_by_scope, class_info, rc.line,
                         )
                         if base_lookup_kind == "import":
                             target_file, target_symbol, kind = base_binding
@@ -629,7 +666,10 @@ def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
                             # ("Parent") -- `base` is only the local alias
                             # ("Alias") used in this file's class header,
                             # and won't match anything in the target file.
-                            lookup_name = target_symbol if (kind == "imported_name" and target_symbol) else base
+                            # For `import base; class C(base.Parent)`,
+                            # there's no from-import target_symbol -- use
+                            # the class name split off of `base` itself.
+                            lookup_name = target_symbol if (kind == "imported_name" and target_symbol) else dotted_class_name
                             base_info_map = all_class_info.get(target_file, {})
                             base_qual = None
                             for qn in base_info_map:
@@ -654,7 +694,7 @@ def resolve_calls(raw_calls: list, caller_file: str, top_level_index: dict,
         elif rc.kind == "attribute_on_name":
             base = rc.base_name
             base_lookup_kind, base_binding = _lookup_in_scope_chain(
-                base, rc.caller_symbol, parent_of, local_names_by_symbol, bindings_by_scope, class_info,
+                base, rc.caller_symbol, parent_of, local_names_by_symbol, bindings_by_scope, class_info, rc.line,
             )
             if base_lookup_kind == "shadowed":
                 explanation = f"'{base}' is shadowed by a parameter or local variable in the enclosing scope"

@@ -105,13 +105,13 @@ Revit_Fingerprint/
   DECISIONS.md  (106.5 KB, 1674 lines)
   dev_tools/
     repo_context/
-      rc_chunking.py  (7.4 KB, 199 lines)
+      rc_chunking.py  (7.7 KB, 202 lines)
       rc_classify.py  (4.3 KB, 106 lines)
       rc_common.py  (7.5 KB, 266 lines)
       rc_manifest.py  (5.8 KB, 149 lines)
       rc_overview.py  (10.6 KB, 245 lines)
       rc_packet.py  (21.5 KB, 490 lines)
-      rc_pyanalysis.py  (31.6 KB, 689 lines)
+      rc_pyanalysis.py  (33.9 KB, 729 lines)
       rc_scan.py  (14.8 KB, 356 lines)
       rc_tree.py  (2.9 KB, 84 lines)
       rc_validate.py  (11.0 KB, 255 lines)
@@ -120,9 +120,9 @@ Revit_Fingerprint/
       repo_context.py  (10.6 KB, 238 lines)
       tests/
         conftest.py  (1.1 KB, 41 lines)
-        test_chunking.py  (3.2 KB, 88 lines)
+        test_chunking.py  (4.1 KB, 112 lines)
         test_determinism_incremental.py  (3.7 KB, 92 lines)
-        test_imports_and_calls.py  (9.2 KB, 262 lines)
+        test_imports_and_calls.py  (10.5 KB, 297 lines)
         test_inventory_and_exclusions.py  (4.2 KB, 108 lines)
         test_large_file_cap.py  (1.1 KB, 27 lines)
         test_packets.py  (6.3 KB, 158 lines)
