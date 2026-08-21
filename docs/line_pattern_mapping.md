@@ -51,15 +51,30 @@ document already open in the host session).
   point (`IN[0]` = input directory, `IN[1]` = report path, `IN[2]` = optional
   repo-root override), following the same
   `DocumentManager.Instance.CurrentDBDocument` / `IN`/`OUT` convention as
-  `tools/probes/*.py`. Because this script is meant to be pasted directly
-  into a Dynamo Python Script node (executed from a string, not loaded from
-  disk), `__file__` is not available to locate the repo checkout the way
-  every other module here can rely on -- `_resolve_repo_root()` mirrors
+  `tools/probes/*.py`.
+- `mapping/_dynamo_bootstrap.py` -- shared repo-root resolution, sys.modules
+  purging, sys.path promotion, and RevitServices/RevitAPI assembly
+  registration for every `mapping/create_*_mappings.py` entry point (not
+  specific to `line_patterns`). Because an entry-point script is meant to be
+  pasted directly into a Dynamo Python Script node (executed from a string,
+  not loaded from disk), `__file__` is not available on the entry point to
+  locate the repo checkout -- `resolve_repo_root()` mirrors
   `runner/run_dynamo.py`'s env-var-first resolution
   (`REVIT_FINGERPRINT_REPO_ROOT_SELECTED` / `REVIT_FINGERPRINT_REPO_DIR`),
-  falls back to `__file__` when it *is* available (e.g. run via a
-  "script from file" node), and otherwise requires the checkout path as
-  `IN[2]`.
+  falls back to its own (always-loaded-from-disk) `__file__` when the
+  environment doesn't resolve it, and otherwise requires the checkout path
+  explicitly. Since this module can't bootstrap its own import for pasted
+  code either (`mapping` isn't on `sys.path` yet), each entry point still
+  carries a small, unavoidable loader shim
+  (`_load_dynamo_bootstrap()`) that locates and loads
+  `mapping/_dynamo_bootstrap.py` directly from disk via
+  `importlib.util.spec_from_file_location` before calling its `bootstrap()`.
+  See the module's own docstring for the specific failure modes each piece
+  defends against (three rounds of review in PR #441 -- pasted-node
+  `__file__` `NameError`, stale `sys.modules` across a checkout switch,
+  `sys.path` ordering, and a bad-but-nonempty explicit repo-root silently
+  falling back). Every future domain's entry point should reuse this module
+  the same way rather than re-deriving any of it.
 
 ## Reconstruction and evidence validation
 

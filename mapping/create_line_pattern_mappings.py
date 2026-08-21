@@ -13,6 +13,14 @@
 # opens, saves, or closes any RVT; it operates on whatever document is already
 # open, and the caller is responsible for saving it afterward.
 #
+# Repo-root resolution, sys.modules purging, sys.path promotion, and the
+# RevitServices/RevitAPI assembly references are all handled by the shared
+# mapping/_dynamo_bootstrap.py module (see its docstring for the failure modes
+# each piece defends against). This script only carries the small, unavoidable
+# loader shim needed to load that module before a repo root is known -- every
+# future domain's entry point should reuse mapping/_dynamo_bootstrap.py the
+# same way rather than re-deriving any of this.
+#
 # Inputs:
 #   IN[0] input_dir (str)
 #        Directory containing bundle_pattern_inventory.csv, pattern_settings.csv,
@@ -42,114 +50,86 @@
 #       "actions": {"existing": int, "created": int, "skipped": int, "blocked": int},
 #   }
 
+import importlib.util
 import os
-import sys
 
 
-def _looks_like_repo_root(p):
-    try:
-        base = os.path.abspath(str(p))
-    except Exception:
-        return False
-    return all(
-        os.path.exists(os.path.join(base, sub))
-        for sub in ("mapping", "core", "domains")
-    )
+def _load_bootstrap_module_from(candidate):
+    module_path = os.path.join(os.path.abspath(str(candidate)), "mapping", "_dynamo_bootstrap.py")
+    spec = importlib.util.spec_from_file_location("mapping._dynamo_bootstrap", module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError("no loadable module at {}".format(module_path))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
-def _resolve_repo_root(explicit_repo_root):
-    # A Dynamo Python Script node runs pasted code as a string (File "<string>"),
-    # not as a loaded .py file -- __file__ is undefined in that case, unlike every
-    # other module in this repo (which are always imported from disk). Mirrors
-    # runner/run_dynamo.py's own env-var-first / __file__-fallback resolution,
-    # plus an explicit IN[2] override for exactly this "pasted into a node" case,
-    # where neither the env vars nor __file__ can be relied on.
+def _load_dynamo_bootstrap(explicit_repo_root):
+    """Locate and load mapping/_dynamo_bootstrap.py directly from disk, without
+    relying on sys.path -- this script may be pasted into a Dynamo Python
+    Script node with no __file__, so the shared bootstrap module cannot be
+    found via a normal package import until AFTER a repo root is known (see
+    mapping/_dynamo_bootstrap.py's own docstring for why).
+
+    Returns (module, resolved_candidate) -- resolved_candidate is the exact
+    path the returned module was loaded from, and MUST be passed as
+    bootstrap()'s explicit_repo_root (never re-derived) so the module actually
+    executing and the repo_root it resolves to always refer to the same
+    checkout. Re-deriving it -- e.g. calling bootstrap(None) and letting
+    resolve_repo_root() re-scan the environment from scratch -- can pick a
+    DIFFERENT checkout than the one whose module just loaded whenever an
+    earlier-priority candidate has valid marker directories but a bootstrap
+    module that raises on import: resolve_repo_root() only checks
+    looks_like_repo_root() (structural), not "did this candidate's module
+    actually load", so it would happily re-select that earlier, broken
+    candidate while this function has already moved on and loaded the next
+    one (see PR #442 review -- this is the same "explicit-but-wrong falls
+    through silently" mismatch class as the explicit_repo_root case below,
+    just for the environment-fallback path instead).
+
+    A caller-supplied explicit_repo_root (IN[2]) is an explicit selection, not
+    a hint: if mapping/_dynamo_bootstrap.py can't be loaded from exactly that
+    path -- missing entirely, or present but raising on import (e.g. a stale/
+    partially-updated checkout) -- that failure is propagated immediately
+    rather than silently trying environment-variable or __file__ candidates
+    instead. Only non-explicit candidates (env vars, then __file__) get
+    try-the-next-one-on-failure semantics, matching resolve_repo_root()'s own
+    fallback order.
+    """
     if explicit_repo_root:
-        # A caller-supplied IN[2] is an explicit selection, not a hint: if it's
-        # wrong (typo, incomplete checkout), silently falling through to the
-        # env vars or __file__ could resolve a *different* checkout than the
-        # one the caller asked for -- e.g. a stale REVIT_FINGERPRINT_REPO_ROOT_
-        # SELECTED left over from a previous run in the same persistent Dynamo
-        # session -- and apply mappings using unintended code with no error at
-        # all. Fail loudly instead of guessing.
-        if _looks_like_repo_root(explicit_repo_root):
-            return os.path.abspath(explicit_repo_root)
-        raise RuntimeError(
-            "IN[2] repo_root ({!r}) does not look like a Revit_Fingerprint checkout "
-            "(expected mapping/, core/, and domains/ subdirectories) -- not falling "
-            "back to the environment or __file__ since IN[2] was explicitly given.".format(
-                explicit_repo_root
-            )
-        )
+        return _load_bootstrap_module_from(explicit_repo_root), str(explicit_repo_root)
 
+    candidates = []
     for env_key in ("REVIT_FINGERPRINT_REPO_ROOT_SELECTED", "REVIT_FINGERPRINT_REPO_DIR"):
         try:
             env_val = str(os.environ.get(env_key, "")).strip()
         except Exception:
             env_val = ""
-        if env_val and _looks_like_repo_root(env_val):
-            return os.path.abspath(env_val)
-
+        if env_val:
+            candidates.append(env_val)
     try:
-        this_dir = os.path.dirname(os.path.abspath(__file__))
-        candidate = os.path.dirname(this_dir)
-        if _looks_like_repo_root(candidate):
-            return candidate
+        candidates.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     except Exception:
         pass
 
+    last_error = None
+    for candidate in candidates:
+        try:
+            return _load_bootstrap_module_from(candidate), candidate
+        except Exception as ex:
+            last_error = ex
+            continue
+
     raise RuntimeError(
-        "Could not determine the Revit_Fingerprint repo root: this script was run "
-        "from pasted code (no __file__), and neither REVIT_FINGERPRINT_REPO_ROOT_SELECTED/"
-        "REVIT_FINGERPRINT_REPO_DIR is set nor was IN[2] given. Pass the checkout's "
-        "absolute path as IN[2]."
+        "Could not locate/load mapping/_dynamo_bootstrap.py from any candidate repo root "
+        "(REVIT_FINGERPRINT_REPO_ROOT_SELECTED/REVIT_FINGERPRINT_REPO_DIR, or __file__). "
+        "Pass the checkout's absolute path as IN[2]. Last error: {}".format(last_error)
     )
 
 
-def _purge_repo_modules():
-    # A persistent Dynamo CPython session keeps its interpreter (and sys.modules)
-    # alive across node re-runs. Two failure modes if this isn't unconditional:
-    # (1) a "purge only if stale" check keyed on a single representative module
-    #     (e.g. mapping.line_pattern_reconstruction) misses core.*/domains.* left
-    #     cached by an entirely different script -- e.g. the extraction runner --
-    #     that was run earlier in the same interpreter and never touched
-    #     mapping.* at all, so that check's "nothing cached yet" early-return
-    #     would leave those stale modules in place;
-    # (2) sys.modules staleness and sys.path ordering are separate problems --
-    #     purging alone doesn't fix an already-present-but-not-first sys.path
-    #     entry (see the promotion below).
-    # An unconditional purge is cheap (dict pops) and sidesteps needing a
-    # staleness heuristic at all. Mirrors runner/thin_runner.py's
-    # _purge_repo_modules(), generalized to always run rather than only on a
-    # detected mismatch.
-    prefixes = ("mapping", "core", "domains")
-    for name in list(sys.modules.keys()):
-        if name in prefixes or any(name.startswith(p + ".") for p in prefixes):
-            sys.modules.pop(name, None)
-
-
-_REPO_ROOT = _resolve_repo_root(IN[2] if len(IN) > 2 else None)
-_purge_repo_modules()
-# Promote (not just ensure-present): if _REPO_ROOT is already in sys.path but
-# not first -- e.g. a prior run in this same persistent interpreter selected a
-# different checkout that inserted itself ahead -- a plain "insert if absent"
-# would leave that other checkout's directory earlier in sys.path, so the
-# purged modules above would simply re-resolve from there instead of
-# _REPO_ROOT. Mirrors runner/thin_runner.py's identical remove-then-reinsert.
-if _REPO_ROOT in sys.path:
-    sys.path.remove(_REPO_ROOT)
-sys.path.insert(0, _REPO_ROOT)
-
-# A fresh Dynamo CPython3 Python Script node does not expose RevitServices/
-# RevitAPI to pythonnet until these assemblies are explicitly referenced --
-# same convention as tools/probes/*.py (e.g. probe_line_patterns.py) and
-# runner/run_dynamo.py's own clr.AddReference("RevitServices") before
-# importing DocumentManager. Must happen before importing DocumentManager
-# below and before importing mapping.line_pattern_revit_apply (which imports
-# Autodesk.Revit.DB symbols at module load time).
-import clr
-clr.AddReference("RevitServices")
-clr.AddReference("RevitAPI")
+_IN2 = IN[2] if len(IN) > 2 else None
+_dynamo_bootstrap, _resolved_repo_root_candidate = _load_dynamo_bootstrap(_IN2)
+_REPO_ROOT = _dynamo_bootstrap.bootstrap(explicit_repo_root=_resolved_repo_root_candidate)
 
 from RevitServices.Persistence import DocumentManager
 
