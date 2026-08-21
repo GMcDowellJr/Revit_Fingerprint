@@ -248,7 +248,21 @@ def create_and_verify_line_pattern(
                 reason=verification.reason,
             )
 
-        t.Commit()
+        commit_status = t.Commit()
+        if commit_status != TransactionStatus.Committed:
+            # Revit can resolve a commit-time failure/warning by rolling the
+            # transaction back internally without Commit() raising -- Commit()
+            # returns the actual outcome as a TransactionStatus (see
+            # reference/revit_lookup/Descriptors/ElementDescriptor.cs:358-360
+            # for the same check applied there). Never report success on a
+            # transaction that didn't actually land.
+            return CreationResult(
+                ok=False,
+                element_id=None,
+                verified_join_hash=verification.verified_join_hash,
+                reason="transaction_not_committed:{}".format(safe_str(commit_status)),
+            )
+
         return CreationResult(
             ok=True,
             element_id=safe_str(created.Id.IntegerValue),
