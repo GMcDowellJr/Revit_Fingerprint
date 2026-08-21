@@ -80,6 +80,19 @@ def test_line_packet_raw_fallback_withholds_stale_excerpt(repo, out):
     assert "no symbol here" not in text
 
 
+def test_search_packet_skips_files_changed_since_scan(repo, out):
+    write_files(repo, {"a.py": "def old():\n    return 'needle'\n"})
+    _scan(repo, out)
+    write_files(repo, {"a.py": "def replacement():\n    return 'needle'\n"})
+
+    result = run_tool(["packet", str(repo), "--output", str(out), "--search", "needle"])
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_search_needle.md").read_text(encoding="utf-8")
+    assert "(0 match(es))" in text
+    assert "changed on disk since the last" in text
+    assert "old" not in text.split("Omitted")[0]
+
+
 def test_packet_by_symbol(repo, out):
     write_files(repo, {"pkg/mod.py": "def unique_symbol_name():\n    return 1\n"})
     _scan(repo, out)

@@ -85,6 +85,16 @@ def test_duplicate_filenames_in_different_directories(repo, out):
     assert files_with_helper == {"a/util.py", "b/util.py"}
 
 
+def test_dyn_files_are_parsed_as_text_not_binary(repo, out):
+    write_files(repo, {"graph.dyn": '{"Name": "test graph", "Nodes": []}\n'})
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    rows = {r["relative_path"]: r for r in _read_csv(out / "file_inventory.csv")}
+    assert rows["graph.dyn"]["text_or_binary"] == "text"
+    assert rows["graph.dyn"]["line_count"] == "1"
+
+
 def test_secret_files_excluded_by_default(repo, out):
     write_files(repo, {
         ".env": "SECRET=1\n",

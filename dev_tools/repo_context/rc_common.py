@@ -49,7 +49,10 @@ BINARY_EXTENSIONS = {
     ".mp3", ".mp4", ".avi", ".mov", ".wav", ".flac",
     ".db", ".sqlite", ".sqlite3",
     ".ttf", ".otf", ".woff", ".woff2",
-    ".dyn",
+    # Note: ".dyn" (Dynamo graph files) is deliberately NOT here -- it's
+    # plain JSON text, not binary. Content sniffing already classifies it
+    # correctly; hardcoding it here bypassed decoding/chunking/search
+    # entirely for a text format.
 }
 
 SECRET_LINE_PATTERNS = [

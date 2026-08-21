@@ -420,6 +420,7 @@ def generate_packet(opts: PacketOptions) -> Path:
 
     if opts.search:
         matches = []
+        stale_files_skipped = 0
         # A single repetitive/generated file can otherwise produce an
         # unbounded number of matches before the next file is even
         # considered -- cap collection itself, not just which files are
@@ -430,6 +431,15 @@ def generate_packet(opts: PacketOptions) -> Path:
                 continue
             if len(matches) >= search_collect_cap:
                 break
+            # A match's line/text is always read live and so is accurate,
+            # but the "(within `symbol`)" attribution below comes from the
+            # last scan's index -- if the file changed since then, that
+            # attribution could label unrelated new content as being
+            # inside a since-moved-or-removed symbol. Skip stale files
+            # rather than risk a misleading label.
+            if not _file_is_fresh(opts.root, frow["relative_path"], frow.get("sha256", "")):
+                stale_files_skipped += 1
+                continue
             excerpt = _safe_excerpt(opts.root, frow["relative_path"], 1, 10_000_000)
             if excerpt is None:
                 continue
@@ -438,6 +448,11 @@ def generate_packet(opts: PacketOptions) -> Path:
                     matches.append((frow["relative_path"], ln, text))
                     if len(matches) >= search_collect_cap:
                         break
+        if stale_files_skipped:
+            budget.omissions.append(
+                f"{stale_files_skipped} file(s) changed on disk since the last `scan` and were skipped "
+                f"for --search (their line/symbol attribution could be misleading); re-run scan."
+            )
         out.append(f"\n## Search results for `{opts.search}` ({len(matches)} match(es))\n")
         files_shown = []
         for rel_path, ln, text in matches:

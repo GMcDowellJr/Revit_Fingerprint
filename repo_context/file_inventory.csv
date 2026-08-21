@@ -43,7 +43,7 @@ README.md,README.md,.md,documentation,2071,text,79,54acfce4fe02356a9be6d71f6141d
 REFACTOR.md,REFACTOR.md,.md,documentation,6222,text,225,9b63a5556b7253eba64fa127c25c5133668ff1192b1e3bd5d690c030f33fcc1a,true,,false,n/a,no
 REPO_OPERATIONAL_REVIEW.md,REPO_OPERATIONAL_REVIEW.md,.md,documentation,21963,text,285,de75651342780bcbe674f946a833a23c48120c1b86875ff177f820baae7f7bcb,true,,false,n/a,no
 REVIT_LOOKUP_DOMAIN_MAP.md,REVIT_LOOKUP_DOMAIN_MAP.md,.md,documentation,7379,text,103,67c660a9b1ea6b573c244d1fc5e2acc031efbffb91b1414243037c6e4f0ecc8c,true,,false,n/a,no
-Revit fingerprint MVP.dyn,Revit fingerprint MVP.dyn,.dyn,unsupported_text,43168,binary,,455c931f9987270f521cc1dd50021094f2d9480bfa0d67e37934f046d4875679,true,,false,n/a,no
+Revit fingerprint MVP.dyn,Revit fingerprint MVP.dyn,.dyn,unsupported_text,43168,text,626,455c931f9987270f521cc1dd50021094f2d9480bfa0d67e37934f046d4875679,true,,false,n/a,no
 audit_results/README.md,README.md,.md,documentation,687,text,13,38829d8cf396382ccb66088f8b24a5c4d58c68c951e6e2233501219c78424487,true,,false,n/a,no
 audit_results/audit_10_bundle_bi_output_location_correction.md,audit_10_bundle_bi_output_location_correction.md,.md,documentation,5660,text,83,6951a8f523be7f29429df030f1754c144b42314f2c3d5cbb9a2a456c70c871b6,true,,false,n/a,no
 audit_results/audit_11_domain_extractor_delta_step0_findings.md,audit_11_domain_extractor_delta_step0_findings.md,.md,documentation,91153,text,517,01f11c8c682797050e9ae4b111c8ac4d175573981d3e9c5285b02c1256fd9bbd,true,,true,n/a,no
@@ -93,27 +93,27 @@ core/vg_sig.py,vg_sig.py,.py,python_source,15132,text,462,2eca32d4583300ba907af1
 dev_tools/repo_context/README.md,README.md,.md,documentation,9410,text,209,23a03549e5ee88d5011f759d48491fa40e1cac6851c4bc3462421dcf7e101c1c,true,,false,n/a,no
 dev_tools/repo_context/rc_chunking.py,rc_chunking.py,.py,python_source,7848,text,202,77b42edf8213c7123f87897dd78aa6ae3a4408aff5aca3d4f752bd1f5b30e57b,true,,false,ok,no
 dev_tools/repo_context/rc_classify.py,rc_classify.py,.py,python_source,4387,text,106,73070ab1328a5174127459407835363c35ba718f738e62a329a0a3a553011851,true,,false,ok,generated
-dev_tools/repo_context/rc_common.py,rc_common.py,.py,python_source,7712,text,266,42a6acf77d68e39178bdde1e58b7acc15cb40aa9378221d6feb5d5345abd007e,true,,false,ok,no
-dev_tools/repo_context/rc_manifest.py,rc_manifest.py,.py,python_source,5953,text,149,9a49a5c351ee5f7dfbda8eb21bd996f930f2a78227d2c075d8b5a6f6fcc9a597,true,,false,ok,no
+dev_tools/repo_context/rc_common.py,rc_common.py,.py,python_source,7951,text,269,88f998d84d88a1988dac717bd6c9808f5b7c86e702d9b5b53d33689e4c172f20,true,,false,ok,no
+dev_tools/repo_context/rc_manifest.py,rc_manifest.py,.py,python_source,6262,text,153,a8ec68be54057149cea8bfb20cdc0cc1470ab0a865236880269bc4dd46796f6c,true,,false,ok,no
 dev_tools/repo_context/rc_overview.py,rc_overview.py,.py,python_source,10821,text,245,32060399c7e77ec5666cfefba044cb302be11c7a74f4fc9506f9ae45b122a614,true,,false,ok,no
-dev_tools/repo_context/rc_packet.py,rc_packet.py,.py,python_source,21974,text,490,d4dba51c46cef22d175c058ddf743963139b54fbef3ef91368411a01b7bccb35,true,,false,ok,no
+dev_tools/repo_context/rc_packet.py,rc_packet.py,.py,python_source,22863,text,505,eb123e48f87f369e3e34b1190dfc6870134d6fd7446145e8843a0d32ab3c05a0,true,,false,ok,no
 dev_tools/repo_context/rc_pyanalysis.py,rc_pyanalysis.py,.py,python_source,34749,text,729,7e154d07e9c7ec0456d45988c575b72cc8ae1fa08bb954992dfe85331b8348e7,true,,false,ok,no
-dev_tools/repo_context/rc_scan.py,rc_scan.py,.py,python_source,15157,text,356,c03336ec7227d8b789cee3306e0fc04e0d89172414b6d4d192fcd756610ebb22,true,,false,ok,no
+dev_tools/repo_context/rc_scan.py,rc_scan.py,.py,python_source,16210,text,381,41a4543cfacfb3626297e85250077a81fc14c026efd1f288ea644d573027185c,true,,false,ok,no
 dev_tools/repo_context/rc_tree.py,rc_tree.py,.py,python_source,2990,text,84,fcff5535df129fa55ba1f83e32324008bec54f77cea553a3a4d16f27d2dcc466,true,,false,ok,no
-dev_tools/repo_context/rc_validate.py,rc_validate.py,.py,python_source,11262,text,255,691c3e2094c6a2ea87ace1feddb039e7f52e73204455f2b2c6cbdcb9b806fca1,true,,false,ok,no
+dev_tools/repo_context/rc_validate.py,rc_validate.py,.py,python_source,11823,text,264,1f9886387696af723929bbd50863c631b93dc2d03e351c5868c82da3b6db51a3,true,,false,ok,no
 dev_tools/repo_context/rc_writers.py,rc_writers.py,.py,python_source,5470,text,133,7f9cbdcbfe503899cf73d60fe359b0b7f1e2032957801bda7721d311cac88be5,true,,false,ok,no
 dev_tools/repo_context/repo_context.py,repo_context.py,.py,python_source,10816,text,238,114cd052fccd2259f6e85b5a21c1d9e831cf8edd6620b88daf62c794bf2656ae,true,,false,ok,no
 dev_tools/repo_context/tests/conftest.py,conftest.py,.py,test,1160,text,41,95c137066380fa544fdd79b7c63f8099e55dbdb9eff4bcd89536aaa128da5c2d,true,,false,ok,no
 dev_tools/repo_context/tests/test_chunking.py,test_chunking.py,.py,test,4180,text,112,015d193de76eca96fa185b9b184e883b9e62e4a2805169b165cc5f0294c64794,true,,false,ok,no
 dev_tools/repo_context/tests/test_determinism_incremental.py,test_determinism_incremental.py,.py,test,3796,text,92,98d136e8697aea432fad13a222b9d41fed7f8aedaa18012c7930afe220a0585b,true,,false,ok,no
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_imports_and_calls.py,.py,test,10737,text,297,b9829f28cd92e74e8164e0e4a79f371b60bb03a08555db3fc5a48971da43d7d1,true,,false,ok,no
-dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_inventory_and_exclusions.py,.py,test,4253,text,108,0c8b03fad8f40e30c198ad14aff3e80b29ce3b0ee76e40ce56f76aab2ff058ed,true,,false,ok,no
+dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_inventory_and_exclusions.py,.py,test,4698,text,118,63056bc2fbc87bf725b2990cb0bfff4112adf006c289433da5483c2c2196af04,true,,false,ok,no
 dev_tools/repo_context/tests/test_large_file_cap.py,test_large_file_cap.py,.py,test,1152,text,27,b087219944d90cec15355c860f7b2673785afe7386bfc5ed2e5eedb922db26c6,true,,false,ok,no
-dev_tools/repo_context/tests/test_packets.py,test_packets.py,.py,test,6457,text,158,bea0097cf7fae657f62a63d58bb6365249a1ce59cf9b6c4f818d1d010512fc20,true,,false,ok,no
+dev_tools/repo_context/tests/test_packets.py,test_packets.py,.py,test,7052,text,171,51c4b2d4094cedab737fd6100894926a0b0d8821cf81c7c3adca0a5c6ca9b203,true,,false,ok,no
 dev_tools/repo_context/tests/test_python_symbols.py,test_python_symbols.py,.py,test,3125,text,98,e0662e729b61a221c252f594828066ff13102b540709dbc38ab96185e7035254,true,,false,ok,no
 dev_tools/repo_context/tests/test_safety.py,test_safety.py,.py,test,3391,text,87,e590c0f4e1f1802a9e6136576e30e32d2b916b41597971c52401ffdf7cf03fd2,true,,false,ok,no
-dev_tools/repo_context/tests/test_symlinks.py,test_symlinks.py,.py,test,2949,text,74,d70b0151916a578f9587b4bbe772580ff822c3fb86544a3c2f5675793de377eb,true,,false,ok,no
-dev_tools/repo_context/tests/test_validate.py,test_validate.py,.py,test,2874,text,82,a08a4b0d3e26298e86d7fce4fa675841e857097e91ff23e8218a04707d946ea4,true,,false,ok,no
+dev_tools/repo_context/tests/test_symlinks.py,test_symlinks.py,.py,test,3954,text,96,ef163643fb0a1de3752a137d699bcad5879cc7b3c9e25af3c289d680bb51af4e,true,,false,ok,no
+dev_tools/repo_context/tests/test_validate.py,test_validate.py,.py,test,4337,text,117,66cc737bf42aef4c118e2b843da24c8597d2542e939cf68d38d6ff86665dc107,true,,false,ok,no
 docs/CENTRAL_PATH_NORM_RULE.md,CENTRAL_PATH_NORM_RULE.md,.md,documentation,562,text,17,04abdb14693640fb797b5291c78699ee4ff222fe7755d9eae778858ac72f0bbb,true,,false,n/a,no
 docs/CSV_CONTRACT_v2.1.md,CSV_CONTRACT_v2.1.md,.md,documentation,2143,text,47,19cb0b5fc70a6c068323397fc071d0ecd66252a651d7788761e4cd866fdc5c5c,true,,false,n/a,no
 docs/DEPLOYMENT_CONFIGURATION.md,DEPLOYMENT_CONFIGURATION.md,.md,documentation,2518,text,54,b4c2352fc8977e8bf0ad2aca3be54b181ae892b082c657b6ee5faaa9f290b461,true,,false,n/a,no
@@ -608,7 +608,7 @@ tools/probes/PROBE_EXPORTER_DELTA.md,PROBE_EXPORTER_DELTA.md,.md,documentation,1
 tools/probes/build_probe_inventory.py,build_probe_inventory.py,.py,python_source,39417,text,868,6cf3addd7717b495595e8a82ffc2256858288ffe25288782248af0c473dd4176,true,,false,ok,no
 tools/probes/check_line_patterns_normhash.py,check_line_patterns_normhash.py,.py,python_source,5267,text,126,fb44e4849e1f43740d1d8fff5702bc95ea170abb17d5fadd011eab6a6876bd89,true,,false,ok,no
 tools/probes/find_crosswalk_candidates.py,find_crosswalk_candidates.py,.py,python_source,12966,text,323,90037ee436f2a6af3edbdb8f5169e04d93b71995184ca863d0cbb2faffebe97a,true,,false,ok,no
-tools/probes/fingerprint_probe.dyn,fingerprint_probe.dyn,.dyn,unsupported_text,34578,binary,,ba925d8a1574e78784ad7e78c804478d9b864d5ad452e294c14d3df99b7f10f1,true,,false,n/a,no
+tools/probes/fingerprint_probe.dyn,fingerprint_probe.dyn,.dyn,unsupported_text,34578,text,392,ba925d8a1574e78784ad7e78c804478d9b864d5ad452e294c14d3df99b7f10f1,true,,false,n/a,no
 tools/probes/probe_arrowheads.py,probe_arrowheads.py,.py,python_source,36711,text,986,3f8cf8fa43a0f7553407144fc3183277382e427ac3c81083efb18262f260075b,true,,false,ok,no
 tools/probes/probe_browser_organization.py,probe_browser_organization.py,.py,python_source,39263,text,961,286e6240a7fe51edcbc90b97cafaeaf6855d2114a1e1cc6b15a0f575edbfe346,true,,false,ok,no
 tools/probes/probe_ceiling_types.py,probe_ceiling_types.py,.py,python_source,36861,text,884,c7bf9e71018904130376490462e232857536ee649c007edad40efe4b5af62d9d,true,,false,ok,no

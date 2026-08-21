@@ -63,6 +63,14 @@ def _sort_key(name: str):
     return (name.lower(), name)
 
 
+def _is_ancestor(candidate_ancestor: Path, path: Path) -> bool:
+    try:
+        path.relative_to(candidate_ancestor)
+        return True
+    except ValueError:
+        return False
+
+
 def _should_exclude_file(rel_posix: str, filename: str, options: ScanOptions) -> Optional[str]:
     if options.include_globs and match_any_glob(rel_posix, options.include_globs):
         return None
@@ -78,7 +86,7 @@ def _should_exclude_file(rel_posix: str, filename: str, options: ScanOptions) ->
 
 
 def _walk(root: Path, exclude_dir_names: set, result: ScanResult, verbose: bool,
-          output_exclude_rel_path: Optional[str] = None):
+          output_exclude_rel_path: Optional[str] = None, output_dir_real: Optional[Path] = None):
     """Yield (abs_path, rel_posix) for every file found, honoring hard
     directory exclusions and symlink-escape safety. Directories themselves
     are reported via result.dir_exclusions when skipped."""
@@ -116,6 +124,17 @@ def _walk(root: Path, exclude_dir_names: set, result: ScanResult, verbose: bool,
                 if entry.is_dir(follow_symlinks=True):
                     if str(real) in visited_real_dirs:
                         result.dir_exclusions.append((rel_posix, name, "symlink_cycle"))
+                        continue
+                    # A symlink whose real target *is* (or contains) the
+                    # output directory would otherwise bypass the
+                    # exact-path exclusion below, which only compares the
+                    # symlink's own lexical path -- walking in would
+                    # re-inventory a prior run's own generated output as
+                    # repository source.
+                    if output_dir_real is not None and (
+                        real == output_dir_real or _is_ancestor(real, output_dir_real)
+                    ):
+                        result.dir_exclusions.append((rel_posix, name, "output_directory"))
                         continue
                     visited_real_dirs.add(str(real))
 
@@ -156,8 +175,14 @@ def scan_repository(options: ScanOptions) -> ScanResult:
 
     py_analyses: dict[str, rc_pyanalysis.PyFileAnalysis] = {}
 
+    try:
+        output_dir_real = options.output_dir.resolve()
+    except OSError:
+        output_dir_real = None
+
     for abs_path, rel_posix, forced_reason in _walk(
-        options.root, exclude_dir_names, result, options.verbose, options.output_exclude_rel_path,
+        options.root, exclude_dir_names, result, options.verbose,
+        options.output_exclude_rel_path, output_dir_real,
     ):
         filename = abs_path.name
         ext = abs_path.suffix.lower()

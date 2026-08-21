@@ -211,36 +211,36 @@ dev_tools/repo_context/rc_classify.py,is_test_path,function,30,39,<module>,,"rel
 dev_tools/repo_context/rc_classify.py,classify_file,function,42,81,<module>,,"rel_posix: str, filename: str, ext: str, sample_text: str | None",,"tuple[str, str]",true,"Return (category, reason). sample_text is a small text prefix, or None for binary.",40,21,
 dev_tools/repo_context/rc_classify.py,detect_generated_or_vendor,function,84,97,<module>,,"rel_posix: str, sample_text: str | None",,str,false,,14,8,
 dev_tools/repo_context/rc_classify.py,detect_entrypoint_reason,function,100,106,<module>,,"rel_posix: str, has_main_guard: bool",,str | None,false,,7,3,
-dev_tools/repo_context/rc_common.py,<module>,module,1,266,,,,,,true,"Shared constants, dataclasses, and small utilities for repo_context.",266,1,"redact_secrets,to_posix_rel,sha256_file,sha256_text,count_lines_streaming,stable_path_id,sanitize_stem,match_any_glob,sniff_binary,FileRecord,SymbolRecord,ImportRecord,CallRecord,ChunkRecord,atomic_write_text,atomic_write_bytes,estimate_tokens"
-dev_tools/repo_context/rc_common.py,redact_secrets,function,63,73,<module>,,text: str,,str,false,,11,4,
-dev_tools/repo_context/rc_common.py,to_posix_rel,function,76,77,<module>,,"path: Path, root: Path",,str,false,,2,1,
-dev_tools/repo_context/rc_common.py,sha256_file,function,80,88,<module>,,"path: Path, chunk_size: int = 1 << 20",,str,false,,9,4,
-dev_tools/repo_context/rc_common.py,sha256_text,function,91,92,<module>,,text: str,,str,false,,2,1,
-dev_tools/repo_context/rc_common.py,count_lines_streaming,function,95,108,<module>,,"path: Path, chunk_size: int = 1 << 20",,int,true,Count newline-terminated lines without holding the file in memory.,14,6,
-dev_tools/repo_context/rc_common.py,stable_path_id,function,111,112,<module>,,"rel_path: str, length: int = 12",,str,false,,2,1,
-dev_tools/repo_context/rc_common.py,sanitize_stem,function,115,117,<module>,,name: str,,str,false,,3,1,
-dev_tools/repo_context/rc_common.py,match_any_glob,function,120,124,<module>,,"name: str, patterns",,Optional[str],false,,5,3,
-dev_tools/repo_context/rc_common.py,sniff_binary,function,127,134,<module>,,sample: bytes,,bool,false,,8,5,
-dev_tools/repo_context/rc_common.py,FileRecord,class,138,152,<module>,dataclass,,,,false,,15,1,
-dev_tools/repo_context/rc_common.py,SymbolRecord,class,156,171,<module>,dataclass,,,,false,,16,1,
-dev_tools/repo_context/rc_common.py,ImportRecord,class,175,185,<module>,dataclass,,,,false,,11,1,
-dev_tools/repo_context/rc_common.py,CallRecord,class,189,198,<module>,dataclass,,,,false,,10,1,
-dev_tools/repo_context/rc_common.py,ChunkRecord,class,202,213,<module>,dataclass,,,,false,,12,1,
-dev_tools/repo_context/rc_common.py,atomic_write_text,function,249,254,<module>,,"path: Path, text: str",,None,false,,6,2,
-dev_tools/repo_context/rc_common.py,atomic_write_bytes,function,257,262,<module>,,"path: Path, data: bytes",,None,false,,6,2,
-dev_tools/repo_context/rc_common.py,estimate_tokens,function,265,266,<module>,,char_count: int,,int,false,,2,1,
-dev_tools/repo_context/rc_manifest.py,<module>,module,1,149,,,,,,true,Incremental reuse support + generation_manifest.json.,149,1,"chunking_signature,load_previous_state,make_chunk_reuse_provider,write_manifest,utc_now_iso"
+dev_tools/repo_context/rc_common.py,<module>,module,1,269,,,,,,true,"Shared constants, dataclasses, and small utilities for repo_context.",269,1,"redact_secrets,to_posix_rel,sha256_file,sha256_text,count_lines_streaming,stable_path_id,sanitize_stem,match_any_glob,sniff_binary,FileRecord,SymbolRecord,ImportRecord,CallRecord,ChunkRecord,atomic_write_text,atomic_write_bytes,estimate_tokens"
+dev_tools/repo_context/rc_common.py,redact_secrets,function,66,76,<module>,,text: str,,str,false,,11,4,
+dev_tools/repo_context/rc_common.py,to_posix_rel,function,79,80,<module>,,"path: Path, root: Path",,str,false,,2,1,
+dev_tools/repo_context/rc_common.py,sha256_file,function,83,91,<module>,,"path: Path, chunk_size: int = 1 << 20",,str,false,,9,4,
+dev_tools/repo_context/rc_common.py,sha256_text,function,94,95,<module>,,text: str,,str,false,,2,1,
+dev_tools/repo_context/rc_common.py,count_lines_streaming,function,98,111,<module>,,"path: Path, chunk_size: int = 1 << 20",,int,true,Count newline-terminated lines without holding the file in memory.,14,6,
+dev_tools/repo_context/rc_common.py,stable_path_id,function,114,115,<module>,,"rel_path: str, length: int = 12",,str,false,,2,1,
+dev_tools/repo_context/rc_common.py,sanitize_stem,function,118,120,<module>,,name: str,,str,false,,3,1,
+dev_tools/repo_context/rc_common.py,match_any_glob,function,123,127,<module>,,"name: str, patterns",,Optional[str],false,,5,3,
+dev_tools/repo_context/rc_common.py,sniff_binary,function,130,137,<module>,,sample: bytes,,bool,false,,8,5,
+dev_tools/repo_context/rc_common.py,FileRecord,class,141,155,<module>,dataclass,,,,false,,15,1,
+dev_tools/repo_context/rc_common.py,SymbolRecord,class,159,174,<module>,dataclass,,,,false,,16,1,
+dev_tools/repo_context/rc_common.py,ImportRecord,class,178,188,<module>,dataclass,,,,false,,11,1,
+dev_tools/repo_context/rc_common.py,CallRecord,class,192,201,<module>,dataclass,,,,false,,10,1,
+dev_tools/repo_context/rc_common.py,ChunkRecord,class,205,216,<module>,dataclass,,,,false,,12,1,
+dev_tools/repo_context/rc_common.py,atomic_write_text,function,252,257,<module>,,"path: Path, text: str",,None,false,,6,2,
+dev_tools/repo_context/rc_common.py,atomic_write_bytes,function,260,265,<module>,,"path: Path, data: bytes",,None,false,,6,2,
+dev_tools/repo_context/rc_common.py,estimate_tokens,function,268,269,<module>,,char_count: int,,int,false,,2,1,
+dev_tools/repo_context/rc_manifest.py,<module>,module,1,153,,,,,,true,Incremental reuse support + generation_manifest.json.,153,1,"chunking_signature,load_previous_state,make_chunk_reuse_provider,write_manifest,utc_now_iso"
 dev_tools/repo_context/rc_manifest.py,chunking_signature,function,18,25,<module>,,options,,dict,false,,8,1,
-dev_tools/repo_context/rc_manifest.py,load_previous_state,function,28,74,<module>,,output_dir: Path,,,true,"Returns (prev_hash_by_path, prev_chunks_by_path, prev_signature) or",47,15,
-dev_tools/repo_context/rc_manifest.py,make_chunk_reuse_provider,function,77,105,<module>,,"output_dir: Path, options, force: bool",,,false,,29,4,provider
-dev_tools/repo_context/rc_manifest.py,make_chunk_reuse_provider.provider,nested_function,86,103,make_chunk_reuse_provider,,"rel_path: str, current_sha: str",,,false,,18,8,
-dev_tools/repo_context/rc_manifest.py,write_manifest,function,108,145,<module>,,"output_dir: Path, options, result, root: Path, started_at_utc: str, reuse_active: bool, extra: dict",,None,false,,38,10,
-dev_tools/repo_context/rc_manifest.py,utc_now_iso,function,148,149,<module>,,,,str,false,,2,1,
+dev_tools/repo_context/rc_manifest.py,load_previous_state,function,28,78,<module>,,output_dir: Path,,,true,"Returns (prev_hash_by_path, prev_chunks_by_path, prev_signature) or",51,15,
+dev_tools/repo_context/rc_manifest.py,make_chunk_reuse_provider,function,81,109,<module>,,"output_dir: Path, options, force: bool",,,false,,29,4,provider
+dev_tools/repo_context/rc_manifest.py,make_chunk_reuse_provider.provider,nested_function,90,107,make_chunk_reuse_provider,,"rel_path: str, current_sha: str",,,false,,18,8,
+dev_tools/repo_context/rc_manifest.py,write_manifest,function,112,149,<module>,,"output_dir: Path, options, result, root: Path, started_at_utc: str, reuse_active: bool, extra: dict",,None,false,,38,10,
+dev_tools/repo_context/rc_manifest.py,utc_now_iso,function,152,153,<module>,,,,str,false,,2,1,
 dev_tools/repo_context/rc_overview.py,<module>,module,1,245,,,,,,true,repository_overview.md and README.md generation.,245,1,"_top_dir,generate_overview_md,generate_readme_md"
 dev_tools/repo_context/rc_overview.py,_top_dir,function,13,15,<module>,,rel_path: str,,str,false,,3,1,
 dev_tools/repo_context/rc_overview.py,generate_overview_md,function,18,134,<module>,,"result, root_name: str, scan_time_iso: str",,str,false,,117,42,
 dev_tools/repo_context/rc_overview.py,generate_readme_md,function,137,245,<module>,,,,str,false,,109,1,
-dev_tools/repo_context/rc_packet.py,<module>,module,1,490,,,,,,true,Targeted context packet generation.,490,1,"_load_csv,_norm_rel,_file_is_fresh,_safe_excerpt,_symbol_matches,_find_symbol_candidates,PacketOptions,Budget,_callers_of,_callees_of,_bfs_callers,_bfs_callees,_enclosing_class_or_func,_candidate_tests_for_file,_render_symbol_block,generate_packet"
+dev_tools/repo_context/rc_packet.py,<module>,module,1,505,,,,,,true,Targeted context packet generation.,505,1,"_load_csv,_norm_rel,_file_is_fresh,_safe_excerpt,_symbol_matches,_find_symbol_candidates,PacketOptions,Budget,_callers_of,_callees_of,_bfs_callers,_bfs_callees,_enclosing_class_or_func,_candidate_tests_for_file,_render_symbol_block,generate_packet"
 dev_tools/repo_context/rc_packet.py,_load_csv,function,17,21,<module>,,path: Path,,list,false,,5,3,
 dev_tools/repo_context/rc_packet.py,_norm_rel,function,24,25,<module>,,path_str: str,,str,false,,2,1,
 dev_tools/repo_context/rc_packet.py,_file_is_fresh,function,28,50,<module>,,"root: Path, rel_path: str, expected_sha256: str",,bool,true,True if rel_path's current on-disk content still matches the,23,7,
@@ -259,7 +259,7 @@ dev_tools/repo_context/rc_packet.py,_bfs_callees,function,148,165,<module>,,"sta
 dev_tools/repo_context/rc_packet.py,_enclosing_class_or_func,function,168,175,<module>,,"row: dict, symbols_by_file: dict",,Optional[dict],false,,8,5,
 dev_tools/repo_context/rc_packet.py,_candidate_tests_for_file,function,178,190,<module>,,"target_file: str, imports: list, calls: list, files_by_path: dict",,list,false,,13,7,
 dev_tools/repo_context/rc_packet.py,_render_symbol_block,function,193,227,<module>,,"root: Path, row: dict, budget: Budget, out: list, note_prefix: str = '', expected_sha256: str = ''",,None,false,,35,6,
-dev_tools/repo_context/rc_packet.py,generate_packet,function,230,490,<module>,,opts: PacketOptions,,Path,false,,261,52,"add_file_section,add_symbol_section"
+dev_tools/repo_context/rc_packet.py,generate_packet,function,230,505,<module>,,opts: PacketOptions,,Path,false,,276,54,"add_file_section,add_symbol_section"
 dev_tools/repo_context/rc_packet.py,generate_packet.add_file_section,nested_function,271,330,generate_packet,,rel_path: str,,None,false,,60,20,
 dev_tools/repo_context/rc_packet.py,generate_packet.add_symbol_section,nested_function,332,365,generate_packet,,row: dict,,None,false,,34,15,
 dev_tools/repo_context/rc_pyanalysis.py,<module>,module,1,729,,,,,,true,AST-based Python symbol / import / call extraction.,729,1,"dotted_module_path,_complexity_count,complexity_approx,_is_main_guard,_unparse_safe,format_params,RawCall,ClassInfo,PyFileAnalysis,_collect_local_bound_names,_collect_module_reassigned_names,analyze_python_source,resolve_import_record,build_import_bindings,build_bindings_by_scope,_lookup_in_scope_chain,resolve_calls,name_in_index"
@@ -290,16 +290,17 @@ dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,function,512,518
 dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,function,521,569,<module>,,"name: str, caller_symbol: str, parent_of: dict, local_names_by_symbol: dict, bindings_by_scope: dict, class_info: dict, call_line: int",,,true,"Walk caller_symbol's lexical scope chain (its own scope, then each",49,11,
 dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,function,572,725,<module>,,"raw_calls: list, caller_file: str, top_level_index: dict, class_info: dict, bindings_by_scope: dict, all_top_level_index: dict, all_class_info: dict, local_names_by_symbol: dict, parent_of: dict, module_reassigned_names: set",,list,false,,154,34,
 dev_tools/repo_context/rc_pyanalysis.py,name_in_index,function,728,729,<module>,,"index: dict, name: str",,bool,false,,2,2,
-dev_tools/repo_context/rc_scan.py,<module>,module,1,356,,,,,,true,Filesystem walk + inventory + Python analysis orchestration.,356,1,"ScanOptions,ScanResult,_sort_key,_should_exclude_file,_walk,scan_repository,_cleanup_stale_chunks,_resolve_python_relationships"
+dev_tools/repo_context/rc_scan.py,<module>,module,1,381,,,,,,true,Filesystem walk + inventory + Python analysis orchestration.,381,1,"ScanOptions,ScanResult,_sort_key,_is_ancestor,_should_exclude_file,_walk,scan_repository,_cleanup_stale_chunks,_resolve_python_relationships"
 dev_tools/repo_context/rc_scan.py,ScanOptions,class,28,44,<module>,dataclass,,,,false,,17,1,
 dev_tools/repo_context/rc_scan.py,ScanResult,class,48,59,<module>,dataclass,,,,false,,12,1,
 dev_tools/repo_context/rc_scan.py,_sort_key,function,62,63,<module>,,name: str,,,false,,2,1,
-dev_tools/repo_context/rc_scan.py,_should_exclude_file,function,66,77,<module>,,"rel_posix: str, filename: str, options: ScanOptions",,Optional[str],false,,12,7,
-dev_tools/repo_context/rc_scan.py,_walk,function,80,150,<module>,,"root: Path, exclude_dir_names: set, result: ScanResult, verbose: bool, output_exclude_rel_path: Optional[str] = None",,,true,"Yield (abs_path, rel_posix) for every file found, honoring hard",71,1,recurse
-dev_tools/repo_context/rc_scan.py,_walk.recurse,nested_function,88,148,_walk,,"dir_path: Path, rel_dir: str",,,false,,61,21,
-dev_tools/repo_context/rc_scan.py,scan_repository,function,153,309,<module>,,options: ScanOptions,,ScanResult,false,,157,54,
-dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,function,312,328,<module>,,"output_dir: Path, result: ScanResult",,int,true,Remove chunk files left over from a prior run that this run's final,17,8,
-dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,function,331,356,<module>,,"py_analyses: dict, result: ScanResult",,None,false,,26,7,
+dev_tools/repo_context/rc_scan.py,_is_ancestor,function,66,71,<module>,,"candidate_ancestor: Path, path: Path",,bool,false,,6,3,
+dev_tools/repo_context/rc_scan.py,_should_exclude_file,function,74,85,<module>,,"rel_posix: str, filename: str, options: ScanOptions",,Optional[str],false,,12,7,
+dev_tools/repo_context/rc_scan.py,_walk,function,88,169,<module>,,"root: Path, exclude_dir_names: set, result: ScanResult, verbose: bool, output_exclude_rel_path: Optional[str] = None, output_dir_real: Optional[Path] = None",,,true,"Yield (abs_path, rel_posix) for every file found, honoring hard",82,1,recurse
+dev_tools/repo_context/rc_scan.py,_walk.recurse,nested_function,96,167,_walk,,"dir_path: Path, rel_dir: str",,,false,,72,24,
+dev_tools/repo_context/rc_scan.py,scan_repository,function,172,334,<module>,,options: ScanOptions,,ScanResult,false,,163,56,
+dev_tools/repo_context/rc_scan.py,_cleanup_stale_chunks,function,337,353,<module>,,"output_dir: Path, result: ScanResult",,int,true,Remove chunk files left over from a prior run that this run's final,17,8,
+dev_tools/repo_context/rc_scan.py,_resolve_python_relationships,function,356,381,<module>,,"py_analyses: dict, result: ScanResult",,None,false,,26,7,
 dev_tools/repo_context/rc_tree.py,<module>,module,1,84,,,,,,true,Deterministic repository_tree.txt generation.,84,1,"_sort_key,_human_size,_Node,_build_tree,_render,generate_tree_text,write_tree"
 dev_tools/repo_context/rc_tree.py,_sort_key,function,7,8,<module>,,name: str,,,false,,2,1,
 dev_tools/repo_context/rc_tree.py,_human_size,function,11,16,<module>,,n: int,,str,false,,6,3,
@@ -309,7 +310,7 @@ dev_tools/repo_context/rc_tree.py,_build_tree,function,29,49,<module>,,"files, d
 dev_tools/repo_context/rc_tree.py,_render,function,52,72,<module>,,"node: _Node, prefix: str, depth: int, max_depth, lines: list",,None,false,,21,8,
 dev_tools/repo_context/rc_tree.py,generate_tree_text,function,75,79,<module>,,"result, root_name: str, max_depth = None, show_excluded_dirs: bool = False",,str,false,,5,1,
 dev_tools/repo_context/rc_tree.py,write_tree,function,82,84,<module>,,"output_dir, result, root_name: str, max_depth = None, show_excluded_dirs: bool = False",,None,false,,3,1,
-dev_tools/repo_context/rc_validate.py,<module>,module,1,255,,,,,,true,`validate` command: sanity-check a previously generated output directory.,255,1,"_looks_absolute_or_backslashed,ValidationResult,_read_csv_rows,validate_output_dir,_symbol_name_matches,format_report"
+dev_tools/repo_context/rc_validate.py,<module>,module,1,264,,,,,,true,`validate` command: sanity-check a previously generated output directory.,264,1,"_looks_absolute_or_backslashed,ValidationResult,_read_csv_rows,validate_output_dir,_symbol_name_matches,format_report"
 dev_tools/repo_context/rc_validate.py,_looks_absolute_or_backslashed,function,54,57,<module>,,value: str,,bool,false,,4,4,
 dev_tools/repo_context/rc_validate.py,ValidationResult,class,60,73,<module>,,,,,false,,14,1,"__init__,error,warn,ok"
 dev_tools/repo_context/rc_validate.py,ValidationResult.__init__,method,61,63,ValidationResult,,self,,,false,,3,1,
@@ -317,9 +318,9 @@ dev_tools/repo_context/rc_validate.py,ValidationResult.error,method,65,66,Valida
 dev_tools/repo_context/rc_validate.py,ValidationResult.warn,method,68,69,ValidationResult,,"self, msg: str",,None,false,,2,1,
 dev_tools/repo_context/rc_validate.py,ValidationResult.ok,method,72,73,ValidationResult,property,self,,bool,false,,2,1,
 dev_tools/repo_context/rc_validate.py,_read_csv_rows,function,76,80,<module>,,path: Path,,,false,,5,2,
-dev_tools/repo_context/rc_validate.py,validate_output_dir,function,83,239,<module>,,"output_dir: Path, allow_absolute_paths: bool = False",,ValidationResult,false,,157,62,
-dev_tools/repo_context/rc_validate.py,_symbol_name_matches,function,242,243,<module>,,"requested: str, qualified: str",,bool,false,,2,3,
-dev_tools/repo_context/rc_validate.py,format_report,function,246,255,<module>,,"res: ValidationResult, output_dir: Path",,str,false,,10,3,
+dev_tools/repo_context/rc_validate.py,validate_output_dir,function,83,248,<module>,,"output_dir: Path, allow_absolute_paths: bool = False",,ValidationResult,false,,166,66,
+dev_tools/repo_context/rc_validate.py,_symbol_name_matches,function,251,252,<module>,,"requested: str, qualified: str",,bool,false,,2,3,
+dev_tools/repo_context/rc_validate.py,format_report,function,255,264,<module>,,"res: ValidationResult, output_dir: Path",,str,false,,10,3,
 dev_tools/repo_context/rc_writers.py,<module>,module,1,133,,,,,,true,"CSV / JSONL table writers, sharing schemas with rc_validate.py.",133,1,"_bool_str,_rows_to_csv_text,file_record_to_row,file_record_to_dict,symbol_record_to_row,symbol_record_to_dict,import_record_to_row,call_record_to_row,chunk_record_to_row,write_all_tables"
 dev_tools/repo_context/rc_writers.py,_bool_str,function,12,13,<module>,,v,,str,false,,2,1,
 dev_tools/repo_context/rc_writers.py,_rows_to_csv_text,function,16,22,<module>,,"header, rows",,str,false,,7,3,
@@ -374,28 +375,30 @@ dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_level_rebindi
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_qualified_base_class_resolves_inherited_method,function,246,263,<module>,,"repo, out",,,false,,18,7,
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_duplicate_import_resolved_by_call_site_order,function,266,278,<module>,,"repo, out",,,false,,13,6,
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,function,281,297,<module>,,"repo, out",,,false,,17,6,
-dev_tools/repo_context/tests/test_inventory_and_exclusions.py,<module>,module,1,108,,,,,,false,,108,1,"_read_csv,test_basic_repository_inventory,test_default_exclusions,test_binary_file_detection,test_duplicate_filenames_in_different_directories,test_secret_files_excluded_by_default"
+dev_tools/repo_context/tests/test_inventory_and_exclusions.py,<module>,module,1,118,,,,,,false,,118,1,"_read_csv,test_basic_repository_inventory,test_default_exclusions,test_binary_file_detection,test_duplicate_filenames_in_different_directories,test_dyn_files_are_parsed_as_text_not_binary,test_secret_files_excluded_by_default"
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,_read_csv,function,6,8,<module>,,path,,,false,,3,2,
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_basic_repository_inventory,function,11,32,<module>,,"repo, out",,,false,,22,14,
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_default_exclusions,function,35,53,<module>,,"repo, out",,,false,,19,9,
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_binary_file_detection,function,56,68,<module>,,"repo, out",,,false,,13,7,
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_duplicate_filenames_in_different_directories,function,71,85,<module>,,"repo, out",,,false,,15,9,
-dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_secret_files_excluded_by_default,function,88,108,<module>,,"repo, out",,,false,,21,10,
+dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_dyn_files_are_parsed_as_text_not_binary,function,88,95,<module>,,"repo, out",,,false,,8,5,
+dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_secret_files_excluded_by_default,function,98,118,<module>,,"repo, out",,,false,,21,10,
 dev_tools/repo_context/tests/test_large_file_cap.py,<module>,module,1,27,,,,,,true,White-box test for the >MAX_TEXT_READ_BYTES surfacing fix.,27,1,test_oversized_text_file_is_surfaced_not_silently_skipped
 dev_tools/repo_context/tests/test_large_file_cap.py,test_oversized_text_file_is_surfaced_not_silently_skipped,function,12,27,<module>,,"repo, out, monkeypatch",,,false,,16,9,
-dev_tools/repo_context/tests/test_packets.py,<module>,module,1,158,,,,,,false,,158,1,"_scan,test_packet_by_file,test_search_packet_respects_size_budget_on_repetitive_file,test_packet_withholds_excerpt_when_source_changed_since_scan,test_file_packet_respects_tiny_size_budget,test_line_packet_raw_fallback_withholds_stale_excerpt,test_packet_by_symbol,test_packet_by_search,test_packet_by_line,test_ambiguous_symbol_requires_qualifier_or_all_matches,test_packet_accepts_windows_style_relative_path,test_packet_without_prior_scan_fails_cleanly"
+dev_tools/repo_context/tests/test_packets.py,<module>,module,1,171,,,,,,false,,171,1,"_scan,test_packet_by_file,test_search_packet_respects_size_budget_on_repetitive_file,test_packet_withholds_excerpt_when_source_changed_since_scan,test_file_packet_respects_tiny_size_budget,test_line_packet_raw_fallback_withholds_stale_excerpt,test_search_packet_skips_files_changed_since_scan,test_packet_by_symbol,test_packet_by_search,test_packet_by_line,test_ambiguous_symbol_requires_qualifier_or_all_matches,test_packet_accepts_windows_style_relative_path,test_packet_without_prior_scan_fails_cleanly"
 dev_tools/repo_context/tests/test_packets.py,_scan,function,4,6,<module>,,"repo, out",,,false,,3,2,
 dev_tools/repo_context/tests/test_packets.py,test_packet_by_file,function,9,18,<module>,,"repo, out",,,false,,10,5,
 dev_tools/repo_context/tests/test_packets.py,test_search_packet_respects_size_budget_on_repetitive_file,function,21,34,<module>,,"repo, out",,,false,,14,5,
 dev_tools/repo_context/tests/test_packets.py,test_packet_withholds_excerpt_when_source_changed_since_scan,function,37,48,<module>,,"repo, out",,,false,,12,5,
 dev_tools/repo_context/tests/test_packets.py,test_file_packet_respects_tiny_size_budget,function,51,67,<module>,,"repo, out",,,false,,17,7,
 dev_tools/repo_context/tests/test_packets.py,test_line_packet_raw_fallback_withholds_stale_excerpt,function,70,80,<module>,,"repo, out",,,false,,11,5,
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,function,83,90,<module>,,"repo, out",,,false,,8,4,
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,function,93,101,<module>,,"repo, out",,,false,,9,4,
-dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,function,104,111,<module>,,"repo, out",,,false,,8,3,
-dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,function,114,140,<module>,,"repo, out",,,false,,27,10,
-dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,function,143,151,<module>,,"repo, out",,,false,,9,4,
-dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,function,154,158,<module>,,"repo, out",,,false,,5,2,
+dev_tools/repo_context/tests/test_packets.py,test_search_packet_skips_files_changed_since_scan,function,83,93,<module>,,"repo, out",,,false,,11,5,
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_symbol,function,96,103,<module>,,"repo, out",,,false,,8,4,
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,function,106,114,<module>,,"repo, out",,,false,,9,4,
+dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,function,117,124,<module>,,"repo, out",,,false,,8,3,
+dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,function,127,153,<module>,,"repo, out",,,false,,27,10,
+dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,function,156,164,<module>,,"repo, out",,,false,,9,4,
+dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,function,167,171,<module>,,"repo, out",,,false,,5,2,
 dev_tools/repo_context/tests/test_python_symbols.py,<module>,module,1,98,,,,,,false,,98,1,"_symbols,test_functions_classes_methods_nested_async,test_utf8_bom_prefixed_python_file_still_parses,test_syntax_error_handling_does_not_abort_scan"
 dev_tools/repo_context/tests/test_python_symbols.py,_symbols,function,30,32,<module>,,out,,,false,,3,2,
 dev_tools/repo_context/tests/test_python_symbols.py,test_functions_classes_methods_nested_async,function,35,63,<module>,,"repo, out",,,false,,29,18,
@@ -410,18 +413,21 @@ dev_tools/repo_context/tests/test_safety.py,test_invalid_root_returns_nonzero,fu
 dev_tools/repo_context/tests/test_safety.py,test_missing_subcommand_returns_nonzero,function,62,64,<module>,,,,,false,,3,2,
 dev_tools/repo_context/tests/test_safety.py,test_non_positive_chunk_target_lines_rejected,function,67,72,<module>,,"repo, out",,,false,,6,3,
 dev_tools/repo_context/tests/test_safety.py,test_validate_does_not_require_packets_dir,function,75,87,<module>,,"repo, out",,,false,,13,3,
-dev_tools/repo_context/tests/test_symlinks.py,<module>,module,1,74,,,,,,false,,74,1,"test_symlink_escaping_root_is_excluded,test_file_symlink_escaping_root_is_excluded_without_being_read,test_symlink_cycle_inside_root_does_not_hang,test_fifo_directly_under_root_does_not_hang"
+dev_tools/repo_context/tests/test_symlinks.py,<module>,module,1,96,,,,,,false,,96,1,"test_symlink_escaping_root_is_excluded,test_file_symlink_escaping_root_is_excluded_without_being_read,test_symlink_cycle_inside_root_does_not_hang,test_symlink_pointing_at_output_dir_is_excluded,test_fifo_directly_under_root_does_not_hang"
 dev_tools/repo_context/tests/test_symlinks.py,test_symlink_escaping_root_is_excluded,function,13,33,<module>,,"tmp_path, repo, out",,,false,,21,11,
 dev_tools/repo_context/tests/test_symlinks.py,test_file_symlink_escaping_root_is_excluded_without_being_read,function,36,50,<module>,,"tmp_path, repo, out",,,false,,15,7,
 dev_tools/repo_context/tests/test_symlinks.py,test_symlink_cycle_inside_root_does_not_hang,function,53,59,<module>,,"repo, out",,,false,,7,2,
-dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,function,62,74,<module>,,"repo, out",,,false,,13,7,
-dev_tools/repo_context/tests/test_validate.py,<module>,module,1,82,,,,,,false,,82,1,"_big_text,test_validate_passes_on_freshly_generated_output,test_validate_detects_modified_chunk,test_validate_detects_missing_chunk,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,test_validate_fails_on_missing_required_file"
+dev_tools/repo_context/tests/test_symlinks.py,test_symlink_pointing_at_output_dir_is_excluded,function,62,81,<module>,,repo,,,false,,20,8,
+dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,function,84,96,<module>,,"repo, out",,,false,,13,7,
+dev_tools/repo_context/tests/test_validate.py,<module>,module,1,117,,,,,,false,,117,1,"_big_text,test_validate_passes_on_freshly_generated_output,test_validate_detects_modified_chunk,test_validate_detects_missing_chunk,test_validate_catches_entirely_deleted_chunk_rows,test_scan_does_not_crash_on_malformed_prior_chunk_manifest,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,test_validate_fails_on_missing_required_file"
 dev_tools/repo_context/tests/test_validate.py,_big_text,function,6,7,<module>,,n = 1500,,,false,,2,2,
 dev_tools/repo_context/tests/test_validate.py,test_validate_passes_on_freshly_generated_output,function,10,19,<module>,,"repo, out",,,false,,10,4,
 dev_tools/repo_context/tests/test_validate.py,test_validate_detects_modified_chunk,function,22,35,<module>,,"repo, out",,,false,,14,6,
 dev_tools/repo_context/tests/test_validate.py,test_validate_detects_missing_chunk,function,38,51,<module>,,"repo, out",,,false,,14,6,
-dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,function,54,72,<module>,,"repo, out",,,false,,19,8,
-dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,function,75,82,<module>,,"repo, out",,,false,,8,4,
+dev_tools/repo_context/tests/test_validate.py,test_validate_catches_entirely_deleted_chunk_rows,function,54,66,<module>,,"repo, out",,,false,,13,5,
+dev_tools/repo_context/tests/test_validate.py,test_scan_does_not_crash_on_malformed_prior_chunk_manifest,function,69,86,<module>,,"repo, out",,,false,,18,7,
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,function,89,107,<module>,,"repo, out",,,false,,19,8,
+dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,function,110,117,<module>,,"repo, out",,,false,,8,4,
 domains/__init__.py,<module>,module,1,10,,,,,,true,Domain extractors package.,10,1,
 domains/arrowheads.py,<module>,module,1,667,,,,,,true,Arrowheads domain extractor.,667,4,"_fmt_deg_from_rad,_canon_yesno_bool,_as_value_string,_get_arrowhead_style,_build_common_identity_items,_build_arrow_identity_items,_build_tick_identity_items,_is_arrowhead_type,_iter_arrowhead_ids_from_element,extract"
 domains/arrowheads.py,_fmt_deg_from_rad,function,64,70,<module>,,rad,,,false,,7,4,

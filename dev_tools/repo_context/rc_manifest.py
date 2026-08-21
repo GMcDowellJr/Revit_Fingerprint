@@ -68,7 +68,11 @@ def load_previous_state(output_dir: Path):
                     estimated_tokens=int(row["estimated_tokens"]),
                 )
                 prev_chunks_by_path.setdefault(rec.source_relative_path, []).append(rec)
-    except OSError:
+    except (OSError, ValueError, KeyError):
+        # A malformed/corrupted prior chunk_manifest.csv (bad numeric
+        # field, missing column, ...) is just an unusable cache -- treat
+        # it the same as "no previous run" rather than letting a normal
+        # scan crash trying to read leftover state from an older run.
         return None, None, None
 
     return prev_hash_by_path, prev_chunks_by_path, prev_signature

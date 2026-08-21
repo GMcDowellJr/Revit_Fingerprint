@@ -59,6 +59,28 @@ def test_symlink_cycle_inside_root_does_not_hang(repo, out):
     assert result.returncode == 0, result.stderr
 
 
+def test_symlink_pointing_at_output_dir_is_excluded(repo):
+    # The output directory must be *nested inside* root for this to
+    # exercise the real scenario: an internal symlink whose target is the
+    # output directory, reached under a different name than its own
+    # exact relative path -- the plain lexical-path check alone can't
+    # catch that.
+    write_files(repo, {"normal.py": "x = 1\n"})
+    out = repo / "context_output"
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    (repo / "alias").symlink_to(out, target_is_directory=True)
+
+    result2 = run_tool(["scan", str(repo), "--output", str(out), "--force"])
+    assert result2.returncode == 0, result2.stderr
+
+    with open(out / "file_inventory.csv", newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    assert not any("alias" in r["relative_path"] for r in rows)
+    assert not any("context_output" in r["relative_path"] for r in rows)
+
+
 def test_fifo_directly_under_root_does_not_hang(repo, out):
     # No symlink involved -- a bare FIFO (no writer) would block forever
     # if the walker ever opened it for hashing.

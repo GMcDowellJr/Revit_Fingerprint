@@ -192,6 +192,15 @@ def validate_output_dir(output_dir: Path, allow_absolute_paths: bool = False) ->
                 res.error(f"Chunked file {src} coverage ends at line {last_end}, "
                           f"expected {line_count} (full source line count)")
 
+    # A file marked chunked=true in the inventory must have *some* row in
+    # chunk_manifest.csv -- if every row for it was deleted (not just
+    # malformed), the loop above never sees it at all and would otherwise
+    # silently report zero errors.
+    for rel_path, inv in inventory_by_path.items():
+        if inv.get("chunked") == "true" and rel_path not in by_source and rel_path not in malformed_sources:
+            res.error(f"{rel_path} is marked chunked=true in file_inventory.csv but has no rows in "
+                      f"chunk_manifest.csv")
+
     packets_dir = output_dir / "packets"
     symbol_names = {r["qualified_name"] for r in symbol_rows}
     for packet_file in sorted(packets_dir.glob("*.md")):

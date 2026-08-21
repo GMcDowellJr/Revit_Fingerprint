@@ -51,6 +51,41 @@ def test_validate_detects_missing_chunk(repo, out):
     assert "missing" in v.stdout.lower()
 
 
+def test_validate_catches_entirely_deleted_chunk_rows(repo, out):
+    write_files(repo, {"big.txt": _big_text()})
+    r = run_tool(["scan", str(repo), "--output", str(out)])
+    assert r.returncode == 0, r.stderr
+
+    manifest_path = out / "chunk_manifest.csv"
+    rows = list(csv.reader(open(manifest_path, newline="", encoding="utf-8")))
+    with open(manifest_path, "w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerow(rows[0])  # header only -- all rows for big.txt gone
+
+    v = run_tool(["validate", str(out)])
+    assert v.returncode != 0
+    assert "has no rows in chunk_manifest.csv" in v.stdout
+
+
+def test_scan_does_not_crash_on_malformed_prior_chunk_manifest(repo, out):
+    lines = ["def big_func(x):"]
+    for i in range(1200):
+        lines.append(f"    y{i} = x + {i}")
+    lines.append("    return x")
+    write_files(repo, {"big.py": "\n".join(lines) + "\n"})
+    r1 = run_tool(["scan", str(repo), "--output", str(out)])
+    assert r1.returncode == 0, r1.stderr
+
+    manifest_path = out / "chunk_manifest.csv"
+    rows = list(csv.reader(open(manifest_path, newline="", encoding="utf-8")))
+    rows[1][3] = "CORRUPT"  # start_line column
+    with open(manifest_path, "w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows(rows)
+
+    r2 = run_tool(["scan", str(repo), "--output", str(out)])
+    assert r2.returncode == 0, r2.stderr
+    assert "Traceback" not in r2.stdout and "Traceback" not in r2.stderr
+
+
 def test_validate_reports_malformed_chunk_manifest_instead_of_crashing(repo, out):
     lines = ["def big_func(x):"]
     for i in range(1200):
