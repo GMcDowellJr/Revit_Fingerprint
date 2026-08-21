@@ -114,14 +114,55 @@ _ORIGIN_KIND_XY = "xy"
 
 
 # ---------------------------------------------------------------------------
-# Reading grids back from a live Revit FillPatternElement
+# Reading target + grids back from a live Revit FillPatternElement
 # ---------------------------------------------------------------------------
 
-def read_grids_from_element(doc: Any, element: Any) -> Optional[List[ReconstructedGrid]]:
-    """Mirror domains/fill_patterns.py::extract_drafting()/extract_model()'s grid
-    reading path (GetFillPattern -> GetFillGrids()) for a single already-resolved
-    element. Returns None (not a sentinel value) if the pattern/grids could not be
-    read at all -- callers treat that as a bounded, explicit failure.
+def read_target_name(fp: Any) -> Optional[str]:
+    """Read a live FillPattern's Target as the same "Drafting"/"Model" string
+    domains/fill_patterns.py's own partitions use, mirroring
+    tools/probes/probe_fill_patterns.py's enum-stringification convention
+    (prefer .ToString(), fall back to str())."""
+    try:
+        tgt = fp.Target
+    except Exception:
+        return None
+    if tgt is None:
+        return None
+    try:
+        name = tgt.ToString()
+    except Exception:
+        name = None
+    if not name:
+        try:
+            name = str(tgt)
+        except Exception:
+            return None
+    name = str(name).strip()
+    return name or None
+
+
+def read_fill_pattern_from_element(
+    doc: Any, element: Any
+) -> Optional[Tuple[str, List[ReconstructedGrid]]]:
+    """Mirror domains/fill_patterns.py::extract_drafting()/extract_model()'s
+    reading path (GetFillPattern -> Target / GetFillGrids()) for a single
+    already-resolved element. Returns (target_name, grids), or None (not a
+    sentinel value) if the pattern, its target, or its grids could not be read
+    at all -- callers treat that as a bounded, explicit failure.
+
+    Reading the element's ACTUAL target here (rather than trusting a caller-
+    supplied expected value) matters because build_name_index() indexes
+    FillPatternElement objects across BOTH partitions in one shared namespace
+    (mapping/create_fill_pattern_mappings.py processes fill_patterns_drafting
+    and fill_patterns_model against the same document) -- an existing element
+    found by name while resolving a fill_patterns_model request could actually
+    be a Drafting-target element created earlier while resolving
+    fill_patterns_drafting (same observed name, coincidentally matching
+    grids). Hashing that element's real grids against a caller-asserted
+    "Model" target instead of its own true target would then falsely appear
+    to reproduce the requested join_hash. See mapping/fill_pattern_reconstruction.py
+    and verify_element_join_hash() below, which rejects any target mismatch
+    before ever computing a join_hash.
     """
     fp = None
     try:
@@ -129,6 +170,10 @@ def read_grids_from_element(doc: Any, element: Any) -> Optional[List[Reconstruct
     except Exception:
         fp = None
     if fp is None:
+        return None
+
+    target_name = read_target_name(fp)
+    if target_name is None:
         return None
 
     try:
@@ -184,7 +229,7 @@ def read_grids_from_element(doc: Any, element: Any) -> Optional[List[Reconstruct
             )
         )
 
-    return grids
+    return target_name, grids
 
 
 # ---------------------------------------------------------------------------
@@ -226,18 +271,28 @@ def verify_element_join_hash(
     doc: Any,
     element: Any,
     domain_name: str,
-    target_name: str,
+    expected_target_name: str,
     requested_join_hash: str,
     *,
     domain_policy: Dict[str, Any],
 ) -> VerificationResult:
-    grids = read_grids_from_element(doc, element)
-    if grids is None:
+    result = read_fill_pattern_from_element(doc, element)
+    if result is None:
         return VerificationResult(ok=False, verified_join_hash=None, reason="element_unreadable")
+    actual_target_name, grids = result
+
+    # An existing element found by name could belong to the OTHER partition
+    # (both share one FillPatternElement namespace within a document) --
+    # never trust a caller-asserted target over the element's own. See
+    # read_fill_pattern_from_element()'s docstring.
+    if actual_target_name != expected_target_name:
+        return VerificationResult(
+            ok=False, verified_join_hash=None, reason="target_mismatch:{}".format(actual_target_name)
+        )
 
     grids_def_hash = compute_grids_def_hash(len(grids), grids)
     verified_join_hash, _join_key, _missing = compute_join_hash_for_grids(
-        domain_name, target_name, len(grids), grids_def_hash, domain_policy=domain_policy
+        domain_name, expected_target_name, len(grids), grids_def_hash, domain_policy=domain_policy
     )
     if verified_join_hash != requested_join_hash:
         return VerificationResult(

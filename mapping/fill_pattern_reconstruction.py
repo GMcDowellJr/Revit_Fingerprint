@@ -530,8 +530,20 @@ def reconstruct_pattern(domain_name: str, join_hash: str, settings_rows: List[Di
                 origin_a = _require_float("origin.u")
                 origin_b = _require_float("origin.v")
             elif origin_kind == _ORIGIN_KIND_XY:
-                origin_a = _require_float("origin.x")
-                origin_b = _require_float("origin.y")
+                # Revit's real FillGrid.Origin is exclusively UV-typed (confirmed
+                # against the live Revit API surface) -- domains/fill_patterns.py's
+                # "xy" branch is a defensive fallback for a runtime Origin shape
+                # that has never been observed to occur, kept only so extraction
+                # never silently drops a genuinely different Origin type if one
+                # ever appeared. This mapping utility cannot faithfully construct
+                # OR verify such a grid: FillPatternElement.Create only ever
+                # produces UV origins, so read-back would always report "uv",
+                # never reproducing an "xy"-labeled requested join_hash. Block
+                # rather than guess that x/y values are interchangeable with u/v
+                # (never inferred) -- see docs/fill_pattern_mapping.md.
+                return _blocked(
+                    domain_name, join_hash, "grid_origin_kind_not_creatable:{:03d}:{}".format(idx, origin_kind)
+                )
             else:
                 return _blocked(domain_name, join_hash, "grid_origin_kind_unmapped:{:03d}:{}".format(idx, origin_kind))
 

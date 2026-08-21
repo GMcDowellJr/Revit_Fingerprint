@@ -189,6 +189,47 @@ policy) for the same reason `line_patterns` does: `bundle_pattern_inventory.csv`
 (`tools/extractor.py`'s `cluster_id = f"{domain}|{schema}|{join_hash}"`), not
 `sig_hash`.
 
+## `"xy"`-shaped origin evidence is blocked, not reconstructed
+
+`domains/fill_patterns.py`'s grid-reading code has a defensive `"xy"` fallback
+(reading `Origin.X`/`.Y` if `.U`/`.V` aren't present) for a runtime `Origin`
+shape that has never actually been observed -- the real Revit API's
+`FillGrid.Origin` is exclusively `UV`-typed. `mapping/fill_pattern_reconstruction.py`
+therefore **blocks** (`grid_origin_kind_not_creatable:idx:xy`) any evidence
+declaring `origin.kind == "xy"`, rather than accepting it as reconstructable:
+this mapping utility can only ever construct a `FillGrid` with a `UV` origin
+(`Autodesk.Revit.DB.UV(u, v)`), and reading a grid back off any live
+`FillPatternElement` can only ever report `"uv"` too (`read_fill_pattern_from_element`
+only checks `.U`/`.V`) -- so an `"xy"`-labeled requested `join_hash` could
+never be reproduced by a created element in the first place, and blocking it
+up front (before any transaction) is more useful than a doomed
+create-then-rollback attempt. `compute_grids_def_hash()` itself still
+supports `"xy"` as a general hash-preimage shape (it's a pure hashing
+utility, not a creatability check), but `reconstruct_pattern()` -- the
+function that actually feeds the Revit-mutation pipeline -- never produces a
+grid with `origin_kind == "xy"`.
+
+## Verification reads the element's ACTUAL target, never a caller assumption
+
+Both partitions share one `FillPatternElement` namespace within a single
+Revit document (`build_name_index()` in `mapping/fill_pattern_revit_apply.py`
+indexes both regardless of `Target`), and
+`mapping/create_fill_pattern_mappings.py` processes both partitions against
+the same, shared `name_index`. This means an existing element found by name
+while resolving a `fill_patterns_model` request could actually be a
+Drafting-target element created earlier while resolving
+`fill_patterns_drafting` (same observed name, coincidentally matching
+grids). `verify_element_join_hash()` therefore reads the element's *actual*
+`FillPattern.Target` (`read_fill_pattern_from_element()`) and rejects a
+mismatch against the domain's expected target (`target_mismatch:<actual>`)
+**before** computing any hash -- it never trusts a caller-supplied expected
+target value over what the live element actually reports. Without this
+check, a same-named, same-grid-geometry element from the *other* partition
+could falsely pass verification, since the target string participates in the
+`join_hash` preimage but was otherwise being asserted rather than read.
+See `tests/test_fill_pattern_revit_apply_verification.py` for the regression
+coverage.
+
 ## Naming
 
 Identical convention to `line_patterns` (`docs/line_pattern_mapping.md`):

@@ -227,14 +227,19 @@ def test_reconstruct_ok_with_full_evidence():
     assert result.reconstructed_join_hash == jh
 
 
-def test_reconstruct_ok_with_xy_origin():
+def test_block_xy_origin_not_creatable():
+    # Revit's real FillGrid.Origin is exclusively UV-typed -- "xy" evidence
+    # (domains/fill_patterns.py's defensive fallback for a runtime Origin shape
+    # that has never been observed) can never be constructed or verified
+    # against a live FillPatternElement, so reconstruction blocks it rather
+    # than guessing x/y are interchangeable with u/v.
     grid_dicts = [{"idx": 0, "angle": 0.1, "origin_kind": "xy", "a": 3.0, "b": -1.5, "offset": 0.2, "shift": 0.0}]
     jh = _requested_join_hash_for(DOMAIN_MODEL, grid_dicts)
     rows = _settings_rows_for(DOMAIN_MODEL, jh, grid_dicts)
 
     result = reconstruct_pattern(DOMAIN_MODEL, jh, rows)
-    assert result.status == STATUS_OK
-    assert result.grids[0].origin_kind == "xy"
+    assert result.status == STATUS_BLOCKED
+    assert result.reasons == ["grid_origin_kind_not_creatable:000:xy"]
 
 
 def test_reconstruct_degraded_when_grids_def_hash_evidence_absent():
