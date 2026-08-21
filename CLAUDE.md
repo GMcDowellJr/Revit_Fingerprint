@@ -409,6 +409,19 @@ docs/                   Technical documentation
                                        missing-invocation/ambiguous-quality-state issues in PROBE_INVENTORY.csv
   research/                          RevitLookup API concept-mapping working files
 
+mapping/                Revit-side downstream mapping utilities (model-writing; separate from
+                          core/domains/runner/tools -- see docs/line_pattern_mapping.md, D-038).
+                          line_patterns is the only supported domain so far.
+  line_pattern_reconstruction.py  Pure Python (no Revit dep): CSV loading, evidence validation/
+                                    blocking, segment + hash reconstruction/verification against the
+                                    real line_patterns join-key policy, deterministic naming, report
+                                    formatting. Unit tested directly.
+  line_pattern_revit_apply.py     Revit API half: read segments back off a live LinePatternElement,
+                                    bounded create-then-verify-then-commit/rollback Transactions,
+                                    existing-vs-create-vs-block decision per requested join_hash.
+  create_line_pattern_mappings.py Dynamo CPython3 entry point (IN[0]=input dir, IN[1]=report path),
+                                    same DocumentManager/IN/OUT convention as tools/probes/*.py.
+
 legacy/                 MVP implementation (preserved reference)
   fingerprint_mvp.py
 ```

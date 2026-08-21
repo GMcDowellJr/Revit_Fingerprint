@@ -13,6 +13,23 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Added
+- **`mapping/` line_patterns Revit mapping utility (D-038).** New downstream,
+  Revit-writing package (separate from `core/`/`domains/`/`runner/`/`tools/`)
+  that reads `tools/export_bundle_pattern_detail.py`'s
+  `bundle_pattern_inventory.csv`/`pattern_settings.csv`/`pattern_names.csv`
+  and materializes representative `LinePatternElement` objects in the
+  currently open Revit document for a mapping/configuration RVT. Every
+  requested `(domain="line_patterns", join_hash)` is reconstructed from
+  evidence and blocked (never inferred) on incomplete/inconsistent data;
+  creation happens inside a per-configuration `Transaction` that is only
+  committed after the created element is read back and its `join_hash`
+  (via the existing `line_patterns.join_key.v3` policy -- not `sig_hash`)
+  is verified to match the request, with rollback on any mismatch or
+  exception. No existing extraction, join-key, bundle-analysis, or
+  `export_bundle_pattern_detail.py` semantics change -- this is purely
+  additive. See `docs/line_pattern_mapping.md` and D-038.
+
 ### Changed
 - **Repository-neutral runtime and sample defaults.** Dynamo runner discovery no
   longer searches an organization-specific user-profile path, both checked-in

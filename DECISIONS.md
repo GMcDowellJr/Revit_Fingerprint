@@ -1604,3 +1604,71 @@ limitations remain.
 - Pre-v2 CSV consumers must explicitly rename the retired field.
 - Policy overrides are reproducible beside identity-aware artifacts.
 - Historical audit text remains historical; maintained prose/examples are neutral.
+
+## D-038 — `mapping/` line_patterns Revit mapping utility (model-writing, join_hash-verified)
+
+### Status
+Accepted (2026-08-21)
+
+### Decision
+Introduce `mapping/`, a new top-level package separate from `core/`/`domains/`/
+`runner/`/`tools/`, that reads the `tools/export_bundle_pattern_detail.py` CSV
+triple (`bundle_pattern_inventory.csv`/`pattern_settings.csv`/`pattern_names.csv`)
+and materializes representative `LinePatternElement` objects in the currently
+open Revit document, for use in a mapping/configuration RVT consumed by
+downstream governance tooling. This is the first behavior in the repository
+that writes to a Revit document rather than only reading it.
+
+Scope is locked to the `line_patterns` domain only. Every unique
+`(domain="line_patterns", join_hash)` in `bundle_pattern_inventory.csv` is a
+requested configuration; reconstruction from `pattern_settings.csv` blocks
+(never infers) on any incomplete/inconsistent evidence. Verification against
+the requested identity uses `join_hash` (the `line_patterns.join_key.v3`
+policy value, D-017's `line_pattern.segments_norm_hash`-derived scale-invariant
+identity) computed via the existing `core/join_key_builder.py` +
+`policies/domain_join_key_policies.json`, never `sig_hash` (which remains
+`line_pattern.segments_def_hash`-derived, exact-scale identity) -- these answer
+different questions and are not interchangeable. Each requested configuration
+is created inside its own `Autodesk.Revit.DB.Transaction`, read back, and
+re-verified against the requested `join_hash` before commit; any mismatch or
+exception rolls that one transaction back without affecting others. Mapping
+elements are named `MAP__<observed_name>`, with a deterministic
+`MAP__<observed_name>__<short_join_hash>` fallback on a name collision against
+a *different* configuration; an existing nonmatching element is never modified
+or replaced.
+
+`line_pattern.segments_norm_hash` is computed synthetically by
+`tools/run_extract_all.py`'s private `_append_line_pattern_synthetic_norm_hash()`
+during the flatten stage and is not exposed as an importable function. Rather
+than import it (and couple this Revit-writing utility to that CLI
+orchestrator's machinery), `mapping/line_pattern_reconstruction.py` carries a
+deliberately independent reimplementation of the same per-record algorithm --
+the same "independent reimplementation over import" precedent
+`tools/pattern_id_utils.py` already established for `tools/extractor.py`'s
+private `_stable_pattern_id()`. A cross-check test
+(`tests/test_line_pattern_mapping_reconstruction.py::test_segments_norm_hash_matches_run_extract_all_reference`)
+asserts the two implementations agree over synthetic segment lists.
+
+### Rationale
+Existing extraction/analysis hash and join-key semantics are reused verbatim
+(no hash-affecting change to any domain or policy). The only genuinely new
+rules introduced are downstream-only and non-hash-affecting: a Revit
+element-name sanitizer (`mapping/line_pattern_reconstruction.py::sanitize_revit_name`,
+since nothing upstream previously needed to construct Revit-legal names from
+arbitrary observed labels), and a defensive re-application of the existing
+Dot-length-normalization rule (`domains/line_patterns.py` already forces Dot
+segment length to `0.0` at extraction time; this utility re-applies the same
+normalization to defend against a hand-edited/stale CSV, marking the result
+degraded rather than blocked when it has to).
+
+### Consequences
+- No existing extraction, join-key, bundle-analysis, or
+  `export_bundle_pattern_detail.py` behavior changes; `mapping/` is
+  purely additive and downstream.
+- `core/`, `domains/`, and `runner/` must never import from `mapping/`
+  (dependency direction stays one-way, same as the existing
+  Core -> Domains -> Context -> Runner rule).
+- A subsequent fill-pattern (or other domain) mapping PR must redo its own
+  domain-specific reconstruction/naming/verification; no shared
+  "materialize-a-domain-into-Revit" abstraction was introduced here to avoid
+  generalizing prematurely from a single domain.
