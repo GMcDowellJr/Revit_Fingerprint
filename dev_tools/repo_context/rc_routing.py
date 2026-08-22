@@ -410,9 +410,19 @@ def _render_index(root: Path, started_at_utc: str, git_info: dict, source_manife
 
     lines.append("## How to use this index\n")
     lines.append(
+        "**This index has counts, not names -- it is not enough on its own to pick good selectors.** "
+        "Do not draft `packet_request.json` from this file alone. Follow these steps in order:\n\n"
         "1. Skim the catalog summaries below and pick the one(s) most likely to cover your question.\n"
-        "2. Open that catalog (`routing/<name>.md`) and identify candidate files/symbols/search terms.\n"
-        "3. Write a `packet_request.json` (schema: `schema/packet_request.schema.json`) naming those "
+        "2. **Ask for that catalog file (`routing/<name>.md`) and read it before writing a request.** "
+        "It has the actual file paths, symbol names, and line numbers this index does not. If you have "
+        "not been given a catalog yet, your next reply should ask for it -- not a `packet_request.json`.\n"
+        "3. From the catalog, prefer `selectors.files` and/or `selectors.symbols` (an exact symbol name, "
+        "optionally narrowed with `file`) that name the actual code involved. Use `selectors.search_terms` "
+        "only for a short, distinctive phrase or identifier you expect to appear in very few places -- a "
+        "single common word (e.g. \"blocked\", \"Model\", \"error\") can match hundreds of files across the "
+        "whole repository and will get crowded out of the packet by `limits.max_files` before it reaches "
+        "anything relevant. Treat search terms as a supplement to file/symbol selectors, never a substitute.\n"
+        "4. Write a `packet_request.json` (schema: `schema/packet_request.schema.json`) naming those "
         "selectors, e.g.:\n"
     )
     lines.append(
@@ -427,10 +437,12 @@ def _render_index(root: Path, started_at_utc: str, git_info: dict, source_manife
         '  "limits": {"max_estimated_tokens": 12000, "max_files": 12}\n'
         "}\n"
         "```\n"
-        "4. Run:\n"
+        "5. Run:\n"
         "   `python repo_context.py packet ROOT --output OUT --request packet_request.json`\n"
-        "5. Read the generated packet in `packets/`; it contains exact source excerpts, a "
-        "selector-resolution report, and an explicit list of anything omitted or ambiguous.\n"
+        "6. Read the generated packet in `packets/`. If any selector came back `missing`/`ambiguous` in "
+        "its resolution report, or search terms were reported omitted under `limits.max_files`, revise "
+        "the request (narrow the term, add a `file` qualifier, raise the limit) and re-run -- do not "
+        "answer from a packet that reports selectors it couldn't resolve.\n"
     )
 
     lines.append(f"## Catalogs ({len(catalog_entries)})\n")

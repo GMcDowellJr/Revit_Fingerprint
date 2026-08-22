@@ -128,11 +128,11 @@ def test_routing_index_respects_max_chars(repo, out):
     assert "omitted from this index" not in full_index
     assert full_index.count("### `routing/") == 40
 
-    _scan(repo, out, ["--routing-index-max-chars", "2200", "--force"])
+    _scan(repo, out, ["--routing-index-max-chars", "3200", "--force"])
     small_index = (out / "routing" / "index.md").read_text(encoding="utf-8")
     assert "omitted from this index" in small_index
     assert small_index.count("### `routing/") < 40
-    assert len(small_index) <= 2200 + 400  # small slack for the overflow note itself
+    assert len(small_index) <= 3200 + 400  # small slack for the overflow note itself
 
 
 def test_routing_catalog_respects_max_catalog_chars(repo, out):
