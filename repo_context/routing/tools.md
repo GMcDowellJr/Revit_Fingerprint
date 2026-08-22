@@ -1,6 +1,6 @@
 # Routing catalog: `tools`
 
-- Generated (UTC): 2026-08-22T06:21:11Z
+- Generated (UTC): 2026-08-22T06:29:19Z
 - Tool version: 0.1.0
 - Files covered: 49
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `186bd8fb5e648d3853b278c2db4aa9f2801dc7c2a2d2be25436967cc0d21bae6`
@@ -379,46 +379,40 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`f829463581fe612b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/compute_latent_purgeable.py`)
 
-### `tools/corpus_update_runbook.ps1`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
+### `tools/discover_hash_policy.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
 - Purpose clues:
-  - filename/path terms: corpus update runbook
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
+  - filename/path terms: discover hash policy
+- Important symbols (5 total):
+  - `_resolve_phase0_dir` (function) — line 19
+  - `_load_items` (function) — line 39
+  - `_domain_rows` (function) — line 45
+  - `_run_target` (function) — line 72
+  - `main` (function) — line 157
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
 - Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
+  - imports `tools/discover_join_policy.py`
+  - imports `tools/join_key_discovery/eval.py`
+  - imports `tools/join_key_discovery/greedy.py`
 - Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
+  - `<module> (tools/discover_hash_policy.py:235)`
+  - `_run_target (tools/discover_hash_policy.py:94)`
+  - `main (tools/discover_hash_policy.py:205)`
+  - `main (tools/discover_hash_policy.py:225)`
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`b596abef434f0935…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/corpus_update_runbook.ps1`)
+- Retrieval identity: sha256=`f3d1aff20f843d91…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/discover_hash_policy.py`)
 
-### `tools/dimension_types.join_key.json`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: dimension types.join key
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`7d0d00bff27abb32…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/dimension_types.join_key.json`)
+## Other files (non-Python)
 
-## Omitted from this catalog (size limit reached)
-
-36 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
-
-- `tools/dimension_types.join_key.md`
-- `tools/discover_hash_policy.py`
-- `tools/discover_join_policy.py`
-- `tools/domain_authority.py`
-- `tools/emit_element_dominance.py`
-- `tools/enterprise_policy.py`
-- `tools/export_bundle_pattern_detail.py`
-- `tools/export_to_flat_tables.py`
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/corpus_update_runbook.ps1` | corpus update runbook | `unknown` |
+| `tools/dimension_types.join_key.json` | dimension types.join key | `unknown` |
+| `tools/dimension_types.join_key.md` | { | `unknown` |
+| `tools/label_refresh_runbook.ps1` | label refresh runbook | `unknown` |
+| `tools/probe_config.json` | probe config | `unknown` |
+| `tools/refreshed_revit_governance_dod.md` | Refreshed Definition of Done — Revit Standards Governance Narrative Outputs | `unknown` |
+| `tools/run_config.json` | run config | `unknown` |
+| `tools/run_discovery_sweep.ps1` | run discovery sweep | `unknown` |
 

@@ -208,15 +208,11 @@
     {
       "file_count": 25,
       "key": "dev_tools",
-      "omitted_file_count": 7,
+      "omitted_file_count": 3,
       "omitted_paths": [
-        "dev_tools/repo_context/rc_routing.py",
-        "dev_tools/repo_context/rc_scan.py",
-        "dev_tools/repo_context/rc_tree.py",
+        "dev_tools/repo_context/rc_validate.py",
         "dev_tools/repo_context/rc_writers.py",
-        "dev_tools/repo_context/README.md",
-        "dev_tools/repo_context/repo_context.py",
-        "dev_tools/repo_context/schema/packet_request.schema.json"
+        "dev_tools/repo_context/repo_context.py"
       ],
       "path": "routing/dev_tools.md",
       "roles": {
@@ -229,26 +225,14 @@
         "dev_tools/repo_context/examples/packet_request.invalid_ambiguous_line_range.json",
         "dev_tools/repo_context/examples/packet_request.invalid_empty_selectors.json"
       ],
-      "source_hash": "ea34227389b7707664f24b24db5f603e4175df4fa4acc2b3f9ebb3a6da891407",
-      "symbol_count": 149
+      "source_hash": "1a8118aafe131653aeb6cfb4b3581c274df5d273515d881170a12c2228fc9f32",
+      "symbol_count": 150
     },
     {
       "file_count": 41,
       "key": "docs",
-      "omitted_file_count": 11,
-      "omitted_paths": [
-        "docs/research/fingerprint_api_concept_map.csv",
-        "docs/research/fingerprint_api_semantic_mapping.md",
-        "docs/research/semantic_label_review.csv",
-        "docs/research/unsupported_api_concepts.csv",
-        "docs/SPLIT_EXPORT.md",
-        "docs/tools_DEPRECATED.md",
-        "docs/tools_PHASE0_1_2_MAP.md",
-        "docs/tracked-reference-hygiene.md",
-        "docs/V21_ANALYSIS_SCHEMA.md",
-        "docs/V21_DETERMINISM_AND_IDENTITY.md",
-        "docs/V21_PHASE0_EXPORT_SCHEMA.md"
-      ],
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/docs.md",
       "roles": {
         "unknown": 41
@@ -264,9 +248,8 @@
     {
       "file_count": 31,
       "key": "domains",
-      "omitted_file_count": 15,
+      "omitted_file_count": 14,
       "omitted_paths": [
-        "domains/materials.py",
         "domains/object_styles.py",
         "domains/phase_graphics.py",
         "domains/phases.py",
@@ -384,98 +367,8 @@
     {
       "file_count": 117,
       "key": "reference/revit_lookup/Descriptors",
-      "omitted_file_count": 89,
-      "omitted_paths": [
-        "reference/revit_lookup/Descriptors/DependencyObjectDescriptor.cs",
-        "reference/revit_lookup/Descriptors/DisposableDescriptor.cs",
-        "reference/revit_lookup/Descriptors/DocumentCreationDescriptor.cs",
-        "reference/revit_lookup/Descriptors/DocumentDescriptor.cs",
-        "reference/revit_lookup/Descriptors/DuctDescriptor.cs",
-        "reference/revit_lookup/Descriptors/EdgeDescriptor.cs",
-        "reference/revit_lookup/Descriptors/EdgeEndPointDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ElementDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ElementIdDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ElementTypeDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ElevationMarkerDescriptor.cs",
-        "reference/revit_lookup/Descriptors/EntityDescriptor.cs",
-        "reference/revit_lookup/Descriptors/EnumerableDescriptor.cs",
-        "reference/revit_lookup/Descriptors/EnumeratorDescriptor.cs",
-        "reference/revit_lookup/Descriptors/EvaluatedParameterDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ExternalDefinitionDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ExternalResourceReferenceDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ExternalResourceTypeDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ExternalServiceDescriptor.cs",
-        "reference/revit_lookup/Descriptors/FaceDescriptor.cs",
-        "reference/revit_lookup/Descriptors/FailureDefinitionAccessorDescriptor.cs",
-        "reference/revit_lookup/Descriptors/FailureMessageDescriptor.cs",
-        "reference/revit_lookup/Descriptors/FamilyDescriptor.cs",
-        "reference/revit_lookup/Descriptors/FamilyInstanceDescriptor.cs",
-        "reference/revit_lookup/Descriptors/FamilyManagerDescriptor.cs",
-        "reference/revit_lookup/Descriptors/FamilyParameterDescriptor.cs",
-        "reference/revit_lookup/Descriptors/FamilySizeTableColumnDescriptor.cs",
-        "reference/revit_lookup/Descriptors/FamilySizeTableDescriptor.cs",
-        "reference/revit_lookup/Descriptors/FamilySizeTableManagerDescriptor.cs",
-        "reference/revit_lookup/Descriptors/FamilySymbolDescriptor.cs",
-        "reference/revit_lookup/Descriptors/FieldDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ForgeTypeIdDescriptor.cs",
-        "reference/revit_lookup/Descriptors/GeometryObjectDescriptor.cs",
-        "reference/revit_lookup/Descriptors/GlobalParameterDescriptor.cs",
-        "reference/revit_lookup/Descriptors/GuidEnumDescriptor.cs",
-        "reference/revit_lookup/Descriptors/HostObjectDescriptor.cs",
-        "reference/revit_lookup/Descriptors/IndependentTagDescriptor.cs",
-        "reference/revit_lookup/Descriptors/InternalOriginDescriptor.cs",
-        "reference/revit_lookup/Descriptors/LightFamilyDescriptor.cs",
-        "reference/revit_lookup/Descriptors/LocationCurveDescriptor.cs",
-        "reference/revit_lookup/Descriptors/MepSectionDescriptor.cs",
-        "reference/revit_lookup/Descriptors/MepSystemDescriptor.cs",
-        "reference/revit_lookup/Descriptors/MeshDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ModelPathDescriptor.cs",
-        "reference/revit_lookup/Descriptors/PanelDescriptor.cs",
-        "reference/revit_lookup/Descriptors/PaperSizeDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ParameterDescriptor.cs",
-        "reference/revit_lookup/Descriptors/PartDescriptor.cs",
-        "reference/revit_lookup/Descriptors/PartMakerDescriptor.cs",
-        "reference/revit_lookup/Descriptors/PerformanceAdviserDescriptor.cs",
-        "reference/revit_lookup/Descriptors/PipeDescriptor.cs",
-        "reference/revit_lookup/Descriptors/PlanViewRangeDescriptor.cs",
-        "reference/revit_lookup/Descriptors/PointCloudFilterDescriptor.cs",
-        "reference/revit_lookup/Descriptors/PrintManagerDescriptor.cs",
-        "reference/revit_lookup/Descriptors/RebarDescriptor.cs",
-        "reference/revit_lookup/Descriptors/RebarShapeDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ReferenceDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ReferencePointDescriptor.cs",
-        "reference/revit_lookup/Descriptors/RevisionNumberingSequenceDescriptor.cs",
-        "reference/revit_lookup/Descriptors/RevitLinkTypeDescriptor.cs",
-        "reference/revit_lookup/Descriptors/RibbonItemDescriptor.cs",
-        "reference/revit_lookup/Descriptors/RibbonPanelDescriptor.cs",
-        "reference/revit_lookup/Descriptors/RibbonTabDescriptor.cs",
-        "reference/revit_lookup/Descriptors/SchedulableFieldDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ScheduleDefinitionDescriptor.cs",
-        "reference/revit_lookup/Descriptors/SchemaDescriptor.cs",
-        "reference/revit_lookup/Descriptors/SolidDescriptor.cs",
-        "reference/revit_lookup/Descriptors/SpatialElementDescriptor.cs",
-        "reference/revit_lookup/Descriptors/StructuralSettingsDescriptor.cs",
-        "reference/revit_lookup/Descriptors/SubelementDescriptor.cs",
-        "reference/revit_lookup/Descriptors/SunAndShadowSettingsDescriptor.cs",
-        "reference/revit_lookup/Descriptors/SurfaceDescriptor.cs",
-        "reference/revit_lookup/Descriptors/TableDataDescriptor.cs",
-        "reference/revit_lookup/Descriptors/TableSectionDataDescriptor.cs",
-        "reference/revit_lookup/Descriptors/TableViewDescriptor.cs",
-        "reference/revit_lookup/Descriptors/TriangulationInterfaceDescriptor.cs",
-        "reference/revit_lookup/Descriptors/UiApplicationDescriptor.cs",
-        "reference/revit_lookup/Descriptors/UiElementDescriptor.cs",
-        "reference/revit_lookup/Descriptors/UiObjectDescriptor.cs",
-        "reference/revit_lookup/Descriptors/UnitsDescriptor.cs",
-        "reference/revit_lookup/Descriptors/UpdaterInfoDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ViewDescriptor.cs",
-        "reference/revit_lookup/Descriptors/ViewScheduleDescriptor.cs",
-        "reference/revit_lookup/Descriptors/WallDescriptor.cs",
-        "reference/revit_lookup/Descriptors/WallTypeDescriptor.cs",
-        "reference/revit_lookup/Descriptors/WireDescriptor.cs",
-        "reference/revit_lookup/Descriptors/WorksetDescriptor.cs",
-        "reference/revit_lookup/Descriptors/WorksetTableDescriptor.cs",
-        "reference/revit_lookup/Descriptors/XyzDescriptor.cs"
-      ],
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/reference_revit_lookup_Descriptors.md",
       "roles": {
         "unknown": 117
@@ -685,8 +578,8 @@
         "dev_tools/repo_context/tests/test_chunking.py",
         "dev_tools/repo_context/tests/test_determinism_incremental.py"
       ],
-      "source_hash": "6958e5c0ef14b6bc97d44c7c815cadba6023503e8c20226fb0a5d8de84b68b27",
-      "symbol_count": 181
+      "source_hash": "a9f3c9f604fed56ac244569b388c0e2bc248d8c392e5052f1587dfbdecda1ab7",
+      "symbol_count": 184
     },
     {
       "file_count": 4,
@@ -709,10 +602,8 @@
     {
       "file_count": 49,
       "key": "tools",
-      "omitted_file_count": 36,
+      "omitted_file_count": 29,
       "omitted_paths": [
-        "tools/dimension_types.join_key.md",
-        "tools/discover_hash_policy.py",
         "tools/discover_join_policy.py",
         "tools/domain_authority.py",
         "tools/emit_element_dominance.py",
@@ -731,17 +622,12 @@
         "tools/inspect_lft_similarity.py",
         "tools/jenks_utils.py",
         "tools/join_key_derivation.py",
-        "tools/label_refresh_runbook.ps1",
         "tools/na_token.py",
         "tools/pairwise_analysis.py",
         "tools/pareto_joinkey_search.py",
         "tools/pattern_id_utils.py",
         "tools/population_framing.py",
-        "tools/probe_config.json",
-        "tools/refreshed_revit_governance_dod.md",
         "tools/reset_wall_types_for_reapply.py",
-        "tools/run_config.json",
-        "tools/run_discovery_sweep.ps1",
         "tools/run_extract_all.py",
         "tools/run_segment_orchestrator.py",
         "tools/run_split_detection_all.py",
@@ -765,10 +651,8 @@
     {
       "file_count": 19,
       "key": "tools/archetype",
-      "omitted_file_count": 4,
+      "omitted_file_count": 2,
       "omitted_paths": [
-        "tools/archetype/review/select_archetype_review_files.py",
-        "tools/archetype/validate_archetype_signals.py",
         "tools/archetype/vfd_bip_target_domain_hints.json",
         "tools/archetype/vfd_category_domain_map.json"
       ],
@@ -792,11 +676,11 @@
       "omitted_file_count": 7,
       "omitted_paths": [
         "tools/bundle_analysis/step2b_bundle_share_profile.py",
-        "tools/bundle_analysis/step3_build_dag.py",
         "tools/bundle_analysis/step4_difference_sets.py",
         "tools/bundle_analysis/step5_classify_patterns.py",
         "tools/bundle_analysis/step6_classify_files.py",
         "tools/bundle_analysis/step7_overlap_report.py",
+        "tools/bundle_analysis/step_compare.py",
         "tools/bundle_analysis/utils.py"
       ],
       "path": "routing/tools_bundle_analysis.md",
@@ -948,9 +832,8 @@
     {
       "file_count": 33,
       "key": "tools/probes",
-      "omitted_file_count": 21,
+      "omitted_file_count": 20,
       "omitted_paths": [
-        "tools/probes/probe_floor_types.py",
         "tools/probes/probe_identity.py",
         "tools/probes/probe_line_patterns.py",
         "tools/probes/probe_line_styles.py",
@@ -1002,14 +885,14 @@
       "symbol_count": 8
     }
   ],
-  "generated_at_utc": "2026-08-22T06:21:11Z",
+  "generated_at_utc": "2026-08-22T06:29:19Z",
   "git": {
     "available": true,
-    "commit": "f15e9a3fef1b86b73f3c0fb3097ece7fbcbd5bf2",
+    "commit": "643897f48585cd729f327191c8b66c82826ca76f",
     "dirty": true
   },
   "graphify_warnings": [
-    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit f15e9a3fef1b; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
+    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 643897f48585; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
   ],
   "options": {
     "allow_stale_graphify": false,
@@ -1018,6 +901,6 @@
     "max_index_chars": 10000,
     "max_symbols_per_file_entry": 25
   },
-  "source_manifest_hash": "bfc5ab2d1c6c188ea0b8d4a3c69ebbed4a1c3ab9bbed7dd32d486e452b90e2a9",
+  "source_manifest_hash": "271f660cb20172418ef86f91dffbcdcd95fd1b384423d245438b344d43160144",
   "tool_version": "0.1.0"
 }

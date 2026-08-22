@@ -1,6 +1,6 @@
 # Routing catalog: `tools/probes`
 
-- Generated (UTC): 2026-08-22T06:21:11Z
+- Generated (UTC): 2026-08-22T06:29:19Z
 - Tool version: 0.1.0
 - Files covered: 33
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `764135461a8a642b2f798a2b03eb1cb4bd5bd2629b37925ce66714173e6ad324`
@@ -71,21 +71,6 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`fb44e4849e1f4374…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/check_line_patterns_normhash.py`)
 
-### `tools/probes/Exports/README.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: README
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`e8d6f3f339c7bfc6…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/Exports/README.md`)
-
 ### `tools/probes/find_crosswalk_candidates.py`
 - Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
 - Purpose clues:
@@ -127,21 +112,6 @@
 - Related tests:
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`90037ee436f2a6af…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/find_crosswalk_candidates.py`)
-
-### `tools/probes/fingerprint_probe.dyn`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: fingerprint probe
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`ba925d8a1574e787…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/fingerprint_probe.dyn`)
 
 ### `tools/probes/probe_arrowheads.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
@@ -355,21 +325,6 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`c9e2998c9a3c2f21…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_dimension_types.py`)
 
-### `tools/probes/PROBE_EXPORTER_DELTA.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: PROBE EXPORTER DELTA
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`1698c0b9cb5a027e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/PROBE_EXPORTER_DELTA.md`)
-
 ### `tools/probes/probe_fill_patterns.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
 - Purpose clues:
@@ -424,6 +379,61 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`b7e1557e7ca19327…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_fill_patterns.py`)
 
+### `tools/probes/probe_floor_types.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: probe floor types
+- Important symbols (26 total):
+  - `_safe` (function) — line 89
+  - `_safe_capture` (function) — line 95
+  - `_multi_repr` (function) — line 101
+  - `_safe_type_name` (function) — line 121
+  - `_safe_param_def_name` (function) — line 136
+  - `_safe_get_datatype` (function) — line 143
+  - `_is_length_datatype` (function) — line 152
+  - `_is_angle_datatype` (function) — line 160
+  - `_fmt_display` (function) — line 168
+  - `_format_param_contract` (function) — line 179
+  - `_contract_from_value` (function) — line 231
+  - `_to_inches` (function) — line 234
+  - `_resolve_material` (function) — line 277
+  - `_resolve_similar_type` (function) — line 288
+  - `_resolve_workset` (function) — line 302
+  - `_ensure_entry` (function) — line 324
+  - `_maybe_set_example` (function) — line 330
+  - `_observe` (function) — line 341
+  - `_reflect_member_names` (function) — line 490
+  - `_reflect_try_get` (function) — line 638
+  - `_reflect_contract` (function) — line 660
+  - `_run_reflection_sweep` (function) — line 731
+  - `_probe_revit_version` (function) — line 778
+  - `_probe_document_identity` (function) — line 787
+  - `_probe_run_id` (function) — line 794
+  - ... and 1 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/probes/probe_floor_types.py:244)`
+  - `<module> (tools/probes/probe_floor_types.py:268)`
+  - `<module> (tools/probes/probe_floor_types.py:272)`
+  - `<module> (tools/probes/probe_floor_types.py:363)`
+  - `<module> (tools/probes/probe_floor_types.py:364)`
+  - `<module> (tools/probes/probe_floor_types.py:365)`
+  - `<module> (tools/probes/probe_floor_types.py:366)`
+  - `<module> (tools/probes/probe_floor_types.py:367)`
+  - `<module> (tools/probes/probe_floor_types.py:369)`
+  - `<module> (tools/probes/probe_floor_types.py:371)`
+  - `<module> (tools/probes/probe_floor_types.py:372)`
+  - `<module> (tools/probes/probe_floor_types.py:384)`
+  - `<module> (tools/probes/probe_floor_types.py:386)`
+  - `<module> (tools/probes/probe_floor_types.py:388)`
+  - `<module> (tools/probes/probe_floor_types.py:391)`
+  - ... and 73 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`8cef12353edd1d5f…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_floor_types.py`)
+
 ### `tools/probes/probe_roof_type_import.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
 - Purpose clues:
@@ -439,28 +449,17 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`cd6aa63529e6fc97…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_roof_type_import.py`)
 
+## Other files (non-Python)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/probes/Exports/README.md` | Probe export data | `unknown` |
+| `tools/probes/fingerprint_probe.dyn` | fingerprint probe | `unknown` |
+| `tools/probes/PROBE_EXPORTER_DELTA.md` | <!-- | `unknown` |
+
 ## Omitted from this catalog (size limit reached)
 
-21 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
+20 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
 
-- `tools/probes/probe_floor_types.py`
 - `tools/probes/probe_identity.py`
-- `tools/probes/probe_line_patterns.py`
-- `tools/probes/probe_line_styles.py`
-- `tools/probes/probe_loaded_family_types.py`
-- `tools/probes/probe_materials.py`
-- `tools/probes/probe_object_styles.py`
-- `tools/probes/probe_phase_filters.py`
-- `tools/probes/probe_phase_graphics.py`
-- `tools/probes/probe_phases.py`
-- `tools/probes/probe_roof_types.py`
-- `tools/probes/probe_text_types.py`
-- `tools/probes/probe_units.py`
-- `tools/probes/probe_view_category_overrides.py`
-- `tools/probes/probe_view_filter_applications.py`
-- `tools/probes/probe_view_filter_definitions.py`
-- `tools/probes/probe_view_templates.py`
-- `tools/probes/probe_views.py`
-- `tools/probes/probe_wall_types.py`
-- `tools/probes/probe_worksets.py`
 

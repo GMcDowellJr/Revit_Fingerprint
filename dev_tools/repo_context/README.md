@@ -113,16 +113,24 @@ Natural-language question
      always get their own `tests.md`; archived/legacy files get
      `archived.md`; everything else buckets by top-level directory,
      further split by an additional path segment once a directory exceeds
-     `--routing-max-files-per-catalog`, default 60). Each file entry lists
-     its operational-role classification (with the evidence/rule that
-     produced it — see below), purpose clues (module docstring + filename
-     terms, never an invented summary), top-level symbols with exact line
-     numbers, entrypoint evidence, resolved internal imports, statically
-     resolved callers, related tests, and (if `graphify-out/graph.json` is
-     present and its `built_at_commit` matches the current HEAD) a
-     clearly-labeled Graphify community. Capped at
-     `--routing-max-catalog-chars` (default 24000); anything over the cap
-     is listed by bare path instead of a full entry, never dropped
+     `--routing-max-files-per-catalog`, default 60). Each **Python** file
+     entry lists its operational-role classification (with the
+     evidence/rule that produced it — see below), purpose clues (module
+     docstring + filename terms, never an invented summary), top-level
+     symbols with exact line numbers, entrypoint evidence, resolved
+     internal imports, statically resolved callers, related tests, and
+     (if `graphify-out/graph.json` is present and its `built_at_commit`
+     matches the current HEAD) a clearly-labeled Graphify community.
+     **Non-Python files** (docs, config, data, etc.) get a compact table
+     row instead, under a separate "Other files (non-Python)" section —
+     the full Python-oriented entry format is mostly inapplicable
+     boilerplate for them (no symbols/imports/callers to report). A `.md`
+     file's row includes a real content-derived title (its first `#`
+     heading, or first non-empty line if it has none) rather than just
+     filename tokens; other non-Python types fall back to filename terms.
+     Capped at `--routing-max-catalog-chars` (default 24000); anything
+     over the cap is listed by bare path instead of a full entry, never
+     dropped
      silently.
    - `routing/routing_manifest.json` — the same data in machine-readable
      form (per-catalog file/symbol counts and source hashes, git revision,

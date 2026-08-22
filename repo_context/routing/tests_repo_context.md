@@ -1,9 +1,9 @@
 # Routing catalog: `tests/repo_context`
 
-- Generated (UTC): 2026-08-22T06:21:11Z
+- Generated (UTC): 2026-08-22T06:29:19Z
 - Tool version: 0.1.0
 - Files covered: 15
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `6958e5c0ef14b6bc97d44c7c815cadba6023503e8c20226fb0a5d8de84b68b27`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `a9f3c9f604fed56ac244569b388c0e2bc248d8c392e5052f1587dfbdecda1ab7`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/tests/conftest.py`

@@ -1,6 +1,6 @@
 # Routing catalog: `tools/bundle_analysis`
 
-- Generated (UTC): 2026-08-22T06:21:11Z
+- Generated (UTC): 2026-08-22T06:29:19Z
 - Tool version: 0.1.0
 - Files covered: 19
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `f736b277d9e1f6fd82b4fe97f9be754014de1e4e507b028c1e996c87ecd81442`
@@ -147,21 +147,6 @@
 - Related tests:
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`d0d72a81804d060e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/bundle_analysis/placeholder_exclusions_legacy.py`)
-
-### `tools/bundle_analysis/README.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: README
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`29165b967322682d…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/bundle_analysis/README.md`)
 
 ### `tools/bundle_analysis/reference_bundle.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
@@ -323,20 +308,37 @@
   - `tests/test_bundle_analysis_name_projection.py`
 - Retrieval identity: sha256=`4ada0e721a8d51d0…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/bundle_analysis/step2_find_bundles.py`)
 
-### `tools/bundle_analysis/step_compare.py`
-- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+### `tools/bundle_analysis/step3_build_dag.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
 - Purpose clues:
-  - filename/path terms: step compare
-- Important symbols (2 total):
-  - `_compute_gap_rows` (function) — line 30
-  - `run_compare_for_domain` (function) — line 133
-- Entrypoint evidence: none
+  - filename/path terms: step3 build dag
+- Important symbols (3 total):
+  - `build_dag_for_domain` (function) — line 18
+  - `_parse_args` (function) — line 228
+  - `main` (function) — line 235
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
 - Internal dependencies (resolved imports within this repository):
   - imports `tools/bundle_analysis/common.py`
 - Called by (high/medium-confidence static callers):
-  - `run_bundle_analysis (tools/bundle_analysis/run_bundle_analysis.py:806)`
-  - `run_compare_for_domain (tools/bundle_analysis/step_compare.py:146)`
+  - `<module> (tools/bundle_analysis/step3_build_dag.py:242)`
+  - `_run_pipeline_once (tools/bundle_analysis/run_bundle_analysis.py:238)`
+  - `_run_step2_to_step7 (tools/bundle_analysis/run_bundle_analysis.py:320)`
+  - `main (tools/bundle_analysis/step3_build_dag.py:236)`
+  - `main (tools/bundle_analysis/step3_build_dag.py:237)`
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`83b12c25156fdbf4…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/bundle_analysis/step_compare.py`)
+- Retrieval identity: sha256=`b0e54a7ae5de0558…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/bundle_analysis/step3_build_dag.py`)
+
+## Other files (non-Python)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/bundle_analysis/README.md` | Bundle Analysis Pipeline | `unknown` |
+
+## Omitted from this catalog (size limit reached)
+
+7 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
+
+- `tools/bundle_analysis/step2b_bundle_share_profile.py`
+- `tools/bundle_analysis/step4_difference_sets.py`
 

@@ -1,6 +1,6 @@
 # Routing catalog: `tools/migration`
 
-- Generated (UTC): 2026-08-22T06:21:11Z
+- Generated (UTC): 2026-08-22T06:29:19Z
 - Tool version: 0.1.0
 - Files covered: 5
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `f26a653c52fdc4bc1ab31c5da9f42d11fcbf4d363db37cc6721522fa242179cd`
@@ -116,18 +116,9 @@
   - `tests/test_text_types_conversion_convergence.py`
 - Retrieval identity: sha256=`41588940f4577bb8…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/migration/reformat_to_flat_items.py`)
 
-### `tools/migration/role_policy.json`
-- Role: `migration` (evidence: path contains migration directory segment 'migration')
-- Purpose clues:
-  - filename/path terms: role policy
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`4f1034e2b0856d4e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/migration/role_policy.json`)
+## Other files (non-Python)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/migration/role_policy.json` | role policy | `migration` |
 

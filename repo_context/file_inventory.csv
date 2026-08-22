@@ -92,7 +92,7 @@ core/sig_hash_policy.py,sig_hash_policy.py,.py,python_source,2659,text,60,016c2a
 core/timing_collector.py,timing_collector.py,.py,python_source,8090,text,217,c5d4e08c42c96cb155ddbec5a1205818ca46aac93fea12e88e02f1fadc364af6,true,,false,ok,no
 core/vg_sig.py,vg_sig.py,.py,python_source,15132,text,462,2eca32d4583300ba907af1856850e7f3a7239713b82efb456570e3bddf58d35c,true,,false,ok,no
 dev_tools/repo_context/E2E_VERIFICATION.md,E2E_VERIFICATION.md,.md,documentation,7650,text,129,40962572f681e735662598d9c33faef04a7ac76806ef65678e4ebd0937376492,true,,false,n/a,generated
-dev_tools/repo_context/README.md,README.md,.md,documentation,15779,text,314,c20cf1080a5cf9f5a7705d4026c66bddb27db0ef53dd01cde86583f68af7bcb6,true,,false,n/a,no
+dev_tools/repo_context/README.md,README.md,.md,documentation,16296,text,322,88a53181aafd1f3ef6ea50351bd8d399ee4269c69cfd9e02395be3678e863228,true,,false,n/a,no
 dev_tools/repo_context/examples/packet_request.invalid_ambiguous_line_range.json,packet_request.invalid_ambiguous_line_range.json,.json,data,220,text,7,30663de793db3aa68f240124064a545f7b0e4cb802078be1097b0bbb76192302,true,,false,n/a,no
 dev_tools/repo_context/examples/packet_request.invalid_empty_selectors.json,packet_request.invalid_empty_selectors.json,.json,data,195,text,10,11a2945f9eb6b6f47b695a86ecb141f690371d0c9dddb5457d846d8569e7011d,true,,false,n/a,no
 dev_tools/repo_context/examples/packet_request.invalid_path_traversal.json,packet_request.invalid_path_traversal.json,.json,data,169,text,7,ca49876b4e757be835e70018839fbdfa2ae41fa4e1ac1cde8bad3270f99d5118,true,,false,n/a,no
@@ -109,7 +109,7 @@ dev_tools/repo_context/rc_overview.py,rc_overview.py,.py,python_source,10821,tex
 dev_tools/repo_context/rc_packet.py,rc_packet.py,.py,python_source,26566,text,582,51c343731f80f2f00655380005941aede6d2b78dd227f508388b25db02bc8c1c,true,,false,ok,no
 dev_tools/repo_context/rc_pyanalysis.py,rc_pyanalysis.py,.py,python_source,39565,text,814,6250793f1eacbfb100c0625912aa46d768bc18744bfb960af91342e2e0840f02,true,,false,ok,no
 dev_tools/repo_context/rc_request.py,rc_request.py,.py,python_source,55473,text,1092,9afae857c0fde058a6c80995f21f1d847647d7b327a1e3e9e5318ec40212b388,true,,true,ok,no
-dev_tools/repo_context/rc_routing.py,rc_routing.py,.py,python_source,26572,text,560,7affc179b729c3bd506266f09922812b53daa7734c0df2142f58135ac35ff8fe,true,,false,ok,no
+dev_tools/repo_context/rc_routing.py,rc_routing.py,.py,python_source,29874,text,625,8a054ebae93c80a6b54bca1e21ac0e02834b088d8f59bfed7ccf964acac59fe5,true,,false,ok,no
 dev_tools/repo_context/rc_scan.py,rc_scan.py,.py,python_source,16378,text,384,6ebef0788146efcb2861f9e32a2e073dfe08249d096ec621e66ae7831ae89544,true,,false,ok,no
 dev_tools/repo_context/rc_tree.py,rc_tree.py,.py,python_source,2990,text,84,fcff5535df129fa55ba1f83e32324008bec54f77cea553a3a4d16f27d2dcc466,true,,false,ok,no
 dev_tools/repo_context/rc_validate.py,rc_validate.py,.py,python_source,12701,text,279,98473370de559b4fbf0627ec458a7a452d4b545e66fb4a2b71815cb12d311d5a,true,,false,ok,no
@@ -127,7 +127,7 @@ dev_tools/repo_context/tests/test_packet_from_request.py,test_packet_from_reques
 dev_tools/repo_context/tests/test_packets.py,test_packets.py,.py,test,8408,text,209,0afd41f0794d37d2894122d22a24ca7d88913b134d303bc2f4753c54f99b4c7e,true,,false,ok,no
 dev_tools/repo_context/tests/test_python_symbols.py,test_python_symbols.py,.py,test,3125,text,98,e0662e729b61a221c252f594828066ff13102b540709dbc38ab96185e7035254,true,,false,ok,no
 dev_tools/repo_context/tests/test_request_validation.py,test_request_validation.py,.py,test,7567,text,214,84b3611bc48cafe522d23f18e121dc4c4386a0097b7ee98022643bb516e2f5eb,true,,false,ok,no
-dev_tools/repo_context/tests/test_routing.py,test_routing.py,.py,test,17187,text,343,48923bb7299f02f7150263cf3b83162b7f9b17e2604a499ce23fd6ce8ab55a32,true,,false,ok,no
+dev_tools/repo_context/tests/test_routing.py,test_routing.py,.py,test,20719,text,407,dce4dc40f57d2c82a4f39d2614eff68a8736204900a939cf69bd4414fa4efc7e,true,,false,ok,no
 dev_tools/repo_context/tests/test_safety.py,test_safety.py,.py,test,5776,text,137,fdb2725b37898da31788e202dce39f4b347e146f2a901837e794f4dd7c2d9984,true,,false,ok,no
 dev_tools/repo_context/tests/test_symlinks.py,test_symlinks.py,.py,test,4800,text,115,52a30fb823073bd5a5dd51eb3ecd8a4899ab3c551969bc7fb5c0cc6a707990a1,true,,false,ok,no
 dev_tools/repo_context/tests/test_validate.py,test_validate.py,.py,test,5769,text,154,a2f72254cf88e0e4af004b484186fc1dc1042fc80dbe2d21a613fcbfb3944d7b,true,,false,ok,no

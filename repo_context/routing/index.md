@@ -1,11 +1,11 @@
 # Routing index: Revit_Fingerprint
 
-- Generated (UTC): 2026-08-22T06:21:11Z
+- Generated (UTC): 2026-08-22T06:29:19Z
 - Tool version: 0.1.0
-- Repository revision: `f15e9a3fef1b86b73f3c0fb3097ece7fbcbd5bf2` (dirty worktree)
-- Source manifest hash (sha256 over every included file's `path:sha256`): `bfc5ab2d1c6c188ea0b8d4a3c69ebbed4a1c3ab9bbed7dd32d486e452b90e2a9`
+- Repository revision: `643897f48585cd729f327191c8b66c82826ca76f` (dirty worktree)
+- Source manifest hash (sha256 over every included file's `path:sha256`): `271f660cb20172418ef86f91dffbcdcd95fd1b384423d245438b344d43160144`
 - Freshness rule: if this hash no longer matches a fresh `scan`, re-run `scan` before trusting any catalog below or building a `packet_request.json` from it.
-- Graphify: graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit f15e9a3fef1b; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven).
+- Graphify: graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 643897f48585; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven).
 
 ## How to use this index
 
@@ -64,16 +64,15 @@
 - Note: 13 file(s) omitted from this catalog by its own size limit
 
 ### `routing/dev_tools.md`
-- Covers: 25 file(s), 149 top-level symbol(s)
-- Note: 7 file(s) omitted from this catalog by its own size limit
+- Covers: 25 file(s), 150 top-level symbol(s)
+- Note: 3 file(s) omitted from this catalog by its own size limit
 
 ### `routing/docs.md`
 - Covers: 41 file(s), 0 top-level symbol(s)
-- Note: 11 file(s) omitted from this catalog by its own size limit
 
 ### `routing/domains.md`
 - Covers: 31 file(s), 165 top-level symbol(s)
-- Note: 15 file(s) omitted from this catalog by its own size limit
+- Note: 14 file(s) omitted from this catalog by its own size limit
 
 ### `routing/graphify-out.md`
 - Covers: 5 file(s), 0 top-level symbol(s)
@@ -92,7 +91,6 @@
 
 ### `routing/reference_revit_lookup_Descriptors.md`
 - Covers: 117 file(s), 0 top-level symbol(s)
-- Note: 89 file(s) omitted from this catalog by its own size limit
 
 ### `routing/runner.md`
 - Covers: 6 file(s), 55 top-level symbol(s)
@@ -111,7 +109,7 @@
 - Covers: 1 file(s), 10 top-level symbol(s)
 
 ### `routing/tests_repo_context.md`
-- Covers: 15 file(s), 181 top-level symbol(s)
+- Covers: 15 file(s), 184 top-level symbol(s)
 - Note: 5 file(s) omitted from this catalog by its own size limit
 
 ### `routing/tests_revit.md`
@@ -119,11 +117,11 @@
 
 ### `routing/tools.md`
 - Covers: 49 file(s), 559 top-level symbol(s)
-- Note: 36 file(s) omitted from this catalog by its own size limit
+- Note: 29 file(s) omitted from this catalog by its own size limit
 
 ### `routing/tools_archetype.md`
 - Covers: 19 file(s), 140 top-level symbol(s)
-- Note: 4 file(s) omitted from this catalog by its own size limit
+- Note: 2 file(s) omitted from this catalog by its own size limit
 
 ### `routing/tools_bundle_analysis.md`
 - Covers: 19 file(s), 79 top-level symbol(s)
@@ -153,7 +151,7 @@
 
 ### `routing/tools_probes.md`
 - Covers: 33 file(s), 633 top-level symbol(s)
-- Note: 21 file(s) omitted from this catalog by its own size limit
+- Note: 20 file(s) omitted from this catalog by its own size limit
 
 ### `routing/validators.md`
 - Covers: 1 file(s), 8 top-level symbol(s)

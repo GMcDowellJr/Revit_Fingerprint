@@ -1,6 +1,6 @@
 # Routing catalog: `tools/compare_templates_stand-alone`
 
-- Generated (UTC): 2026-08-22T06:21:11Z
+- Generated (UTC): 2026-08-22T06:29:19Z
 - Tool version: 0.1.0
 - Files covered: 2
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `8f0edbcd1530934fbe09b667ad93747ea5ae50be36ff5785ffa37546c59df6c8`
@@ -60,18 +60,9 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`5d941df515762a01…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/compare_templates_stand-alone/compare_view_templates_stand-alone.py`)
 
-### `tools/compare_templates_stand-alone/compare_view_templates_stand-alone_mapping.json`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: compare view templates stand alone mapping
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`d9451bd19d69a964…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/compare_templates_stand-alone/compare_view_templates_stand-alone_mapping.json`)
+## Other files (non-Python)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/compare_templates_stand-alone/compare_view_templates_stand-alone_mapping.json` | compare view templates stand alone mapping | `unknown` |
 

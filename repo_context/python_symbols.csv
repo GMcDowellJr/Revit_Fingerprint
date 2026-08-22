@@ -328,20 +328,21 @@ dev_tools/repo_context/rc_request.py,generate_packet_from_request,function,662,1
 dev_tools/repo_context/rc_request.py,generate_packet_from_request.note_focus_file,nested_function,719,725,generate_packet_from_request,,rel: str,,bool,false,,7,3,
 dev_tools/repo_context/rc_request.py,generate_packet_from_request._spend_header,nested_function,752,757,generate_packet_from_request,,header: str,,bool,false,,6,2,
 dev_tools/repo_context/rc_request.py,_res_to_dict,function,1088,1092,<module>,,r: SelectorResolution,,dict,false,,5,1,
-dev_tools/repo_context/rc_routing.py,<module>,module,1,560,,,,,,true,Hierarchical routing-catalog generation.,560,1,"RoutingOptions,_sort_key,_partition_files,_catalog_filenames,_top_level_symbols,_module_docstring,_filename_terms,_render_file_entry,generate_routing,_render_index"
-dev_tools/repo_context/rc_routing.py,RoutingOptions,class,35,41,<module>,dataclass,,,,false,,7,1,
-dev_tools/repo_context/rc_routing.py,_sort_key,function,44,45,<module>,,rel_path: str,,,false,,2,1,
-dev_tools/repo_context/rc_routing.py,_partition_files,function,48,98,<module>,,"files_with_role: list, max_files: int",,dict,true,"files_with_role: [(FileRecord, role), ...]. Returns",51,5,split
-dev_tools/repo_context/rc_routing.py,_partition_files.split,nested_function,74,94,_partition_files,,"key: str, files: list, depth: int",,None,false,,21,8,
-dev_tools/repo_context/rc_routing.py,_catalog_filenames,function,101,119,<module>,,keys: list,,dict,true,"Injective key -> filename mapping. A naive ""/"" -> ""_"" substitution",19,6,
-dev_tools/repo_context/rc_routing.py,_top_level_symbols,function,122,125,<module>,,"rel_path: str, symbols_by_file: dict",,list,false,,4,4,
-dev_tools/repo_context/rc_routing.py,_module_docstring,function,128,132,<module>,,"rel_path: str, symbols_by_file: dict",,str,false,,5,4,
-dev_tools/repo_context/rc_routing.py,_filename_terms,function,135,138,<module>,,rel_path: str,,str,false,,4,3,
-dev_tools/repo_context/rc_routing.py,_render_file_entry,function,141,196,<module>,,"f, symbols_by_file: dict, role: str, role_evidence: str, entrypoint_reason: Optional[str], internal_deps: list, called_by: list, related_tests: list, communities: list, max_symbols: int",,str,false,,56,15,
-dev_tools/repo_context/rc_routing.py,generate_routing,function,199,441,<module>,,"root: Path, output_dir: Path, result, routing_opts: RoutingOptions, started_at_utc: str",,Optional[dict],true,"Generate routing/index.md, routing/<key>.md catalogs, and",243,44,has_main_guard
-dev_tools/repo_context/rc_routing.py,generate_routing.has_main_guard,nested_function,236,238,generate_routing,,rel_path: str,,bool,false,,3,1,
-dev_tools/repo_context/rc_routing.py,_render_index,function,444,560,<module>,,"root: Path, started_at_utc: str, git_info: dict, source_manifest_hash: str, catalog_entries: list, routing_opts: RoutingOptions, graphify_warnings: list",,str,false,,117,7,entry_lines
-dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,nested_function,505,513,_render_index,,"e: dict, include_summary: bool",,list,false,,9,5,
+dev_tools/repo_context/rc_routing.py,<module>,module,1,625,,,,,,true,Hierarchical routing-catalog generation.,625,1,"RoutingOptions,_sort_key,_partition_files,_catalog_filenames,_top_level_symbols,_module_docstring,_filename_terms,_markdown_title,_render_file_entry,generate_routing,_render_index"
+dev_tools/repo_context/rc_routing.py,RoutingOptions,class,36,42,<module>,dataclass,,,,false,,7,1,
+dev_tools/repo_context/rc_routing.py,_sort_key,function,45,46,<module>,,rel_path: str,,,false,,2,1,
+dev_tools/repo_context/rc_routing.py,_partition_files,function,49,99,<module>,,"files_with_role: list, max_files: int",,dict,true,"files_with_role: [(FileRecord, role), ...]. Returns",51,5,split
+dev_tools/repo_context/rc_routing.py,_partition_files.split,nested_function,75,95,_partition_files,,"key: str, files: list, depth: int",,None,false,,21,8,
+dev_tools/repo_context/rc_routing.py,_catalog_filenames,function,102,120,<module>,,keys: list,,dict,true,"Injective key -> filename mapping. A naive ""/"" -> ""_"" substitution",19,6,
+dev_tools/repo_context/rc_routing.py,_top_level_symbols,function,123,126,<module>,,"rel_path: str, symbols_by_file: dict",,list,false,,4,4,
+dev_tools/repo_context/rc_routing.py,_module_docstring,function,129,133,<module>,,"rel_path: str, symbols_by_file: dict",,str,false,,5,4,
+dev_tools/repo_context/rc_routing.py,_filename_terms,function,136,139,<module>,,rel_path: str,,str,false,,4,3,
+dev_tools/repo_context/rc_routing.py,_markdown_title,function,146,167,<module>,,"root: Path, rel_path: str",,str,true,First real content clue for a markdown file: its first `#` heading,22,6,
+dev_tools/repo_context/rc_routing.py,_render_file_entry,function,170,225,<module>,,"f, symbols_by_file: dict, role: str, role_evidence: str, entrypoint_reason: Optional[str], internal_deps: list, called_by: list, related_tests: list, communities: list, max_symbols: int",,str,false,,56,15,
+dev_tools/repo_context/rc_routing.py,generate_routing,function,228,506,<module>,,"root: Path, output_dir: Path, result, routing_opts: RoutingOptions, started_at_utc: str",,Optional[dict],true,"Generate routing/index.md, routing/<key>.md catalogs, and",279,50,has_main_guard
+dev_tools/repo_context/rc_routing.py,generate_routing.has_main_guard,nested_function,265,267,generate_routing,,rel_path: str,,bool,false,,3,1,
+dev_tools/repo_context/rc_routing.py,_render_index,function,509,625,<module>,,"root: Path, started_at_utc: str, git_info: dict, source_manifest_hash: str, catalog_entries: list, routing_opts: RoutingOptions, graphify_warnings: list",,str,false,,117,7,entry_lines
+dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,nested_function,570,578,_render_index,,"e: dict, include_summary: bool",,list,false,,9,5,
 dev_tools/repo_context/rc_scan.py,<module>,module,1,384,,,,,,true,Filesystem walk + inventory + Python analysis orchestration.,384,1,"ScanOptions,ScanResult,_sort_key,_is_ancestor,_should_exclude_file,_walk,scan_repository,_cleanup_stale_chunks,_resolve_python_relationships"
 dev_tools/repo_context/rc_scan.py,ScanOptions,class,28,44,<module>,dataclass,,,,false,,17,1,
 dev_tools/repo_context/rc_scan.py,ScanResult,class,48,59,<module>,dataclass,,,,false,,12,1,
@@ -541,7 +542,7 @@ dev_tools/repo_context/tests/test_request_validation.py,test_non_string_schema_v
 dev_tools/repo_context/tests/test_request_validation.py,test_boolean_line_value_is_rejected,function,188,196,<module>,,,,,false,,9,3,
 dev_tools/repo_context/tests/test_request_validation.py,test_boolean_end_line_value_is_rejected,function,199,204,<module>,,,,,false,,6,4,
 dev_tools/repo_context/tests/test_request_validation.py,test_parse_and_validate_request_applies_defaults,function,207,214,<module>,,,,,false,,8,7,
-dev_tools/repo_context/tests/test_routing.py,<module>,module,1,343,,,,,,false,,343,1,"_scan,_manifest,test_routing_catalogs_are_generated_and_deterministic,test_every_included_file_has_exactly_one_primary_catalog,test_test_and_archived_files_get_dedicated_catalogs,test_catalog_line_anchors_match_python_symbols_csv,test_routing_catalog_splits_oversized_directory_by_subdirectory,test_routing_index_respects_max_chars,test_routing_catalog_respects_max_catalog_chars,test_catalog_appendix_respects_the_cap_when_header_alone_is_close_to_it,test_omitted_path_appendix_is_bounded_regardless_of_omitted_count,test_manifest_stores_the_complete_omitted_path_list,test_first_catalog_entry_is_also_capped_by_max_catalog_chars,test_changed_source_changes_source_manifest_hash,test_routing_disabled_with_no_routing_flag,test_no_routing_removes_stale_routing_from_earlier_scan,test_catalog_filenames_do_not_collide_across_partition_keys,test_purpose_clues_are_traceable_to_deterministic_evidence,test_scan_survives_a_malformed_graphify_top_level_structure"
+dev_tools/repo_context/tests/test_routing.py,<module>,module,1,407,,,,,,false,,407,1,"_scan,_manifest,test_routing_catalogs_are_generated_and_deterministic,test_every_included_file_has_exactly_one_primary_catalog,test_test_and_archived_files_get_dedicated_catalogs,test_catalog_line_anchors_match_python_symbols_csv,test_routing_catalog_splits_oversized_directory_by_subdirectory,test_routing_index_respects_max_chars,test_routing_catalog_respects_max_catalog_chars,test_catalog_appendix_respects_the_cap_when_header_alone_is_close_to_it,test_omitted_path_appendix_is_bounded_regardless_of_omitted_count,test_manifest_stores_the_complete_omitted_path_list,test_first_catalog_entry_is_also_capped_by_max_catalog_chars,test_non_python_files_get_a_lightweight_table_row_not_a_full_block,test_markdown_title_prefers_heading_falls_back_to_first_line_then_filename,test_other_files_table_rows_respect_the_catalog_cap,test_changed_source_changes_source_manifest_hash,test_routing_disabled_with_no_routing_flag,test_no_routing_removes_stale_routing_from_earlier_scan,test_catalog_filenames_do_not_collide_across_partition_keys,test_purpose_clues_are_traceable_to_deterministic_evidence,test_scan_survives_a_malformed_graphify_top_level_structure"
 dev_tools/repo_context/tests/test_routing.py,_scan,function,6,9,<module>,,"repo, out, extra = None",,,false,,4,3,
 dev_tools/repo_context/tests/test_routing.py,_manifest,function,12,13,<module>,,out,,,false,,2,1,
 dev_tools/repo_context/tests/test_routing.py,test_routing_catalogs_are_generated_and_deterministic,function,16,35,<module>,,"repo, out",,,false,,20,3,strip_time
@@ -556,12 +557,15 @@ dev_tools/repo_context/tests/test_routing.py,test_catalog_appendix_respects_the_
 dev_tools/repo_context/tests/test_routing.py,test_omitted_path_appendix_is_bounded_regardless_of_omitted_count,function,173,197,<module>,,"repo, out",,,false,,25,5,
 dev_tools/repo_context/tests/test_routing.py,test_manifest_stores_the_complete_omitted_path_list,function,200,216,<module>,,"repo, out",,,false,,17,8,
 dev_tools/repo_context/tests/test_routing.py,test_first_catalog_entry_is_also_capped_by_max_catalog_chars,function,219,257,<module>,,"repo, out",,,false,,39,12,
-dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,function,260,267,<module>,,"repo, out",,,false,,8,2,
-dev_tools/repo_context/tests/test_routing.py,test_routing_disabled_with_no_routing_flag,function,270,273,<module>,,"repo, out",,,false,,4,2,
-dev_tools/repo_context/tests/test_routing.py,test_no_routing_removes_stale_routing_from_earlier_scan,function,276,286,<module>,,"repo, out",,,false,,11,3,
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,function,289,320,<module>,,"repo, out",,,false,,32,15,
-dev_tools/repo_context/tests/test_routing.py,test_purpose_clues_are_traceable_to_deterministic_evidence,function,323,328,<module>,,"repo, out",,,false,,6,3,
-dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_malformed_graphify_top_level_structure,function,331,343,<module>,,"repo, out",,,false,,13,2,
+dev_tools/repo_context/tests/test_routing.py,test_non_python_files_get_a_lightweight_table_row_not_a_full_block,function,260,283,<module>,,"repo, out",,,false,,24,9,
+dev_tools/repo_context/tests/test_routing.py,test_markdown_title_prefers_heading_falls_back_to_first_line_then_filename,function,286,299,<module>,,"repo, out",,,false,,14,4,
+dev_tools/repo_context/tests/test_routing.py,test_other_files_table_rows_respect_the_catalog_cap,function,302,321,<module>,,"repo, out",,,false,,20,8,
+dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,function,324,331,<module>,,"repo, out",,,false,,8,2,
+dev_tools/repo_context/tests/test_routing.py,test_routing_disabled_with_no_routing_flag,function,334,337,<module>,,"repo, out",,,false,,4,2,
+dev_tools/repo_context/tests/test_routing.py,test_no_routing_removes_stale_routing_from_earlier_scan,function,340,350,<module>,,"repo, out",,,false,,11,3,
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,function,353,384,<module>,,"repo, out",,,false,,32,15,
+dev_tools/repo_context/tests/test_routing.py,test_purpose_clues_are_traceable_to_deterministic_evidence,function,387,392,<module>,,"repo, out",,,false,,6,3,
+dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_malformed_graphify_top_level_structure,function,395,407,<module>,,"repo, out",,,false,,13,2,
 dev_tools/repo_context/tests/test_safety.py,<module>,module,1,137,,,,,,false,,137,1,"test_refuses_output_dir_equal_to_root,test_output_dir_inside_root_is_never_scanned_into_itself,test_custom_named_output_dir_inside_root_is_auto_excluded,test_nested_output_dir_excludes_only_itself_not_its_whole_parent,test_invalid_root_returns_nonzero,test_missing_subcommand_returns_nonzero,test_non_positive_chunk_target_lines_rejected,test_validate_does_not_require_packets_dir,test_redaction_does_not_remove_valid_code_statements_naming_token_or_secret,test_redaction_regression_flows_through_generated_chunks"
 dev_tools/repo_context/tests/test_safety.py,test_refuses_output_dir_equal_to_root,function,6,9,<module>,,repo,,,false,,4,2,
 dev_tools/repo_context/tests/test_safety.py,test_output_dir_inside_root_is_never_scanned_into_itself,function,12,21,<module>,,repo,,,false,,10,6,

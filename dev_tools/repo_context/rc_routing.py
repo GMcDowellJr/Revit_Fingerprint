@@ -23,6 +23,7 @@ import rc_graphify
 from rc_common import (
     TOOL_VERSION, atomic_write_text, generated_output_exclude_paths, get_git_info, sha256_text, stable_path_id,
 )
+from rc_packet import _safe_excerpt
 
 DEFAULT_MAX_FILES_PER_CATALOG = 60
 DEFAULT_MAX_CATALOG_CHARS = 24_000
@@ -136,6 +137,34 @@ def _filename_terms(rel_path: str) -> str:
     stem = Path(rel_path).stem
     words = [w for w in stem.replace("-", "_").split("_") if w]
     return " ".join(words)
+
+
+_MAX_CONTENT_TITLE_CHARS = 120
+_MARKDOWN_TITLE_SCAN_LINES = 40
+
+
+def _markdown_title(root: Path, rel_path: str) -> str:
+    """First real content clue for a markdown file: its first `#` heading
+    (any level) if it has one, else its first non-empty line -- both
+    genuinely describe the file's topic, unlike a module docstring (which
+    doesn't exist for non-Python files) or filename tokens alone (which is
+    all the routing catalog previously had to go on for a .md file).
+    Bounded to the first few dozen lines and a short excerpt -- this is a
+    routing hint, not a summary. Returns "" if the file is unreadable, has
+    no content, or (rare) sits outside root."""
+    excerpt = _safe_excerpt(root, rel_path, 1, _MARKDOWN_TITLE_SCAN_LINES)
+    if not excerpt:
+        return ""
+    first_line = ""
+    for _, text in excerpt:
+        stripped = text.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("#"):
+            return stripped.lstrip("#").strip()[:_MAX_CONTENT_TITLE_CHARS]
+        if not first_line:
+            first_line = stripped
+    return first_line[:_MAX_CONTENT_TITLE_CHARS]
 
 
 def _render_file_entry(f, symbols_by_file: dict, role: str, role_evidence: str,
@@ -295,6 +324,8 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
         )
 
         blocks = []
+        other_rows = []   # non-Python files: lightweight table rows, see below
+        table_header_added = False
         omitted_paths = []
         header = (
             f"# Routing catalog: `{key}`\n\n"
@@ -306,8 +337,40 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
             f"and this catalog should be regenerated via `scan`.\n\n"
         )
         body_len = len(header)
+        # "## Other files (non-Python)" table header, added once and
+        # budget-checked like everything else -- see the branch below.
+        table_header = "\n## Other files (non-Python)\n\n| Path | Title/summary | Role |\n|---|---|---|\n"
         for f in cat_files:
             rel = f.relative_path
+            if f.extension != ".py":
+                # Every field in _render_file_entry below (Role, top-level
+                # symbols, internal deps, callers, related tests) is a
+                # Python-specific fact that simply doesn't exist for a
+                # non-Python file -- rendering the full block produced six
+                # lines of "(none)"/"unknown" per entry and nothing else
+                # useful beyond the filename itself. A markdown file also
+                # has genuine content to draw a purpose clue from (its
+                # first heading or first line) that a bare filename can't
+                # give you. A compact table row carries that clue at a
+                # fraction of the cost of the Python block format, so more
+                # of these files fit before the catalog's own cap kicks in.
+                title = _markdown_title(root, rel) if f.extension == ".md" else ""
+                if not title:
+                    title = _filename_terms(rel) or "(no title)"
+                title = title.replace("|", "\\|").replace("\n", " ")
+                row = f"| `{rel}` | {title} | `{roles[rel]}` |\n"
+                extra_header_cost = 0 if table_header_added else len(table_header)
+                if body_len + extra_header_cost + len(row) > routing_opts.max_catalog_chars:
+                    omitted_paths.append(rel)
+                    continue
+                if not table_header_added:
+                    other_rows.append(table_header)
+                    body_len += len(table_header)
+                    table_header_added = True
+                other_rows.append(row)
+                body_len += len(row)
+                continue
+
             block = _render_file_entry(
                 f, symbols_by_file, roles[rel], role_evidence[rel],
                 entrypoint_reason_by_path.get(rel), sorted(internal_deps_by_file.get(rel, ())),
@@ -344,6 +407,8 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
             body_len += join_cost + len(block)
 
         text = header + "\n".join(blocks)
+        if other_rows:
+            text += "".join(other_rows)
         # The header above is fixed, mandatory framing (revision/hash
         # provenance) that always renders in full regardless of the
         # configured cap -- but the appendix below is optional annotation,

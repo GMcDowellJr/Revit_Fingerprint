@@ -1,6 +1,6 @@
 # Routing catalog: `domains`
 
-- Generated (UTC): 2026-08-22T06:21:11Z
+- Generated (UTC): 2026-08-22T06:29:19Z
 - Tool version: 0.1.0
 - Files covered: 31
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `77af39c4f48ed1872bc8aee884b47866cc5896647bdbd27c8e5678467294a3cb`
@@ -274,51 +274,6 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`d81d66b57171b20a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/floor_types.py`)
 
-### `domains/graph_2024.json`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: graph 2024
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`cb6bc4c9b8ffac63…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `domains/graph_2024.json`)
-
-### `domains/graph_2025.json`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: graph 2025
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`4cd4a9219ca8075c…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `domains/graph_2025.json`)
-
-### `domains/graph_2026.json`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: graph 2026
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`cbd7039e952ac698…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `domains/graph_2026.json`)
-
 ### `domains/identity.py`
 - Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
 - Purpose clues:
@@ -461,6 +416,50 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`571f4d75e24cb9f2…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/loaded_family_types.py`)
 
+### `domains/materials.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Materials domain extractor (materials.v1).
+  - filename/path terms: materials
+- Important symbols (9 total):
+  - `_read_prop` (function) — line 59
+  - `_canon_id_local` (function) — line 66
+  - `_rgb_sig` (function) — line 79
+  - `_read_param_as_string` (function) — line 88
+  - `_resolve_pattern_slot` (function) — line 142
+  - `_export_ctx` (function) — line 204
+  - `_safe_item_value` (function) — line 213
+  - `_mk_item` (function) — line 224
+  - `extract` (function) — line 253
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+  - imports `core/collect.py`
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `_mk_item (domains/materials.py:230)`
+  - `extract (domains/materials.py:284)`
+  - `extract (domains/materials.py:316)`
+  - `extract (domains/materials.py:317)`
+  - `extract (domains/materials.py:318)`
+  - `extract (domains/materials.py:320)`
+  - `extract (domains/materials.py:321)`
+  - `extract (domains/materials.py:322)`
+  - `extract (domains/materials.py:325)`
+  - `extract (domains/materials.py:330)`
+  - `extract (domains/materials.py:335)`
+  - `extract (domains/materials.py:340)`
+  - `extract (domains/materials.py:345)`
+  - `extract (domains/materials.py:350)`
+  - `extract (domains/materials.py:355)`
+  - ... and 28 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`5cdd5ac408856778…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/materials.py`)
+
 ### `domains/phase_filters.py`
 - Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
 - Purpose clues:
@@ -483,11 +482,18 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`dfc2137bfef55c13…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/phase_filters.py`)
 
+## Other files (non-Python)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `domains/graph_2024.json` | graph 2024 | `unknown` |
+| `domains/graph_2025.json` | graph 2025 | `unknown` |
+| `domains/graph_2026.json` | graph 2026 | `unknown` |
+
 ## Omitted from this catalog (size limit reached)
 
-15 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
+14 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
 
-- `domains/materials.py`
 - `domains/object_styles.py`
 - `domains/phase_graphics.py`
 - `domains/phases.py`
@@ -496,4 +502,8 @@
 - `domains/units.py`
 - `domains/view_category_overrides.py`
 - `domains/view_category_overrides_annotation.py`
+- `domains/view_category_overrides_model.py`
+- `domains/view_filter_applications_view_templates.py`
+- `domains/view_filter_definitions.py`
+- `domains/view_templates.py`
 

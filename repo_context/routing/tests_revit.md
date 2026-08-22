@@ -1,6 +1,6 @@
 # Routing catalog: `tests/revit`
 
-- Generated (UTC): 2026-08-22T06:21:11Z
+- Generated (UTC): 2026-08-22T06:29:19Z
 - Tool version: 0.1.0
 - Files covered: 4
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `e97d1be96513e9cfafd064cce5b118e1af4244bebf62d142f3685c397cbb5760`
@@ -37,36 +37,6 @@
   - `tests/revit/revit_test_runner_pyrevit.py`
 - Retrieval identity: sha256=`f45080505381f92e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/revit/_json_diff.py`)
 
-### `tests/revit/config.example.json`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: config.example
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`b961c9b306273550…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/revit/config.example.json`)
-
-### `tests/revit/README.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: README
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`e0e51f6463385244…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/revit/README.md`)
-
 ### `tests/revit/revit_test_runner_pyrevit.py`
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
 - Purpose clues:
@@ -100,4 +70,11 @@
 - Related tests:
   - `tests/revit/revit_test_runner_pyrevit.py`
 - Retrieval identity: sha256=`982119a851b84e0d…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/revit/revit_test_runner_pyrevit.py`)
+
+## Other files (non-Python)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `tests/revit/config.example.json` | config.example | `unknown` |
+| `tests/revit/README.md` | Revit integration tests (golden baselines) | `unknown` |
 

@@ -1,6 +1,6 @@
 # Routing catalog: `tools/archetype`
 
-- Generated (UTC): 2026-08-22T06:21:11Z
+- Generated (UTC): 2026-08-22T06:29:19Z
 - Tool version: 0.1.0
 - Files covered: 19
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `c5dfc15c8ac63c3bd8e5c140c081e69d97eb5fb91d4f2ed43f57ac619d6f3163`
@@ -53,21 +53,6 @@
 - Related tests:
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`31cf3514b50a33ff…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/assign_archetype_classifications.py`)
-
-### `tools/archetype/bip_lookup.json`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: bip lookup
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`39371dc91b4a4404…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/bip_lookup.json`)
 
 ### `tools/archetype/build_cross_domain_items.py`
 - Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
@@ -330,78 +315,76 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`03bdf22e06a40e3b…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/prepare_archetype_review.py`)
 
-### `tools/archetype/README.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
+### `tools/archetype/review/select_archetype_review_files.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
 - Purpose clues:
-  - filename/path terms: README
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
+  - module docstring: Select the minimum set of files needed to review all archetype clusters.
+  - filename/path terms: select archetype review files
+- Important symbols (14 total):
+  - `log` (function) — line 105
+  - `read_csv_rows` (function) — line 109
+  - `read_json` (function) — line 116
+  - `atomic_write_csv` (function) — line 123
+  - `_load_file_paths` (function) — line 135
+  - `_all_cluster_pairs` (function) — line 152
+  - `_cluster_signal_ids` (function) — line 163
+  - `_build_approach_label_map` (function) — line 174
+  - `_build_file_cluster_index` (function) — line 208
+  - `_load_review_csvs` (function) — line 269
+  - `_greedy_cover` (function) — line 294
+  - `_build_output_rows` (function) — line 355
+  - `_identify_gaps` (function) — line 444
+  - `main` (function) — line 470
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
+  - `<module> (tools/archetype/review/select_archetype_review_files.py:612)`
+  - `_load_file_paths (tools/archetype/review/select_archetype_review_files.py:136)`
+  - `_load_review_csvs (tools/archetype/review/select_archetype_review_files.py:281)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:501)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:502)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:504)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:505)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:507)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:509)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:510)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:512)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:513)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:515)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:516)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:528)`
+  - ... and 16 more (see python_calls.csv)
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`887f40eb72e4403b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/README.md`)
+- Retrieval identity: sha256=`8924d10205891811…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/review/select_archetype_review_files.py`)
 
-### `tools/archetype/review/archetype_dp1_prompt.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
+### `tools/archetype/validate_archetype_signals.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
 - Purpose clues:
-  - filename/path terms: archetype dp1 prompt
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
+  - module docstring: Validate archetype signal coherence at sig_hash grain.
+  - filename/path terms: validate archetype signals
+- Important symbols (2 total):
+  - `_coherence_tier` (function) — line 153
+  - `main` (function) — line 161
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
+  - `<module> (tools/archetype/validate_archetype_signals.py:458)`
+  - `main (tools/archetype/validate_archetype_signals.py:362)`
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`768b5268978ac76e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/review/archetype_dp1_prompt.md`)
+- Retrieval identity: sha256=`d44e5d261376d1bc…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/validate_archetype_signals.py`)
 
-### `tools/archetype/review/archetype_dp2_label_decisions.csv.bak`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: archetype dp2 label decisions.csv
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`56bdbf621c8d6139…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/review/archetype_dp2_label_decisions.csv.bak`)
+## Other files (non-Python)
 
-### `tools/archetype/review/archetype_dp2_prompt.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: archetype dp2 prompt
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`41317aad190c81a3…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/review/archetype_dp2_prompt.md`)
-
-### `tools/archetype/shared_param_names.json`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: shared param names
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`b76d87a0285ec563…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/shared_param_names.json`)
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/archetype/bip_lookup.json` | bip lookup | `unknown` |
+| `tools/archetype/README.md` | Cross-Domain Archetype Discovery Pipeline (`tools/archetype/`) | `unknown` |
+| `tools/archetype/review/archetype_dp1_prompt.md` | Archetype Decision Point 1 — Candidate Promotion | `unknown` |
+| `tools/archetype/review/archetype_dp2_label_decisions.csv.bak` | archetype dp2 label decisions.csv | `unknown` |
+| `tools/archetype/review/archetype_dp2_prompt.md` | Archetype Decision Point 2 — Approach Label Ratification | `unknown` |
+| `tools/archetype/shared_param_names.json` | shared param names | `unknown` |
 

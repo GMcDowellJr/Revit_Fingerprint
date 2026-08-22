@@ -341,7 +341,8 @@ dev_tools/repo_context/rc_routing.py,dev_tools.repo_context.rc_routing,23,from_i
 dev_tools/repo_context/rc_routing.py,dev_tools.repo_context.rc_routing,23,from_import,rc_common,get_git_info,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_routing.py,dev_tools.repo_context.rc_routing,23,from_import,rc_common,sha256_text,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_routing.py,dev_tools.repo_context.rc_routing,23,from_import,rc_common,stable_path_id,,0,,unresolved_external_or_missing
-dev_tools/repo_context/rc_routing.py,dev_tools.repo_context.rc_routing,211,import,shutil,,,0,,unresolved_external_or_missing
+dev_tools/repo_context/rc_routing.py,dev_tools.repo_context.rc_routing,26,from_import,rc_packet,_safe_excerpt,,0,,unresolved_external_or_missing
+dev_tools/repo_context/rc_routing.py,dev_tools.repo_context.rc_routing,240,import,shutil,,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_scan.py,dev_tools.repo_context.rc_scan,7,from_import,__future__,annotations,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_scan.py,dev_tools.repo_context.rc_scan,9,import,ast,,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_scan.py,dev_tools.repo_context.rc_scan,10,import,hashlib,,,0,,unresolved_external_or_missing

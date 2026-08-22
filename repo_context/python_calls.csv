@@ -2955,198 +2955,215 @@ dev_tools/repo_context/rc_request.py,generate_packet_from_request,1070,_res_to_d
 dev_tools/repo_context/rc_request.py,generate_packet_from_request,1077,round,round,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_request.py,generate_packet_from_request,1082,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_request.py,generate_packet_from_request,1083,json.dumps,dumps,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_routing.py,_sort_key,45,rel_path.lower,lower,,,unresolved,'rel_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_partition_files,61,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_partition_files,68,f.relative_path.split,split,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_partition_files,69,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_partition_files,70,buckets[key].append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_partition_files.split,75,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_partition_files.split,76,final.setdefault,setdefault,,,unresolved,'final' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_partition_files.split,76,"final.setdefault(key, []).extend",extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_partition_files.split,78,key.count,count,,,unresolved,'key' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_partition_files.split,79,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_partition_files.split,81,f.relative_path.split,split,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_partition_files.split,82,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_partition_files.split,83,by_sub[parts[depth_index]].append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_partition_files.split,85,direct.append,append,,,unresolved,'direct' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_partition_files.split,89,final.setdefault,setdefault,,,unresolved,'final' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_partition_files.split,89,"final.setdefault(key, []).extend",extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_partition_files.split,92,final.setdefault,setdefault,,,unresolved,'final' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_partition_files.split,92,"final.setdefault(key, []).extend",extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_partition_files.split,93,by_sub.items,items,,,unresolved,'by_sub' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_partition_files.split,93,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_partition_files.split,94,split,split,,,unresolved,'split' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_routing.py,_partition_files,96,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_partition_files,97,split,split,,,unresolved,'split' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_routing.py,_catalog_filenames,108,key.replace,replace,,,unresolved,'key' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_catalog_filenames,109,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_catalog_filenames,110,naive.items,items,,,unresolved,'naive' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_catalog_filenames,111,by_filename[filename].append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_catalog_filenames,113,by_filename.items,items,,,unresolved,'by_filename' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_catalog_filenames,114,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_catalog_filenames,118,key.replace,replace,,,unresolved,'key' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_catalog_filenames,118,stable_path_id,stable_path_id,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_top_level_symbols,123,symbols_by_file.get,get,,,unresolved,'symbols_by_file' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_top_level_symbols,125,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_module_docstring,129,symbols_by_file.get,get,,,unresolved,'symbols_by_file' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_filename_terms,136,Path,Path,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_filename_terms,137,stem.replace,replace,,,unresolved,'stem' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_filename_terms,137,"stem.replace('-', '_').split",split,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_filename_terms,138,' '.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_render_file_entry,147,_module_docstring,_module_docstring,dev_tools/repo_context/rc_routing.py,_module_docstring,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_routing.py,_render_file_entry,148,_filename_terms,_filename_terms,dev_tools/repo_context/rc_routing.py,_filename_terms,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_routing.py,_render_file_entry,149,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,151,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,152,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,154,_top_level_symbols,_top_level_symbols,dev_tools/repo_context/rc_routing.py,_top_level_symbols,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_routing.py,_render_file_entry,155,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_render_file_entry,155,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,158,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,159,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_render_file_entry,160,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_render_file_entry,160,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,162,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,164,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,166,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,169,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,170,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_render_file_entry,171,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_render_file_entry,171,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,173,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,175,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_sort_key,46,rel_path.lower,lower,,,unresolved,'rel_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_partition_files,62,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_partition_files,69,f.relative_path.split,split,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_partition_files,70,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_partition_files,71,buckets[key].append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_partition_files.split,76,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_partition_files.split,77,final.setdefault,setdefault,,,unresolved,'final' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_partition_files.split,77,"final.setdefault(key, []).extend",extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_partition_files.split,79,key.count,count,,,unresolved,'key' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_partition_files.split,80,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_partition_files.split,82,f.relative_path.split,split,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_partition_files.split,83,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_partition_files.split,84,by_sub[parts[depth_index]].append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_partition_files.split,86,direct.append,append,,,unresolved,'direct' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_partition_files.split,90,final.setdefault,setdefault,,,unresolved,'final' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_partition_files.split,90,"final.setdefault(key, []).extend",extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_partition_files.split,93,final.setdefault,setdefault,,,unresolved,'final' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_partition_files.split,93,"final.setdefault(key, []).extend",extend,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_partition_files.split,94,by_sub.items,items,,,unresolved,'by_sub' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_partition_files.split,94,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_partition_files.split,95,split,split,,,unresolved,'split' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_routing.py,_partition_files,97,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_partition_files,98,split,split,,,unresolved,'split' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_routing.py,_catalog_filenames,109,key.replace,replace,,,unresolved,'key' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_catalog_filenames,110,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_catalog_filenames,111,naive.items,items,,,unresolved,'naive' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_catalog_filenames,112,by_filename[filename].append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_catalog_filenames,114,by_filename.items,items,,,unresolved,'by_filename' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_catalog_filenames,115,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_catalog_filenames,119,key.replace,replace,,,unresolved,'key' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_catalog_filenames,119,stable_path_id,stable_path_id,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_top_level_symbols,124,symbols_by_file.get,get,,,unresolved,'symbols_by_file' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_top_level_symbols,126,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_module_docstring,130,symbols_by_file.get,get,,,unresolved,'symbols_by_file' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_filename_terms,137,Path,Path,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_filename_terms,138,stem.replace,replace,,,unresolved,'stem' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_filename_terms,138,"stem.replace('-', '_').split",split,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_filename_terms,139,' '.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_markdown_title,155,_safe_excerpt,_safe_excerpt,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_markdown_title,160,text.strip,strip,,,unresolved,'text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_markdown_title,163,stripped.startswith,startswith,,,unresolved,'stripped' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_markdown_title,164,stripped.lstrip,lstrip,,,unresolved,'stripped' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_markdown_title,164,stripped.lstrip('#').strip,strip,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_render_file_entry,176,_module_docstring,_module_docstring,dev_tools/repo_context/rc_routing.py,_module_docstring,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_routing.py,_render_file_entry,177,_filename_terms,_filename_terms,dev_tools/repo_context/rc_routing.py,_filename_terms,high,direct call to a function defined in the same module
 dev_tools/repo_context/rc_routing.py,_render_file_entry,178,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,179,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_render_file_entry,180,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_routing.py,_render_file_entry,180,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,182,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,181,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,183,_top_level_symbols,_top_level_symbols,dev_tools/repo_context/rc_routing.py,_top_level_symbols,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_routing.py,_render_file_entry,184,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_routing.py,_render_file_entry,184,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_routing.py,_render_file_entry,187,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,188,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_render_file_entry,189,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_routing.py,_render_file_entry,189,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,192,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,192,rc_graphify.format_communities,format_communities,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_routing.py,_render_file_entry,194,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_file_entry,196,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,generate_routing,210,routing_dir.exists,exists,,,unresolved,'routing_dir' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,212,shutil.rmtree,rmtree,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_routing.py,generate_routing,216,routing_dir.mkdir,mkdir,,,unresolved,'routing_dir' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,220,routing_dir.iterdir,iterdir,,,unresolved,'routing_dir' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,221,entry.is_file,is_file,,,unresolved,'entry' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,223,entry.unlink,unlink,,,unresolved,'entry' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,230,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,232,symbols_by_file[s.relative_path].append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,generate_routing,234,dict,dict,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing.has_main_guard,237,entrypoint_reason_by_path.get,get,,,unresolved,'entrypoint_reason_by_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing.has_main_guard,238,reason.startswith,startswith,,,unresolved,'reason' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,240,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,243,internal_deps_by_file[imp.source_file].add,add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,generate_routing,245,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,248,called_by_file[c.candidate_file].add,add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,generate_routing,250,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,253,files_by_path.get,get,,,unresolved,'files_by_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,255,tests_by_target[imp.resolved_file].add,add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,generate_routing,258,files_by_path.get,get,,,unresolved,'files_by_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,260,tests_by_target[c.candidate_file].add,add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,generate_routing,262,generated_output_exclude_paths,generated_output_exclude_paths,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,262,get_git_info,get_git_info,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,263,rc_graphify.load_graphify_communities,load_graphify_communities,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_routing.py,generate_routing,264,git_info.get,get,,,unresolved,'git_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,264,git_info.get,get,,,unresolved,'git_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,266,git_info.get,get,,,unresolved,'git_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,266,git_info.get,get,,,unresolved,'git_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,272,_module_docstring,_module_docstring,dev_tools/repo_context/rc_routing.py,_module_docstring,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_routing.py,generate_routing,273,rc_classify.classify_operational_role,classify_operational_role,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_routing.py,generate_routing,275,has_main_guard,has_main_guard,,,unresolved,'has_main_guard' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_routing.py,generate_routing,280,_partition_files,_partition_files,dev_tools/repo_context/rc_routing.py,_partition_files,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_routing.py,generate_routing,283,sha256_text,sha256_text,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,284,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,generate_routing,284,_sort_key,_sort_key,dev_tools/repo_context/rc_routing.py,_sort_key,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_routing.py,generate_routing,284,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,287,_catalog_filenames,_catalog_filenames,dev_tools/repo_context/rc_routing.py,_catalog_filenames,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_routing.py,generate_routing,287,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,287,partitions.keys,keys,,,unresolved,'partitions' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,290,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,291,_sort_key,_sort_key,dev_tools/repo_context/rc_routing.py,_sort_key,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_routing.py,generate_routing,291,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,293,sha256_text,sha256_text,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,294,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,generate_routing,303,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,308,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,311,_render_file_entry,_render_file_entry,dev_tools/repo_context/rc_routing.py,_render_file_entry,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_routing.py,generate_routing,313,entrypoint_reason_by_path.get,get,,,unresolved,'entrypoint_reason_by_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,313,internal_deps_by_file.get,get,,,unresolved,'internal_deps_by_file' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,191,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,193,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,195,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,198,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,199,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_render_file_entry,200,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_render_file_entry,200,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,202,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,204,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,207,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,208,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_render_file_entry,209,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_render_file_entry,209,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,211,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,213,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,216,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,218,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,221,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,221,rc_graphify.format_communities,format_communities,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_routing.py,_render_file_entry,223,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_file_entry,225,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,generate_routing,239,routing_dir.exists,exists,,,unresolved,'routing_dir' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,241,shutil.rmtree,rmtree,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_routing.py,generate_routing,245,routing_dir.mkdir,mkdir,,,unresolved,'routing_dir' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,249,routing_dir.iterdir,iterdir,,,unresolved,'routing_dir' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,250,entry.is_file,is_file,,,unresolved,'entry' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,252,entry.unlink,unlink,,,unresolved,'entry' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,259,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,261,symbols_by_file[s.relative_path].append,append,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,generate_routing,263,dict,dict,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing.has_main_guard,266,entrypoint_reason_by_path.get,get,,,unresolved,'entrypoint_reason_by_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing.has_main_guard,267,reason.startswith,startswith,,,unresolved,'reason' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,269,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,272,internal_deps_by_file[imp.source_file].add,add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,generate_routing,274,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,277,called_by_file[c.candidate_file].add,add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,generate_routing,279,defaultdict,defaultdict,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,282,files_by_path.get,get,,,unresolved,'files_by_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,284,tests_by_target[imp.resolved_file].add,add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,generate_routing,287,files_by_path.get,get,,,unresolved,'files_by_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,289,tests_by_target[c.candidate_file].add,add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,generate_routing,291,generated_output_exclude_paths,generated_output_exclude_paths,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,291,get_git_info,get_git_info,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,292,rc_graphify.load_graphify_communities,load_graphify_communities,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_routing.py,generate_routing,293,git_info.get,get,,,unresolved,'git_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,293,git_info.get,get,,,unresolved,'git_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,295,git_info.get,get,,,unresolved,'git_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,295,git_info.get,get,,,unresolved,'git_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,301,_module_docstring,_module_docstring,dev_tools/repo_context/rc_routing.py,_module_docstring,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_routing.py,generate_routing,302,rc_classify.classify_operational_role,classify_operational_role,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_routing.py,generate_routing,304,has_main_guard,has_main_guard,,,unresolved,'has_main_guard' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_routing.py,generate_routing,309,_partition_files,_partition_files,dev_tools/repo_context/rc_routing.py,_partition_files,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_routing.py,generate_routing,312,sha256_text,sha256_text,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,313,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,generate_routing,313,_sort_key,_sort_key,dev_tools/repo_context/rc_routing.py,_sort_key,high,direct call to a function defined in the same module
 dev_tools/repo_context/rc_routing.py,generate_routing,313,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,314,called_by_file.get,get,,,unresolved,'called_by_file' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,314,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,314,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,314,tests_by_target.get,get,,,unresolved,'tests_by_target' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,315,communities_by_file.get,get,,,unresolved,'communities_by_file' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,325,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,327,omitted_paths.append,append,,,unresolved,'omitted_paths' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,337,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,338,omitted_paths.append,append,,,unresolved,'omitted_paths' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,340,blocks.append,append,,,unresolved,'blocks' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,341,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,343,blocks.append,append,,,unresolved,'blocks' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,344,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,346,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,generate_routing,364,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,367,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,370,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,372,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,384,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,387,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,389,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,392,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,400,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,402,Counter,Counter,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,403,_top_level_symbols,_top_level_symbols,dev_tools/repo_context/rc_routing.py,_top_level_symbols,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_routing.py,generate_routing,403,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,403,sum,sum,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,404,catalog_entries.append,append,,,unresolved,'catalog_entries' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,316,_catalog_filenames,_catalog_filenames,dev_tools/repo_context/rc_routing.py,_catalog_filenames,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_routing.py,generate_routing,316,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,316,partitions.keys,keys,,,unresolved,'partitions' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,319,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,320,_sort_key,_sort_key,dev_tools/repo_context/rc_routing.py,_sort_key,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_routing.py,generate_routing,320,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,322,sha256_text,sha256_text,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,323,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,generate_routing,334,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,339,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,357,_markdown_title,_markdown_title,dev_tools/repo_context/rc_routing.py,_markdown_title,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_routing.py,generate_routing,359,_filename_terms,_filename_terms,dev_tools/repo_context/rc_routing.py,_filename_terms,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_routing.py,generate_routing,360,title.replace,replace,,,unresolved,'title' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,360,"title.replace('|', '\\|').replace",replace,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,generate_routing,362,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,363,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,364,omitted_paths.append,append,,,unresolved,'omitted_paths' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,367,other_rows.append,append,,,unresolved,'other_rows' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,368,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,370,other_rows.append,append,,,unresolved,'other_rows' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,371,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,374,_render_file_entry,_render_file_entry,dev_tools/repo_context/rc_routing.py,_render_file_entry,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_routing.py,generate_routing,376,entrypoint_reason_by_path.get,get,,,unresolved,'entrypoint_reason_by_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,376,internal_deps_by_file.get,get,,,unresolved,'internal_deps_by_file' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,376,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,377,called_by_file.get,get,,,unresolved,'called_by_file' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,377,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,377,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,377,tests_by_target.get,get,,,unresolved,'tests_by_target' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,378,communities_by_file.get,get,,,unresolved,'communities_by_file' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,388,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,390,omitted_paths.append,append,,,unresolved,'omitted_paths' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,400,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,401,omitted_paths.append,append,,,unresolved,'omitted_paths' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,403,blocks.append,append,,,unresolved,'blocks' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,404,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,406,blocks.append,append,,,unresolved,'blocks' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_routing.py,generate_routing,407,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,409,by_role.items,items,,,unresolved,'by_role' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,generate_routing,409,dict,dict,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,409,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,410,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,419,_render_index,_render_index,dev_tools/repo_context/rc_routing.py,_render_index,high,direct call to a function defined in the same module
-dev_tools/repo_context/rc_routing.py,generate_routing,423,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,440,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,generate_routing,440,json.dumps,dumps,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/rc_routing.py,_render_index,447,root.resolve,resolve,,,unresolved,'root' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,451,git_info.get,get,,,unresolved,'git_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,452,git_info.get,get,,,unresolved,'git_info' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,454,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,456,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,457,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,458,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,463,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,464,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,466,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,467,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,483,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,503,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_render_index,503,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,508,"', '.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,508,e['roles'].items,items,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,509,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,510,"', '.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,510,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,512,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,517,body_lines.extend,extend,,,unresolved,'body_lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,517,entry_lines,entry_lines,,,unresolved,'entry_lines' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_routing.py,_render_index,518,body_lines.append,append,,,unresolved,'body_lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,520,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_render_index,521,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_render_index,522,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_render_index,522,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_render_index,526,body_lines.extend,extend,,,unresolved,'body_lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,526,entry_lines,entry_lines,,,unresolved,'entry_lines' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
-dev_tools/repo_context/rc_routing.py,_render_index,527,body_lines.append,append,,,unresolved,'body_lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_routing.py,_render_index,528,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_routing.py,_render_index,530,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_render_index,530,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_render_index,553,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_routing.py,_render_index,553,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,409,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,generate_routing,411,''.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,generate_routing,429,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,432,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,435,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,437,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,449,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,452,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,454,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,457,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,465,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,467,Counter,Counter,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,468,_top_level_symbols,_top_level_symbols,dev_tools/repo_context/rc_routing.py,_top_level_symbols,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_routing.py,generate_routing,468,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,468,sum,sum,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,469,catalog_entries.append,append,,,unresolved,'catalog_entries' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,472,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,474,by_role.items,items,,,unresolved,'by_role' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,generate_routing,474,dict,dict,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,474,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,475,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,484,_render_index,_render_index,dev_tools/repo_context/rc_routing.py,_render_index,high,direct call to a function defined in the same module
+dev_tools/repo_context/rc_routing.py,generate_routing,488,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,505,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,generate_routing,505,json.dumps,dumps,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_routing.py,_render_index,512,root.resolve,resolve,,,unresolved,'root' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,516,git_info.get,get,,,unresolved,'git_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,517,git_info.get,get,,,unresolved,'git_info' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,519,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,521,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,522,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,523,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,528,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,529,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,531,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,532,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,548,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,568,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_render_index,568,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,573,"', '.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,573,e['roles'].items,items,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,574,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,575,"', '.join",join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,575,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index.entry_lines,577,out.append,append,,,unresolved,'out' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,582,body_lines.extend,extend,,,unresolved,'body_lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,582,entry_lines,entry_lines,,,unresolved,'entry_lines' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_routing.py,_render_index,583,body_lines.append,append,,,unresolved,'body_lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,585,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_render_index,586,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_render_index,587,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_render_index,587,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_render_index,591,body_lines.extend,extend,,,unresolved,'body_lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,591,entry_lines,entry_lines,,,unresolved,'entry_lines' is shadowed by a parameter or local variable in the enclosing scope; not statically resolvable to the module-level definition
+dev_tools/repo_context/rc_routing.py,_render_index,592,body_lines.append,append,,,unresolved,'body_lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_routing.py,_render_index,593,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_routing.py,_render_index,595,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_render_index,595,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_render_index,618,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_routing.py,_render_index,618,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_scan.py,ScanOptions,31,field,field,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_scan.py,ScanOptions,33,field,field,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/rc_scan.py,ScanOptions,34,field,field,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -4621,38 +4638,55 @@ dev_tools/repo_context/tests/test_routing.py,test_first_catalog_entry_is_also_ca
 dev_tools/repo_context/tests/test_routing.py,test_first_catalog_entry_is_also_capped_by_max_catalog_chars,246,cat_text.count,count,,,unresolved,'cat_text' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/tests/test_routing.py,test_first_catalog_entry_is_also_capped_by_max_catalog_chars,255,_manifest,_manifest,dev_tools/repo_context/tests/test_routing.py,_manifest,high,direct call to a function defined in the same module
 dev_tools/repo_context/tests/test_routing.py,test_first_catalog_entry_is_also_capped_by_max_catalog_chars,256,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,261,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,262,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,263,_manifest,_manifest,dev_tools/repo_context/tests/test_routing.py,_manifest,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,264,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,265,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,266,_manifest,_manifest,dev_tools/repo_context/tests/test_routing.py,_manifest,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_routing_disabled_with_no_routing_flag,271,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_routing_disabled_with_no_routing_flag,272,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_routing_disabled_with_no_routing_flag,273,(out / 'routing').exists,exists,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_routing.py,test_no_routing_removes_stale_routing_from_earlier_scan,281,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_no_routing_removes_stale_routing_from_earlier_scan,282,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_no_routing_removes_stale_routing_from_earlier_scan,283,(out / 'routing' / 'index.md').exists,exists,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_routing.py,test_no_routing_removes_stale_routing_from_earlier_scan,285,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_no_routing_removes_stale_routing_from_earlier_scan,286,(out / 'routing').exists,exists,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,295,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,301,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,302,_manifest,_manifest,dev_tools/repo_context/tests/test_routing.py,_manifest,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,309,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,309,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,309,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,311,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,312,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,315,(out / a_b_nested['path']).read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,316,(out / a_b_top['path']).read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_routing.py,test_purpose_clues_are_traceable_to_deterministic_evidence,324,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_purpose_clues_are_traceable_to_deterministic_evidence,325,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_purpose_clues_are_traceable_to_deterministic_evidence,326,(out / 'routing' / 'core.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_malformed_graphify_top_level_structure,339,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_malformed_graphify_top_level_structure,340,(repo / 'graphify-out').mkdir,mkdir,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_malformed_graphify_top_level_structure,341,(repo / 'graphify-out' / 'graph.json').write_text,write_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_malformed_graphify_top_level_structure,342,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_malformed_graphify_top_level_structure,343,(out / 'routing' / 'index.md').exists,exists,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_non_python_files_get_a_lightweight_table_row_not_a_full_block,269,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_non_python_files_get_a_lightweight_table_row_not_a_full_block,274,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_non_python_files_get_a_lightweight_table_row_not_a_full_block,275,(out / 'routing' / 'core.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_non_python_files_get_a_lightweight_table_row_not_a_full_block,282,cat_text.split,split,,,unresolved,'cat_text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_routing.py,test_non_python_files_get_a_lightweight_table_row_not_a_full_block,283,cat_text.split,split,,,unresolved,'cat_text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_routing.py,test_markdown_title_prefers_heading_falls_back_to_first_line_then_filename,287,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_markdown_title_prefers_heading_falls_back_to_first_line_then_filename,292,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_markdown_title_prefers_heading_falls_back_to_first_line_then_filename,293,(out / 'routing' / 'docs.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_other_files_table_rows_respect_the_catalog_cap,311,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_other_files_table_rows_respect_the_catalog_cap,312,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_other_files_table_rows_respect_the_catalog_cap,313,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_other_files_table_rows_respect_the_catalog_cap,314,(out / 'routing' / 'docs.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_other_files_table_rows_respect_the_catalog_cap,315,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_other_files_table_rows_respect_the_catalog_cap,316,cat_text.count,count,,,unresolved,'cat_text' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_routing.py,test_other_files_table_rows_respect_the_catalog_cap,318,_manifest,_manifest,dev_tools/repo_context/tests/test_routing.py,_manifest,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_other_files_table_rows_respect_the_catalog_cap,319,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_other_files_table_rows_respect_the_catalog_cap,321,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,325,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,326,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,327,_manifest,_manifest,dev_tools/repo_context/tests/test_routing.py,_manifest,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,328,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,329,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_changed_source_changes_source_manifest_hash,330,_manifest,_manifest,dev_tools/repo_context/tests/test_routing.py,_manifest,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_routing_disabled_with_no_routing_flag,335,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_routing_disabled_with_no_routing_flag,336,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_routing_disabled_with_no_routing_flag,337,(out / 'routing').exists,exists,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_no_routing_removes_stale_routing_from_earlier_scan,345,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_no_routing_removes_stale_routing_from_earlier_scan,346,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_no_routing_removes_stale_routing_from_earlier_scan,347,(out / 'routing' / 'index.md').exists,exists,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_no_routing_removes_stale_routing_from_earlier_scan,349,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_no_routing_removes_stale_routing_from_earlier_scan,350,(out / 'routing').exists,exists,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,359,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,365,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,366,_manifest,_manifest,dev_tools/repo_context/tests/test_routing.py,_manifest,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,373,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,373,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,373,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,375,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,376,next,next,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,379,(out / a_b_nested['path']).read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_do_not_collide_across_partition_keys,380,(out / a_b_top['path']).read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_purpose_clues_are_traceable_to_deterministic_evidence,388,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_purpose_clues_are_traceable_to_deterministic_evidence,389,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_purpose_clues_are_traceable_to_deterministic_evidence,390,(out / 'routing' / 'core.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_malformed_graphify_top_level_structure,403,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_malformed_graphify_top_level_structure,404,(repo / 'graphify-out').mkdir,mkdir,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_malformed_graphify_top_level_structure,405,(repo / 'graphify-out' / 'graph.json').write_text,write_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_malformed_graphify_top_level_structure,406,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_malformed_graphify_top_level_structure,407,(out / 'routing' / 'index.md').exists,exists,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 dev_tools/repo_context/tests/test_safety.py,test_refuses_output_dir_equal_to_root,7,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_safety.py,test_refuses_output_dir_equal_to_root,8,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_safety.py,test_refuses_output_dir_equal_to_root,8,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import

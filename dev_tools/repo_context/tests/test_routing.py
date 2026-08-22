@@ -257,6 +257,70 @@ def test_first_catalog_entry_is_also_capped_by_max_catalog_chars(repo, out):
     assert core_cat["omitted_file_count"] == 4
 
 
+def test_non_python_files_get_a_lightweight_table_row_not_a_full_block(repo, out):
+    # Cataloging a .md/.json/etc. file used to run it through the full
+    # Python-oriented block template (_render_file_entry) anyway -- every
+    # section (Role, top-level symbols, internal dependencies, callers,
+    # related tests) is a Python-specific fact that simply doesn't exist
+    # for a non-Python file, so five or six of the block's ~seven lines
+    # were always "(none)"/"unknown" boilerplate, with only the filename-
+    # derived "Purpose clues" line carrying any real information. A
+    # non-Python file must render as a compact table row instead.
+    write_files(repo, {
+        "core/a.py": "def f():\n    return 1\n",
+        "core/readme.md": "# Widget Factory\n\nBuilds widgets.\n",
+        "core/data.json": '{"a": 1}\n',
+    })
+    _scan(repo, out)
+    cat_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
+    assert "### `core/a.py`" in cat_text  # Python files still get the full block
+    assert "### `core/readme.md`" not in cat_text
+    assert "### `core/data.json`" not in cat_text
+    assert "## Other files (non-Python)" in cat_text
+    assert "| `core/readme.md` | Widget Factory | " in cat_text
+    assert "| `core/data.json` |" in cat_text
+    assert "Important symbols" not in cat_text.split("## Other files")[1]
+    assert "(none resolved" not in cat_text.split("## Other files")[1]
+
+
+def test_markdown_title_prefers_heading_falls_back_to_first_line_then_filename(repo, out):
+    write_files(repo, {
+        "docs/with_heading.md": "Some preamble\n\n# The Real Title\n\nBody text.\n",
+        "docs/no_heading.md": "Just a plain first line of prose.\n\nMore text.\n",
+        "docs/empty.md": "",
+    })
+    _scan(repo, out)
+    cat_text = (out / "routing" / "docs.md").read_text(encoding="utf-8")
+    # A heading anywhere in the scanned window wins over an earlier plain line.
+    assert "| `docs/with_heading.md` | The Real Title | " in cat_text
+    # No heading at all -- falls back to the first non-empty line.
+    assert "| `docs/no_heading.md` | Just a plain first line of prose. | " in cat_text
+    # Unreadable/empty content -- falls back to filename terms, never blank.
+    assert "| `docs/empty.md` | empty | " in cat_text
+
+
+def test_other_files_table_rows_respect_the_catalog_cap(repo, out):
+    # The lightweight table must be bounded by --routing-max-catalog-chars
+    # the same way the Python block list is -- omitted rows still land in
+    # the manifest's per-catalog omitted list, not silently dropped or
+    # left unbounded. (With many small, uniform-size rows like these, the
+    # greedy packing loop tends to fill right up to the cap and leave too
+    # little slack for the appendix's own short notice to fit too -- that
+    # is expected, not a bug; the manifest is the authoritative record
+    # regardless of whether the appendix text happens to render.)
+    files = {f"docs/note_{i:03d}.md": f"# Note {i}\n\nBody.\n" for i in range(200)}
+    write_files(repo, files)
+    _scan(repo, out, ["--routing-max-catalog-chars", "2000"])
+    cat_text = (out / "routing" / "docs.md").read_text(encoding="utf-8")
+    assert len(cat_text) < 2000 + 200
+    row_count = cat_text.count("| `docs/note_")
+    assert 0 < row_count < 200
+    manifest = _manifest(out)
+    docs_cat = next(c for c in manifest["catalogs"] if c["key"] == "docs")
+    assert docs_cat["omitted_file_count"] == 200 - row_count
+    assert len(docs_cat["omitted_paths"]) == docs_cat["omitted_file_count"]
+
+
 def test_changed_source_changes_source_manifest_hash(repo, out):
     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
     _scan(repo, out)

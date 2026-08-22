@@ -1,458 +1,55 @@
 # Routing catalog: `docs`
 
-- Generated (UTC): 2026-08-22T06:21:11Z
+- Generated (UTC): 2026-08-22T06:29:19Z
 - Tool version: 0.1.0
 - Files covered: 41
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `23143e64227d3a38a1b130c94aa40d7077e977ca975b11549be445757fb3a545`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
-### `docs/analysis-phases-question-map.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: analysis phases question map
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`c77288abf4294d14…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/analysis-phases-question-map.md`)
 
-### `docs/CENTRAL_PATH_NORM_RULE.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: CENTRAL PATH NORM RULE
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`04abdb14693640fb…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/CENTRAL_PATH_NORM_RULE.md`)
+## Other files (non-Python)
 
-### `docs/cross_segment_comparison.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: cross segment comparison
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`4f092d10a673c883…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/cross_segment_comparison.md`)
-
-### `docs/CSV_CONTRACT_v2.1.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: CSV CONTRACT v2.1
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`19cb0b5fc70a6c06…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/CSV_CONTRACT_v2.1.md`)
-
-### `docs/DEPLOYMENT_CONFIGURATION.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: DEPLOYMENT CONFIGURATION
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`b4c2352fc8977e8b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/DEPLOYMENT_CONFIGURATION.md`)
-
-### `docs/extract_stage_matrix.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: extract stage matrix
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`c3c76aa83d9b15ef…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/extract_stage_matrix.md`)
-
-### `docs/fingerprint_hashing_rules.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: fingerprint hashing rules
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`3d6a42a976ac80b1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/fingerprint_hashing_rules.md`)
-
-### `docs/governance/governance_classification_rules.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: governance classification rules
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`0078ca45bd934454…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/governance/governance_classification_rules.md`)
-
-### `docs/governance/governance_interpretation_guide.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: governance interpretation guide
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`6f216b1f2623cb94…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/governance/governance_interpretation_guide.md`)
-
-### `docs/governance/governance_question_routes.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: governance question routes
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`cf42354df1b45f1d…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/governance/governance_question_routes.md`)
-
-### `docs/governance/governance_reading_order.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: governance reading order
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`5859e9805445288d…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/governance/governance_reading_order.md`)
-
-### `docs/governance_evidence_package.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: governance evidence package
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`55bb3bcd0dcb0232…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/governance_evidence_package.md`)
-
-### `docs/governance_generator_cross_compare_coverage.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: governance generator cross compare coverage
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`f67a382fad42d9e6…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/governance_generator_cross_compare_coverage.md`)
-
-### `docs/governance_narrative_group1_scope_gap_investigation.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: governance narrative group1 scope gap investigation
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`c1d5c3544bf09d3e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/governance_narrative_group1_scope_gap_investigation.md`)
-
-### `docs/governance_narrative_scope_gap_audit.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: governance narrative scope gap audit
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`4f11255ae7b70a56…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/governance_narrative_scope_gap_audit.md`)
-
-### `docs/hash_discovery_tooling.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: hash discovery tooling
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`571da5aeb21732e1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/hash_discovery_tooling.md`)
-
-### `docs/join_key_shape_gating.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: join key shape gating
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`116fa2c34d0c424a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/join_key_shape_gating.md`)
-
-### `docs/line_pattern_mapping.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: line pattern mapping
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`bbe28badcdbd7a11…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/line_pattern_mapping.md`)
-
-### `docs/line_pattern_mapping_verification.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: line pattern mapping verification
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`8961e09101a70ae0…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/line_pattern_mapping_verification.md`)
-
-### `docs/method_invocation_candidates_annotated.csv`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: method invocation candidates annotated
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`855bd86253534b01…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/method_invocation_candidates_annotated.csv`)
-
-### `docs/METRICS.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: METRICS
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`12fcf19873ae039c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/METRICS.md`)
-
-### `docs/PATTERN_ID_AND_LABEL_RULES.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: PATTERN ID AND LABEL RULES
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`82caecd3d38554b1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/PATTERN_ID_AND_LABEL_RULES.md`)
-
-### `docs/phase2-identity-and-semantic-plan.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: phase2 identity and semantic plan
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`08c7af67d6fe9a6b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/phase2-identity-and-semantic-plan.md`)
-
-### `docs/phase_2_join-key_discovery.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: phase 2 join key discovery
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`294fbba4103003a8…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/phase_2_join-key_discovery.md`)
-
-### `docs/phase_2_join_key_discovery_summary`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: phase 2 join key discovery summary
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`30d41c4ed05a7aa0…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/phase_2_join_key_discovery_summary`)
-
-### `docs/probe_method_invocation_candidates_verification.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: probe method invocation candidates verification
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`7e2f66484e427675…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/probe_method_invocation_candidates_verification.md`)
-
-### `docs/probe_method_invocation_serialization_findings.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: probe method invocation serialization findings
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`fa1614ceb9b66801…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/probe_method_invocation_serialization_findings.md`)
-
-### `docs/repository-ai-client-reference-review.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: repository ai client reference review
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`24066ea02662a43c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/repository-ai-client-reference-review.md`)
-
-### `docs/repository-history-remediation-runbook.md`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: repository history remediation runbook
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`91c276b27b08ff0e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/repository-history-remediation-runbook.md`)
-
-### `docs/research/candidate_dependency_edges.csv`
-- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
-- Purpose clues:
-  - filename/path terms: candidate dependency edges
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`91680641627fcb00…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/research/candidate_dependency_edges.csv`)
+| Path | Title/summary | Role |
+|---|---|---|
+| `docs/analysis-phases-question-map.md` | Phase 0–6: Questions Each Phase Can Answer | `unknown` |
+| `docs/CENTRAL_PATH_NORM_RULE.md` | central_path_norm Rule (v2.1) | `unknown` |
+| `docs/cross_segment_comparison.md` | Cross-Segment Comparison | `unknown` |
+| `docs/CSV_CONTRACT_v2.1.md` | CSV Contract v2.1 (Option 2 joinable split-analysis) | `unknown` |
+| `docs/DEPLOYMENT_CONFIGURATION.md` | Deployment configuration | `unknown` |
+| `docs/extract_stage_matrix.md` | Extract Orchestrator Stage Matrix | `unknown` |
+| `docs/fingerprint_hashing_rules.md` | Fingerprint Hashing Rules — Semantic Stability & API Reachability | `unknown` |
+| `docs/governance/governance_classification_rules.md` | Governance Classification Rules | `unknown` |
+| `docs/governance/governance_interpretation_guide.md` | Governance Interpretation Guide | `unknown` |
+| `docs/governance/governance_question_routes.md` | Governance Question Routes | `unknown` |
+| `docs/governance/governance_reading_order.md` | Governance Reading Order | `unknown` |
+| `docs/governance_evidence_package.md` | Governance Evidence Package | `unknown` |
+| `docs/governance_generator_cross_compare_coverage.md` | Governance Generator Coverage of Cross-Segment Outputs | `unknown` |
+| `docs/governance_narrative_group1_scope_gap_investigation.md` | Investigation: Group 1 (`tc`/`cp`/`tp`) scope-gating gap in `build_cascade()` | `unknown` |
+| `docs/governance_narrative_scope_gap_audit.md` | Investigation: `generate_governance_narrative.py` — Scope-Level Gap & Hardcoding Audit | `unknown` |
+| `docs/hash_discovery_tooling.md` | Hash Discovery Tooling (`tools/discover_hash_policy.py`) | `unknown` |
+| `docs/join_key_shape_gating.md` | Join Key Shape-Gating Schema Extension | `unknown` |
+| `docs/line_pattern_mapping.md` | Line Pattern Mapping Utility | `unknown` |
+| `docs/line_pattern_mapping_verification.md` | Line Pattern Mapping -- Manual Verification Procedure | `unknown` |
+| `docs/method_invocation_candidates_annotated.csv` | method invocation candidates annotated | `unknown` |
+| `docs/METRICS.md` | Metrics | `unknown` |
+| `docs/PATTERN_ID_AND_LABEL_RULES.md` | Pattern ID and Label Rules (v2.1) | `unknown` |
+| `docs/phase2-identity-and-semantic-plan.md` | Phase-2 Identity & Semantics Refactor Plan | `unknown` |
+| `docs/phase_2_join-key_discovery.md` | Phase 2 — Join‑Key Discovery (Summary) | `unknown` |
+| `docs/phase_2_join_key_discovery_summary` | phase 2 join key discovery summary | `unknown` |
+| `docs/probe_method_invocation_candidates_verification.md` | Probe Method Invocation Candidates — Step 0 Verification (Findings Only) | `unknown` |
+| `docs/probe_method_invocation_serialization_findings.md` | Method Invocation Results — Serialization Gap, Missing Invocation, Ambiguous Quality State | `unknown` |
+| `docs/repository-ai-client-reference-review.md` | Repository AI and client-reference review | `unknown` |
+| `docs/repository-history-remediation-runbook.md` | Repository history remediation runbook | `unknown` |
+| `docs/research/candidate_dependency_edges.csv` | candidate dependency edges | `unknown` |
+| `docs/research/fingerprint_api_concept_map.csv` | fingerprint api concept map | `unknown` |
+| `docs/research/fingerprint_api_semantic_mapping.md` | Fingerprint API Semantic Mapping Research | `unknown` |
+| `docs/research/semantic_label_review.csv` | semantic label review | `unknown` |
+| `docs/research/unsupported_api_concepts.csv` | unsupported api concepts | `unknown` |
+| `docs/SPLIT_EXPORT.md` | Split export removed | `unknown` |
+| `docs/tools_DEPRECATED.md` | Deprecated / Legacy Tools (tools/) | `unknown` |
+| `docs/tools_PHASE0_1_2_MAP.md` | Phase 0 / Phase 1 / Phase 2 Tools Map (tools/) | `unknown` |
+| `docs/tracked-reference-hygiene.md` | Tracked-reference hygiene | `unknown` |
+| `docs/V21_ANALYSIS_SCHEMA.md` | V2.1 Analysis Schema | `unknown` |
+| `docs/V21_DETERMINISM_AND_IDENTITY.md` | V2.1 Determinism & Identity | `unknown` |
+| `docs/V21_PHASE0_EXPORT_SCHEMA.md` | V2.1 Phase 0 Export Schema | `unknown` |
 
