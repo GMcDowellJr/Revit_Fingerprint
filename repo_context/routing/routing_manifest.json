@@ -4,6 +4,7 @@
       "file_count": 10,
       "key": ".agents",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/.agents.md",
       "roles": {
         "unknown": 10
@@ -20,6 +21,7 @@
       "file_count": 2,
       "key": ".claude",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/.claude.md",
       "roles": {
         "unknown": 2
@@ -35,6 +37,7 @@
       "file_count": 4,
       "key": ".codex",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/.codex.md",
       "roles": {
         "unknown": 4
@@ -51,6 +54,7 @@
       "file_count": 10,
       "key": ".copilot",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/.copilot.md",
       "roles": {
         "unknown": 10
@@ -67,6 +71,7 @@
       "file_count": 6,
       "key": ".github",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/.github.md",
       "roles": {
         "unknown": 6
@@ -83,6 +88,30 @@
       "file_count": 35,
       "key": "archived",
       "omitted_file_count": 22,
+      "omitted_paths": [
+        "tools/patterns_analysis/_archive/intradomain_summary.py",
+        "tools/patterns_analysis/_archive/io.py",
+        "tools/patterns_analysis/_archive/pareto_join_keys_by_ids.py",
+        "tools/patterns_analysis/_archive/pareto_with_splits.py",
+        "tools/patterns_analysis/_archive/report.py",
+        "tools/patterns_analysis/_archive/run_attribute_stress.py",
+        "tools/patterns_analysis/_archive/run_attribute_stress_all_joinable.py",
+        "tools/patterns_analysis/_archive/run_candidate_joinkey_simulation.py",
+        "tools/patterns_analysis/_archive/run_change_type.py",
+        "tools/patterns_analysis/_archive/run_collision_differencing.py",
+        "tools/patterns_analysis/_archive/run_dimension_types_by_family.py",
+        "tools/patterns_analysis/_archive/run_identity_collision_diagnostics.py",
+        "tools/patterns_analysis/_archive/run_joinhash_label_population.py",
+        "tools/patterns_analysis/_archive/run_joinhash_parameter_population.py",
+        "tools/patterns_analysis/_archive/run_population_stability.py",
+        "tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py",
+        "tools/patterns_analysis/_archive/run_view_category_overrides_joinkey_analysis.py",
+        "tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py",
+        "tools/patterns_analysis/_archive/split_detection.py",
+        "tools/patterns_analysis/_archive/split_detection_element_level.py",
+        "tools/patterns_analysis/_archive/split_detection_file_level.py",
+        "tools/patterns_analysis/_archive/stability.py"
+      ],
       "path": "routing/archived.md",
       "roles": {
         "archived_or_legacy": 35
@@ -99,6 +128,7 @@
       "file_count": 16,
       "key": "audit_results",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/audit_results.md",
       "roles": {
         "unknown": 16
@@ -115,6 +145,7 @@
       "file_count": 1,
       "key": "config",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/config.md",
       "roles": {
         "unknown": 1
@@ -129,6 +160,7 @@
       "file_count": 4,
       "key": "contracts",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/contracts.md",
       "roles": {
         "unknown": 4
@@ -145,6 +177,21 @@
       "file_count": 25,
       "key": "core",
       "omitted_file_count": 13,
+      "omitted_paths": [
+        "core/join_key_builder.py",
+        "core/join_key_policy.py",
+        "core/manifest.py",
+        "core/name_key_builder.py",
+        "core/name_key_coverage.py",
+        "core/naming.py",
+        "core/phase2.py",
+        "core/record_v2.py",
+        "core/rows.py",
+        "core/sig_hash_builder.py",
+        "core/sig_hash_policy.py",
+        "core/timing_collector.py",
+        "core/vg_sig.py"
+      ],
       "path": "routing/core.md",
       "roles": {
         "library_module": 25
@@ -161,6 +208,15 @@
       "file_count": 25,
       "key": "dev_tools",
       "omitted_file_count": 7,
+      "omitted_paths": [
+        "dev_tools/repo_context/rc_routing.py",
+        "dev_tools/repo_context/rc_tree.py",
+        "dev_tools/repo_context/rc_validate.py",
+        "dev_tools/repo_context/rc_writers.py",
+        "dev_tools/repo_context/README.md",
+        "dev_tools/repo_context/repo_context.py",
+        "dev_tools/repo_context/schema/packet_request.schema.json"
+      ],
       "path": "routing/dev_tools.md",
       "roles": {
         "developer_utility": 14,
@@ -172,13 +228,26 @@
         "dev_tools/repo_context/examples/packet_request.invalid_ambiguous_line_range.json",
         "dev_tools/repo_context/examples/packet_request.invalid_empty_selectors.json"
       ],
-      "source_hash": "52b482d478e6cbd6aab42565e7710ba0787c9b759123b54d37693db3cbe247a2",
-      "symbol_count": 143
+      "source_hash": "d30d9cfca1fe5a718aff6664822be6bf7ab15498716a20a8bb75dda4c89b72c9",
+      "symbol_count": 144
     },
     {
       "file_count": 41,
       "key": "docs",
       "omitted_file_count": 11,
+      "omitted_paths": [
+        "docs/research/fingerprint_api_concept_map.csv",
+        "docs/research/fingerprint_api_semantic_mapping.md",
+        "docs/research/semantic_label_review.csv",
+        "docs/research/unsupported_api_concepts.csv",
+        "docs/SPLIT_EXPORT.md",
+        "docs/tools_DEPRECATED.md",
+        "docs/tools_PHASE0_1_2_MAP.md",
+        "docs/tracked-reference-hygiene.md",
+        "docs/V21_ANALYSIS_SCHEMA.md",
+        "docs/V21_DETERMINISM_AND_IDENTITY.md",
+        "docs/V21_PHASE0_EXPORT_SCHEMA.md"
+      ],
       "path": "routing/docs.md",
       "roles": {
         "unknown": 41
@@ -195,6 +264,23 @@
       "file_count": 31,
       "key": "domains",
       "omitted_file_count": 15,
+      "omitted_paths": [
+        "domains/materials.py",
+        "domains/object_styles.py",
+        "domains/phase_graphics.py",
+        "domains/phases.py",
+        "domains/roof_types.py",
+        "domains/text_types.py",
+        "domains/units.py",
+        "domains/view_category_overrides.py",
+        "domains/view_category_overrides_annotation.py",
+        "domains/view_category_overrides_model.py",
+        "domains/view_filter_applications_view_templates.py",
+        "domains/view_filter_definitions.py",
+        "domains/view_templates.py",
+        "domains/wall_types.py",
+        "domains/worksets.py"
+      ],
       "path": "routing/domains.md",
       "roles": {
         "library_module": 28,
@@ -212,6 +298,7 @@
       "file_count": 5,
       "key": "graphify-out",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/graphify-out.md",
       "roles": {
         "unknown": 5
@@ -228,6 +315,7 @@
       "file_count": 5,
       "key": "mapping",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/mapping.md",
       "roles": {
         "library_module": 5
@@ -244,6 +332,7 @@
       "file_count": 14,
       "key": "other",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/other.md",
       "roles": {
         "active_pipeline": 1,
@@ -261,6 +350,7 @@
       "file_count": 13,
       "key": "policies",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/policies.md",
       "roles": {
         "unknown": 13
@@ -277,6 +367,7 @@
       "file_count": 3,
       "key": "reference/revit_lookup",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/reference_revit_lookup.md",
       "roles": {
         "unknown": 3
@@ -293,6 +384,97 @@
       "file_count": 117,
       "key": "reference/revit_lookup/Descriptors",
       "omitted_file_count": 89,
+      "omitted_paths": [
+        "reference/revit_lookup/Descriptors/DependencyObjectDescriptor.cs",
+        "reference/revit_lookup/Descriptors/DisposableDescriptor.cs",
+        "reference/revit_lookup/Descriptors/DocumentCreationDescriptor.cs",
+        "reference/revit_lookup/Descriptors/DocumentDescriptor.cs",
+        "reference/revit_lookup/Descriptors/DuctDescriptor.cs",
+        "reference/revit_lookup/Descriptors/EdgeDescriptor.cs",
+        "reference/revit_lookup/Descriptors/EdgeEndPointDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ElementDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ElementIdDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ElementTypeDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ElevationMarkerDescriptor.cs",
+        "reference/revit_lookup/Descriptors/EntityDescriptor.cs",
+        "reference/revit_lookup/Descriptors/EnumerableDescriptor.cs",
+        "reference/revit_lookup/Descriptors/EnumeratorDescriptor.cs",
+        "reference/revit_lookup/Descriptors/EvaluatedParameterDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ExternalDefinitionDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ExternalResourceReferenceDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ExternalResourceTypeDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ExternalServiceDescriptor.cs",
+        "reference/revit_lookup/Descriptors/FaceDescriptor.cs",
+        "reference/revit_lookup/Descriptors/FailureDefinitionAccessorDescriptor.cs",
+        "reference/revit_lookup/Descriptors/FailureMessageDescriptor.cs",
+        "reference/revit_lookup/Descriptors/FamilyDescriptor.cs",
+        "reference/revit_lookup/Descriptors/FamilyInstanceDescriptor.cs",
+        "reference/revit_lookup/Descriptors/FamilyManagerDescriptor.cs",
+        "reference/revit_lookup/Descriptors/FamilyParameterDescriptor.cs",
+        "reference/revit_lookup/Descriptors/FamilySizeTableColumnDescriptor.cs",
+        "reference/revit_lookup/Descriptors/FamilySizeTableDescriptor.cs",
+        "reference/revit_lookup/Descriptors/FamilySizeTableManagerDescriptor.cs",
+        "reference/revit_lookup/Descriptors/FamilySymbolDescriptor.cs",
+        "reference/revit_lookup/Descriptors/FieldDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ForgeTypeIdDescriptor.cs",
+        "reference/revit_lookup/Descriptors/GeometryObjectDescriptor.cs",
+        "reference/revit_lookup/Descriptors/GlobalParameterDescriptor.cs",
+        "reference/revit_lookup/Descriptors/GuidEnumDescriptor.cs",
+        "reference/revit_lookup/Descriptors/HostObjectDescriptor.cs",
+        "reference/revit_lookup/Descriptors/IndependentTagDescriptor.cs",
+        "reference/revit_lookup/Descriptors/InternalOriginDescriptor.cs",
+        "reference/revit_lookup/Descriptors/LightFamilyDescriptor.cs",
+        "reference/revit_lookup/Descriptors/LocationCurveDescriptor.cs",
+        "reference/revit_lookup/Descriptors/MepSectionDescriptor.cs",
+        "reference/revit_lookup/Descriptors/MepSystemDescriptor.cs",
+        "reference/revit_lookup/Descriptors/MeshDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ModelPathDescriptor.cs",
+        "reference/revit_lookup/Descriptors/PanelDescriptor.cs",
+        "reference/revit_lookup/Descriptors/PaperSizeDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ParameterDescriptor.cs",
+        "reference/revit_lookup/Descriptors/PartDescriptor.cs",
+        "reference/revit_lookup/Descriptors/PartMakerDescriptor.cs",
+        "reference/revit_lookup/Descriptors/PerformanceAdviserDescriptor.cs",
+        "reference/revit_lookup/Descriptors/PipeDescriptor.cs",
+        "reference/revit_lookup/Descriptors/PlanViewRangeDescriptor.cs",
+        "reference/revit_lookup/Descriptors/PointCloudFilterDescriptor.cs",
+        "reference/revit_lookup/Descriptors/PrintManagerDescriptor.cs",
+        "reference/revit_lookup/Descriptors/RebarDescriptor.cs",
+        "reference/revit_lookup/Descriptors/RebarShapeDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ReferenceDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ReferencePointDescriptor.cs",
+        "reference/revit_lookup/Descriptors/RevisionNumberingSequenceDescriptor.cs",
+        "reference/revit_lookup/Descriptors/RevitLinkTypeDescriptor.cs",
+        "reference/revit_lookup/Descriptors/RibbonItemDescriptor.cs",
+        "reference/revit_lookup/Descriptors/RibbonPanelDescriptor.cs",
+        "reference/revit_lookup/Descriptors/RibbonTabDescriptor.cs",
+        "reference/revit_lookup/Descriptors/SchedulableFieldDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ScheduleDefinitionDescriptor.cs",
+        "reference/revit_lookup/Descriptors/SchemaDescriptor.cs",
+        "reference/revit_lookup/Descriptors/SolidDescriptor.cs",
+        "reference/revit_lookup/Descriptors/SpatialElementDescriptor.cs",
+        "reference/revit_lookup/Descriptors/StructuralSettingsDescriptor.cs",
+        "reference/revit_lookup/Descriptors/SubelementDescriptor.cs",
+        "reference/revit_lookup/Descriptors/SunAndShadowSettingsDescriptor.cs",
+        "reference/revit_lookup/Descriptors/SurfaceDescriptor.cs",
+        "reference/revit_lookup/Descriptors/TableDataDescriptor.cs",
+        "reference/revit_lookup/Descriptors/TableSectionDataDescriptor.cs",
+        "reference/revit_lookup/Descriptors/TableViewDescriptor.cs",
+        "reference/revit_lookup/Descriptors/TriangulationInterfaceDescriptor.cs",
+        "reference/revit_lookup/Descriptors/UiApplicationDescriptor.cs",
+        "reference/revit_lookup/Descriptors/UiElementDescriptor.cs",
+        "reference/revit_lookup/Descriptors/UiObjectDescriptor.cs",
+        "reference/revit_lookup/Descriptors/UnitsDescriptor.cs",
+        "reference/revit_lookup/Descriptors/UpdaterInfoDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ViewDescriptor.cs",
+        "reference/revit_lookup/Descriptors/ViewScheduleDescriptor.cs",
+        "reference/revit_lookup/Descriptors/WallDescriptor.cs",
+        "reference/revit_lookup/Descriptors/WallTypeDescriptor.cs",
+        "reference/revit_lookup/Descriptors/WireDescriptor.cs",
+        "reference/revit_lookup/Descriptors/WorksetDescriptor.cs",
+        "reference/revit_lookup/Descriptors/WorksetTableDescriptor.cs",
+        "reference/revit_lookup/Descriptors/XyzDescriptor.cs"
+      ],
       "path": "routing/reference_revit_lookup_Descriptors.md",
       "roles": {
         "unknown": 117
@@ -309,6 +491,7 @@
       "file_count": 6,
       "key": "runner",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/runner.md",
       "roles": {
         "library_module": 6
@@ -325,6 +508,7 @@
       "file_count": 1,
       "key": "scripts",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/scripts.md",
       "roles": {
         "operator_entrypoint": 1
@@ -339,6 +523,104 @@
       "file_count": 107,
       "key": "tests",
       "omitted_file_count": 96,
+      "omitted_paths": [
+        "tests/test_compare_cross_segment_comparison_registry.py",
+        "tests/test_compare_cross_segment_cross_client.py",
+        "tests/test_compare_cross_segment_governance.py",
+        "tests/test_compare_cross_segment_lineage.py",
+        "tests/test_compare_cross_segment_streamed_pairs.py",
+        "tests/test_compare_cross_segment_worker_count.py",
+        "tests/test_compare_governance_populations.py",
+        "tests/test_compound_types_wall.py",
+        "tests/test_contracts_bounded_errors.py",
+        "tests/test_contracts_run_status.py",
+        "tests/test_deployment_config.py",
+        "tests/test_deps_require_domain.py",
+        "tests/test_dimension_types_placeholder_fields.py",
+        "tests/test_dimension_types_shape_gating.py",
+        "tests/test_discover_hash_policy.py",
+        "tests/test_discover_join_policy_verification.py",
+        "tests/test_discover_vfd_edges.py",
+        "tests/test_dynamo_bootstrap.py",
+        "tests/test_enterprise_policy.py",
+        "tests/test_export_bundle_pattern_detail_quality_resolution.py",
+        "tests/test_export_layer_stacks.py",
+        "tests/test_extractor_unit_system.py",
+        "tests/test_fill_patterns_canonical_selectors.py",
+        "tests/test_fill_patterns_is_import_coercion.py",
+        "tests/test_fingerprint_export_discovery.py",
+        "tests/test_generate_governance_narrative_bc_client_sections.py",
+        "tests/test_generate_governance_narrative_brief.py",
+        "tests/test_generate_governance_narrative_classification.py",
+        "tests/test_generate_governance_narrative_comparison_registry.py",
+        "tests/test_generate_governance_narrative_evidence_package.py",
+        "tests/test_generate_governance_narrative_findings.py",
+        "tests/test_generate_governance_narrative_group1_bc_pooled.py",
+        "tests/test_generate_governance_narrative_policy.py",
+        "tests/test_generate_governance_narrative_scope_breakdown.py",
+        "tests/test_generate_governance_narrative_state_types.py",
+        "tests/test_generate_governance_narrative_static_docs_copy.py",
+        "tests/test_generate_governance_narrative_union_breadth.py",
+        "tests/test_generate_governance_narrative_unscoped_segment.py",
+        "tests/test_generate_governance_narrative_wp_reliability_resolved.py",
+        "tests/test_generate_name_key_patterns.py",
+        "tests/test_governance_evidence_package.py",
+        "tests/test_governance_field_completeness_gate.py",
+        "tests/test_governance_manifest.py",
+        "tests/test_governance_policy.py",
+        "tests/test_governance_relationships.py",
+        "tests/test_graphic_overrides.py",
+        "tests/test_hashing_incremental.py",
+        "tests/test_identity_canonical_selectors.py",
+        "tests/test_identity_project_info.py",
+        "tests/test_join_key_builder_shape_gating_dedupe.py",
+        "tests/test_join_key_discovery_shape_matching.py",
+        "tests/test_join_key_migration.py",
+        "tests/test_join_key_policy_validation.py",
+        "tests/test_label_synthesis_domain_prompt_loader.py",
+        "tests/test_line_pattern_mapping_reconstruction.py",
+        "tests/test_line_patterns_canonical_selectors.py",
+        "tests/test_line_styles_canonical_selectors.py",
+        "tests/test_materials.py",
+        "tests/test_na_token.py",
+        "tests/test_name_key_inline_analysis_agreement.py",
+        "tests/test_name_key_policy.py",
+        "tests/test_no_direct_filtered_element_collector_in_domains.py",
+        "tests/test_object_styles_canonical_selectors.py",
+        "tests/test_pareto_shape_gating.py",
+        "tests/test_phase_filters_canonical_selectors.py",
+        "tests/test_phases_canonical_selectors.py",
+        "tests/test_placeholder_exclusions.py",
+        "tests/test_probe_inventory_builder.py",
+        "tests/test_record_contract_v2.py",
+        "tests/test_record_id_determinism.py",
+        "tests/test_record_v2_utils.py",
+        "tests/test_reference_bundle.py",
+        "tests/test_reformat_to_flat_items_identity_lineage.py",
+        "tests/test_repository_data_remediation.py",
+        "tests/test_revitlookup_audit_regressions.py",
+        "tests/test_run_segment_orchestrator_name_projection.py",
+        "tests/test_run_segment_orchestrator_worker_split.py",
+        "tests/test_runner_canonicalization.py",
+        "tests/test_runner_extraction_context.py",
+        "tests/test_sentinel_policy.py",
+        "tests/test_sig_hash_policy_builder.py",
+        "tests/test_split_export.py",
+        "tests/test_split_named_clusters_and_thresholds.py",
+        "tests/test_suggest_discovery_params.py",
+        "tests/test_text_types_canonical_selectors.py",
+        "tests/test_text_types_conversion_convergence.py",
+        "tests/test_text_types_flat_items_export.py",
+        "tests/test_timing_collector.py",
+        "tests/test_units_canonical_selectors.py",
+        "tests/test_v21_join_policy_compat.py",
+        "tests/test_view_category_overrides_canonical_selectors.py",
+        "tests/test_view_filter_applications_view_templates_canonical_selectors.py",
+        "tests/test_view_filter_definitions_canonical_selectors.py",
+        "tests/test_view_filter_definitions_empty_domain.py",
+        "tests/test_view_instances_cache_key_consistency.py",
+        "tests/test_view_templates_canonical_selectors.py"
+      ],
       "path": "routing/tests.md",
       "roles": {
         "test_harness": 107
@@ -355,6 +637,7 @@
       "file_count": 2,
       "key": "tests/golden",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tests_golden.md",
       "roles": {
         "unknown": 2
@@ -370,6 +653,7 @@
       "file_count": 1,
       "key": "tests/probes",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tests_probes.md",
       "roles": {
         "test_harness": 1
@@ -384,6 +668,12 @@
       "file_count": 15,
       "key": "tests/repo_context",
       "omitted_file_count": 4,
+      "omitted_paths": [
+        "dev_tools/repo_context/tests/test_request_validation.py",
+        "dev_tools/repo_context/tests/test_routing.py",
+        "dev_tools/repo_context/tests/test_symlinks.py",
+        "dev_tools/repo_context/tests/test_validate.py"
+      ],
       "path": "routing/tests_repo_context.md",
       "roles": {
         "test_harness": 15
@@ -393,13 +683,14 @@
         "dev_tools/repo_context/tests/test_chunking.py",
         "dev_tools/repo_context/tests/test_determinism_incremental.py"
       ],
-      "source_hash": "5a5a1f57b835a73f4cc7d5800ebd96e6ad628790a9add1fa91c499b7e8369ab0",
-      "symbol_count": 146
+      "source_hash": "b2078f6c1e070fdaabb9bf8fb8dc9b51aeedec523a85431b254fd20392009f27",
+      "symbol_count": 165
     },
     {
       "file_count": 4,
       "key": "tests/revit",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tests_revit.md",
       "roles": {
         "test_harness": 2,
@@ -417,6 +708,44 @@
       "file_count": 49,
       "key": "tools",
       "omitted_file_count": 36,
+      "omitted_paths": [
+        "tools/dimension_types.join_key.md",
+        "tools/discover_hash_policy.py",
+        "tools/discover_join_policy.py",
+        "tools/domain_authority.py",
+        "tools/emit_element_dominance.py",
+        "tools/enterprise_policy.py",
+        "tools/export_bundle_pattern_detail.py",
+        "tools/export_to_flat_tables.py",
+        "tools/extract_segment_subtree.py",
+        "tools/extractor.py",
+        "tools/generate_governance_narrative.py",
+        "tools/generate_name_key_patterns.py",
+        "tools/generate_sig_hash_policy.py",
+        "tools/governance_evidence_package.py",
+        "tools/governance_manifest.py",
+        "tools/governance_policy.py",
+        "tools/governance_relationships.py",
+        "tools/inspect_lft_similarity.py",
+        "tools/jenks_utils.py",
+        "tools/join_key_derivation.py",
+        "tools/label_refresh_runbook.ps1",
+        "tools/na_token.py",
+        "tools/pairwise_analysis.py",
+        "tools/pareto_joinkey_search.py",
+        "tools/pattern_id_utils.py",
+        "tools/population_framing.py",
+        "tools/probe_config.json",
+        "tools/refreshed_revit_governance_dod.md",
+        "tools/reset_wall_types_for_reapply.py",
+        "tools/run_config.json",
+        "tools/run_discovery_sweep.ps1",
+        "tools/run_extract_all.py",
+        "tools/run_segment_orchestrator.py",
+        "tools/run_split_detection_all.py",
+        "tools/similarity_compare.py",
+        "tools/suggest_discovery_params.py"
+      ],
       "path": "routing/tools.md",
       "roles": {
         "active_pipeline": 33,
@@ -435,6 +764,12 @@
       "file_count": 19,
       "key": "tools/archetype",
       "omitted_file_count": 4,
+      "omitted_paths": [
+        "tools/archetype/review/select_archetype_review_files.py",
+        "tools/archetype/validate_archetype_signals.py",
+        "tools/archetype/vfd_bip_target_domain_hints.json",
+        "tools/archetype/vfd_category_domain_map.json"
+      ],
       "path": "routing/tools_archetype.md",
       "roles": {
         "active_pipeline": 10,
@@ -453,6 +788,15 @@
       "file_count": 19,
       "key": "tools/bundle_analysis",
       "omitted_file_count": 7,
+      "omitted_paths": [
+        "tools/bundle_analysis/step2b_bundle_share_profile.py",
+        "tools/bundle_analysis/step3_build_dag.py",
+        "tools/bundle_analysis/step4_difference_sets.py",
+        "tools/bundle_analysis/step5_classify_patterns.py",
+        "tools/bundle_analysis/step6_classify_files.py",
+        "tools/bundle_analysis/step7_overlap_report.py",
+        "tools/bundle_analysis/utils.py"
+      ],
       "path": "routing/tools_bundle_analysis.md",
       "roles": {
         "active_pipeline": 12,
@@ -471,6 +815,7 @@
       "file_count": 2,
       "key": "tools/compare_templates_stand-alone",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tools_compare_templates_stand-alone.md",
       "roles": {
         "active_pipeline": 1,
@@ -487,6 +832,7 @@
       "file_count": 1,
       "key": "tools/governance",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tools_governance.md",
       "roles": {
         "active_pipeline": 1
@@ -501,6 +847,7 @@
       "file_count": 3,
       "key": "tools/join_key_discovery",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tools_join_key_discovery.md",
       "roles": {
         "active_pipeline": 1,
@@ -518,6 +865,19 @@
       "file_count": 26,
       "key": "tools/label_synthesis",
       "omitted_file_count": 11,
+      "omitted_paths": [
+        "tools/label_synthesis/patch_domain_patterns_labels.py",
+        "tools/label_synthesis/synopsis_formatters/arrowheads.py",
+        "tools/label_synthesis/synopsis_formatters/dimension_types.py",
+        "tools/label_synthesis/synopsis_formatters/fill_patterns.py",
+        "tools/label_synthesis/synopsis_formatters/line_patterns.py",
+        "tools/label_synthesis/synopsis_formatters/line_styles.py",
+        "tools/label_synthesis/synopsis_formatters/object_styles_annotation.py",
+        "tools/label_synthesis/synopsis_formatters/object_styles_model.py",
+        "tools/label_synthesis/synopsis_formatters/phase_filters.py",
+        "tools/label_synthesis/synopsis_formatters/text_types.py",
+        "tools/label_synthesis/synthesize_fragmented_labels.py"
+      ],
       "path": "routing/tools_label_synthesis.md",
       "roles": {
         "active_pipeline": 6,
@@ -535,6 +895,7 @@
       "file_count": 4,
       "key": "tools/lib",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tools_lib.md",
       "roles": {
         "developer_utility": 4
@@ -551,6 +912,7 @@
       "file_count": 5,
       "key": "tools/migration",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tools_migration.md",
       "roles": {
         "migration": 5
@@ -567,6 +929,7 @@
       "file_count": 4,
       "key": "tools/patterns_analysis",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tools_patterns_analysis.md",
       "roles": {
         "active_pipeline": 2,
@@ -584,6 +947,29 @@
       "file_count": 33,
       "key": "tools/probes",
       "omitted_file_count": 21,
+      "omitted_paths": [
+        "tools/probes/probe_floor_types.py",
+        "tools/probes/probe_identity.py",
+        "tools/probes/probe_line_patterns.py",
+        "tools/probes/probe_line_styles.py",
+        "tools/probes/probe_loaded_family_types.py",
+        "tools/probes/probe_materials.py",
+        "tools/probes/probe_object_styles.py",
+        "tools/probes/probe_phase_filters.py",
+        "tools/probes/probe_phase_graphics.py",
+        "tools/probes/probe_phases.py",
+        "tools/probes/probe_roof_types.py",
+        "tools/probes/probe_text_types.py",
+        "tools/probes/probe_units.py",
+        "tools/probes/probe_view_category_overrides.py",
+        "tools/probes/probe_view_filter_applications.py",
+        "tools/probes/probe_view_filter_definitions.py",
+        "tools/probes/probe_view_templates.py",
+        "tools/probes/probe_views.py",
+        "tools/probes/probe_wall_types.py",
+        "tools/probes/probe_worksets.py",
+        "tools/probes/sweep_line_pattern_normhash_precision.py"
+      ],
       "path": "routing/tools_probes.md",
       "roles": {
         "active_pipeline": 3,
@@ -602,6 +988,7 @@
       "file_count": 1,
       "key": "validators",
       "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/validators.md",
       "roles": {
         "library_module": 1
@@ -613,14 +1000,14 @@
       "symbol_count": 8
     }
   ],
-  "generated_at_utc": "2026-08-22T04:24:28Z",
+  "generated_at_utc": "2026-08-22T05:05:18Z",
   "git": {
     "available": true,
-    "commit": "08f43f90f1a90e611c17dbcc16f95b057296c771",
+    "commit": "2212554e6ab46b522e72844eb575ef8fdb207e4c",
     "dirty": true
   },
   "graphify_warnings": [
-    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 08f43f90f1a9; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
+    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 2212554e6ab4; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
   ],
   "options": {
     "allow_stale_graphify": false,
@@ -629,6 +1016,6 @@
     "max_index_chars": 6000,
     "max_symbols_per_file_entry": 25
   },
-  "source_manifest_hash": "e4f6caadabc41c84def3d2c0ec6ffc14ae7acbddba20a1f09468de4d5a2df8df",
+  "source_manifest_hash": "7e059e5c842bc93334e35c9939f630007aa372ff8220f67bf12035f1113ab98f",
   "tool_version": "0.1.0"
 }

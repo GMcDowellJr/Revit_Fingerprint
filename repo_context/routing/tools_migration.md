@@ -1,6 +1,6 @@
 # Routing catalog: `tools/migration`
 
-- Generated (UTC): 2026-08-22T04:24:28Z
+- Generated (UTC): 2026-08-22T05:05:18Z
 - Tool version: 0.1.0
 - Files covered: 5
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `f26a653c52fdc4bc1ab31c5da9f42d11fcbf4d363db37cc6721522fa242179cd`

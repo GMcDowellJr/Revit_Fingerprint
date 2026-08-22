@@ -1,6 +1,6 @@
 # Routing catalog: `tools`
 
-- Generated (UTC): 2026-08-22T04:24:28Z
+- Generated (UTC): 2026-08-22T05:05:18Z
 - Tool version: 0.1.0
 - Files covered: 49
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `186bd8fb5e648d3853b278c2db4aa9f2801dc7c2a2d2be25436967cc0d21bae6`
@@ -443,10 +443,5 @@
 - `tools/refreshed_revit_governance_dod.md`
 - `tools/reset_wall_types_for_reapply.py`
 - `tools/run_config.json`
-- `tools/run_discovery_sweep.ps1`
-- `tools/run_extract_all.py`
-- `tools/run_segment_orchestrator.py`
-- `tools/run_split_detection_all.py`
-- `tools/similarity_compare.py`
-- `tools/suggest_discovery_params.py`
+- ... and 6 more (not listed here; see `file_inventory.csv` or `routing/routing_manifest.json`)
 

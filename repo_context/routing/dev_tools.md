@@ -1,9 +1,9 @@
 # Routing catalog: `dev_tools`
 
-- Generated (UTC): 2026-08-22T04:24:28Z
+- Generated (UTC): 2026-08-22T05:05:18Z
 - Tool version: 0.1.0
 - Files covered: 25
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `52b482d478e6cbd6aab42565e7710ba0787c9b759123b54d37693db3cbe247a2`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `d30d9cfca1fe5a718aff6664822be6bf7ab15498716a20a8bb75dda4c89b72c9`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/E2E_VERIFICATION.md`
@@ -203,7 +203,7 @@
   - `run_discover (dev_tools/repo_context/rc_discover.py:47)`
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`195b232025f9edc9…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_discover.py`)
+- Retrieval identity: sha256=`157bf77cc12898c8…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_discover.py`)
 
 ### `dev_tools/repo_context/rc_graphify.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
@@ -212,7 +212,7 @@
   - filename/path terms: rc graphify
 - Important symbols (2 total):
   - `load_graphify_communities` (function) — line 20
-  - `format_communities` (function) — line 69
+  - `format_communities` (function) — line 104
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
@@ -220,7 +220,7 @@
   - (none resolved statically; see python_calls.csv)
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`44f44deb6386f088…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_graphify.py`)
+- Retrieval identity: sha256=`54708e932f065ca3…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_graphify.py`)
 
 ### `dev_tools/repo_context/rc_manifest.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
@@ -364,44 +364,45 @@
 - Purpose clues:
   - module docstring: packet_request.json: schema validation, deterministic selector
   - filename/path terms: rc request
-- Important symbols (14 total):
-  - `RequestError` (class) — line 36
-  - `ResolvedRequest` (class) — line 43
-  - `_is_safe_repo_relative_path` (function) — line 62
-  - `validate_request_dict` (function) — line 76
-  - `parse_and_validate_request` (function) — line 202
-  - `SelectorResolution` (class) — line 244
-  - `resolve_files` (function) — line 253
-  - `resolve_symbols` (function) — line 267
-  - `resolve_lines` (function) — line 292
-  - `_render_origin_header` (function) — line 317
-  - `_render_excerpt_block` (function) — line 321
-  - `_symbol_expansion` (function) — line 352
-  - `generate_packet_from_request` (function) — line 443
-  - `_res_to_dict` (function) — line 718
+- Important symbols (15 total):
+  - `RequestError` (class) — line 37
+  - `ResolvedRequest` (class) — line 44
+  - `_is_safe_repo_relative_path` (function) — line 63
+  - `validate_request_dict` (function) — line 77
+  - `parse_and_validate_request` (function) — line 225
+  - `SelectorResolution` (class) — line 267
+  - `resolve_files` (function) — line 276
+  - `resolve_symbols` (function) — line 290
+  - `resolve_lines` (function) — line 315
+  - `resolve_search_terms` (function) — line 338
+  - `_render_origin_header` (function) — line 384
+  - `_render_excerpt_block` (function) — line 388
+  - `_symbol_expansion` (function) — line 419
+  - `generate_packet_from_request` (function) — line 546
+  - `_res_to_dict` (function) — line 887
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:458)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:471)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:472)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:473)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:479)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:520)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:550)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:554)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:565)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:566)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:570)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:561)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:574)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:575)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:576)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:577)`
   - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:585)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:591)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:595)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:602)`
-  - ... and 16 more (see python_calls.csv)
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:635)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:665)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:669)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:683)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:684)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:688)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:705)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:711)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:715)`
+  - ... and 20 more (see python_calls.csv)
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`406c3779ba7e34ec…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_request.py`)
+- Retrieval identity: sha256=`f152492420caff4b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_request.py`)
 
 ### `dev_tools/repo_context/rc_scan.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
