@@ -811,7 +811,33 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         f"- Limits: max_estimated_tokens={resolved.max_estimated_tokens}, max_files={resolved.max_files}, "
         f"max_hops={resolved.max_hops}"
     )
-    budget.spend("\n".join(header_lines) + "\n", len(header_lines))
+    header_text = "\n".join(header_lines) + "\n"
+
+    # Same fixed-framing reasoning as the header -- always rendered in
+    # full, reserved together with it (see below) so nothing else can
+    # spend against budget the footer will also need.
+    footer = ("\n_Static analysis only. Call/import relationships above are candidates, not proof of runtime "
+              "dispatch. See README.md in this output directory for full limitations._\n")
+
+    # Header and footer must be reserved *together*, in one atomic check,
+    # before anything else (including the selector-resolution report
+    # below) is allowed to spend -- reserving the header alone first (an
+    # earlier version of this fix) still let a resolution-report entry's
+    # own budget.allow() check pass against a budget that hadn't yet
+    # accounted for the footer, so the footer's later unconditional spend
+    # pushed the total over the cap anyway. Both are mandatory and
+    # unshrinkable, so if they don't fit *together* in the requested
+    # budget, no amount of Tier-1/Tier-2 selector content could ever have
+    # fit either -- fail the request outright instead of writing a packet
+    # whose true size exceeds what was asked for.
+    framing_text = header_text + footer
+    if not budget.allow(framing_text, len(header_lines) + 1):
+        return None, [_res_to_dict(r) for r in all_resolutions], (
+            f"limits.max_estimated_tokens ({resolved.max_estimated_tokens}) is too small to fit this packet's "
+            f"fixed framing (header + footer, before any selector content or the selector-resolution report) "
+            f"alone; increase limits.max_estimated_tokens."
+        )
+    budget.spend(framing_text, len(header_lines) + 1)
 
     # The resolution report scales with the *request*, not the source
     # repository (a request naming hundreds of missing/ambiguous
@@ -820,9 +846,10 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
     # everything else, with a count-of-omitted note rather than an
     # unbounded listing. The full, untruncated report is always available
     # in the accompanying packet_<name>.resolution.json sidecar. Computed
-    # here (reserved up front, alongside the header) rather than after
-    # Tier-1/Tier-2 render, since it depends only on `all_resolutions`
-    # (already resolved above), not on anything Tier-1/Tier-2 produce.
+    # here (reserved up front, alongside the header/footer) rather than
+    # after Tier-1/Tier-2 render, since it depends only on
+    # `all_resolutions` (already resolved above), not on anything
+    # Tier-1/Tier-2 produce.
     resolution_lines = ["## Selector resolution report\n"]
     omitted_selector_count = 0
     for idx, r in enumerate(all_resolutions):
@@ -841,13 +868,6 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             resolution_lines.append(note)
             budget.spend(note, 1)
     resolution_lines.append("")
-
-    # Same fixed-framing reasoning as the header above -- always rendered
-    # in full, reserved up front so Tier-1/Tier-2 content can't spend
-    # against budget this footer will also need.
-    footer = ("\n_Static analysis only. Call/import relationships above are candidates, not proof of runtime "
-              "dispatch. See README.md in this output directory for full limitations._\n")
-    budget.spend(footer, 1)
 
     # --- Tier 1: explicit selectors (never silently dropped) ---
     # explicit_conflicts collects only "the explicit excerpt itself doesn't

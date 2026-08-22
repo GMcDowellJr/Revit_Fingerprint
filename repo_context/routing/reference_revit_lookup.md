@@ -1,6 +1,6 @@
 # Routing catalog: `reference/revit_lookup`
 
-- Generated (UTC): 2026-08-22T10:27:04Z
+- Generated (UTC): 2026-08-22T10:35:17Z
 - Tool version: 0.1.0
 - Files covered: 3
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `36fda2d3b68815355c67ce04b39ab9b89f93d4290f9e7c018a893e75148345f2`

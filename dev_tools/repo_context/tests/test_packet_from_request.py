@@ -111,10 +111,14 @@ def test_hard_budget_conflict_on_explicit_selector_aborts_without_partial_packet
         lines += [f"def func_{i}():", f"    return {i}", ""]
     write_files(repo, {"big.py": "\n".join(lines) + "\n"})
     _scan(repo, out)
+    # 200 tokens comfortably clears the fixed framing's own floor (see
+    # rc_request.py's "Reserve the fixed framing's budget cost up front")
+    # but nowhere near big.py's ~900 lines -- this exercises the explicit
+    # *selector* conflict, not the separate framing-alone conflict.
     req = _request(out, "req.json", {
         "schema_version": "1.0", "question": "q",
         "selectors": {"files": ["big.py"], "symbols": [], "search_terms": [], "lines": []},
-        "limits": {"max_estimated_tokens": 1, "max_files": 12},
+        "limits": {"max_estimated_tokens": 200, "max_files": 12},
     })
     result = _packet(repo, out, req)
     assert result.returncode == 1
@@ -182,10 +186,14 @@ def test_search_match_does_not_reserve_focus_file_slot_unless_rendered(repo, out
     # evidence for it.
     write_files(repo, {"a.py": f"needle = {'x' * 500!r}\n"})
     _scan(repo, out)
+    # 130 tokens is just above the fixed framing's own floor (header +
+    # resolution report + footer must be reserved first -- see
+    # rc_request.py's "Reserve the fixed framing's budget cost up front")
+    # but well short of also fitting the ~500-char match line.
     req = _request(out, "req.json", {
         "schema_version": "1.0", "question": "q",
         "selectors": {"files": [], "symbols": [], "search_terms": ["needle"], "lines": []},
-        "limits": {"max_estimated_tokens": 10, "max_files": 1},
+        "limits": {"max_estimated_tokens": 130, "max_files": 1},
     })
     result = _packet(repo, out, req)
     assert result.returncode == 0, result.stderr
@@ -494,13 +502,14 @@ def test_packet_header_and_footer_charged_against_budget(repo, out):
     # A search-term selector, not an explicit file/symbol/line selector --
     # the latter now correctly hard-aborts the whole packet if it can't
     # fit alongside the (now-charged) header, which is a separate, correct
-    # invariant this test isn't about. A search term is soft/omittable, so
-    # the packet still succeeds even when the header alone consumes most
-    # of an unreasonably tiny budget.
+    # invariant this test isn't about. A generous budget here so the
+    # request succeeds; the header (which embeds the question verbatim)
+    # is charged/reserved up front regardless (see rc_request.py's
+    # "Reserve the fixed framing's budget cost up front").
     req = _request(out, "req.json", {
         "schema_version": "1.0", "question": long_question,
         "selectors": {"files": [], "symbols": [], "search_terms": ["nonexistent_term_xyz"], "lines": []},
-        "limits": {"max_estimated_tokens": 1, "max_files": 12},
+        "limits": {"max_estimated_tokens": 2000, "max_files": 12},
     })
     result = _packet(repo, out, req)
     assert result.returncode == 0, result.stderr
@@ -508,6 +517,21 @@ def test_packet_header_and_footer_charged_against_budget(repo, out):
     sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
     assert sidecar["estimated_tokens_used"] > 100  # the question alone is ~700+ chars
     assert sidecar["estimated_tokens_used"] * 4 >= len(text) * 0.5
+
+    # And a budget too small to fit the header (which embeds the question
+    # verbatim) plus the footer must now hard-abort outright, rather than
+    # silently "succeed" with a packet whose true size is many times over
+    # the requested cap -- exactly the shape of the original bug this
+    # regression test exists for.
+    tiny_req = _request(out, "tiny.json", {
+        "schema_version": "1.0", "question": long_question,
+        "selectors": {"files": [], "symbols": [], "search_terms": ["nonexistent_term_xyz"], "lines": []},
+        "limits": {"max_estimated_tokens": 1, "max_files": 12},
+    })
+    tiny_result = _packet(repo, out, tiny_req)
+    assert tiny_result.returncode == 1
+    assert "too small to fit" in tiny_result.stderr
+    assert not (out / "packets" / "packet_tiny.md").exists()
 
 
 def test_stale_source_since_scan_withholds_excerpt(repo, out):
@@ -721,11 +745,15 @@ def test_invalid_regex_notices_are_charged_against_budget(repo, out):
     write_files(repo, {"a.py": "def f():\n    return 1\n"})
     _scan(repo, out)
     bad_terms = [f"(unclosed_{i}" for i in range(200)]
+    # 300 tokens clears the fixed framing's own floor (header + selector-
+    # resolution report + footer, reserved up front -- see rc_request.py's
+    # "Reserve the fixed framing's budget cost up front") but is nowhere
+    # near enough to fit all 200 invalid-regex notices.
     req = _request(out, "req.json", {
         "schema_version": "1.0", "question": "q",
         "selectors": {"files": [], "symbols": [], "search_terms": bad_terms, "lines": []},
         "expansion": {"search_as_regex": True},
-        "limits": {"max_estimated_tokens": 1, "max_files": 500},
+        "limits": {"max_estimated_tokens": 300, "max_files": 500},
     })
     result = _packet(repo, out, req)
     assert result.returncode == 0, result.stderr
@@ -1068,22 +1096,23 @@ def test_selector_resolution_report_is_charged_against_budget(repo, out):
     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
     _scan(repo, out)
     missing_files = [f"missing_{i}.py" for i in range(200)]
+    # 300 tokens clears the fixed framing's own floor (header + footer,
+    # reserved up front -- see rc_request.py's "Reserve the fixed framing's
+    # budget cost up front") but is nowhere near enough to fit all 200
+    # resolution-report entries.
     req = _request(out, "req.json", {
         "schema_version": "1.0", "question": "q",
         "selectors": {"files": missing_files, "symbols": [], "search_terms": [], "lines": []},
-        "limits": {"max_estimated_tokens": 1, "max_files": 500},
+        "limits": {"max_estimated_tokens": 300, "max_files": 500},
     })
     result = _packet(repo, out, req)
     assert result.returncode == 0, result.stderr
     text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
     sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
-    # With a 4-character budget, almost nothing should have rendered --
-    # certainly not a full 200-entry resolution report. The fixed header
-    # framing is itself now charged (a separate fix), so the reported
-    # figure is the framing's own honest cost, not exactly 0 -- but it
-    # must stay small and, above all, must not be a wild understatement
-    # of the packet's actual size the way ~0 tokens for an 18KB packet
-    # was before either fix.
+    # Certainly not a full 200-entry resolution report rendered in the
+    # packet body -- it must be truncated with a count-of-omitted note,
+    # not a wild understatement of the packet's actual size the way ~0
+    # tokens for an 18KB packet was before this fix.
     assert len(text) < 2000
     assert text.count("missing_") < 200
     assert sidecar["estimated_tokens_used"] * 4 >= len(text) * 0.5
@@ -1241,3 +1270,34 @@ def test_fixed_framing_is_reserved_before_tier1_content_spends_budget(repo, out)
     packet_path, _, err = _gen("under", min_success_tokens - 1)
     assert packet_path is None
     assert "do not fit" in (err or "")
+
+
+def test_search_term_match_cannot_exceed_budget_via_late_footer_charge(repo, out):
+    # Regression (fresh Codex evidence after the first framing-reservation
+    # fix): reserving the header up front, then charging the selector-
+    # resolution report entries via budget.allow(), and only *then*
+    # unconditionally spending the footer, still let a resolution-report
+    # entry get allowed against a budget that hadn't yet accounted for the
+    # footer's own cost -- the footer's later unconditional spend then
+    # pushed the packet's true size back over the cap anyway. Concretely:
+    # a 100-token request whose only content is one ~500-character search
+    # match still reported estimated_tokens_used around 136, over the
+    # 100-token cap. Header and footer must be reserved *together*, as one
+    # atomic unit, before the resolution report (or anything else) spends.
+    write_files(repo, {"a.py": f"needle = {'x' * 500!r}\n"})
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [], "search_terms": ["needle"], "lines": []},
+        "limits": {"max_estimated_tokens": 100, "max_files": 12},
+    })
+    packet_path, _, err = rr.generate_packet_from_request(repo, out, req, name_override="req")
+    # Either this cleanly hard-aborts (the fixed framing alone doesn't fit
+    # this tiny budget) or, if it succeeds, its real size must not exceed
+    # what was requested -- what it must never do is "succeed" while its
+    # true size exceeds the cap.
+    if packet_path is not None:
+        sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+        assert sidecar["estimated_tokens_used"] <= 100
+    else:
+        assert "too small to fit" in err

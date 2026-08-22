@@ -1,11 +1,11 @@
 # Chunk of dev_tools/repo_context/rc_request.py
 
 - Source relative path: `dev_tools/repo_context/rc_request.py`
-- Chunk: 2 of 3
+- Chunk: 2 of 4
 - Original line range: 517-715
 - Overlap lines with previous chunk: 0
 - Symbols fully or partially present: _render_excerpt_block, _symbol_expansion, _file_expansion
-- Source SHA-256: 6c748c6dae6fe757e70a4e79cf617c64dd69f78347f47fb2e3913ec88c0b6a25
+- Source SHA-256: 82e6de1cc1d8a6782ab71ce65e4e91a7f422b049d64883de0a14e381c517b7c3
 - Starts inside symbol: no
 - Ends inside symbol: no
 
