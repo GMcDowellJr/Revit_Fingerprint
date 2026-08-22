@@ -1,6 +1,6 @@
 # Repository Overview: Revit_Fingerprint
 
-- Scan time (UTC): 2026-08-22T05:44:02Z
+- Scan time (UTC): 2026-08-22T06:02:15Z
 - Generator: repo_context.py v0.1.0
 - Total files considered: 670
 - Included: 670
@@ -69,13 +69,14 @@
 - `tools/run_extract_all.py` — 1234 lines
 - `tools/bundle_analysis/run_bundle_analysis.py` — 1202 lines
 
-## Files that required chunking (44)
+## Files that required chunking (45)
 
 - `CHANGELOG.md`
 - `DECISIONS.md`
 - `audit_results/audit_11_domain_extractor_delta_step0_findings.md`
 - `contracts/domain_identity_keys_v2.json`
 - `core/dimension_type_helpers.py`
+- `dev_tools/repo_context/rc_request.py`
 - `domains/dimension_types.py`
 - `domains/fill_patterns.py`
 - `domains/graph_2024.json`
@@ -85,8 +86,7 @@
 - `graphify-out/GRAPH_REPORT.md`
 - `graphify-out/cache/stat-index.json`
 - `graphify-out/graph.json`
-- `graphify-out/manifest.json`
-- ... and 29 more (see chunk_manifest.csv)
+- ... and 30 more (see chunk_manifest.csv)
 
 ## Python parse failures (0)
 
@@ -228,6 +228,6 @@ _Heuristic only: line count > 800 or any symbol with approximate cyclomatic comp
 - `core/vg_sig.py` — 462 lines, max symbol complexity ~18
 - `dev_tools/repo_context/rc_chunking.py` — 202 lines, max symbol complexity ~24
 - `dev_tools/repo_context/rc_classify.py` — 182 lines, max symbol complexity ~21
-- `dev_tools/repo_context/rc_discover.py` — 177 lines, max symbol complexity ~45
+- `dev_tools/repo_context/rc_discover.py` — 213 lines, max symbol complexity ~49
 - ... and 167 more
 

@@ -208,6 +208,10 @@ def cmd_discover(args: argparse.Namespace) -> int:
         root, output_dir, args.question, max_per_channel=args.max_per_channel,
     )
     print(f"wrote {report_path}")
+    if request_path is None:
+        print("no draft packet_request.json written: no usable path/symbol/search-term selectors "
+              "were found for this question (see the report for why)", file=sys.stderr)
+        return 1
     print(f"wrote {request_path}")
     return 0
 

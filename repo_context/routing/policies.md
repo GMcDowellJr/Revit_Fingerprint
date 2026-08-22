@@ -1,6 +1,6 @@
 # Routing catalog: `policies`
 
-- Generated (UTC): 2026-08-22T05:44:02Z
+- Generated (UTC): 2026-08-22T06:02:15Z
 - Tool version: 0.1.0
 - Files covered: 13
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `26c4830b9bf1ea0ce0468277a23baf876f1692ae372979175291784df427b5db`

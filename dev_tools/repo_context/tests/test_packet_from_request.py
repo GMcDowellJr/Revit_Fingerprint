@@ -1,6 +1,7 @@
 import json
 
-from conftest import run_tool, write_files
+from conftest import run_tool, write_files  # noqa: F401 -- conftest import also puts TOOL_DIR on sys.path
+import rc_request as rr
 
 
 def _scan(repo, out):
@@ -474,6 +475,31 @@ def test_invalid_regex_notices_are_charged_against_budget(repo, out):
     assert text.count("not a valid regex") < 200
 
 
+def test_pathological_regex_search_term_times_out_instead_of_hanging(repo, out, monkeypatch):
+    # Regression: search_as_regex ran a caller-supplied pattern through
+    # plain re.search with no bound on evaluation time. A syntactically
+    # valid but pathological pattern like `(a+)+$` against a long, nearly-
+    # matching line triggers catastrophic backtracking -- confirmed to
+    # still be running after 20+ seconds for just 35 characters on this
+    # engine -- which could hang the CLI indefinitely for an LLM-produced
+    # or malicious request. Each term's evaluation must be bounded.
+    monkeypatch.setattr(rr, "_REGEX_SEARCH_TIMEOUT_SECONDS", 0.5)
+    write_files(repo, {"core/a.py": "x = '" + "a" * 35 + "!'\n"})
+    _scan(repo, out)
+    files_rows = rr._load_csv(out / "file_inventory.csv")
+    resolutions, matches_by_term, _ = rr.resolve_search_terms(repo, ["(a+)+$"], True, files_rows)
+    assert resolutions[0].status == "invalid"
+    assert "exceeded" in resolutions[0].detail
+    assert matches_by_term["(a+)+$"] == []
+
+    # A normal (non-pathological) regex must still work correctly under
+    # the same bounded path -- the timeout mechanism must not break
+    # ordinary regex search.
+    resolutions2, matches_by_term2, _ = rr.resolve_search_terms(repo, ["a{3}"], True, files_rows)
+    assert resolutions2[0].status == "resolved"
+    assert matches_by_term2["a{3}"]
+
+
 def test_graphify_peer_listing_respects_max_files(repo, out):
     # Regression: Graphify community-peer paths were emitted without
     # going through note_focus_file, so they could exceed limits.max_files
@@ -540,6 +566,36 @@ def test_graphify_withheld_on_dirty_worktree_even_with_matching_commit(repo, out
     text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
     assert "graphify_expansion" not in text
     assert "worktree is dirty" in text
+
+
+def test_graphify_not_withheld_for_dirtiness_confined_to_output_dir(repo):
+    # Regression: get_git_info(root) reported "dirty" for *any* uncommitted
+    # change anywhere in the worktree, including this tool's own freshly
+    # written --output directory when it lives inside the scanned repo (as
+    # it does for this project's own repo_context/). scan/packet always
+    # write fresh output before this check runs, so every single run
+    # against such a repo made the worktree look dirty and withheld
+    # Graphify evidence for a reason that has nothing to do with the
+    # scanned *source* changing.
+    output_dir = repo / "repo_context"
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    commit = _git_init_commit(repo)
+    graph = {
+        "built_at_commit": commit,
+        "nodes": [{"source_file": "core/a.py", "community": 5, "community_name": "Widgets"}],
+    }
+    (repo / "graphify-out").mkdir(parents=True, exist_ok=True)
+    (repo / "graphify-out" / "graph.json").write_text(json.dumps(graph), encoding="utf-8")
+    _scan(repo, output_dir)  # writes brand-new, untracked files *inside* repo -- this alone used to dirty git status
+    req = _request(output_dir, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [{"name": "f", "file": "core/a.py"}], "search_terms": [], "lines": []},
+        "expansion": {"include_graphify": True},
+    })
+    result = _packet(repo, output_dir, req)
+    assert result.returncode == 0, result.stderr
+    text = (output_dir / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert "worktree is dirty" not in text
 
 
 def test_overlong_question_is_rejected(repo, out):

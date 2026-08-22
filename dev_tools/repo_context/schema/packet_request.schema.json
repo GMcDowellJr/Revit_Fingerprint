@@ -75,7 +75,10 @@
         "include_imports": {"type": "boolean", "default": true},
         "include_related_tests": {"type": "boolean", "default": true},
         "include_graphify": {"type": "boolean", "default": false},
-        "search_as_regex": {"type": "boolean", "default": false},
+        "search_as_regex": {
+          "type": "boolean", "default": false,
+          "description": "Each term's evaluation is bounded (a few seconds) to avoid catastrophic backtracking on a pathological pattern; a term that exceeds it is reported as an invalid selector rather than hanging."
+        },
         "max_hops": {"type": "integer", "minimum": 0, "maximum": 5, "default": 1}
       }
     },

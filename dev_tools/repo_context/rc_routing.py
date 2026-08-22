@@ -20,7 +20,9 @@ from typing import Optional
 
 import rc_classify
 import rc_graphify
-from rc_common import TOOL_VERSION, atomic_write_text, get_git_info, sha256_text, stable_path_id
+from rc_common import (
+    TOOL_VERSION, atomic_write_text, generated_output_exclude_paths, get_git_info, sha256_text, stable_path_id,
+)
 
 DEFAULT_MAX_FILES_PER_CATALOG = 60
 DEFAULT_MAX_CATALOG_CHARS = 24_000
@@ -257,7 +259,7 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
             if src and src.category == "test":
                 tests_by_target[c.candidate_file].add(c.caller_file)
 
-    git_info = get_git_info(root)
+    git_info = get_git_info(root, exclude_paths=generated_output_exclude_paths(root, output_dir))
     communities_by_file, graphify_warnings = rc_graphify.load_graphify_communities(
         root, git_info.get("commit") if git_info.get("available") else None,
         allow_stale=routing_opts.allow_stale_graphify,

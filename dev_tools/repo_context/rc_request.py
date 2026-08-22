@@ -12,12 +12,16 @@ from __future__ import annotations
 
 import json
 import re
+import signal
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 import rc_graphify
-from rc_common import TOOL_VERSION, atomic_write_text, get_git_info, redact_secrets, sanitize_stem, sha256_text
+from rc_common import (
+    TOOL_VERSION, atomic_write_text, generated_output_exclude_paths, get_git_info, redact_secrets,
+    sanitize_stem, sha256_text,
+)
 # Sibling-module reuse: these are the same read-only, budget-aware
 # rendering primitives the direct --file/--symbol/--search/--line packet
 # path already uses. Reusing them (rather than re-implementing excerpt
@@ -335,6 +339,72 @@ def resolve_lines(lines: list, files_by_path: dict) -> list:
     return out
 
 
+_REGEX_SEARCH_TIMEOUT_SECONDS = 5.0
+
+
+def _scan_term_matches(term: str, pattern: Optional["re.Pattern"], files_rows: list, root: Path) -> tuple:
+    term_matches = []
+    stale = 0
+    for frow in files_rows:
+        if frow.get("included") != "true" or frow.get("text_or_binary") == "binary":
+            continue
+        if not _file_is_fresh(root, frow["relative_path"], frow.get("sha256", "")):
+            stale += 1
+            continue
+        excerpt = _safe_excerpt(root, frow["relative_path"], 1, 10_000_000)
+        if excerpt is None:
+            continue
+        for ln, text in excerpt:
+            hit = pattern.search(text) if pattern else (term in text)
+            if hit:
+                term_matches.append((frow["relative_path"], ln, text))
+    return term_matches, stale
+
+
+class _RegexSearchTimeout(Exception):
+    pass
+
+
+def _raise_regex_timeout(signum, frame) -> None:
+    raise _RegexSearchTimeout()
+
+
+def _scan_term_matches_bounded(term: str, pattern, files_rows: list, root: Path,
+                                timeout: Optional[float] = None):
+    """Runs _scan_term_matches with a wall-clock ceiling, to bound a
+    pathological `search_as_regex` pattern's catastrophic-backtracking
+    blowup (e.g. `(a+)+$` against a long, nearly-matching source line)
+    instead of hanging the CLI indefinitely. Returns None on timeout.
+
+    Uses SIGALRM (POSIX only) rather than a background thread: CPython's
+    regex engine checks for pending signals periodically even mid-match,
+    so the alarm reliably interrupts a runaway match in the *same* thread.
+    A background-thread timeout was tried first and rejected -- Python's
+    `re` can't be safely killed once started, so an abandoned worker kept
+    running and, worse, kept contending for the GIL, which starved the
+    "recovered" main thread just as badly (confirmed: the whole process
+    still hadn't returned after 60s in that version, despite the join()
+    itself returning at 5s).
+
+    On platforms without SIGALRM (Windows), there's no safe way to
+    interrupt a C-level regex match from Python at all, so this runs
+    unbounded there -- the same behavior as before this fix, not a
+    regression, just a gap this fix doesn't close on that platform."""
+    if timeout is None:
+        timeout = _REGEX_SEARCH_TIMEOUT_SECONDS
+    if not hasattr(signal, "SIGALRM"):
+        return _scan_term_matches(term, pattern, files_rows, root)
+    previous_handler = signal.signal(signal.SIGALRM, _raise_regex_timeout)
+    signal.setitimer(signal.ITIMER_REAL, timeout)
+    try:
+        return _scan_term_matches(term, pattern, files_rows, root)
+    except _RegexSearchTimeout:
+        return None
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+
+
 def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_rows: list) -> tuple:
     """Resolve each search term against the scanned repository's current
     source (same matching rule Tier 2 rendering uses). Returns
@@ -356,20 +426,20 @@ def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_r
             resolutions.append(SelectorResolution("search_term", term, "invalid", f"not a valid regex: {exc}"))
             matches_by_term[term] = []
             continue
-        term_matches = []
-        for frow in files_rows:
-            if frow.get("included") != "true" or frow.get("text_or_binary") == "binary":
+        if search_as_regex:
+            scanned = _scan_term_matches_bounded(term, pattern, files_rows, root)
+            if scanned is None:
+                resolutions.append(SelectorResolution(
+                    "search_term", term, "invalid",
+                    f"regex evaluation exceeded {_REGEX_SEARCH_TIMEOUT_SECONDS:.0f}s (likely catastrophic "
+                    f"backtracking); term skipped -- simplify the pattern or disable search_as_regex",
+                ))
+                matches_by_term[term] = []
                 continue
-            if not _file_is_fresh(root, frow["relative_path"], frow.get("sha256", "")):
-                stale_files_skipped += 1
-                continue
-            excerpt = _safe_excerpt(root, frow["relative_path"], 1, 10_000_000)
-            if excerpt is None:
-                continue
-            for ln, text in excerpt:
-                hit = pattern.search(text) if pattern else (term in text)
-                if hit:
-                    term_matches.append((frow["relative_path"], ln, text))
+            term_matches, stale = scanned
+        else:
+            term_matches, stale = _scan_term_matches(term, pattern, files_rows, root)
+        stale_files_skipped += stale
         matches_by_term[term] = term_matches
         if term_matches:
             resolutions.append(SelectorResolution("search_term", term, "resolved",
@@ -596,7 +666,7 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
 
     communities_by_file: dict = {}
     if resolved.include_graphify:
-        _git_for_graphify = get_git_info(root)
+        _git_for_graphify = get_git_info(root, exclude_paths=generated_output_exclude_paths(root, output_dir))
         communities_by_file, graphify_warnings_for_request = rc_graphify.load_graphify_communities(
             root, _git_for_graphify.get("commit") if _git_for_graphify.get("available") else None,
             current_dirty=_git_for_graphify.get("dirty") if _git_for_graphify.get("available") else None,
@@ -875,7 +945,7 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
     # resolution report" section built into the header below -- not
     # repeated here.)
 
-    git_info = get_git_info(root)
+    git_info = get_git_info(root, exclude_paths=generated_output_exclude_paths(root, output_dir))
     header_lines = [
         "# Repo Context Packet (from packet_request.json)\n",
         f"- Root: `{root.resolve().name}`",

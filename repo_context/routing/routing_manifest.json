@@ -211,8 +211,8 @@
       "omitted_file_count": 7,
       "omitted_paths": [
         "dev_tools/repo_context/rc_routing.py",
+        "dev_tools/repo_context/rc_scan.py",
         "dev_tools/repo_context/rc_tree.py",
-        "dev_tools/repo_context/rc_validate.py",
         "dev_tools/repo_context/rc_writers.py",
         "dev_tools/repo_context/README.md",
         "dev_tools/repo_context/repo_context.py",
@@ -229,8 +229,8 @@
         "dev_tools/repo_context/examples/packet_request.invalid_ambiguous_line_range.json",
         "dev_tools/repo_context/examples/packet_request.invalid_empty_selectors.json"
       ],
-      "source_hash": "93466cd0693c696c6a266ea337714476a0072ab7135bf4a8dfc5fa94546f08c5",
-      "symbol_count": 144
+      "source_hash": "70e1f17e978f142f42e77eef30c46ca9f80806e017dc8d8082dcc4c834311734",
+      "symbol_count": 149
     },
     {
       "file_count": 41,
@@ -672,7 +672,7 @@
       "omitted_paths": [
         "dev_tools/repo_context/tests/test_request_validation.py",
         "dev_tools/repo_context/tests/test_routing.py",
-        "dev_tools/repo_context/tests/test_symlinks.py",
+        "dev_tools/repo_context/tests/test_safety.py",
         "dev_tools/repo_context/tests/test_validate.py"
       ],
       "path": "routing/tests_repo_context.md",
@@ -684,8 +684,8 @@
         "dev_tools/repo_context/tests/test_chunking.py",
         "dev_tools/repo_context/tests/test_determinism_incremental.py"
       ],
-      "source_hash": "881286a2b17015ea45e85b43a1c274642215a15cf1ba4d9207c604df5b8b1a55",
-      "symbol_count": 170
+      "source_hash": "22898055ba377437adb68c1abdbfe7f361ee5da6317b87030874765c493edbca",
+      "symbol_count": 174
     },
     {
       "file_count": 4,
@@ -1001,14 +1001,14 @@
       "symbol_count": 8
     }
   ],
-  "generated_at_utc": "2026-08-22T05:44:02Z",
+  "generated_at_utc": "2026-08-22T06:02:15Z",
   "git": {
     "available": true,
-    "commit": "7114ad699fcce9598e10cd8b6007f1f3ed6f5b08",
+    "commit": "4fa815c1859e12d091438269d6b0777893f8343f",
     "dirty": true
   },
   "graphify_warnings": [
-    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 7114ad699fcc; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
+    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 4fa815c1859e; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
   ],
   "options": {
     "allow_stale_graphify": false,
@@ -1017,6 +1017,6 @@
     "max_index_chars": 10000,
     "max_symbols_per_file_entry": 25
   },
-  "source_manifest_hash": "a3fa815a049cb9aef79c51f72ea4e181a5574cbd0de1d7b4a6d32c1c91ba8353",
+  "source_manifest_hash": "832a09c8df4625e5d73a76fa6f51e8e42d3c997e52255010bc7ba6e4aa3e82ca",
   "tool_version": "0.1.0"
 }

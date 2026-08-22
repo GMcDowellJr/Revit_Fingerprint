@@ -312,12 +312,19 @@ def estimate_tokens(char_count: int) -> int:
     return max(1, round(char_count / 4))
 
 
-def get_git_info(root: Path, timeout: float = 5.0) -> dict:
+def get_git_info(root: Path, timeout: float = 5.0, exclude_paths: Optional[list] = None) -> dict:
     """Best-effort, read-only git metadata for the scanned root: current
     commit hash and dirty-worktree state. Never raises -- any failure
     (not a git repo, git not installed, timeout) yields
     {"available": False}. Used only for provenance/freshness reporting,
-    never to gate whether a scan or packet can run."""
+    never to gate whether a scan or packet can run.
+
+    exclude_paths: repo-relative directories to exclude from the
+    dirty-worktree determination (e.g. this tool's own --output directory,
+    or graphify-out/ -- both are routinely rewritten by this tool's own
+    normal operation, so dirtiness confined to them says nothing about
+    whether the scanned *source* changed; see generated_output_exclude_paths()).
+    """
     import subprocess
     try:
         commit = subprocess.run(
@@ -326,8 +333,12 @@ def get_git_info(root: Path, timeout: float = 5.0) -> dict:
         )
         if commit.returncode != 0:
             return {"available": False}
+        status_cmd = ["git", "status", "--porcelain"]
+        if exclude_paths:
+            status_cmd.append("--")
+            status_cmd.extend(f":(exclude){p}" for p in exclude_paths)
         status = subprocess.run(
-            ["git", "status", "--porcelain"], cwd=str(root), capture_output=True,
+            status_cmd, cwd=str(root), capture_output=True,
             text=True, timeout=timeout,
         )
         dirty = bool(status.stdout.strip()) if status.returncode == 0 else None
@@ -338,3 +349,22 @@ def get_git_info(root: Path, timeout: float = 5.0) -> dict:
         }
     except (OSError, subprocess.SubprocessError):
         return {"available": False}
+
+
+def generated_output_exclude_paths(root: Path, output_dir: Path) -> list:
+    """Repo-relative paths get_git_info()'s dirty-worktree check should
+    exclude: the configured --output directory (if it's inside root) and
+    graphify-out/ (Graphify's own generated artifacts -- see AGENTS.md's
+    "dirty graphify-out/ files are expected" note for this exact
+    repository). Both are routinely rewritten as a side effect of this
+    tool's own (or Graphify's own) normal operation; if that's the only
+    thing making the worktree look dirty, callers like the Graphify
+    revision-alignment check would otherwise withhold evidence for a
+    reason that has nothing to do with the scanned source changing."""
+    excludes = ["graphify-out"]
+    try:
+        rel = output_dir.resolve().relative_to(root.resolve())
+        excludes.append(str(rel).replace("\\", "/"))
+    except ValueError:
+        pass  # output_dir isn't inside root -- nothing to exclude for it
+    return excludes
