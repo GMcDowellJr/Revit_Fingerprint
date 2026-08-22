@@ -1,9 +1,9 @@
 # Routing catalog: `dev_tools`
 
-- Generated (UTC): 2026-08-22T05:05:18Z
+- Generated (UTC): 2026-08-22T05:44:02Z
 - Tool version: 0.1.0
 - Files covered: 25
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `d30d9cfca1fe5a718aff6664822be6bf7ab15498716a20a8bb75dda4c89b72c9`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `93466cd0693c696c6a266ea337714476a0072ab7135bf4a8dfc5fa94546f08c5`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/E2E_VERIFICATION.md`
@@ -378,31 +378,31 @@
   - `_render_origin_header` (function) — line 384
   - `_render_excerpt_block` (function) — line 388
   - `_symbol_expansion` (function) — line 419
-  - `generate_packet_from_request` (function) — line 546
-  - `_res_to_dict` (function) — line 887
+  - `generate_packet_from_request` (function) — line 550
+  - `_res_to_dict` (function) — line 957
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:561)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:574)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:575)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:576)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:577)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:585)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:635)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:665)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:669)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:683)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:684)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:688)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:705)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:711)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:715)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:565)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:578)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:579)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:580)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:581)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:589)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:666)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:679)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:724)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:730)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:754)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:763)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:767)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:775)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:789)`
   - ... and 20 more (see python_calls.csv)
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`f152492420caff4b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_request.py`)
+- Retrieval identity: sha256=`a71d7b614ecd8469…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_request.py`)
 
 ### `dev_tools/repo_context/rc_scan.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')

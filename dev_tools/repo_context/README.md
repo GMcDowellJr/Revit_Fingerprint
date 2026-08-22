@@ -101,10 +101,13 @@ Natural-language question
    - `routing/index.md` — a small, persistent guide: repository revision +
      dirty-worktree state, a source-manifest hash (freshness evidence),
      every catalog's path/coverage/counts, and instructions for writing a
-     `packet_request.json`. Kept under `--routing-index-max-chars`
-     (default 6000) by first dropping per-catalog summaries, then
-     truncating the catalog list itself with an explicit count of what was
-     omitted.
+     `packet_request.json`. Tries to stay under `--routing-index-max-chars`
+     (default 10000) by first dropping the richer per-catalog summary
+     (roles/sample paths), but every catalog's bare entry (path + coverage
+     counts) is always listed regardless -- a catalog's name/path is never
+     omitted from the index, even if that means running over the
+     configured limit. An overage is called out with an explicit note
+     rather than silently truncating the catalog list.
    - `routing/<key>.md` — one catalog per partition (derived from actual
      repository paths, not a hardcoded domain list: test-classified files
      always get their own `tests.md`; archived/legacy files get

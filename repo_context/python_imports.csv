@@ -417,7 +417,7 @@ dev_tools/repo_context/tests/test_large_file_cap.py,dev_tools.repo_context.tests
 dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,1,import,json,,,0,,unresolved_external_or_missing
 dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,3,from_import,conftest,run_tool,,0,,unresolved_external_or_missing
 dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,3,from_import,conftest,write_files,,0,,unresolved_external_or_missing
-dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,448,import,subprocess,,,0,,unresolved_external_or_missing
+dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,592,import,subprocess,,,0,,unresolved_external_or_missing
 dev_tools/repo_context/tests/test_packets.py,dev_tools.repo_context.tests.test_packets,1,from_import,conftest,run_tool,,0,,unresolved_external_or_missing
 dev_tools/repo_context/tests/test_packets.py,dev_tools.repo_context.tests.test_packets,1,from_import,conftest,write_files,,0,,unresolved_external_or_missing
 dev_tools/repo_context/tests/test_python_symbols.py,dev_tools.repo_context.tests.test_python_symbols,1,import,csv,,,0,,unresolved_external_or_missing

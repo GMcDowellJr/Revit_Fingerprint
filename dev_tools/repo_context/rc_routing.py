@@ -24,7 +24,7 @@ from rc_common import TOOL_VERSION, atomic_write_text, get_git_info, sha256_text
 
 DEFAULT_MAX_FILES_PER_CATALOG = 60
 DEFAULT_MAX_CATALOG_CHARS = 24_000
-DEFAULT_MAX_INDEX_CHARS = 6_000
+DEFAULT_MAX_INDEX_CHARS = 10_000
 DEFAULT_MAX_SYMBOLS_PER_FILE_ENTRY = 25
 MAX_PARTITION_DEPTH = 4
 
@@ -488,25 +488,33 @@ def _render_index(root: Path, started_at_utc: str, git_info: dict, source_manife
         body_text = "\n".join(body_lines)
 
     if len(header_text) + len(body_text) > routing_opts.max_index_chars:
-        # Second reduction: truncate the catalog list itself (stable,
-        # alphabetical order), stating how many more exist.
-        kept = []
-        running = len(header_text)
-        shown = 0
-        for e in catalog_entries:
-            block = "\n".join(entry_lines(e, include_summary=False)) + "\n"
-            if running + len(block) > routing_opts.max_index_chars - 200:
-                break
-            kept.append(block)
-            running += len(block)
-            shown += 1
-        remaining = len(catalog_entries) - shown
-        body_text = "".join(kept)
-        if remaining > 0:
-            body_text += (
-                f"\n_...and {remaining} more catalog(s) omitted from this index to stay within "
-                f"--routing-index-max-chars={routing_opts.max_index_chars}. See `routing/routing_manifest.json` "
-                f"for the complete list._\n"
-            )
+        # Every catalog's bare entry (path + coverage counts) is always
+        # listed here, even if that means running over
+        # --routing-index-max-chars -- an index that silently drops a
+        # catalog's *existence* is a worse failure than one that's a bit
+        # oversized. A dropped catalog has no path/name anywhere for an
+        # LLM to ask for; an oversized index is merely a bit more to read.
+        #
+        # NOTE for a future revisit: if this note starts firing routinely
+        # (i.e. --routing-max-files-per-catalog partitions a repo into
+        # more catalogs than fit even at this bare-entry density), the
+        # next lever is *ranking*, not truncation -- sort catalog_entries
+        # by an importance signal (e.g. file_count, or role-density like
+        # how many operator_entrypoint/active_pipeline files it holds)
+        # before deciding which catalogs get the richer include_summary=True
+        # treatment above, instead of the current uniform all-or-nothing
+        # (every catalog gets full summary, or every catalog gets bare).
+        # That would make the *richer* detail biased toward the catalogs
+        # most likely to matter, without ever reintroducing outright
+        # omission of a catalog's name. Not implemented -- current corpus
+        # doesn't need it and it adds a policy question (what counts as
+        # "important") that's better decided against a real repeat case.
+        body_text += (
+            f"\n_Note: this index ({len(header_text) + len(body_text)} chars) exceeds "
+            f"--routing-index-max-chars={routing_opts.max_index_chars} because every catalog listed above is "
+            f"always included, even when doing so runs over the configured limit -- no catalog is ever omitted "
+            f"from this list. See `routing/routing_manifest.json` for the same data in a more compact, "
+            f"machine-readable form._\n"
+        )
 
     return header_text + body_text

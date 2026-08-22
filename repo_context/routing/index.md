@@ -1,11 +1,11 @@
 # Routing index: Revit_Fingerprint
 
-- Generated (UTC): 2026-08-22T05:05:18Z
+- Generated (UTC): 2026-08-22T05:44:02Z
 - Tool version: 0.1.0
-- Repository revision: `2212554e6ab46b522e72844eb575ef8fdb207e4c` (dirty worktree)
-- Source manifest hash (sha256 over every included file's `path:sha256`): `7e059e5c842bc93334e35c9939f630007aa372ff8220f67bf12035f1113ab98f`
+- Repository revision: `7114ad699fcce9598e10cd8b6007f1f3ed6f5b08` (dirty worktree)
+- Source manifest hash (sha256 over every included file's `path:sha256`): `a3fa815a049cb9aef79c51f72ea4e181a5574cbd0de1d7b4a6d32c1c91ba8353`
 - Freshness rule: if this hash no longer matches a fresh `scan`, re-run `scan` before trusting any catalog below or building a `packet_request.json` from it.
-- Graphify: graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 2212554e6ab4; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven).
+- Graphify: graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 7114ad699fcc; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven).
 
 ## How to use this index
 
@@ -33,74 +33,127 @@
 
 ### `routing/.agents.md`
 - Covers: 10 file(s), 0 top-level symbol(s)
+
 ### `routing/.claude.md`
-- Covers: 2 file(s), 0 top-level symbol(s)
+- Covers: 3 file(s), 0 top-level symbol(s)
+
 ### `routing/.codex.md`
 - Covers: 4 file(s), 0 top-level symbol(s)
+
 ### `routing/.copilot.md`
 - Covers: 10 file(s), 0 top-level symbol(s)
+
 ### `routing/.github.md`
 - Covers: 6 file(s), 0 top-level symbol(s)
+
 ### `routing/archived.md`
 - Covers: 35 file(s), 260 top-level symbol(s)
 - Note: 22 file(s) omitted from this catalog by its own size limit
+
 ### `routing/audit_results.md`
 - Covers: 16 file(s), 0 top-level symbol(s)
+
 ### `routing/config.md`
 - Covers: 1 file(s), 0 top-level symbol(s)
+
 ### `routing/contracts.md`
 - Covers: 4 file(s), 0 top-level symbol(s)
+
 ### `routing/core.md`
 - Covers: 25 file(s), 159 top-level symbol(s)
 - Note: 13 file(s) omitted from this catalog by its own size limit
+
 ### `routing/dev_tools.md`
 - Covers: 25 file(s), 144 top-level symbol(s)
 - Note: 7 file(s) omitted from this catalog by its own size limit
+
 ### `routing/docs.md`
 - Covers: 41 file(s), 0 top-level symbol(s)
 - Note: 11 file(s) omitted from this catalog by its own size limit
+
 ### `routing/domains.md`
 - Covers: 31 file(s), 165 top-level symbol(s)
 - Note: 15 file(s) omitted from this catalog by its own size limit
+
 ### `routing/graphify-out.md`
 - Covers: 5 file(s), 0 top-level symbol(s)
+
 ### `routing/mapping.md`
 - Covers: 5 file(s), 41 top-level symbol(s)
+
 ### `routing/other.md`
 - Covers: 14 file(s), 6 top-level symbol(s)
+
 ### `routing/policies.md`
 - Covers: 13 file(s), 0 top-level symbol(s)
+
 ### `routing/reference_revit_lookup.md`
 - Covers: 3 file(s), 0 top-level symbol(s)
+
 ### `routing/reference_revit_lookup_Descriptors.md`
 - Covers: 117 file(s), 0 top-level symbol(s)
 - Note: 89 file(s) omitted from this catalog by its own size limit
+
 ### `routing/runner.md`
 - Covers: 6 file(s), 55 top-level symbol(s)
+
 ### `routing/scripts.md`
 - Covers: 1 file(s), 2 top-level symbol(s)
+
 ### `routing/tests.md`
 - Covers: 107 file(s), 1411 top-level symbol(s)
 - Note: 96 file(s) omitted from this catalog by its own size limit
+
 ### `routing/tests_golden.md`
 - Covers: 2 file(s), 0 top-level symbol(s)
+
 ### `routing/tests_probes.md`
 - Covers: 1 file(s), 10 top-level symbol(s)
+
 ### `routing/tests_repo_context.md`
-- Covers: 15 file(s), 165 top-level symbol(s)
+- Covers: 15 file(s), 170 top-level symbol(s)
 - Note: 4 file(s) omitted from this catalog by its own size limit
+
 ### `routing/tests_revit.md`
 - Covers: 4 file(s), 11 top-level symbol(s)
+
 ### `routing/tools.md`
 - Covers: 49 file(s), 559 top-level symbol(s)
 - Note: 36 file(s) omitted from this catalog by its own size limit
+
 ### `routing/tools_archetype.md`
 - Covers: 19 file(s), 140 top-level symbol(s)
 - Note: 4 file(s) omitted from this catalog by its own size limit
+
 ### `routing/tools_bundle_analysis.md`
 - Covers: 19 file(s), 79 top-level symbol(s)
 - Note: 7 file(s) omitted from this catalog by its own size limit
+
 ### `routing/tools_compare_templates_stand-alone.md`
 - Covers: 2 file(s), 24 top-level symbol(s)
 
-_...and 8 more catalog(s) omitted from this index to stay within --routing-index-max-chars=6000. See `routing/routing_manifest.json` for the complete list._
+### `routing/tools_governance.md`
+- Covers: 1 file(s), 9 top-level symbol(s)
+
+### `routing/tools_join_key_discovery.md`
+- Covers: 3 file(s), 29 top-level symbol(s)
+
+### `routing/tools_label_synthesis.md`
+- Covers: 26 file(s), 141 top-level symbol(s)
+- Note: 11 file(s) omitted from this catalog by its own size limit
+
+### `routing/tools_lib.md`
+- Covers: 4 file(s), 37 top-level symbol(s)
+
+### `routing/tools_migration.md`
+- Covers: 5 file(s), 22 top-level symbol(s)
+
+### `routing/tools_patterns_analysis.md`
+- Covers: 4 file(s), 31 top-level symbol(s)
+
+### `routing/tools_probes.md`
+- Covers: 33 file(s), 633 top-level symbol(s)
+- Note: 21 file(s) omitted from this catalog by its own size limit
+
+### `routing/validators.md`
+- Covers: 1 file(s), 8 top-level symbol(s)

@@ -1,6 +1,6 @@
 # Routing catalog: `tools/label_synthesis`
 
-- Generated (UTC): 2026-08-22T05:05:18Z
+- Generated (UTC): 2026-08-22T05:44:02Z
 - Tool version: 0.1.0
 - Files covered: 26
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `f5c31f56b033647f17cf57d58ba06b001e89d4267d32522303a0f4daef3a06e6`

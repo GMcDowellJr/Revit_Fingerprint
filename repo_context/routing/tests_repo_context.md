@@ -1,9 +1,9 @@
 # Routing catalog: `tests/repo_context`
 
-- Generated (UTC): 2026-08-22T05:05:18Z
+- Generated (UTC): 2026-08-22T05:44:02Z
 - Tool version: 0.1.0
 - Files covered: 15
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `b2078f6c1e070fdaabb9bf8fb8dc9b51aeedec523a85431b254fd20392009f27`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `881286a2b17015ea45e85b43a1c274642215a15cf1ba4d9207c604df5b8b1a55`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/tests/conftest.py`
@@ -189,7 +189,7 @@
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
 - Purpose clues:
   - filename/path terms: test packet from request
-- Important symbols (30 total):
+- Important symbols (34 total):
   - `_scan` (function) — line 6
   - `_request` (function) — line 11
   - `_packet` (function) — line 17
@@ -199,23 +199,23 @@
   - `test_missing_selector_is_reported_but_other_selectors_still_processed` (function) — line 78
   - `test_strict_mode_aborts_on_any_unresolved_selector` (function) — line 93
   - `test_hard_budget_conflict_on_explicit_selector_aborts_without_partial_packet` (function) — line 106
-  - `test_explicit_selectors_beyond_max_files_is_a_hard_conflict_not_silent_drop` (function) — line 123
-  - `test_strict_mode_catches_unresolved_search_terms` (function) — line 145
-  - `test_invalid_schema_version_is_rejected_before_resolution` (function) — line 169
-  - `test_path_traversal_selector_is_rejected` (function) — line 182
-  - `test_search_term_matches_and_related_tests_are_included` (function) — line 194
-  - `test_line_selector_resolves_enclosing_symbol` (function) — line 212
-  - `test_stale_source_since_scan_withholds_excerpt` (function) — line 226
-  - `test_resolution_sidecar_json_is_written` (function) — line 241
-  - `test_whole_file_symbol_listing_is_charged_against_budget` (function) — line 256
-  - `test_search_terms_share_a_single_global_max_files_cap` (function) — line 285
-  - `test_invalid_regex_notices_are_charged_against_budget` (function) — line 308
-  - `test_graphify_peer_listing_respects_max_files` (function) — line 333
-  - `test_graphify_withheld_on_dirty_worktree_even_with_matching_commit` (function) — line 371
-  - `test_overlong_question_is_rejected` (function) — line 401
-  - `test_caller_callee_import_expansion_respects_max_files` (function) — line 419
-  - `_git_init_commit` (function) — line 447
-  - ... and 5 more (see python_symbols.csv)
+  - `test_expansion_never_preempts_a_later_explicit_selector` (function) — line 123
+  - `test_search_match_does_not_reserve_focus_file_slot_unless_rendered` (function) — line 169
+  - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence` (function) — line 191
+  - `test_explicit_selectors_beyond_max_files_is_a_hard_conflict_not_silent_drop` (function) — line 209
+  - `test_strict_mode_catches_unresolved_search_terms` (function) — line 231
+  - `test_invalid_schema_version_is_rejected_before_resolution` (function) — line 255
+  - `test_path_traversal_selector_is_rejected` (function) — line 268
+  - `test_search_term_matches_and_related_tests_are_included` (function) — line 280
+  - `test_line_selector_resolves_enclosing_symbol` (function) — line 298
+  - `test_stale_source_since_scan_withholds_excerpt` (function) — line 312
+  - `test_resolution_sidecar_json_is_written` (function) — line 327
+  - `test_whole_file_symbol_listing_is_charged_against_budget` (function) — line 342
+  - `test_explicit_file_excerpt_renders_before_optional_symbol_inventory` (function) — line 371
+  - `test_search_terms_share_a_single_global_max_files_cap` (function) — line 429
+  - `test_invalid_regex_notices_are_charged_against_budget` (function) — line 452
+  - `test_graphify_peer_listing_respects_max_files` (function) — line 477
+  - ... and 9 more (see python_symbols.csv)
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
@@ -223,22 +223,22 @@
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:46)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:47)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:51)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:430)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:431)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:437)`
-  - `test_explicit_selectors_beyond_max_files_is_a_hard_conflict_not_silent_drop (dev_tools/repo_context/tests/test_packet_from_request.py:133)`
-  - `test_explicit_selectors_beyond_max_files_is_a_hard_conflict_not_silent_drop (dev_tools/repo_context/tests/test_packet_from_request.py:134)`
-  - `test_explicit_selectors_beyond_max_files_is_a_hard_conflict_not_silent_drop (dev_tools/repo_context/tests/test_packet_from_request.py:139)`
-  - `test_graphify_peer_listing_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:341)`
-  - `test_graphify_peer_listing_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:351)`
-  - `test_graphify_peer_listing_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:352)`
-  - `test_graphify_peer_listing_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:358)`
-  - `test_graphify_withheld_on_dirty_worktree_even_with_matching_commit (dev_tools/repo_context/tests/test_packet_from_request.py:377)`
-  - `test_graphify_withheld_on_dirty_worktree_even_with_matching_commit (dev_tools/repo_context/tests/test_packet_from_request.py:388)`
-  - ... and 68 more (see python_calls.csv)
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:574)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:575)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:581)`
+  - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:198)`
+  - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:199)`
+  - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:204)`
+  - `test_expansion_never_preempts_a_later_explicit_selector (dev_tools/repo_context/tests/test_packet_from_request.py:134)`
+  - `test_expansion_never_preempts_a_later_explicit_selector (dev_tools/repo_context/tests/test_packet_from_request.py:137)`
+  - `test_expansion_never_preempts_a_later_explicit_selector (dev_tools/repo_context/tests/test_packet_from_request.py:145)`
+  - `test_expansion_never_preempts_a_later_explicit_selector (dev_tools/repo_context/tests/test_packet_from_request.py:153)`
+  - `test_expansion_never_preempts_a_later_explicit_selector (dev_tools/repo_context/tests/test_packet_from_request.py:161)`
+  - `test_explicit_file_excerpt_renders_before_optional_symbol_inventory (dev_tools/repo_context/tests/test_packet_from_request.py:383)`
+  - ... and 84 more (see python_calls.csv)
 - Related tests:
   - `dev_tools/repo_context/tests/test_packet_from_request.py`
-- Retrieval identity: sha256=`a4fda3dd0078cadb…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_packet_from_request.py`)
+- Retrieval identity: sha256=`8acce7f047ba4c75…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_packet_from_request.py`)
 
 ### `dev_tools/repo_context/tests/test_packets.py`
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))

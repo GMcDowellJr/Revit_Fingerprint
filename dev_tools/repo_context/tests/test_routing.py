@@ -117,22 +117,30 @@ def test_routing_catalog_splits_oversized_directory_by_subdirectory(repo, out):
 
 
 def test_routing_index_respects_max_chars(repo, out):
-    # One top-level directory per file forces one catalog per file, so the
-    # index's *catalog list* (not any single catalog's contents) is what
-    # has to be truncated to fit a small --routing-index-max-chars.
+    # One top-level directory per file forces one catalog per file. A
+    # small --routing-index-max-chars can no longer truncate the catalog
+    # *list* -- every catalog's bare entry must still appear -- so what
+    # gets dropped first is the richer per-catalog summary (roles/sample
+    # paths), and if even the bare listing doesn't fit, the index runs
+    # over budget with an explicit note rather than omitting any catalog.
     files = {f"dir_{i:02d}/mod.py": f"def f_{i}():\n    return {i}\n" for i in range(40)}
     write_files(repo, files)
 
-    _scan(repo, out)  # default budget: everything fits
+    _scan(repo, out)  # default budget: everything fits with full summaries
     full_index = (out / "routing" / "index.md").read_text(encoding="utf-8")
-    assert "omitted from this index" not in full_index
+    assert "exceeds --routing-index-max-chars" not in full_index
     assert full_index.count("### `routing/") == 40
+    assert "Roles present" in full_index
 
-    _scan(repo, out, ["--routing-index-max-chars", "3200", "--force"])
+    _scan(repo, out, ["--routing-index-max-chars", "500", "--force"])
     small_index = (out / "routing" / "index.md").read_text(encoding="utf-8")
-    assert "omitted from this index" in small_index
-    assert small_index.count("### `routing/") < 40
-    assert len(small_index) <= 3200 + 400  # small slack for the overflow note itself
+    # Regression: every catalog's name must still be discoverable, even
+    # though the index itself now runs well over the configured limit.
+    assert "omitted from this index" not in small_index
+    assert small_index.count("### `routing/") == 40
+    assert "Roles present" not in small_index  # richer summary dropped first
+    assert "exceeds --routing-index-max-chars" in small_index
+    assert len(small_index) > 500  # genuinely over budget, not silently truncated
 
 
 def test_routing_catalog_respects_max_catalog_chars(repo, out):

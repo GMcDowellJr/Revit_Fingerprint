@@ -1,9 +1,9 @@
 # Repository Overview: Revit_Fingerprint
 
-- Scan time (UTC): 2026-08-22T05:05:18Z
+- Scan time (UTC): 2026-08-22T05:44:02Z
 - Generator: repo_context.py v0.1.0
-- Total files considered: 669
-- Included: 669
+- Total files considered: 670
+- Included: 670
 - Excluded: 0
 
 ## Files by extension
@@ -19,11 +19,12 @@
 - `.dyn`: 2
 - `.yml`: 2
 - `.bak`: 1
+- `.lock`: 1
 
 ## Files by classification
 
 - python_source: 261
-- unsupported_text: 127
+- unsupported_text: 128
 - test: 125
 - documentation: 101
 - data: 44
