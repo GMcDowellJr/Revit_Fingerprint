@@ -107,8 +107,8 @@ dev_tools/repo_context/rc_manifest.py,rc_manifest.py,.py,python_source,6262,text
 dev_tools/repo_context/rc_overview.py,rc_overview.py,.py,python_source,10821,text,245,32060399c7e77ec5666cfefba044cb302be11c7a74f4fc9506f9ae45b122a614,true,,false,ok,no
 dev_tools/repo_context/rc_packet.py,rc_packet.py,.py,python_source,26566,text,582,51c343731f80f2f00655380005941aede6d2b78dd227f508388b25db02bc8c1c,true,,false,ok,no
 dev_tools/repo_context/rc_pyanalysis.py,rc_pyanalysis.py,.py,python_source,39565,text,814,6250793f1eacbfb100c0625912aa46d768bc18744bfb960af91342e2e0840f02,true,,false,ok,no
-dev_tools/repo_context/rc_request.py,rc_request.py,.py,python_source,61610,text,1201,523991ef4ebd1a10bc2dd1b35f7956c36be078362fffaf1203e4cefd40337091,true,,true,ok,no
-dev_tools/repo_context/rc_routing.py,rc_routing.py,.py,python_source,31886,text,664,0682c37190820d5ef2d43c42f53510842d289d64da431951399ac3e4d5c1f811,true,,false,ok,no
+dev_tools/repo_context/rc_request.py,rc_request.py,.py,python_source,63010,text,1221,6c748c6dae6fe757e70a4e79cf617c64dd69f78347f47fb2e3913ec88c0b6a25,true,,true,ok,no
+dev_tools/repo_context/rc_routing.py,rc_routing.py,.py,python_source,33093,text,688,c5d518e7937a16450d4ae44dc57c92ff253c3819ff56bce3858a87c6d5c138f6,true,,false,ok,no
 dev_tools/repo_context/rc_scan.py,rc_scan.py,.py,python_source,16378,text,384,6ebef0788146efcb2861f9e32a2e073dfe08249d096ec621e66ae7831ae89544,true,,false,ok,no
 dev_tools/repo_context/rc_tree.py,rc_tree.py,.py,python_source,2990,text,84,fcff5535df129fa55ba1f83e32324008bec54f77cea553a3a4d16f27d2dcc466,true,,false,ok,no
 dev_tools/repo_context/rc_validate.py,rc_validate.py,.py,python_source,12701,text,279,98473370de559b4fbf0627ec458a7a452d4b545e66fb4a2b71815cb12d311d5a,true,,false,ok,no
@@ -122,11 +122,11 @@ dev_tools/repo_context/tests/test_discover.py,test_discover.py,.py,test,9961,tex
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_imports_and_calls.py,.py,test,14788,text,409,cd362e7e743ddc74effe17973ff83c39cf748cc12bde5085edab2029ee34c868,true,,false,ok,no
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_inventory_and_exclusions.py,.py,test,4698,text,118,63056bc2fbc87bf725b2990cb0bfff4112adf006c289433da5483c2c2196af04,true,,false,ok,no
 dev_tools/repo_context/tests/test_large_file_cap.py,test_large_file_cap.py,.py,test,1152,text,27,b087219944d90cec15355c860f7b2673785afe7386bfc5ed2e5eedb922db26c6,true,,false,ok,no
-dev_tools/repo_context/tests/test_packet_from_request.py,test_packet_from_request.py,.py,test,58953,text,1154,759d9ce2ca0219228b05d56db69e1b045fd96066288de392f13f77203a94949c,true,,true,ok,no
+dev_tools/repo_context/tests/test_packet_from_request.py,test_packet_from_request.py,.py,test,63566,text,1243,30ed034adfbd24213b55c30a03d99cc5f8036eb9a7f7a36502023450b6d37a45,true,,true,ok,no
 dev_tools/repo_context/tests/test_packets.py,test_packets.py,.py,test,8408,text,209,0afd41f0794d37d2894122d22a24ca7d88913b134d303bc2f4753c54f99b4c7e,true,,false,ok,no
 dev_tools/repo_context/tests/test_python_symbols.py,test_python_symbols.py,.py,test,3125,text,98,e0662e729b61a221c252f594828066ff13102b540709dbc38ab96185e7035254,true,,false,ok,no
 dev_tools/repo_context/tests/test_request_validation.py,test_request_validation.py,.py,test,7567,text,214,84b3611bc48cafe522d23f18e121dc4c4386a0097b7ee98022643bb516e2f5eb,true,,false,ok,no
-dev_tools/repo_context/tests/test_routing.py,test_routing.py,.py,test,25321,text,498,5427cbd6031a4b9207ae5359a1bf655e9de7c32679e93a030d7a7099a785ddba,true,,false,ok,no
+dev_tools/repo_context/tests/test_routing.py,test_routing.py,.py,test,26584,text,520,8419d00fab1a5307c4d111af519a0cc47edd9285bd9bffc0b11b77c29f0f48e8,true,,false,ok,no
 dev_tools/repo_context/tests/test_safety.py,test_safety.py,.py,test,5776,text,137,fdb2725b37898da31788e202dce39f4b347e146f2a901837e794f4dd7c2d9984,true,,false,ok,no
 dev_tools/repo_context/tests/test_symlinks.py,test_symlinks.py,.py,test,4800,text,115,52a30fb823073bd5a5dd51eb3ecd8a4899ab3c551969bc7fb5c0cc6a707990a1,true,,false,ok,no
 dev_tools/repo_context/tests/test_validate.py,test_validate.py,.py,test,5769,text,154,a2f72254cf88e0e4af004b484186fc1dc1042fc80dbe2d21a613fcbfb3944d7b,true,,false,ok,no

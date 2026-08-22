@@ -5,7 +5,7 @@
 - Original line range: 517-715
 - Overlap lines with previous chunk: 0
 - Symbols fully or partially present: _render_excerpt_block, _symbol_expansion, _file_expansion
-- Source SHA-256: 523991ef4ebd1a10bc2dd1b35f7956c36be078362fffaf1203e4cefd40337091
+- Source SHA-256: 6c748c6dae6fe757e70a4e79cf617c64dd69f78347f47fb2e3913ec88c0b6a25
 - Starts inside symbol: no
 - Ends inside symbol: no
 

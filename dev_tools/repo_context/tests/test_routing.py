@@ -480,6 +480,28 @@ def test_markdown_title_redacts_before_truncating(repo, out):
     assert "REDACTED" in docs_text
 
 
+def test_catalog_filenames_are_capped_by_encoded_byte_length_not_char_count(repo, out):
+    # Regression: the filename length cap measured Python string length
+    # (Unicode code points), not encoded UTF-8 byte length. A partition
+    # key built from multi-byte characters (e.g. CJK, 3 bytes/char in
+    # UTF-8) could look comfortably under a 150-*character* cap while its
+    # actual UTF-8 encoding was 2-3x that many *bytes* -- the quantity a
+    # real filesystem's per-component name limit is actually measured in,
+    # so the write could still fail with OSError: File name too long
+    # despite passing the (character-counting) cap check.
+    segment = "模块" * 28  # 56 CJK characters -> 168 bytes in UTF-8:
+    # under a 150-*char* cap, over a 150-*byte* cap.
+    files = {f"{segment}/mod_{i}.py": f"def f_{i}():\n    return {i}\n" for i in range(61)}
+    write_files(repo, files)
+    _scan(repo, out, ["--routing-max-files-per-catalog", "30"])
+    manifest = _manifest(out)
+    assert manifest["catalogs"]
+    for cat in manifest["catalogs"]:
+        filename = cat["path"].rsplit("/", 1)[-1]
+        assert len(filename.encode("utf-8")) <= 150, f"catalog filename exceeds the byte cap: {filename!r}"
+        assert (out / cat["path"]).exists()
+
+
 def test_catalog_filenames_stay_within_filesystem_limits(repo, out):
     # Regression: an oversized partition split through several long
     # directory segments flattened its entire key ("/" -> "_") into a

@@ -1,6 +1,6 @@
 # Routing catalog: `tests/revit`
 
-- Generated (UTC): 2026-08-22T10:06:55Z
+- Generated (UTC): 2026-08-22T10:27:04Z
 - Tool version: 0.1.0
 - Files covered: 4
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `e97d1be96513e9cfafd064cce5b118e1af4244bebf62d142f3685c397cbb5760`

@@ -1,9 +1,9 @@
 # Routing catalog: `tests/repo_context`
 
-- Generated (UTC): 2026-08-22T10:06:55Z
+- Generated (UTC): 2026-08-22T10:27:04Z
 - Tool version: 0.1.0
 - Files covered: 15
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `22bf2ccf36cd876fc17e44998e43f5ddf9f6ccafd1e659433cf0bfa226640a27`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `15b013b38764fbd7e9ed20510831fb243ce3cc7c6508b6d6936794b8a80d44cb`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/tests/conftest.py`
@@ -199,7 +199,7 @@
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
 - Purpose clues:
   - filename/path terms: test packet from request
-- Important symbols (49 total):
+- Important symbols (51 total):
   - `_scan` (function) — line 8
   - `_request` (function) — line 13
   - `_packet` (function) — line 19
@@ -210,45 +210,45 @@
   - `test_strict_mode_aborts_on_any_unresolved_selector` (function) — line 95
   - `test_hard_budget_conflict_on_explicit_selector_aborts_without_partial_packet` (function) — line 108
   - `test_expansion_never_preempts_a_later_explicit_selector` (function) — line 125
-  - `test_search_match_does_not_reserve_focus_file_slot_unless_rendered` (function) — line 171
-  - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence` (function) — line 193
-  - `test_explicit_selectors_beyond_max_files_is_a_hard_conflict_not_silent_drop` (function) — line 211
-  - `test_strict_mode_catches_unresolved_search_terms` (function) — line 233
-  - `test_invalid_schema_version_is_rejected_before_resolution` (function) — line 257
-  - `test_path_traversal_selector_is_rejected` (function) — line 270
-  - `test_search_term_matches_and_related_tests_are_included` (function) — line 282
-  - `test_line_selector_resolves_enclosing_symbol` (function) — line 300
-  - `test_line_range_extending_past_enclosing_symbol_renders_in_full` (function) — line 314
-  - `test_enclosing_symbol_note_is_charged_against_budget` (function) — line 347
-  - `test_search_match_collection_is_capped` (function) — line 366
-  - `test_redacted_excerpt_is_charged_not_the_raw_source` (function) — line 381
-  - `test_regex_search_rejected_when_bounding_is_unsupported` (function) — line 425
-  - `test_aggregate_search_deadline_applies_to_literal_terms_too` (function) — line 442
-  - `test_search_match_redacts_before_truncating` (function) — line 459
-  - ... and 24 more (see python_symbols.csv)
+  - `test_search_match_does_not_reserve_focus_file_slot_unless_rendered` (function) — line 176
+  - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence` (function) — line 198
+  - `test_explicit_selectors_beyond_max_files_is_a_hard_conflict_not_silent_drop` (function) — line 216
+  - `test_strict_mode_catches_unresolved_search_terms` (function) — line 238
+  - `test_invalid_schema_version_is_rejected_before_resolution` (function) — line 262
+  - `test_path_traversal_selector_is_rejected` (function) — line 275
+  - `test_search_term_matches_and_related_tests_are_included` (function) — line 287
+  - `test_line_selector_resolves_enclosing_symbol` (function) — line 305
+  - `test_line_range_extending_past_enclosing_symbol_renders_in_full` (function) — line 319
+  - `test_enclosing_symbol_note_is_charged_against_budget` (function) — line 352
+  - `test_search_match_collection_is_capped` (function) — line 371
+  - `test_redacted_excerpt_is_charged_not_the_raw_source` (function) — line 386
+  - `test_regex_search_rejected_when_bounding_is_unsupported` (function) — line 430
+  - `test_aggregate_search_deadline_applies_to_literal_terms_too` (function) — line 447
+  - `test_search_match_redacts_before_truncating` (function) — line 464
+  - ... and 26 more (see python_symbols.csv)
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
-  - `test_aggregate_regex_search_time_is_capped_across_all_terms (dev_tools/repo_context/tests/test_packet_from_request.py:770)`
-  - `test_aggregate_search_deadline_applies_to_literal_terms_too (dev_tools/repo_context/tests/test_packet_from_request.py:452)`
+  - `test_aggregate_regex_search_time_is_capped_across_all_terms (dev_tools/repo_context/tests/test_packet_from_request.py:775)`
+  - `test_aggregate_search_deadline_applies_to_literal_terms_too (dev_tools/repo_context/tests/test_packet_from_request.py:457)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:48)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:49)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:53)`
-  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:898)`
-  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:899)`
-  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:906)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:971)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:972)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:978)`
-  - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:200)`
-  - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:201)`
+  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:903)`
+  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:904)`
+  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:911)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:976)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:977)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:983)`
+  - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:205)`
   - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:206)`
-  - `test_enclosing_symbol_note_is_charged_against_budget (dev_tools/repo_context/tests/test_packet_from_request.py:353)`
-  - ... and 124 more (see python_calls.csv)
+  - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:211)`
+  - `test_enclosing_symbol_note_is_charged_against_budget (dev_tools/repo_context/tests/test_packet_from_request.py:358)`
+  - ... and 129 more (see python_calls.csv)
 - Related tests:
   - `dev_tools/repo_context/tests/test_packet_from_request.py`
-- Retrieval identity: sha256=`759d9ce2ca021922…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_packet_from_request.py`)
+- Retrieval identity: sha256=`30ed034adfbd2421…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_packet_from_request.py`)
 
 ### `dev_tools/repo_context/tests/test_packets.py`
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))

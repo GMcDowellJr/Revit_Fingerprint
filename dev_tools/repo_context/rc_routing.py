@@ -100,8 +100,27 @@ def _partition_files(files_with_role: list, max_files: int) -> dict:
     return final
 
 
-_MAX_CATALOG_FILENAME_CHARS = 150  # well under typical filesystem name-length limits (~255 bytes),
-# leaving headroom for atomic_write_text's own temp-file suffix.
+_MAX_CATALOG_FILENAME_BYTES = 150  # well under typical filesystem name-length limits (~255 bytes,
+# which are themselves a byte count, not a character count), leaving headroom for
+# atomic_write_text's own temp-file suffix.
+
+
+def _byte_len(s: str) -> int:
+    return len(s.encode("utf-8"))
+
+
+def _truncate_to_byte_limit(s: str, max_bytes: int) -> str:
+    """Truncate `s` so its UTF-8 encoding is at most `max_bytes` long,
+    without splitting a multi-byte character in half (which would produce
+    a mangled/invalid filename component). A plain `s[:n]` slices by code
+    point, not by encoded byte -- for a multi-byte alphabet (e.g. CJK,
+    3 bytes/char in UTF-8) that undercounts real filesystem cost by up to
+    3x, so a filename that looked comfortably under the cap by character
+    count could still exceed the actual byte limit."""
+    encoded = s.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return s
+    return encoded[:max_bytes].decode("utf-8", errors="ignore")
 
 
 def _catalog_filenames(keys: list) -> dict:
@@ -117,21 +136,26 @@ def _catalog_filenames(keys: list) -> dict:
     partition split through several long directory segments (e.g. four
     70-character directory names) can otherwise flatten into a filename
     long enough to make the write itself fail with OSError: File name too
-    long, independent of whether it collides with anything."""
+    long, independent of whether it collides with anything. The cap is
+    measured and enforced in encoded UTF-8 *bytes*, not Python string
+    length (code points) -- filesystem name limits are a byte count, and
+    a partition key built from multi-byte characters (e.g. CJK path
+    segments) can look well under a character-count cap while its UTF-8
+    encoding is 2-3x that many bytes."""
     naive = {key: key.replace("/", "_") + ".md" for key in keys}
     by_filename: dict = defaultdict(list)
     for key, filename in naive.items():
         by_filename[filename].append(key)
     result = {}
     for filename, colliding_keys in by_filename.items():
-        if len(colliding_keys) == 1 and len(filename) <= _MAX_CATALOG_FILENAME_CHARS:
+        if len(colliding_keys) == 1 and _byte_len(filename) <= _MAX_CATALOG_FILENAME_BYTES:
             result[colliding_keys[0]] = filename
             continue
         for key in colliding_keys:
             flat = key.replace("/", "_")
             suffix = f"__{stable_path_id(key, length=6)}.md"
-            prefix_budget = max(1, _MAX_CATALOG_FILENAME_CHARS - len(suffix))
-            result[key] = f"{flat[:prefix_budget]}{suffix}"
+            prefix_budget_bytes = max(1, _MAX_CATALOG_FILENAME_BYTES - _byte_len(suffix))
+            result[key] = f"{_truncate_to_byte_limit(flat, prefix_budget_bytes)}{suffix}"
     return result
 
 

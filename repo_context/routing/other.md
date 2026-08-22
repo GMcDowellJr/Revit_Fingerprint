@@ -1,6 +1,6 @@
 # Routing catalog: `other`
 
-- Generated (UTC): 2026-08-22T10:06:55Z
+- Generated (UTC): 2026-08-22T10:27:04Z
 - Tool version: 0.1.0
 - Files covered: 14
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `a154ae69a12aefd39d04c0f7dc04d6c2176f8039e3724136b96dd11168041e02`

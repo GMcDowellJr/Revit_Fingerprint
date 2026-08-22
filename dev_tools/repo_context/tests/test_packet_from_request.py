@@ -135,14 +135,19 @@ def test_expansion_never_preempts_a_later_explicit_selector(repo, out):
     })
     _scan(repo, out)
 
-    # Establish the true no-expansion cost for both explicit symbols.
+    # Establish the true no-expansion cost for both explicit symbols. Use a
+    # generous budget for this measurement run -- the fixed framing
+    # (header/resolution-report/footer) is now reserved against the budget
+    # up front (see rc_request.py's "Reserve the fixed framing's budget
+    # cost up front"), so a too-tight value here would fail on framing
+    # alone rather than actually measuring the two symbols' cost.
     baseline_req = _request(out, "baseline.json", {
         "schema_version": "1.0", "question": "q",
         "selectors": {"files": [], "symbols": [{"name": "f", "file": "core/a.py"},
                                                  {"name": "g", "file": "core/b.py"}], "search_terms": [], "lines": []},
         "expansion": {"include_callers": False, "include_callees": False, "include_imports": False,
                       "include_related_tests": False},
-        "limits": {"max_estimated_tokens": 200, "max_files": 12},
+        "limits": {"max_estimated_tokens": 1000, "max_files": 12},
     })
     baseline_result = _packet(repo, out, baseline_req)
     assert baseline_result.returncode == 0, baseline_result.stderr
@@ -1152,3 +1157,87 @@ def test_name_override_controls_output_filename(repo, out):
     result = _packet(repo, out, req, extra=["--name", "custom_stem"])
     assert result.returncode == 0, result.stderr
     assert (out / "packets" / "packet_custom_stem.md").exists()
+
+
+def test_file_level_expansion_runs_for_a_symbol_free_selected_file(repo, out):
+    # Regression: the loop driving file-level expansion (imports/related-
+    # tests/Graphify peers) skipped straight past `_maybe_file_expansion()`
+    # whenever an explicitly selected file had no top-level symbols (e.g.
+    # an __init__.py re-export shim, or a plain module that only does
+    # imports at module scope). Since imports/related-tests describe the
+    # *file*, not any symbol in it, a symbol-free explicitly selected file
+    # previously got zero import/related-test expansion evidence even
+    # when include_imports/include_related_tests were explicitly on.
+    write_files(repo, {
+        "core/__init__.py": "from core.dep import helper\n",
+        "core/dep.py": "def helper():\n    return 1\n",
+    })
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["core/__init__.py"], "symbols": [], "search_terms": [], "lines": []},
+        "expansion": {"include_callers": False, "include_callees": False, "include_imports": True,
+                      "include_related_tests": False},
+        "limits": {"max_estimated_tokens": 12000, "max_files": 12},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert "Internal imports of `core/__init__.py`" in text
+    assert "core/dep.py" in text
+
+
+def test_fixed_framing_is_reserved_before_tier1_content_spends_budget(repo, out):
+    # Regression: the header/selector-resolution-report/footer were
+    # charged against the budget only *after* Tier-1 explicit-selector
+    # content had already been allowed to spend against the full,
+    # unreserved budget. That let a request's explicit content "fit" a
+    # budget that, once framing's real cost landed on top afterward, the
+    # packet's actual rendered size exceeded -- generation still reported
+    # success despite the true size being over limits.max_estimated_tokens.
+    # Framing must be reserved (and charged) first, so a too-tight budget
+    # now correctly surfaces as an explicit_conflicts abort instead of an
+    # over-budget "successful" packet.
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    _scan(repo, out)
+
+    def _gen(name, max_tokens):
+        req = _request(out, f"{name}.json", {
+            "schema_version": "1.0", "question": "q",
+            "selectors": {"files": ["core/a.py"], "symbols": [], "search_terms": [], "lines": []},
+            "expansion": {"include_callers": False, "include_callees": False, "include_imports": False,
+                          "include_related_tests": False},
+            "limits": {"max_estimated_tokens": max_tokens, "max_files": 12},
+        })
+        return rr.generate_packet_from_request(repo, out, req, name_override=name)
+
+    # Sanity-bound the binary search: a generous budget must succeed.
+    packet_path, _, err = _gen("hi", 2000)
+    assert packet_path is not None, err
+
+    lo, hi = 1, 2000
+    while lo < hi:
+        mid = (lo + hi) // 2
+        packet_path, _, _ = _gen(f"probe{mid}", mid)
+        if packet_path is not None:
+            hi = mid
+        else:
+            lo = mid + 1
+    min_success_tokens = hi
+
+    # At the smallest budget that still succeeds, the packet's own
+    # reported size must not exceed what was actually requested -- this
+    # is exactly the invariant framing-charged-too-late violated (it
+    # would report success here with estimated_tokens_used well above
+    # min_success_tokens, since Tier-1 content had already spent as if
+    # framing were free).
+    packet_path, _, err = _gen("boundary", min_success_tokens)
+    assert packet_path is not None, err
+    sidecar = json.loads((out / "packets" / "packet_boundary.resolution.json").read_text(encoding="utf-8"))
+    assert sidecar["estimated_tokens_used"] <= min_success_tokens
+
+    # One token below that boundary must hard-abort -- not silently
+    # succeed with a packet whose true size exceeds the requested cap.
+    packet_path, _, err = _gen("under", min_success_tokens - 1)
+    assert packet_path is None
+    assert "do not fit" in (err or "")

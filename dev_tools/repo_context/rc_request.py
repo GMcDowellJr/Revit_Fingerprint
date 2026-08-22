@@ -778,6 +778,77 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         focus_files.append(rel)
         return True
 
+    # --- Reserve the fixed framing's budget cost up front ---
+    # The header, the selector-resolution report, and the footer are
+    # essential, always-rendered provenance -- not optional content -- so
+    # none of them can be dropped to make room. But charging their cost
+    # only after Tier-1/Tier-2 content had already spent against the full,
+    # unreserved budget (as a prior version did) let Tier-1/Tier-2 content
+    # spend as if framing were free: a request could "succeed" with
+    # Tier-1 content that, combined with the framing charged on top
+    # afterward, made the packet's *actual* rendered size exceed
+    # limits.max_estimated_tokens even though generation reported success.
+    # Reserving framing's cost first means a too-tight budget now
+    # correctly surfaces as an explicit_conflicts abort (an explicit
+    # selector's excerpt no longer fits once framing's real cost is
+    # subtracted) instead of a "successful" packet whose true size is
+    # larger than what was requested.
+    git_info = get_git_info(root, exclude_paths=generated_output_exclude_paths(root, output_dir))
+    header_lines = [
+        "# Repo Context Packet (from packet_request.json)\n",
+        f"- Root: `{root.resolve().name}`",
+        f"- Question: {resolved.question}",
+        f"- schema_version: {resolved.schema_version}",
+        f"- Tool version: {TOOL_VERSION}",
+        f"- Request file: `{request_path.name}` (sha256: `{request_hash[:16]}…`)",
+    ]
+    if git_info.get("available"):
+        dirty = "dirty" if git_info.get("dirty") else ("clean" if git_info.get("dirty") is False else "unknown")
+        header_lines.append(f"- Repository revision: `{git_info['commit']}` ({dirty} worktree)")
+    else:
+        header_lines.append("- Repository revision: not available (not a git repository, or git is not installed)")
+    header_lines.append(
+        f"- Limits: max_estimated_tokens={resolved.max_estimated_tokens}, max_files={resolved.max_files}, "
+        f"max_hops={resolved.max_hops}"
+    )
+    budget.spend("\n".join(header_lines) + "\n", len(header_lines))
+
+    # The resolution report scales with the *request*, not the source
+    # repository (a request naming hundreds of missing/ambiguous
+    # selectors could otherwise render an unbounded report regardless of
+    # limits.max_estimated_tokens) -- charge it against the same budget as
+    # everything else, with a count-of-omitted note rather than an
+    # unbounded listing. The full, untruncated report is always available
+    # in the accompanying packet_<name>.resolution.json sidecar. Computed
+    # here (reserved up front, alongside the header) rather than after
+    # Tier-1/Tier-2 render, since it depends only on `all_resolutions`
+    # (already resolved above), not on anything Tier-1/Tier-2 produce.
+    resolution_lines = ["## Selector resolution report\n"]
+    omitted_selector_count = 0
+    for idx, r in enumerate(all_resolutions):
+        entry = [f"- {r.selector_type} `{r.requested}`: **{r.status}** — {r.detail}"]
+        entry.extend(f"  - candidate: `{c}`" for c in r.candidates)
+        entry_text = "\n".join(entry)
+        if not budget.allow(entry_text, len(entry)):
+            omitted_selector_count = len(all_resolutions) - idx
+            break
+        resolution_lines.extend(entry)
+        budget.spend(entry_text, len(entry))
+    if omitted_selector_count:
+        note = (f"- ... and {omitted_selector_count} more selector(s) omitted from this report (packet size "
+                f"limit reached); see the accompanying packet_*.resolution.json for the complete report.")
+        if budget.allow(note, 1):
+            resolution_lines.append(note)
+            budget.spend(note, 1)
+    resolution_lines.append("")
+
+    # Same fixed-framing reasoning as the header above -- always rendered
+    # in full, reserved up front so Tier-1/Tier-2 content can't spend
+    # against budget this footer will also need.
+    footer = ("\n_Static analysis only. Call/import relationships above are candidates, not proof of runtime "
+              "dispatch. See README.md in this output directory for full limitations._\n")
+    budget.spend(footer, 1)
+
     # --- Tier 1: explicit selectors (never silently dropped) ---
     # explicit_conflicts collects only "the explicit excerpt itself doesn't
     # fit the budget" -- a hard, must-be-reported-not-truncated conflict.
@@ -991,12 +1062,17 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
                          communities_by_file)
 
     for rel, top_level in file_expansion_items:
-        if not top_level:
-            # Matches the prior trigger condition -- a file with no
-            # top-level symbols never had its expansions rendered either.
-            continue
         for r in top_level:
             _symbol_expansion(r, calls_rows, resolved, budget, out, note_focus_file)
+        # File-level expansion (imports/related-tests/Graphify peers) must
+        # run for every explicitly selected file, not just ones with
+        # top-level symbols -- a symbol-free file (e.g. an __init__.py
+        # re-export shim, or a plain config module) previously never got
+        # its imports/related-tests/Graphify-peer expansion at all, since
+        # this loop used to skip straight past it when `top_level` was
+        # empty. Those expansions describe the file, not any symbol in
+        # it, so they apply regardless of whether the file happens to
+        # define any top-level symbols.
         _maybe_file_expansion(rel)
     for row in symbol_expansion_items:
         _symbol_expansion(row, calls_rows, resolved, budget, out, note_focus_file)
@@ -1099,69 +1175,13 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
 
     # (Unresolved/ambiguous selectors are reported once, in the "Selector
     # resolution report" section built into the header below -- not
-    # repeated here.)
+    # repeated here. header_lines/resolution_lines/footer were built and
+    # charged against the budget up front, before Tier-1/Tier-2 rendering
+    # -- see the "Reserve the fixed framing's budget cost up front"
+    # comment above.)
 
-    git_info = get_git_info(root, exclude_paths=generated_output_exclude_paths(root, output_dir))
-    header_lines = [
-        "# Repo Context Packet (from packet_request.json)\n",
-        f"- Root: `{root.resolve().name}`",
-        f"- Question: {resolved.question}",
-        f"- schema_version: {resolved.schema_version}",
-        f"- Tool version: {TOOL_VERSION}",
-        f"- Request file: `{request_path.name}` (sha256: `{request_hash[:16]}…`)",
-    ]
-    if git_info.get("available"):
-        dirty = "dirty" if git_info.get("dirty") else ("clean" if git_info.get("dirty") is False else "unknown")
-        header_lines.append(f"- Repository revision: `{git_info['commit']}` ({dirty} worktree)")
-    else:
-        header_lines.append("- Repository revision: not available (not a git repository, or git is not installed)")
-    header_lines.append(
-        f"- Limits: max_estimated_tokens={resolved.max_estimated_tokens}, max_files={resolved.max_files}, "
-        f"max_hops={resolved.max_hops}"
-    )
-    # This fixed framing (title/root/question/provenance/limits) always
-    # renders in full -- it's essential provenance, not optional content
-    # -- but it must still be *charged* against the budget so "Estimated
-    # tokens used" reflects the packet's true size. A `question` up to
-    # MAX_QUESTION_LENGTH (4000 chars) alone could otherwise make the
-    # actual packet many times larger than limits.max_estimated_tokens
-    # while the sidecar reported a number near zero.
-    budget.spend("\n".join(header_lines) + "\n", len(header_lines))
-
-    # The resolution report scales with the *request*, not the source
-    # repository (a request naming hundreds of missing/ambiguous
-    # selectors could otherwise render an unbounded report regardless of
-    # limits.max_estimated_tokens) -- charge it against the same budget
-    # as everything else, with a count-of-omitted note rather than an
-    # unbounded listing. The full, untruncated report is always available
-    # in the accompanying packet_<name>.resolution.json sidecar.
-    resolution_lines = ["## Selector resolution report\n"]
-    omitted_selector_count = 0
-    for idx, r in enumerate(all_resolutions):
-        entry = [f"- {r.selector_type} `{r.requested}`: **{r.status}** — {r.detail}"]
-        entry.extend(f"  - candidate: `{c}`" for c in r.candidates)
-        entry_text = "\n".join(entry)
-        if not budget.allow(entry_text, len(entry)):
-            omitted_selector_count = len(all_resolutions) - idx
-            break
-        resolution_lines.extend(entry)
-        budget.spend(entry_text, len(entry))
-    if omitted_selector_count:
-        note = (f"- ... and {omitted_selector_count} more selector(s) omitted from this report (packet size "
-                f"limit reached); see the accompanying packet_*.resolution.json for the complete report.")
-        if budget.allow(note, 1):
-            resolution_lines.append(note)
-            budget.spend(note, 1)
-    resolution_lines.append("")
-
-    # Same fixed-framing reasoning as the header above -- always rendered
-    # in full, but charged first so it's reflected in "Estimated tokens
-    # used" below rather than silently riding along uncounted.
-    footer = ("\n_Static analysis only. Call/import relationships above are candidates, not proof of runtime "
-              "dispatch. See README.md in this output directory for full limitations._\n")
-    budget.spend(footer, 1)
-
-    # Computed last so it reflects the resolution report's and footer's own budget spend too.
+    # Computed last so it reflects Tier-1/Tier-2's and the resolution
+    # report's/footer's own budget spend too.
     header_lines.append(
         f"- Estimated tokens used: ~{round(budget.chars_used / 4)} "
         f"(chars_used={budget.chars_used}/{budget.max_characters})\n"

@@ -5,7 +5,7 @@
 - Original line range: 1-516
 - Overlap lines with previous chunk: 0
 - Symbols fully or partially present: RequestError, ResolvedRequest, _is_safe_repo_relative_path, validate_request_dict, parse_and_validate_request, SelectorResolution, resolve_files, resolve_symbols, resolve_lines, _scan_term_matches, _RegexSearchTimeout, _raise_regex_timeout, _scan_term_matches_bounded, resolve_search_terms, _render_origin_header
-- Source SHA-256: 523991ef4ebd1a10bc2dd1b35f7956c36be078362fffaf1203e4cefd40337091
+- Source SHA-256: 6c748c6dae6fe757e70a4e79cf617c64dd69f78347f47fb2e3913ec88c0b6a25
 - Starts inside symbol: no
 - Ends inside symbol: no
 
