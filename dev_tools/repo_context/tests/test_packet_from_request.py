@@ -530,11 +530,11 @@ def test_graphify_peer_listing_respects_max_files(repo, out):
     sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
     assert sidecar["focus_files"] == ["core/a.py"]
     text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
-    # core/b.py is legitimately named in the omission explanation -- it
-    # must never appear as a rendered, [origin: graphify_expansion]-tagged
-    # evidence item.
+    # core/b.py must never appear as a rendered, [origin:
+    # graphify_expansion]-tagged evidence item -- it's beyond
+    # limits.max_files, reported only via the batched omission note.
     assert "[origin: graphify_expansion]" not in text
-    assert "Graphify community peer `core/b.py`" in text
+    assert "Graphify community peer(s)" in text
     assert "limits.max_files" in text
 
 
@@ -596,6 +596,63 @@ def test_graphify_not_withheld_for_dirtiness_confined_to_output_dir(repo):
     assert result.returncode == 0, result.stderr
     text = (output_dir / "packets" / "packet_req.md").read_text(encoding="utf-8")
     assert "worktree is dirty" not in text
+
+
+def test_callee_expansion_continues_past_a_rejected_file(repo, out):
+    # Regression: the callee-expansion loop `break`-ed the whole listing
+    # on the first callee whose file was beyond limits.max_files, even
+    # though a *later* callee might be in a file already in focus_files
+    # (free -- no new slot needed). `f`'s first callee `g` lives in a
+    # different, not-yet-focused file; its second callee `h` lives in the
+    # same file as `f` itself (already focused, since that's the selected
+    # symbol's own file). With max_files:1, `g` must be skipped but `h`
+    # must still render -- not silently dropped along with it.
+    write_files(repo, {
+        "core/a.py": "from core.other import g\n\n\ndef h():\n    return 1\n\n\ndef f():\n    g()\n    h()\n    return 1\n",
+        "core/other.py": "def g():\n    return 2\n",
+    })
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [{"name": "f", "file": "core/a.py"}], "search_terms": [], "lines": []},
+        "expansion": {"include_callers": False, "include_callees": True, "include_imports": False,
+                      "include_related_tests": False, "include_graphify": False},
+        "limits": {"max_files": 1},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert "-> `h`" in text  # the already-focused-file callee must still render
+    assert "core/other.py" not in text  # the beyond-max_files callee stays omitted
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+    assert sidecar["focus_files"] == ["core/a.py"]
+
+
+def test_search_term_matches_continue_past_a_rejected_file(repo, out):
+    # Regression: the search-match loop `break`-ed on the first match
+    # whose file was beyond limits.max_files, even though a *later* match
+    # (for the same term) might be in a file already in focus_files. With
+    # `z/main.py` explicitly selected and `needle_term` matching both
+    # `a/other.py` (scanned first, alphabetically) and `z/main.py`
+    # (already focused), max_files:1 must still render the z/main.py
+    # match instead of losing both to the first rejection.
+    write_files(repo, {
+        "a/other.py": "# needle_term\n",
+        "z/main.py": "# needle_term\n",
+    })
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["z/main.py"], "symbols": [], "search_terms": ["needle_term"], "lines": []},
+        "limits": {"max_files": 1},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert "z/main.py:1" in text
+    assert "a/other.py" not in text
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+    assert sidecar["focus_files"] == ["z/main.py"]
 
 
 def test_overlong_question_is_rejected(repo, out):
@@ -758,7 +815,7 @@ def test_related_test_expansion_respects_global_max_files(repo, out):
     sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
     assert sidecar["focus_files"] == ["core/a.py"]
     text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
-    assert "omitted: limits.max_files" in text
+    assert "beyond limits.max_files" in text
 
 
 def test_name_override_controls_output_filename(repo, out):

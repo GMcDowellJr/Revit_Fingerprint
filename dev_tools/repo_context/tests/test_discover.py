@@ -112,6 +112,41 @@ def test_discover_stopword_only_question_writes_no_draft(repo, out):
     assert "packet --request" in report_text
 
 
+def test_discover_draft_symbol_selectors_include_the_resolved_file(repo, out):
+    # Regression: the draft's symbol selectors dropped the resolved
+    # `file`, keeping only `{"name": qn}`. A qualified name that appears
+    # in more than one file (e.g. two top-level `build()` functions) then
+    # produced two *identical* draft selectors, and `packet --request`
+    # reported both as ambiguous instead of retrieving either -- even
+    # though discovery itself had already resolved which file each match
+    # came from.
+    write_files(repo, {
+        "core/build_a.py": "def build():\n    return 1\n",
+        "core/build_b.py": "def build():\n    return 2\n",
+    })
+    _scan(repo, out)
+    result = run_tool([
+        "discover", str(repo), "--output", str(out), "--question", "How does build work?",
+    ])
+    assert result.returncode == 0, result.stderr
+    [request_path] = list((out / "packets").glob("discover_*.packet_request.json"))
+    draft = json.loads(request_path.read_text(encoding="utf-8"))
+    symbols = draft["selectors"]["symbols"]
+    assert len(symbols) == 2
+    assert all("file" in s for s in symbols)
+    assert {s["file"] for s in symbols} == {"core/build_a.py", "core/build_b.py"}
+
+    # And each must actually resolve (not "ambiguous") when run through
+    # `packet`, since the `file` qualifier disambiguates it.
+    result2 = run_tool(["packet", str(repo), "--output", str(out), "--request", str(request_path)])
+    assert result2.returncode == 0, result2.stderr
+    [sidecar_path] = list((out / "packets").glob("packet_*.resolution.json"))
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    symbol_resolutions = [r for r in sidecar["resolution_report"] if r["selector_type"] == "symbol"]
+    assert len(symbol_resolutions) == 2
+    assert all(r["status"] == "resolved" for r in symbol_resolutions)
+
+
 def test_discover_max_per_channel_truncates_with_count(repo, out):
     files = {f"tools/thing_needle_{i}.py": f"def f_{i}():\n    return {i}\n" for i in range(10)}
     write_files(repo, files)

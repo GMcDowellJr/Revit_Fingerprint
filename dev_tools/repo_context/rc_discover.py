@@ -163,7 +163,13 @@ def run_discover(root: Path, output_dir: Path, question: str, max_per_channel: i
     lines.append("")
 
     draft_files = [p for p, _ in path_matches[:5]]
-    draft_symbols = [{"name": qn} for _, qn, _, _ in symbol_matches[:5]]
+    # Include the resolved `file` for each symbol -- discovery already
+    # knows which specific file each match came from (symbol_matches'
+    # first element), and dropping it here made a name that appears in
+    # multiple files (e.g. `build`) generate duplicate {"name": "build"}
+    # selectors that `packet --request` then reports as ambiguous, even
+    # though discovery had already disambiguated them.
+    draft_symbols = [{"name": qn, "file": file} for file, qn, _, _ in symbol_matches[:5]]
     draft_search_terms = terms[:5]
     has_usable_selectors = bool(draft_files or draft_symbols or draft_search_terms)
 

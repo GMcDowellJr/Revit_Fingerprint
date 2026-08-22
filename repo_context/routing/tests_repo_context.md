@@ -1,9 +1,9 @@
 # Routing catalog: `tests/repo_context`
 
-- Generated (UTC): 2026-08-22T06:02:15Z
+- Generated (UTC): 2026-08-22T06:08:45Z
 - Tool version: 0.1.0
 - Files covered: 15
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `22898055ba377437adb68c1abdbfe7f361ee5da6317b87030874765c493edbca`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `cf69da7bbef0dd0564348f6321b8b55465d841f61f827b26b2d9afb8b2c3c9e2`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/tests/conftest.py`
@@ -76,25 +76,27 @@
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
 - Purpose clues:
   - filename/path terms: test discover
-- Important symbols (6 total):
+- Important symbols (7 total):
   - `_scan` (function) — line 6
   - `test_discover_groups_matches_by_channel_and_writes_draft_request` (function) — line 11
   - `test_discover_output_feeds_directly_into_packet_request` (function) — line 47
   - `test_discover_preserves_case_of_mixed_case_identifiers` (function) — line 66
   - `test_discover_stopword_only_question_writes_no_draft` (function) — line 95
-  - `test_discover_max_per_channel_truncates_with_count` (function) — line 115
+  - `test_discover_draft_symbol_selectors_include_the_resolved_file` (function) — line 115
+  - `test_discover_max_per_channel_truncates_with_count` (function) — line 150
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
+  - `test_discover_draft_symbol_selectors_include_the_resolved_file (dev_tools/repo_context/tests/test_discover.py:127)`
   - `test_discover_groups_matches_by_channel_and_writes_draft_request (dev_tools/repo_context/tests/test_discover.py:18)`
-  - `test_discover_max_per_channel_truncates_with_count (dev_tools/repo_context/tests/test_discover.py:118)`
+  - `test_discover_max_per_channel_truncates_with_count (dev_tools/repo_context/tests/test_discover.py:153)`
   - `test_discover_output_feeds_directly_into_packet_request (dev_tools/repo_context/tests/test_discover.py:54)`
   - `test_discover_preserves_case_of_mixed_case_identifiers (dev_tools/repo_context/tests/test_discover.py:76)`
   - `test_discover_stopword_only_question_writes_no_draft (dev_tools/repo_context/tests/test_discover.py:103)`
 - Related tests:
   - `dev_tools/repo_context/tests/test_discover.py`
-- Retrieval identity: sha256=`586166ff779d7e26…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_discover.py`)
+- Retrieval identity: sha256=`7318f5d5e50995ac…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_discover.py`)
 
 ### `dev_tools/repo_context/tests/test_imports_and_calls.py`
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
@@ -193,7 +195,7 @@
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
 - Purpose clues:
   - filename/path terms: test packet from request
-- Important symbols (36 total):
+- Important symbols (38 total):
   - `_scan` (function) — line 7
   - `_request` (function) — line 12
   - `_packet` (function) — line 18
@@ -219,7 +221,7 @@
   - `test_search_terms_share_a_single_global_max_files_cap` (function) — line 430
   - `test_invalid_regex_notices_are_charged_against_budget` (function) — line 453
   - `test_pathological_regex_search_term_times_out_instead_of_hanging` (function) — line 478
-  - ... and 11 more (see python_symbols.csv)
+  - ... and 13 more (see python_symbols.csv)
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
@@ -227,22 +229,22 @@
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:47)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:48)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:52)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:630)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:631)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:637)`
+  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:614)`
+  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:615)`
+  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:622)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:687)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:688)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:694)`
   - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:199)`
   - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:200)`
   - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:205)`
   - `test_expansion_never_preempts_a_later_explicit_selector (dev_tools/repo_context/tests/test_packet_from_request.py:135)`
   - `test_expansion_never_preempts_a_later_explicit_selector (dev_tools/repo_context/tests/test_packet_from_request.py:138)`
   - `test_expansion_never_preempts_a_later_explicit_selector (dev_tools/repo_context/tests/test_packet_from_request.py:146)`
-  - `test_expansion_never_preempts_a_later_explicit_selector (dev_tools/repo_context/tests/test_packet_from_request.py:154)`
-  - `test_expansion_never_preempts_a_later_explicit_selector (dev_tools/repo_context/tests/test_packet_from_request.py:162)`
-  - `test_explicit_file_excerpt_renders_before_optional_symbol_inventory (dev_tools/repo_context/tests/test_packet_from_request.py:384)`
-  - ... and 89 more (see python_calls.csv)
+  - ... and 95 more (see python_calls.csv)
 - Related tests:
   - `dev_tools/repo_context/tests/test_packet_from_request.py`
-- Retrieval identity: sha256=`7903d338eb9d625b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_packet_from_request.py`)
+- Retrieval identity: sha256=`bc788ad273244394…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_packet_from_request.py`)
 
 ### `dev_tools/repo_context/tests/test_packets.py`
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
@@ -305,32 +307,13 @@
   - `dev_tools/repo_context/tests/test_python_symbols.py`
 - Retrieval identity: sha256=`e0662e729b61a221…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_python_symbols.py`)
 
-### `dev_tools/repo_context/tests/test_symlinks.py`
-- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
-- Purpose clues:
-  - filename/path terms: test symlinks
-- Important symbols (6 total):
-  - `test_symlink_escaping_root_is_excluded` (function) — line 13
-  - `test_file_symlink_escaping_root_is_excluded_without_being_read` (function) — line 36
-  - `test_symlink_cycle_inside_root_does_not_hang` (function) — line 53
-  - `test_symlink_pointing_at_output_dir_is_excluded` (function) — line 62
-  - `test_symlink_into_output_subdirectory_is_excluded` (function) — line 84
-  - `test_fifo_directly_under_root_does_not_hang` (function) — line 103
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`52a30fb823073bd5…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_symlinks.py`)
-
 ## Omitted from this catalog (size limit reached)
 
-4 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
+5 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
 
 - `dev_tools/repo_context/tests/test_request_validation.py`
 - `dev_tools/repo_context/tests/test_routing.py`
 - `dev_tools/repo_context/tests/test_safety.py`
+- `dev_tools/repo_context/tests/test_symlinks.py`
 - `dev_tools/repo_context/tests/test_validate.py`
 

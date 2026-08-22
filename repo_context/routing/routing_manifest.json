@@ -229,7 +229,7 @@
         "dev_tools/repo_context/examples/packet_request.invalid_ambiguous_line_range.json",
         "dev_tools/repo_context/examples/packet_request.invalid_empty_selectors.json"
       ],
-      "source_hash": "70e1f17e978f142f42e77eef30c46ca9f80806e017dc8d8082dcc4c834311734",
+      "source_hash": "4a39c0287ad42fe757441f015dc1ac7124891febcdbaa3b1ad5db5e06ee1033d",
       "symbol_count": 149
     },
     {
@@ -668,11 +668,12 @@
     {
       "file_count": 15,
       "key": "tests/repo_context",
-      "omitted_file_count": 4,
+      "omitted_file_count": 5,
       "omitted_paths": [
         "dev_tools/repo_context/tests/test_request_validation.py",
         "dev_tools/repo_context/tests/test_routing.py",
         "dev_tools/repo_context/tests/test_safety.py",
+        "dev_tools/repo_context/tests/test_symlinks.py",
         "dev_tools/repo_context/tests/test_validate.py"
       ],
       "path": "routing/tests_repo_context.md",
@@ -684,8 +685,8 @@
         "dev_tools/repo_context/tests/test_chunking.py",
         "dev_tools/repo_context/tests/test_determinism_incremental.py"
       ],
-      "source_hash": "22898055ba377437adb68c1abdbfe7f361ee5da6317b87030874765c493edbca",
-      "symbol_count": 174
+      "source_hash": "cf69da7bbef0dd0564348f6321b8b55465d841f61f827b26b2d9afb8b2c3c9e2",
+      "symbol_count": 177
     },
     {
       "file_count": 4,
@@ -1001,14 +1002,14 @@
       "symbol_count": 8
     }
   ],
-  "generated_at_utc": "2026-08-22T06:02:15Z",
+  "generated_at_utc": "2026-08-22T06:08:45Z",
   "git": {
     "available": true,
-    "commit": "4fa815c1859e12d091438269d6b0777893f8343f",
+    "commit": "0e2e08aa53087bfef76417a862dc040c7a837a3d",
     "dirty": true
   },
   "graphify_warnings": [
-    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 4fa815c1859e; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
+    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 0e2e08aa5308; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
   ],
   "options": {
     "allow_stale_graphify": false,
@@ -1017,6 +1018,6 @@
     "max_index_chars": 10000,
     "max_symbols_per_file_entry": 25
   },
-  "source_manifest_hash": "832a09c8df4625e5d73a76fa6f51e8e42d3c997e52255010bc7ba6e4aa3e82ca",
+  "source_manifest_hash": "6bab822e4cbbe07990d4d8e629b88439b35fd4711b746154f4fa55582278c597",
   "tool_version": "0.1.0"
 }

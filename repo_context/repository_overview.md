@@ -1,6 +1,6 @@
 # Repository Overview: Revit_Fingerprint
 
-- Scan time (UTC): 2026-08-22T06:02:15Z
+- Scan time (UTC): 2026-08-22T06:08:45Z
 - Generator: repo_context.py v0.1.0
 - Total files considered: 670
 - Included: 670
@@ -210,7 +210,7 @@ _Derived only from file classification counts in each top-level directory; not a
 - script_powershell: tools
 - python_source: (repository root), core, dev_tools, domains, legacy, mapping, runner, scripts, tools, validators
 
-## Unusually large or structurally complex Python modules (182)
+## Unusually large or structurally complex Python modules (183)
 
 _Heuristic only: line count > 800 or any symbol with approximate cyclomatic complexity > 15._
 
@@ -228,6 +228,6 @@ _Heuristic only: line count > 800 or any symbol with approximate cyclomatic comp
 - `core/vg_sig.py` — 462 lines, max symbol complexity ~18
 - `dev_tools/repo_context/rc_chunking.py` — 202 lines, max symbol complexity ~24
 - `dev_tools/repo_context/rc_classify.py` — 182 lines, max symbol complexity ~21
-- `dev_tools/repo_context/rc_discover.py` — 213 lines, max symbol complexity ~49
-- ... and 167 more
+- `dev_tools/repo_context/rc_discover.py` — 219 lines, max symbol complexity ~49
+- ... and 168 more
 
