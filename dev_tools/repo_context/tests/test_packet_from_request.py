@@ -286,6 +286,54 @@ def test_include_graphify_expansion_lists_revision_aligned_community_peers(repo,
     assert "core/b.py" in text
 
 
+def test_selector_resolution_report_is_charged_against_budget(repo, out):
+    # Regression: the "Selector resolution report" section (one entry per
+    # requested selector, however many) was appended without any budget
+    # accounting, so a request naming hundreds of missing/ambiguous
+    # selectors could produce a large packet while reporting ~0 estimated
+    # tokens used under a tiny limits.max_estimated_tokens.
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    _scan(repo, out)
+    missing_files = [f"missing_{i}.py" for i in range(200)]
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": missing_files, "symbols": [], "search_terms": [], "lines": []},
+        "limits": {"max_estimated_tokens": 1, "max_files": 500},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    # With a 4-character budget, almost nothing should have rendered --
+    # certainly not a full 200-entry resolution report.
+    assert len(text) < 2000
+    assert text.count("missing_") < 200
+    assert "Estimated tokens used: ~0" in text
+
+
+def test_related_test_expansion_respects_global_max_files(repo, out):
+    # Regression: related-test expansion appended directly to focus_files
+    # under a hard-coded 10,000 ceiling instead of going through the same
+    # note_focus_file() gate as every other tier, so it could silently
+    # exceed limits.max_files.
+    write_files(repo, {
+        "core/a.py": "def f():\n    return 1\n",
+        "tests/test_a.py": "from core.a import f\n\n\ndef test_f():\n    assert f() == 1\n",
+    })
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["core/a.py"], "symbols": [], "search_terms": [], "lines": []},
+        "expansion": {"include_related_tests": True},
+        "limits": {"max_estimated_tokens": 12000, "max_files": 1},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+    assert sidecar["focus_files"] == ["core/a.py"]
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert "omitted: limits.max_files" in text
+
+
 def test_name_override_controls_output_filename(repo, out):
     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
     _scan(repo, out)

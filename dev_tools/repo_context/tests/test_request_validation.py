@@ -154,6 +154,39 @@ def test_parse_and_validate_request_rejects_malformed_json():
     assert any("not valid JSON" in e for e in errors)
 
 
+def test_non_string_schema_version_is_rejected_not_a_crash():
+    # Regression: `version not in SUPPORTED_SCHEMA_VERSIONS` (a set) raises
+    # TypeError on an unhashable value (list/dict) instead of returning a
+    # normal validation error.
+    data = _valid_base()
+    data["schema_version"] = ["1.0"]
+    errors = rr.validate_request_dict(data)
+    assert any("must be a string" in e for e in errors)
+
+    data["schema_version"] = {"version": "1.0"}
+    errors = rr.validate_request_dict(data)
+    assert any("must be a string" in e for e in errors)
+
+
+def test_boolean_line_value_is_rejected():
+    # Regression: bool is a subclass of int in Python, so `"line": true`
+    # previously passed isinstance(..., int) and was silently treated as
+    # line 1.
+    data = _valid_base()
+    data["selectors"] = {"files": [], "symbols": [], "search_terms": [],
+                          "lines": [{"file": "a/b.py", "line": True}]}
+    errors = rr.validate_request_dict(data)
+    assert any("must be a positive integer" in e for e in errors)
+
+
+def test_boolean_end_line_value_is_rejected():
+    data = _valid_base()
+    data["selectors"] = {"files": [], "symbols": [], "search_terms": [],
+                          "lines": [{"file": "a/b.py", "line": 1, "end_line": False}]}
+    errors = rr.validate_request_dict(data)
+    assert any("end_line" in e and "must be a positive integer" in e for e in errors)
+
+
 def test_parse_and_validate_request_applies_defaults():
     resolved, errors = rr.parse_and_validate_request(json.dumps(_valid_base()))
     assert errors == []

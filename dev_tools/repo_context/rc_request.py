@@ -92,6 +92,12 @@ def validate_request_dict(data: dict) -> list:
     version = data.get("schema_version")
     if version is None:
         errors.append("missing required field: schema_version")
+    elif not isinstance(version, str):
+        # `in SUPPORTED_SCHEMA_VERSIONS` (a set) raises TypeError on an
+        # unhashable value (a list/dict) -- check the type explicitly
+        # first so malformed-but-valid JSON is reported as a normal
+        # validation error instead of crashing the CLI.
+        errors.append(f"'schema_version' must be a string, got {type(version).__name__}")
     elif version not in SUPPORTED_SCHEMA_VERSIONS:
         errors.append(f"unsupported schema_version: {version!r} (supported: {sorted(SUPPORTED_SCHEMA_VERSIONS)})")
 
@@ -154,13 +160,21 @@ def validate_request_dict(data: dict) -> list:
                     errors.append(f"'selectors.lines[{i}]' has unknown field(s): {sorted(extra)}")
                 if not isinstance(ln["file"], str) or not _is_safe_repo_relative_path(ln["file"]):
                     errors.append(f"'selectors.lines[{i}].file' is not a safe repo-relative path: {ln.get('file')!r}")
-                if not isinstance(ln.get("line"), int) or ln["line"] < 1:
+                # bool is a subclass of int in Python (isinstance(True, int) is
+                # True), so `"line": true` would otherwise pass as line 1 --
+                # JSON Schema (and this contract) does not treat booleans as
+                # integers, so exclude them explicitly.
+                line_val = ln.get("line")
+                line_ok = isinstance(line_val, int) and not isinstance(line_val, bool)
+                if not line_ok or line_val < 1:
                     errors.append(f"'selectors.lines[{i}].line' must be a positive integer")
                 if "end_line" in ln:
-                    if not isinstance(ln["end_line"], int) or ln["end_line"] < 1:
+                    end_val = ln["end_line"]
+                    end_ok = isinstance(end_val, int) and not isinstance(end_val, bool)
+                    if not end_ok or end_val < 1:
                         errors.append(f"'selectors.lines[{i}].end_line' must be a positive integer")
-                    elif isinstance(ln.get("line"), int) and ln["end_line"] < ln["line"]:
-                        errors.append(f"'selectors.lines[{i}].end_line' ({ln['end_line']}) is before 'line' ({ln['line']})")
+                    elif line_ok and end_val < line_val:
+                        errors.append(f"'selectors.lines[{i}].end_line' ({end_val}) is before 'line' ({line_val})")
 
         if isinstance(selectors, dict) and not any(selectors.get(k) for k in allowed_sel):
             errors.append("'selectors' must contain at least one non-empty selector list "
@@ -350,7 +364,7 @@ def _render_excerpt_block(root: Path, rel_path: str, start: int, end: int, budge
 
 
 def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_path: dict,
-                       req: ResolvedRequest, budget: Budget, out: list, focus_files: list,
+                       req: ResolvedRequest, budget: Budget, out: list, note_focus_file,
                        communities_by_file: Optional[dict] = None) -> None:
     rel, qn = row["relative_path"], row["qualified_name"]
 
@@ -407,12 +421,19 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
             if budget.allow(header, 1):
                 out.append(header); budget.spend(header, 1)
                 for t in tests:
+                    if not note_focus_file(t):
+                        # Route through the same global-focus-file gate as
+                        # every other tier -- a hard-coded high ceiling here
+                        # would let related-test expansion silently bypass
+                        # limits.max_files.
+                        budget.omissions.append(
+                            f"Related test `{t}` for `{rel}` omitted: limits.max_files ({req.max_files}) reached."
+                        )
+                        break
                     line = f"- `{t}`"
                     if not budget.allow(line, 1):
                         break
                     out.append(line); budget.spend(line, 1)
-                    if t not in focus_files and len(focus_files) < 10_000:
-                        focus_files.append(t)
 
     if req.include_graphify and communities_by_file:
         my_communities = communities_by_file.get(rel, [])
@@ -551,7 +572,7 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             if status == "too_large":
                 explicit_conflicts.append(f"explicit file selector `{rel}` ({line_count} lines) does not fit")
         for r in top_level:
-            _symbol_expansion(r, calls_rows, imports_rows, files_by_path, resolved, budget, out, focus_files,
+            _symbol_expansion(r, calls_rows, imports_rows, files_by_path, resolved, budget, out, note_focus_file,
                               communities_by_file)
 
     for res in symbol_resolutions:
@@ -567,7 +588,7 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
                                         files_by_path.get(rel, {}).get("sha256", ""))
         if status == "too_large":
             explicit_conflicts.append(f"explicit symbol selector `{row['qualified_name']}` in `{rel}` does not fit")
-        _symbol_expansion(row, calls_rows, imports_rows, files_by_path, resolved, budget, out, focus_files,
+        _symbol_expansion(row, calls_rows, imports_rows, files_by_path, resolved, budget, out, note_focus_file,
                           communities_by_file)
 
     for res in line_resolutions:
@@ -677,16 +698,39 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         f"- Limits: max_estimated_tokens={resolved.max_estimated_tokens}, max_files={resolved.max_files}, "
         f"max_hops={resolved.max_hops}"
     )
+
+    # The resolution report scales with the *request*, not the source
+    # repository (a request naming hundreds of missing/ambiguous
+    # selectors could otherwise render an unbounded report regardless of
+    # limits.max_estimated_tokens) -- charge it against the same budget
+    # as everything else, with a count-of-omitted note rather than an
+    # unbounded listing. The full, untruncated report is always available
+    # in the accompanying packet_<name>.resolution.json sidecar.
+    resolution_lines = ["## Selector resolution report\n"]
+    omitted_selector_count = 0
+    for idx, r in enumerate(all_resolutions):
+        entry = [f"- {r.selector_type} `{r.requested}`: **{r.status}** — {r.detail}"]
+        entry.extend(f"  - candidate: `{c}`" for c in r.candidates)
+        entry_text = "\n".join(entry)
+        if not budget.allow(entry_text, len(entry)):
+            omitted_selector_count = len(all_resolutions) - idx
+            break
+        resolution_lines.extend(entry)
+        budget.spend(entry_text, len(entry))
+    if omitted_selector_count:
+        note = (f"- ... and {omitted_selector_count} more selector(s) omitted from this report (packet size "
+                f"limit reached); see the accompanying packet_*.resolution.json for the complete report.")
+        if budget.allow(note, 1):
+            resolution_lines.append(note)
+            budget.spend(note, 1)
+    resolution_lines.append("")
+
+    # Computed last so it reflects the resolution report's own budget spend too.
     header_lines.append(
         f"- Estimated tokens used: ~{round(budget.chars_used / 4)} "
         f"(chars_used={budget.chars_used}/{budget.max_characters})\n"
     )
-    header_lines.append("## Selector resolution report\n")
-    for r in all_resolutions:
-        header_lines.append(f"- {r.selector_type} `{r.requested}`: **{r.status}** — {r.detail}")
-        for c in r.candidates:
-            header_lines.append(f"  - candidate: `{c}`")
-    header_lines.append("")
+    header_lines.extend(resolution_lines)
 
     out.append("\n_Static analysis only. Call/import relationships above are candidates, not proof of runtime "
                 "dispatch. See README.md in this output directory for full limitations._\n")
