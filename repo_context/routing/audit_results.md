@@ -1,13 +1,13 @@
 # Routing catalog: `audit_results`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 16
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `20c4ca9cc3df0f34f8d952298c7122beb0b3c50c166b25eb87d8aa35e647fa6e`
+- Files covered (this page): 16
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `audit_results` partition): `20c4ca9cc3df0f34f8d952298c7122beb0b3c50c166b25eb87d8aa35e647fa6e`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 
-## Other files (non-Python)
+## Other files (non-Python / boilerplate)
 
 | Path | Title/summary | Role |
 |---|---|---|

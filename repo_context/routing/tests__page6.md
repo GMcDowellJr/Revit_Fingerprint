@@ -1,0 +1,270 @@
+# Routing catalog: `tests (page 6)`
+
+- Generated (UTC): 2026-08-22T11:28:23Z
+- Tool version: 0.1.0
+- Files covered (this page): 5
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests` partition): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tests/test_generate_governance_narrative_evidence_package.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for the PR1 governance evidence-package layer wired into
+  - filename/path terms: test generate governance narrative evidence package
+- Important symbols (52 total):
+  - `_summary_row` (function) — line 40
+  - `_pooled_row` (function) — line 46
+  - `_delta_row` (function) — line 52
+  - `_gov_state_summary_row` (function) — line 58
+  - `_write_csv` (function) — line 64
+  - `_minimal_fixture` (function) — line 71
+  - `_run_main` (function) — line 98
+  - `test_footer_references_real_generator_identity_not_stale_filename` (function) — line 107
+  - `test_authority_header_states_controlled_interpretation_and_no_llm` (function) — line 118
+  - `test_authority_header_inserted_between_header_and_state_model` (function) — line 126
+  - `test_comparison_type_coverage_matches_known_cascade_groups` (function) — line 141
+  - `test_bc_to_bc_and_client_cross_bc_are_registered_not_unrecognized` (function) — line 152
+  - `test_comparison_type_coverage_governance_state_uses_directed_types` (function) — line 175
+  - `test_unrecognized_comparison_type_still_warns_to_stderr` (function) — line 180
+  - `test_domain_csv_column_set_unchanged` (function) — line 252
+  - `test_client_csv_column_set_unchanged` (function) — line 260
+  - `test_emit_evidence_package_default_writes_three_json_files` (function) — line 272
+  - `test_no_emit_evidence_package_suppresses_json_but_not_existing_outputs` (function) — line 280
+  - `test_no_emit_removes_stale_evidence_package_files_from_prior_run` (function) — line 292
+  - `test_emit_and_no_emit_produce_identical_csvs` (function) — line 313
+  - `test_no_emit_narrative_does_not_point_at_missing_package_files` (function) — line 329
+  - `test_emit_narrative_points_at_package_files` (function) — line 347
+  - `test_package_manifest_records_inputs_and_outputs` (function) — line 356
+  - `test_package_manifest_reports_sibling_json_outputs_as_present_with_real_sizes` (function) — line 369
+  - `test_package_manifest_records_comparison_run_ids` (function) — line 392
+  - ... and 27 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_minimal_fixture (tests/test_generate_governance_narrative_evidence_package.py:73)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_evidence_package.py:84)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_evidence_package.py:93)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_evidence_package.py:94)`
+  - `test_authority_header_inserted_between_header_and_state_model (tests/test_generate_governance_narrative_evidence_package.py:127)`
+  - `test_authority_header_inserted_between_header_and_state_model (tests/test_generate_governance_narrative_evidence_package.py:128)`
+  - `test_cli_accepts_policy_dir_and_package_schema_version_as_inert (tests/test_generate_governance_narrative_evidence_package.py:1024)`
+  - `test_cli_accepts_policy_dir_and_package_schema_version_as_inert (tests/test_generate_governance_narrative_evidence_package.py:1026)`
+  - `test_client_csv_column_set_unchanged (tests/test_generate_governance_narrative_evidence_package.py:261)`
+  - `test_client_csv_column_set_unchanged (tests/test_generate_governance_narrative_evidence_package.py:262)`
+  - `test_domain_csv_column_set_unchanged (tests/test_generate_governance_narrative_evidence_package.py:253)`
+  - `test_domain_csv_column_set_unchanged (tests/test_generate_governance_narrative_evidence_package.py:254)`
+  - `test_emit_and_no_emit_produce_identical_csvs (tests/test_generate_governance_narrative_evidence_package.py:317)`
+  - `test_emit_and_no_emit_produce_identical_csvs (tests/test_generate_governance_narrative_evidence_package.py:322)`
+  - `test_emit_and_no_emit_produce_identical_csvs (tests/test_generate_governance_narrative_evidence_package.py:323)`
+  - ... and 102 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_generate_governance_narrative_evidence_package.py`
+- Retrieval identity: sha256=`e60c8dba47b5674d…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_evidence_package.py`)
+
+### `tests/test_generate_governance_narrative_findings.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for structured governance findings (PR2): build_structured_findings(),
+  - filename/path terms: test generate governance narrative findings
+- Important symbols (31 total):
+  - `_min_domain_dict` (function) — line 46
+  - `_client_row` (function) — line 57
+  - `test_strong_baseline_candidate_finding` (function) — line 69
+  - `test_baseline_candidate_without_strong_for_container_gap` (function) — line 90
+  - `test_active_local_practice_and_local_review_required` (function) — line 107
+  - `test_active_local_practice_finding_at_high_primary_containment` (function) — line 116
+  - `test_local_review_required_via_passive_or_missing_share_lists_all_triggering_fields` (function) — line 140
+  - `test_local_review_required_via_investigate_tier_lists_primary_containment_fields` (function) — line 162
+  - `test_high_fragmentation_finding` (function) — line 180
+  - `test_tier_based_findings_use_the_shared_driver_field_list` (function) — line 188
+  - `test_missing_or_degraded_evidence_when_primary_metric_absent` (function) — line 220
+  - `test_missing_or_degraded_evidence_for_sparse_tier_lists_primary_fields` (function) — line 246
+  - `test_missing_or_degraded_evidence_lists_container_to_project_scoped_fields` (function) — line 265
+  - `test_missing_or_degraded_evidence_not_emitted_for_non_renderable_domain` (function) — line 282
+  - `test_cross_client_convergence_finding_independent_of_tier` (function) — line 293
+  - `test_passive_inheritance_risk_finding_for_risk_domain_dual_schema` (function) — line 303
+  - `test_passive_inheritance_risk_not_flagged_for_non_risk_domain` (function) — line 310
+  - `test_passive_inheritance_risk_bundle_fallback_skipped_when_state_present_but_not_material` (function) — line 319
+  - `test_passive_inheritance_risk_not_flagged_below_threshold` (function) — line 334
+  - `test_passive_inheritance_risk_defers_to_clean_explicit_state_over_bundle_signal` (function) — line 342
+  - `test_passive_inheritance_risk_flagged_from_explicit_state_when_material` (function) — line 358
+  - `test_passive_inheritance_risk_finding_from_state_signal_without_bundle_data` (function) — line 373
+  - `test_low_client_coherence_finding` (function) — line 391
+  - `test_leadership_questions_are_questions_not_claims` (function) — line 400
+  - `test_every_finding_has_provenance_and_limits` (function) — line 414
+  - ... and 6 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_active_local_practice_and_local_review_required (tests/test_generate_governance_narrative_findings.py:108)`
+  - `test_active_local_practice_finding_at_high_primary_containment (tests/test_generate_governance_narrative_findings.py:124)`
+  - `test_baseline_candidate_without_strong_for_container_gap (tests/test_generate_governance_narrative_findings.py:96)`
+  - `test_cross_client_convergence_finding_independent_of_tier (tests/test_generate_governance_narrative_findings.py:294)`
+  - `test_every_finding_has_provenance_and_limits (tests/test_generate_governance_narrative_findings.py:416)`
+  - `test_every_finding_has_provenance_and_limits (tests/test_generate_governance_narrative_findings.py:417)`
+  - `test_every_finding_has_provenance_and_limits (tests/test_generate_governance_narrative_findings.py:419)`
+  - `test_finding_ids_are_unique_and_stable_order (tests/test_generate_governance_narrative_findings.py:447)`
+  - `test_finding_ids_are_unique_and_stable_order (tests/test_generate_governance_narrative_findings.py:448)`
+  - `test_findings_do_not_reference_nonexistent_artifact_ids (tests/test_generate_governance_narrative_findings.py:436)`
+  - `test_findings_do_not_reference_nonexistent_artifact_ids (tests/test_generate_governance_narrative_findings.py:437)`
+  - `test_high_fragmentation_finding (tests/test_generate_governance_narrative_findings.py:181)`
+  - `test_local_review_required_via_investigate_tier_lists_primary_containment_fields (tests/test_generate_governance_narrative_findings.py:170)`
+  - `test_local_review_required_via_passive_or_missing_share_lists_all_triggering_fields (tests/test_generate_governance_narrative_findings.py:147)`
+  - `test_low_client_coherence_finding (tests/test_generate_governance_narrative_findings.py:393)`
+  - ... and 18 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_generate_governance_narrative_findings.py`
+- Retrieval identity: sha256=`837c626814368b90…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_findings.py`)
+
+### `tests/test_generate_governance_narrative_group1_bc_pooled.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for the Group 1 (tc/cp/tp) bc-pooled fallback in
+  - filename/path terms: test generate governance narrative group1 bc pooled
+- Important symbols (34 total):
+  - `_row` (function) — line 41
+  - `test_tc_enterprise_slice_unchanged_by_bc_scoped_rows` (function) — line 51
+  - `test_tp_by_scope_absent_when_no_group1_rows` (function) — line 83
+  - `test_tp_bc_pooled_when_both_sides_same_bc_no_enterprise_pair` (function) — line 96
+  - `test_group1_scope_pair_uses_both_sides_unlike_group2` (function) — line 120
+  - `test_scope_pair_separator_does_not_collide_across_multi_dimension_labels` (function) — line 138
+  - `test_group1_scope_pair_rejects_mismatched_bc_values` (function) — line 171
+  - `test_group1_scope_pair_accepts_matching_bc_values` (function) — line 194
+  - `test_group1_scope_pair_mismatched_client_bc_combo` (function) — line 206
+  - `test_has_renderable_cascade_signal_true_for_scope_only_evidence` (function) — line 224
+  - `test_has_renderable_cascade_signal_false_when_by_scope_dicts_all_empty` (function) — line 238
+  - `test_scope_only_domain_reaches_bc_evidence_tier_in_full_pipeline` (function) — line 247
+  - `test_cp_scoped_fallback_populated_when_n_files_sufficient_and_no_enterprise_pair` (function) — line 265
+  - `test_cp_scoped_fallback_ignores_n_files_insufficient_rows` (function) — line 285
+  - `test_cp_scoped_fallback_does_not_change_cp_by_scope_population` (function) — line 302
+  - `test_cp_scoped_fallback_prefers_enterprise_pair_when_present` (function) — line 321
+  - `test_cp_scoped_fallback_picks_bucket_with_most_rows` (function) — line 341
+  - `test_domain_with_no_group1_rows_at_all_absent` (function) — line 367
+  - `_bc_pooled_dict` (function) — line 389
+  - `test_has_group1_bc_pooled_evidence_true_for_tp_bc_bc` (function) — line 401
+  - `test_has_group1_bc_pooled_evidence_true_for_cp_bc_bc` (function) — line 406
+  - `test_has_group1_bc_pooled_evidence_false_when_only_other_scope_pairs` (function) — line 411
+  - `test_has_group1_bc_pooled_evidence_false_when_empty` (function) — line 418
+  - `test_assign_tier_returns_bc_evidence_tier_when_primary_none_and_bc_pooled_present` (function) — line 423
+  - `test_assign_tier_still_returns_insufficient_when_no_bc_pooled_evidence` (function) — line 428
+  - ... and 9 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_group1_rows (tests/test_generate_governance_narrative_group1_bc_pooled.py:456)`
+  - `_group1_rows (tests/test_generate_governance_narrative_group1_bc_pooled.py:461)`
+  - `test_assign_tier_enterprise_primary_path_unaffected_by_bc_data (tests/test_generate_governance_narrative_group1_bc_pooled.py:440)`
+  - `test_assign_tier_returns_bc_evidence_tier_when_primary_none_and_bc_pooled_present (tests/test_generate_governance_narrative_group1_bc_pooled.py:424)`
+  - `test_assign_tier_still_returns_insufficient_when_no_bc_pooled_evidence (tests/test_generate_governance_narrative_group1_bc_pooled.py:431)`
+  - `test_cp_scoped_fallback_does_not_change_cp_by_scope_population (tests/test_generate_governance_narrative_group1_bc_pooled.py:308)`
+  - `test_cp_scoped_fallback_ignores_n_files_insufficient_rows (tests/test_generate_governance_narrative_group1_bc_pooled.py:289)`
+  - `test_cp_scoped_fallback_picks_bucket_with_most_rows (tests/test_generate_governance_narrative_group1_bc_pooled.py:345)`
+  - `test_cp_scoped_fallback_picks_bucket_with_most_rows (tests/test_generate_governance_narrative_group1_bc_pooled.py:350)`
+  - `test_cp_scoped_fallback_picks_bucket_with_most_rows (tests/test_generate_governance_narrative_group1_bc_pooled.py:355)`
+  - `test_cp_scoped_fallback_populated_when_n_files_sufficient_and_no_enterprise_pair (tests/test_generate_governance_narrative_group1_bc_pooled.py:273)`
+  - `test_cp_scoped_fallback_prefers_enterprise_pair_when_present (tests/test_generate_governance_narrative_group1_bc_pooled.py:326)`
+  - `test_cp_scoped_fallback_prefers_enterprise_pair_when_present (tests/test_generate_governance_narrative_group1_bc_pooled.py:330)`
+  - `test_detect_anomalies_flags_material_bc_divergence (tests/test_generate_governance_narrative_group1_bc_pooled.py:470)`
+  - `test_detect_anomalies_silent_when_bc_pairs_agree (tests/test_generate_governance_narrative_group1_bc_pooled.py:480)`
+  - ... and 22 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_generate_governance_narrative_group1_bc_pooled.py`
+- Retrieval identity: sha256=`ddb06a8d24fe3809…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_group1_bc_pooled.py`)
+
+### `tests/test_generate_governance_narrative_policy.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for policy externalization (PR3) in
+  - filename/path terms: test generate governance narrative policy
+- Important symbols (23 total):
+  - `_reset_governance_policy` (function) — line 33
+  - `_summary_row` (function) — line 41
+  - `_pooled_row` (function) — line 47
+  - `_write_csv` (function) — line 53
+  - `_minimal_fixture` (function) — line 60
+  - `_run_main` (function) — line 87
+  - `test_default_policy_dir_is_policies_governance_in_repo` (function) — line 96
+  - `test_shipped_policy_file_matches_python_default_profile` (function) — line 109
+  - `test_finding_rules_json_documents_every_rule_id_generator_emits` (function) — line 131
+  - `test_loading_default_policy_dir_reproduces_module_level_defaults` (function) — line 146
+  - `test_overriding_tier_threshold_changes_assign_tier_output` (function) — line 173
+  - `test_overriding_excluded_from_scoring_changes_build_cascade` (function) — line 188
+  - `test_overriding_excluded_from_scoring_changes_render_limitations_note` (function) — line 209
+  - `test_render_limitations_excluded_note_pluralizes_for_multiple_domains` (function) — line 226
+  - `test_render_limitations_handles_empty_excluded_set` (function) — line 238
+  - `test_overriding_domain_guidance_changes_detect_anomalies_text` (function) — line 248
+  - `test_overriding_static_findings_guidance_changes_rendered_prose` (function) — line 266
+  - `test_overriding_client_onboarding_threshold_changes_profile_text` (function) — line 277
+  - `test_overriding_anomaly_threshold_changes_detect_anomalies_text` (function) — line 288
+  - `test_main_default_invocation_uses_shipped_policy_dir_and_stays_complete` (function) — line 319
+  - `test_main_with_policy_dir_missing_some_files_reports_defaulted_and_degraded` (function) — line 334
+  - `test_main_with_nonexistent_policy_dir_does_not_crash_and_uses_all_defaults` (function) — line 357
+  - `test_main_output_identical_with_default_and_explicit_shipped_policy_dir` (function) — line 367
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_minimal_fixture (tests/test_generate_governance_narrative_policy.py:62)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_policy.py:73)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_policy.py:82)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_policy.py:83)`
+  - `test_main_default_invocation_uses_shipped_policy_dir_and_stays_complete (tests/test_generate_governance_narrative_policy.py:322)`
+  - `test_main_default_invocation_uses_shipped_policy_dir_and_stays_complete (tests/test_generate_governance_narrative_policy.py:323)`
+  - `test_main_output_identical_with_default_and_explicit_shipped_policy_dir (tests/test_generate_governance_narrative_policy.py:371)`
+  - `test_main_output_identical_with_default_and_explicit_shipped_policy_dir (tests/test_generate_governance_narrative_policy.py:374)`
+  - `test_main_output_identical_with_default_and_explicit_shipped_policy_dir (tests/test_generate_governance_narrative_policy.py:375)`
+  - `test_main_with_nonexistent_policy_dir_does_not_crash_and_uses_all_defaults (tests/test_generate_governance_narrative_policy.py:358)`
+  - `test_main_with_nonexistent_policy_dir_does_not_crash_and_uses_all_defaults (tests/test_generate_governance_narrative_policy.py:360)`
+  - `test_main_with_policy_dir_missing_some_files_reports_defaulted_and_degraded (tests/test_generate_governance_narrative_policy.py:335)`
+  - `test_main_with_policy_dir_missing_some_files_reports_defaulted_and_degraded (tests/test_generate_governance_narrative_policy.py:343)`
+- Related tests:
+  - `tests/test_generate_governance_narrative_policy.py`
+- Retrieval identity: sha256=`53551262881b5f7e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_policy.py`)
+
+### `tests/test_generate_governance_narrative_scope_breakdown.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for gt/gc/gp per-target-scope-level breakdown (Option C) in
+  - filename/path terms: test generate governance narrative scope breakdown
+- Important symbols (14 total):
+  - `_row` (function) — line 29
+  - `test_target_scope_label_enterprise` (function) — line 35
+  - `test_target_scope_label_single_dimensions` (function) — line 40
+  - `test_target_scope_label_combined_dimensions` (function) — line 54
+  - `test_target_scope_label_collection_only_is_other_scoped` (function) — line 61
+  - `test_gt_enterprise_slice_unchanged_by_scoped_rows` (function) — line 69
+  - `test_gt_by_scope_absent_when_no_generic_to_template_rows` (function) — line 106
+  - `test_generic_side_still_gated_to_unscoped_reference` (function) — line 119
+  - `_generic_to_template_rows` (function) — line 140
+  - `test_detect_anomalies_flags_material_scope_divergence` (function) — line 158
+  - `test_detect_anomalies_silent_when_no_material_divergence` (function) — line 168
+  - `test_detect_anomalies_silent_when_only_enterprise_scope_exists` (function) — line 177
+  - `test_render_generic_baseline_scope_section_includes_all_scopes` (function) — line 187
+  - `test_render_generic_baseline_scope_section_empty_when_no_data` (function) — line 197
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_generic_to_template_rows (tests/test_generate_governance_narrative_scope_breakdown.py:142)`
+  - `_generic_to_template_rows (tests/test_generate_governance_narrative_scope_breakdown.py:149)`
+  - `test_detect_anomalies_flags_material_scope_divergence (tests/test_generate_governance_narrative_scope_breakdown.py:159)`
+  - `test_detect_anomalies_silent_when_no_material_divergence (tests/test_generate_governance_narrative_scope_breakdown.py:170)`
+  - `test_detect_anomalies_silent_when_only_enterprise_scope_exists (tests/test_generate_governance_narrative_scope_breakdown.py:180)`
+  - `test_generic_side_still_gated_to_unscoped_reference (tests/test_generate_governance_narrative_scope_breakdown.py:125)`
+  - `test_gt_by_scope_absent_when_no_generic_to_template_rows (tests/test_generate_governance_narrative_scope_breakdown.py:108)`
+  - `test_gt_enterprise_slice_unchanged_by_scoped_rows (tests/test_generate_governance_narrative_scope_breakdown.py:74)`
+  - `test_gt_enterprise_slice_unchanged_by_scoped_rows (tests/test_generate_governance_narrative_scope_breakdown.py:78)`
+  - `test_gt_enterprise_slice_unchanged_by_scoped_rows (tests/test_generate_governance_narrative_scope_breakdown.py:83)`
+  - `test_gt_enterprise_slice_unchanged_by_scoped_rows (tests/test_generate_governance_narrative_scope_breakdown.py:88)`
+  - `test_render_generic_baseline_scope_section_empty_when_no_data (tests/test_generate_governance_narrative_scope_breakdown.py:199)`
+  - `test_render_generic_baseline_scope_section_includes_all_scopes (tests/test_generate_governance_narrative_scope_breakdown.py:188)`
+  - `test_target_scope_label_collection_only_is_other_scoped (tests/test_generate_governance_narrative_scope_breakdown.py:65)`
+  - `test_target_scope_label_combined_dimensions (tests/test_generate_governance_narrative_scope_breakdown.py:55)`
+  - ... and 4 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_generate_governance_narrative_scope_breakdown.py`
+- Retrieval identity: sha256=`0a13e5f123a93fdf…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_scope_breakdown.py`)
+

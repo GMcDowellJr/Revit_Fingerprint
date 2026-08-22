@@ -1,0 +1,294 @@
+# Routing catalog: `tools (page 4)`
+
+- Generated (UTC): 2026-08-22T11:28:23Z
+- Tool version: 0.1.0
+- Files covered (this page): 11
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools` partition): `186bd8fb5e648d3853b278c2db4aa9f2801dc7c2a2d2be25436967cc0d21bae6`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tools/population_framing.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - filename/path terms: population framing
+- Important symbols (8 total):
+  - `load_json` (function) — line 17
+  - `load_csv` (function) — line 22
+  - `write_csv` (function) — line 27
+  - `hhi` (function) — line 36
+  - `effective_cluster_count` (function) — line 40
+  - `pick_population_baselines` (function) — line 49
+  - `classify_population_shape` (function) — line 69
+  - `main` (function) — line 89
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/population_framing.py:189)`
+  - `effective_cluster_count (tools/population_framing.py:41)`
+  - `main (tools/population_framing.py:100)`
+  - `main (tools/population_framing.py:101)`
+  - `main (tools/population_framing.py:131)`
+  - `main (tools/population_framing.py:133)`
+  - `main (tools/population_framing.py:145)`
+  - `main (tools/population_framing.py:163)`
+  - `main (tools/population_framing.py:178)`
+  - `main (tools/population_framing.py:99)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`9a75a2b8b9c3387c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/population_framing.py`)
+
+### `tools/reset_wall_types_for_reapply.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Reset wall_type records that are blocked solely because wt.function=unsupported.not_applicable
+  - filename/path terms: reset wall types for reapply
+- Important symbols (3 total):
+  - `_read_wall_items` (function) — line 28
+  - `_is_function_only_block` (function) — line 50
+  - `main` (function) — line 58
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/reset_wall_types_for_reapply.py:127)`
+  - `main (tools/reset_wall_types_for_reapply.py:72)`
+  - `main (tools/reset_wall_types_for_reapply.py:76)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`3570fc4110292d32…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/reset_wall_types_for_reapply.py`)
+
+### `tools/run_extract_all.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - filename/path terms: run extract all
+- Important symbols (21 total):
+  - `_append_line_pattern_synthetic_norm_hash` (function) — line 41
+  - `_discover_domains_from_exports` (function) — line 190
+  - `_ensure_dir` (function) — line 230
+  - `_resolve_sig_hash_policy_path` (function) — line 234
+  - `_apply_sig_hash_to_phase0` (function) — line 252
+  - `_run` (function) — line 400
+  - `_read_csv_rows` (function) — line 407
+  - `_iter_csv_rows` (function) — line 412
+  - `_check_governance_field_completeness` (function) — line 421
+  - `_ensure_domain_scoped_identity_items` (function) — line 453
+  - `_validate_line_pattern_synthetic_norm_hash` (function) — line 500
+  - `_emit_join_policy_diagnostics` (function) — line 541
+  - `_detect_surfaces` (function) — line 574
+  - `_merge_index_details` (function) — line 591
+  - `_pick_sample_file` (function) — line 601
+  - `_read_json` (function) — line 648
+  - `_infer_domains` (function) — line 656
+  - `_parse_stage_csv` (function) — line 701
+  - `_warn_deprecated_alias` (function) — line 707
+  - `_enforce_policy_gate` (function) — line 711
+  - `main` (function) — line 727
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/sig_hash_builder.py`
+  - imports `core/sig_hash_policy.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/run_extract_all.py:1234)`
+  - `_apply_sig_hash_to_phase0 (tools/run_extract_all.py:276)`
+  - `_apply_sig_hash_to_phase0 (tools/run_extract_all.py:279)`
+  - `_apply_sig_hash_to_phase0._load_items_for_domain (tools/run_extract_all.py:298)`
+  - `_enforce_policy_gate (tools/run_extract_all.py:712)`
+  - `_infer_domains (tools/run_extract_all.py:661)`
+  - `_infer_domains (tools/run_extract_all.py:671)`
+  - `_infer_domains (tools/run_extract_all.py:672)`
+  - `_infer_domains (tools/run_extract_all.py:673)`
+  - `_infer_domains (tools/run_extract_all.py:675)`
+  - `_infer_domains (tools/run_extract_all.py:677)`
+  - `_validate_line_pattern_synthetic_norm_hash (tools/run_extract_all.py:513)`
+  - `_validate_line_pattern_synthetic_norm_hash (tools/run_extract_all.py:523)`
+  - `_validate_line_pattern_synthetic_norm_hash (tools/run_extract_all.py:525)`
+  - `main (tools/run_extract_all.py:1003)`
+  - ... and 40 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_fingerprint_export_discovery.py`
+  - `tests/test_governance_field_completeness_gate.py`
+- Retrieval identity: sha256=`6097e03c70f161dd…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/run_extract_all.py`)
+
+### `tools/run_segment_orchestrator.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: tools/run_segment_orchestrator.py
+  - filename/path terms: run segment orchestrator
+- Important symbols (25 total):
+  - `load_manifest` (function) — line 69
+  - `load_registry` (function) — line 80
+  - `load_membership` (function) — line 86
+  - `write_registry_atomic` (function) — line 105
+  - `utc_now_iso` (function) — line 118
+  - `compute_worker_split` (function) — line 122
+  - `_write_run_summary` (function) — line 161
+  - `run_step` (function) — line 295
+  - `run_step_capture` (function) — line 300
+  - `run_step_log` (function) — line 308
+  - `_preshard_one_shard` (function) — line 331
+  - `_preshard_corpus_records` (function) — line 411
+  - `_write_segment_records` (function) — line 553
+  - `_filter_name_key_csv_to_segment` (function) — line 626
+  - `_build_patterns_missing_notes` (function) — line 684
+  - `_active_domains_from_presence_csv` (function) — line 743
+  - `_active_domains_from_name_patterns` (function) — line 763
+  - `_segment_has_name_leg_output` (function) — line 788
+  - `merge_bi_outputs` (function) — line 804
+  - `build_run_plan` (function) — line 876
+  - `validate_membership_against_manifest` (function) — line 908
+  - `_clear_stale_name_all_before_run` (function) — line 947
+  - `_run_one_segment` (function) — line 968
+  - `run_orchestrator` (function) — line 1397
+  - `main` (function) — line 1773
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/run_segment_orchestrator.py:1867)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1057)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1084)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1112)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1122)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1145)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1156)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1183)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1237)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1259)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1261)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1280)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1284)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1342)`
+  - `_run_one_segment (tools/run_segment_orchestrator.py:1347)`
+  - ... and 15 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_bundle_analysis_name_projection.py`
+- Retrieval identity: sha256=`c1d79ae240bf0af4…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/run_segment_orchestrator.py`)
+
+### `tools/run_split_detection_all.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Complete split detection workflow orchestrator.
+  - filename/path terms: run split detection all
+- Important symbols (16 total):
+  - `_read_csv` (function) — line 20
+  - `_write_csv` (function) — line 26
+  - `_domain_record_count` (function) — line 35
+  - `_domain_has_records` (function) — line 42
+  - `_write_no_data_stub_reports` (function) — line 47
+  - `_validate_join_policy_ready` (function) — line 71
+  - `_load_export_mapping` (function) — line 112
+  - `_load_analysis_run_id` (function) — line 128
+  - `_derive_analysis_run_id` (function) — line 138
+  - `_finalize_split_outputs` (function) — line 154
+  - `_inject_split_contract_headers` (function) — line 167
+  - `_emit_file_to_export_bridge` (function) — line 204
+  - `_emit_cluster_to_pattern_map` (function) — line 211
+  - `run_command` (function) — line 289
+  - `run_split_detection_workflow` (function) — line 304
+  - `main` (function) — line 530
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/run_split_detection_all.py:618)`
+  - `_derive_analysis_run_id (tools/run_split_detection_all.py:141)`
+  - `_domain_has_records (tools/run_split_detection_all.py:44)`
+  - `_domain_record_count (tools/run_split_detection_all.py:39)`
+  - `_emit_cluster_to_pattern_map (tools/run_split_detection_all.py:219)`
+  - `_emit_cluster_to_pattern_map (tools/run_split_detection_all.py:220)`
+  - `_emit_cluster_to_pattern_map (tools/run_split_detection_all.py:282)`
+  - `_emit_file_to_export_bridge (tools/run_split_detection_all.py:208)`
+  - `_finalize_split_outputs (tools/run_split_detection_all.py:155)`
+  - `_finalize_split_outputs (tools/run_split_detection_all.py:156)`
+  - `_finalize_split_outputs (tools/run_split_detection_all.py:157)`
+  - `_finalize_split_outputs (tools/run_split_detection_all.py:163)`
+  - `_finalize_split_outputs (tools/run_split_detection_all.py:164)`
+  - `_inject_split_contract_headers (tools/run_split_detection_all.py:175)`
+  - `_inject_split_contract_headers (tools/run_split_detection_all.py:201)`
+  - ... and 24 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_split_named_clusters_and_thresholds.py`
+- Retrieval identity: sha256=`e2098e418c041aad…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/run_split_detection_all.py`)
+
+### `tools/similarity_compare.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - filename/path terms: similarity compare
+- Important symbols (9 total):
+  - `DomainSimilarityRow` (class) — line 16
+  - `_set_jaccard` (function) — line 32
+  - `_multiset_jaccard` (function) — line 40
+  - `_load_metadata` (function) — line 61
+  - `_load_records_grouped` (function) — line 72
+  - `_pair_type` (function) — line 90
+  - `_passes_filters` (function) — line 97
+  - `_build_file_universe` (function) — line 107
+  - `main` (function) — line 133
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/similarity_compare.py:246)`
+  - `_build_file_universe (tools/similarity_compare.py:127)`
+  - `main (tools/similarity_compare.py:144)`
+  - `main (tools/similarity_compare.py:145)`
+  - `main (tools/similarity_compare.py:154)`
+  - `main (tools/similarity_compare.py:173)`
+  - `main (tools/similarity_compare.py:179)`
+  - `main (tools/similarity_compare.py:180)`
+  - `main (tools/similarity_compare.py:181)`
+  - `main (tools/similarity_compare.py:211)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`891d6cd498dcc868…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/similarity_compare.py`)
+
+### `tools/suggest_discovery_params.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Pre-flight sizing for tools/discover_join_policy.py's --sample-size /
+  - filename/path terms: suggest discovery params
+- Important symbols (10 total):
+  - `compute_domain_stats` (function) — line 99
+  - `suggest_sample_size` (function) — line 155
+  - `_cumulative_subset_count` (function) — line 170
+  - `_cumulative_subset_count_from_zero` (function) — line 177
+  - `solve_candidate_fields_and_k` (function) — line 193
+  - `suggest_params_for_domain` (function) — line 230
+  - `_resolve_phase0_dir` (function) — line 381
+  - `_load_policy_fields` (function) — line 397
+  - `_emit_command` (function) — line 445
+  - `main` (function) — line 511
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/discover_join_policy.py`
+  - imports `tools/join_key_discovery/eval.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/suggest_discovery_params.py:639)`
+  - `_cumulative_subset_count_from_zero (tools/suggest_discovery_params.py:190)`
+  - `main (tools/suggest_discovery_params.py:531)`
+  - `main (tools/suggest_discovery_params.py:581)`
+  - `main (tools/suggest_discovery_params.py:585)`
+  - `main (tools/suggest_discovery_params.py:587)`
+  - `main (tools/suggest_discovery_params.py:633)`
+  - `solve_candidate_fields_and_k (tools/suggest_discovery_params.py:208)`
+  - `solve_candidate_fields_and_k (tools/suggest_discovery_params.py:222)`
+  - `suggest_params_for_domain (tools/suggest_discovery_params.py:251)`
+  - `suggest_params_for_domain (tools/suggest_discovery_params.py:252)`
+  - `suggest_params_for_domain (tools/suggest_discovery_params.py:305)`
+  - `test_compute_domain_stats_counts_n_g_f_and_candidates (tests/test_suggest_discovery_params.py:40)`
+  - `test_compute_domain_stats_file_hhi_fully_concentrated_in_one_file (tests/test_suggest_discovery_params.py:75)`
+  - `test_compute_domain_stats_file_hhi_perfectly_even_distribution (tests/test_suggest_discovery_params.py:66)`
+  - ... and 31 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_suggest_discovery_params.py`
+- Retrieval identity: sha256=`2f074dd368887440…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/suggest_discovery_params.py`)
+
+## Other files (non-Python / boilerplate)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/probe_config.json` | probe config | `unknown` |
+| `tools/refreshed_revit_governance_dod.md` | Refreshed Definition of Done — Revit Standards Governance Narrative Outputs | `unknown` |
+| `tools/run_config.json` | run config | `unknown` |
+| `tools/run_discovery_sweep.ps1` | run discovery sweep | `unknown` |
+

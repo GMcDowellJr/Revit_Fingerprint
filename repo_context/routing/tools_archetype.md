@@ -1,9 +1,9 @@
 # Routing catalog: `tools/archetype`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 19
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `c5dfc15c8ac63c3bd8e5c140c081e69d97eb5fb91d4f2ed43f57ac619d6f3163`
+- Files covered (this page): 17
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/archetype` partition): `c5dfc15c8ac63c3bd8e5c140c081e69d97eb5fb91d4f2ed43f57ac619d6f3163`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `tools/archetype/_common.py`
@@ -377,7 +377,7 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`d44e5d261376d1bc…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/validate_archetype_signals.py`)
 
-## Other files (non-Python)
+## Other files (non-Python / boilerplate)
 
 | Path | Title/summary | Role |
 |---|---|---|

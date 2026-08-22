@@ -1,25 +1,10 @@
 # Routing catalog: `tools/lib`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 4
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `63bcd849dab91a65e3fc7ce2ed15ef8fcfec13bfc567b2c92850e61c18d04338`
+- Files covered (this page): 4
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/lib` partition): `63bcd849dab91a65e3fc7ce2ed15ef8fcfec13bfc567b2c92850e61c18d04338`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
-
-### `tools/lib/__init__.py`
-- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
-- Purpose clues:
-  - filename/path terms: init
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`e3b0c44298fc1c14…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/lib/__init__.py`)
 
 ### `tools/lib/diff_engine.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
@@ -137,4 +122,10 @@
 - Related tests:
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`a23692499ea27eff…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/lib/vt_profile.py`)
+
+## Other files (non-Python / boilerplate)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/lib/__init__.py` | init | `developer_utility` |
 

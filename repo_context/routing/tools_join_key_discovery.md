@@ -1,9 +1,9 @@
 # Routing catalog: `tools/join_key_discovery`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 3
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `3f7a7595c7af5316e8d0b792528f0c1e6d35b1d13a241b96982f88d98812a57c`
+- Files covered (this page): 3
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/join_key_discovery` partition): `3f7a7595c7af5316e8d0b792528f0c1e6d35b1d13a241b96982f88d98812a57c`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `tools/join_key_discovery/eval.py`

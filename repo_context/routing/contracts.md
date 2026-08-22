@@ -1,13 +1,13 @@
 # Routing catalog: `contracts`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 4
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `48433650874108acb827339901d4774062a3d8e4f0efbbb5ba54040d0986bc61`
+- Files covered (this page): 4
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `contracts` partition): `48433650874108acb827339901d4774062a3d8e4f0efbbb5ba54040d0986bc61`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 
-## Other files (non-Python)
+## Other files (non-Python / boilerplate)
 
 | Path | Title/summary | Role |
 |---|---|---|

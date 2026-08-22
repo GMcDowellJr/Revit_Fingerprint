@@ -1,9 +1,9 @@
 # Routing catalog: `tests/probes`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 1
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `f6fbdaf3c6533dd6a106bb8b7bcdd056c8430ef0abeb21b6176012d175a42eed`
+- Files covered (this page): 1
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests/probes` partition): `f6fbdaf3c6533dd6a106bb8b7bcdd056c8430ef0abeb21b6176012d175a42eed`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `tools/probes/test_probe_inventory_builder.py`

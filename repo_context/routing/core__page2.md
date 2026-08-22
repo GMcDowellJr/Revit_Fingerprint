@@ -1,0 +1,383 @@
+# Routing catalog: `core (page 2)`
+
+- Generated (UTC): 2026-08-22T11:28:23Z
+- Tool version: 0.1.0
+- Files covered (this page): 10
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `core` partition): `95ded63fe541519763c99967adc6f97648d4e96457f54cb1a76ee6b91f78c293`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `core/join_key_builder.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Join-key builder from policy.
+  - filename/path terms: join key builder
+- Important symbols (7 total):
+  - `_dedupe_preserve_order` (function) — line 56
+  - `_items_to_kqv_map` (function) — line 67
+  - `_infer_indexed_count` (function) — line 81
+  - `_expand_sequence_key` (function) — line 100
+  - `_get_shape_specific_requirements` (function) — line 147
+  - `build_join_key_from_policy` (function) — line 194
+  - `compute_projection_status` (function) — line 316
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `TestAnalysisSideReconstruction.test_view_filter_definitions_reads_raw_name_not_decorated_display (tests/test_name_key_policy.py:229)`
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:268)`
+  - `TestStatusVocabulary.test_blocked_when_no_required_items_configured (tests/test_name_key_policy.py:121)`
+  - `TestStatusVocabulary.test_missing_policy (tests/test_name_key_policy.py:118)`
+  - `TestStatusVocabulary.test_missing_required_when_required_item_absent (tests/test_name_key_policy.py:125)`
+  - `TestStatusVocabulary.test_ok_when_required_items_present (tests/test_name_key_policy.py:129)`
+  - `_build_doc_level_record (domains/worksets.py:401)`
+  - `_build_name_key (domains/compound_layers.py:86)`
+  - `_build_name_key (domains/compound_layers.py:95)`
+  - `_build_per_workset_record (domains/worksets.py:297)`
+  - `_build_record (domains/browser_organization.py:437)`
+  - `_expand_sequence_key (core/join_key_builder.py:139)`
+  - `_extract_object_styles (domains/object_styles.py:453)`
+  - `_inline_equivalent (tests/test_name_key_inline_analysis_agreement.py:52)`
+  - `build_join_key_from_policy (core/join_key_builder.py:210)`
+  - ... and 93 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_arrowheads_shape_gating.py`
+  - `tests/test_dimension_types_shape_gating.py`
+  - `tests/test_fill_patterns_canonical_selectors.py`
+  - `tests/test_identity_canonical_selectors.py`
+  - `tests/test_join_key_builder_shape_gating_dedupe.py`
+  - `tests/test_line_patterns_canonical_selectors.py`
+  - `tests/test_line_styles_canonical_selectors.py`
+  - `tests/test_name_key_inline_analysis_agreement.py`
+  - `tests/test_name_key_policy.py`
+  - `tests/test_object_styles_canonical_selectors.py`
+- Retrieval identity: sha256=`695ad5630b5d9e13…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/join_key_builder.py`)
+
+### `core/join_key_policy.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Join-key policy loader (explicit ctx injection only).
+  - filename/path terms: join key policy
+- Important symbols (5 total):
+  - `_is_list_of_str` (function) — line 34
+  - `_validate_shape_gating` (function) — line 38
+  - `validate_domain_join_key_policy` (function) — line 108
+  - `load_join_key_policies` (function) — line 233
+  - `get_domain_join_key_policy` (function) — line 288
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `TestAnalysisSideReconstruction.test_view_filter_definitions_reads_raw_name_not_decorated_display (tests/test_name_key_policy.py:228)`
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:254)`
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:255)`
+  - `TestSplitDomainPolicies._load_policy (tests/test_dimension_types_shape_gating.py:171)`
+  - `TestSplitDomainPolicies._load_policy (tests/test_dimension_types_shape_gating.py:172)`
+  - `_build_doc_level_record (domains/worksets.py:400)`
+  - `_build_name_key (domains/compound_layers.py:85)`
+  - `_build_per_workset_record (domains/worksets.py:296)`
+  - `_build_record (domains/browser_organization.py:436)`
+  - `_extract_object_styles (domains/object_styles.py:452)`
+  - `_line_patterns_policy (tests/test_line_patterns_canonical_selectors.py:19)`
+  - `_line_patterns_policy (tests/test_line_patterns_canonical_selectors.py:20)`
+  - `_line_styles_policy (tests/test_line_styles_canonical_selectors.py:11)`
+  - `_line_styles_policy (tests/test_line_styles_canonical_selectors.py:12)`
+  - `_load_policy (tests/test_view_templates_canonical_selectors.py:10)`
+  - ... and 104 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_arrowheads_shape_gating.py`
+  - `tests/test_dimension_types_shape_gating.py`
+  - `tests/test_fill_patterns_canonical_selectors.py`
+  - `tests/test_identity_canonical_selectors.py`
+  - `tests/test_identity_project_info.py`
+  - `tests/test_join_key_policy_validation.py`
+  - `tests/test_line_patterns_canonical_selectors.py`
+  - `tests/test_line_styles_canonical_selectors.py`
+  - `tests/test_name_key_inline_analysis_agreement.py`
+  - `tests/test_name_key_policy.py`
+- Retrieval identity: sha256=`ffe97616b178b186…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/join_key_policy.py`)
+
+### `core/manifest.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Stable manifest surface for project-to-project comparison.
+  - filename/path terms: manifest
+- Important symbols (2 total):
+  - `_safe_dict` (function) — line 19
+  - `build_manifest` (function) — line 23
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `build_manifest (core/manifest.py:34)`
+  - `build_manifest (core/manifest.py:37)`
+  - `build_manifest (core/manifest.py:43)`
+  - `build_manifest (core/manifest.py:44)`
+  - `build_manifest (core/manifest.py:48)`
+  - `build_manifest (core/manifest.py:74)`
+  - `main (tests/revit/revit_test_runner_pyrevit.py:126)`
+  - `main (tests/revit/revit_test_runner_pyrevit.py:142)`
+  - `run_fingerprint (runner/run_dynamo.py:1118)`
+  - `test_monolithic_manifest_surface (tests/test_split_export.py:52)`
+- Related tests:
+  - `tests/revit/revit_test_runner_pyrevit.py`
+  - `tests/test_split_export.py`
+- Retrieval identity: sha256=`097f262d089ac868…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/manifest.py`)
+
+### `core/name_key_builder.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Policy-driven, analysis-side reconstruction of the Canonical Name Identity Projection.
+  - filename/path terms: name key builder
+- Important symbols (3 total):
+  - `flat_items_for_record` (function) — line 60
+  - `_has_detail_data` (function) — line 84
+  - `build_name_key_for_record` (function) — line 101
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canonical_items.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `TestAnalysisSideReconstruction.test_flat_items_for_record_merges_all_buckets (tests/test_name_key_policy.py:284)`
+  - `TestAnalysisSideReconstruction.test_has_detail_data_true_for_identity_basis_phase2_or_items (tests/test_name_key_policy.py:270)`
+  - `TestAnalysisSideReconstruction.test_has_detail_data_true_for_identity_basis_phase2_or_items (tests/test_name_key_policy.py:271)`
+  - `TestAnalysisSideReconstruction.test_has_detail_data_true_for_identity_basis_phase2_or_items (tests/test_name_key_policy.py:272)`
+  - `TestAnalysisSideReconstruction.test_has_detail_data_true_for_identity_basis_phase2_or_items (tests/test_name_key_policy.py:273)`
+  - `TestAnalysisSideReconstruction.test_ineligible_domain_returns_none (tests/test_name_key_policy.py:246)`
+  - `TestAnalysisSideReconstruction.test_label_only_domain_arrowheads_reads_raw_component (tests/test_name_key_policy.py:188)`
+  - `TestAnalysisSideReconstruction.test_loaded_family_types_reads_raw_family_name_not_decorated_display (tests/test_name_key_policy.py:208)`
+  - `TestAnalysisSideReconstruction.test_loaded_family_types_reads_raw_family_name_not_decorated_display (tests/test_name_key_policy.py:209)`
+  - `TestAnalysisSideReconstruction.test_missing_name_yields_missing_required_status (tests/test_name_key_policy.py:254)`
+  - `TestAnalysisSideReconstruction.test_native_domain_materials (tests/test_name_key_policy.py:163)`
+  - `TestAnalysisSideReconstruction.test_summary_only_record_does_not_synthesize_label_only_name_key (tests/test_name_key_policy.py:264)`
+  - `TestAnalysisSideReconstruction.test_summary_only_record_does_not_synthesize_label_only_name_key (tests/test_name_key_policy.py:265)`
+  - `TestAnalysisSideReconstruction.test_view_filter_definitions_reads_raw_name_not_decorated_display (tests/test_name_key_policy.py:220)`
+  - `TestAnalysisSideReconstruction.test_widened_domain_phase_filters_reads_coordination_bucket (tests/test_name_key_policy.py:175)`
+  - ... and 5 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_name_key_inline_analysis_agreement.py`
+  - `tests/test_name_key_policy.py`
+- Retrieval identity: sha256=`bab61268a652e3b2…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/name_key_builder.py`)
+
+### `core/name_key_coverage.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Coverage-class registry for the Canonical Name Identity Projection (PR1/PR2).
+  - filename/path terms: name key coverage
+- Important symbols (3 total):
+  - `coverage_class` (function) — line 91
+  - `exclusion_reason` (function) — line 108
+  - `is_eligible` (function) — line 115
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `annotate_name_target_combined_files (tools/bundle_analysis/name_projection_adapter.py:358)`
+  - `build_domain_coverage (tools/generate_name_key_patterns.py:210)`
+  - `build_domain_coverage (tools/generate_name_key_patterns.py:219)`
+  - `build_domain_coverage (tools/generate_name_key_patterns.py:224)`
+  - `build_domain_coverage (tools/generate_name_key_patterns.py:226)`
+  - `build_name_membership (tools/generate_name_key_patterns.py:187)`
+  - `build_name_patterns (tools/generate_name_key_patterns.py:150)`
+- Related tests:
+  - `tests/test_bundle_analysis_name_projection.py`
+  - `tests/test_generate_name_key_patterns.py`
+  - `tests/test_name_key_inline_analysis_agreement.py`
+- Retrieval identity: sha256=`7bacc5842ea26ea3…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/name_key_coverage.py`)
+
+### `core/naming.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Document-derived naming helpers for output files.
+  - filename/path terms: naming
+- Important symbols (6 total):
+  - `safe_slug` (function) — line 24
+  - `_file_stem_from_doc` (function) — line 45
+  - `_project_information` (function) — line 65
+  - `_short_uid` (function) — line 88
+  - `derive_doc_key` (function) — line 100
+  - `build_output_filename` (function) — line 120
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_short_uid (core/naming.py:97)`
+  - `_short_uid (core/naming.py:98)`
+  - `build_output_filename (core/naming.py:141)`
+  - `build_output_filename (core/naming.py:142)`
+  - `build_output_filename (core/naming.py:145)`
+  - `build_output_filename (core/naming.py:148)`
+  - `derive_doc_key (core/naming.py:106)`
+  - `derive_doc_key (core/naming.py:109)`
+  - `derive_doc_key (core/naming.py:110)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`5ccbf5f297bd3b16…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/naming.py`)
+
+### `core/phase2.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Phase-2 instrumentation helpers (export-time, additive-only).
+  - filename/path terms: phase2
+- Important symbols (3 total):
+  - `phase2_sorted_items` (function) — line 31
+  - `phase2_qv_from_legacy_sentinel_str` (function) — line 36
+  - `phase2_join_hash` (function) — line 65
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+  - imports `core/hashing.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `_build_doc_level_record (domains/worksets.py:415)`
+  - `_build_doc_level_record (domains/worksets.py:416)`
+  - `_build_doc_level_record (domains/worksets.py:417)`
+  - `_build_per_workset_record (domains/worksets.py:312)`
+  - `_build_per_workset_record (domains/worksets.py:315)`
+  - `_build_per_workset_record (domains/worksets.py:316)`
+  - `_build_record (domains/browser_organization.py:453)`
+  - `_build_record (domains/browser_organization.py:456)`
+  - `_build_record (domains/browser_organization.py:459)`
+  - `_canonical_identity_items_from_signature (core/vg_sig.py:355)`
+  - `_canonical_identity_items_from_signature (domains/view_templates.py:348)`
+  - `_extract_object_styles (domains/object_styles.py:496)`
+  - `_extract_object_styles (domains/object_styles.py:497)`
+  - `_extract_object_styles (domains/object_styles.py:498)`
+  - `_phase2_build_lineage_items (domains/identity.py:248)`
+  - ... and 108 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`45b56138bb1498f7…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/phase2.py`)
+
+### `core/record_v2.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: core/record_v2.py
+  - filename/path terms: record v2
+- Important symbols (18 total):
+  - `canonicalize_str` (function) — line 83
+  - `canonicalize_str_allow_empty` (function) — line 109
+  - `canonicalize_int` (function) — line 135
+  - `canonicalize_float` (function) — line 178
+  - `canonicalize_bool` (function) — line 205
+  - `canonicalize_enum` (function) — line 237
+  - `make_record_id_from_element` (function) — line 268
+  - `_canonical_structural_value` (function) — line 302
+  - `canonical_structural_fields` (function) — line 327
+  - `make_record_id_structural` (function) — line 335
+  - `_default_record_id_secondary_key` (function) — line 342
+  - `finalize_record_ids_for_domain` (function) — line 357
+  - `_block_record_for_unstable_id` (function) — line 403
+  - `make_identity_item` (function) — line 415
+  - `serialize_identity_items` (function) — line 455
+  - `compute_identity_quality` (function) — line 480
+  - `build_record_v2` (function) — line 530
+  - `block_record_v2` (function) — line 606
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+- Called by (high/medium-confidence static callers):
+  - `TestAnalysisSideReconstruction.test_view_filter_definitions_reads_raw_name_not_decorated_display (tests/test_name_key_policy.py:227)`
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:258)`
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:259)`
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:260)`
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:261)`
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:262)`
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:263)`
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:264)`
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:265)`
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:281)`
+  - `_append_assigned_view_count_cosmetic_item (domains/view_templates.py:114)`
+  - `_append_assigned_view_count_cosmetic_item (domains/view_templates.py:118)`
+  - `_append_color_item (core/graphic_overrides.py:240)`
+  - `_append_pattern_items (core/graphic_overrides.py:217)`
+  - `_append_pattern_items (core/graphic_overrides.py:218)`
+  - ... and 1147 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_arrowheads_shape_gating.py`
+  - `tests/test_dimension_types_shape_gating.py`
+  - `tests/test_fill_patterns_canonical_selectors.py`
+  - `tests/test_graphic_overrides.py`
+  - `tests/test_identity_canonical_selectors.py`
+  - `tests/test_identity_project_info.py`
+  - `tests/test_join_key_builder_shape_gating_dedupe.py`
+  - `tests/test_join_key_migration.py`
+  - `tests/test_line_pattern_mapping_reconstruction.py`
+  - `tests/test_line_patterns_canonical_selectors.py`
+- Retrieval identity: sha256=`9d6e3b28079e8c60…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/record_v2.py`)
+
+### `core/rows.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Core row/parameter utilities (Revit-aware).
+  - filename/path terms: rows
+- Important symbols (12 total):
+  - `_param` (function) — line 21
+  - `_as_string` (function) — line 38
+  - `_as_value_string` (function) — line 58
+  - `_as_double` (function) — line 82
+  - `_as_int` (function) — line 100
+  - `_as_bool_from_param` (function) — line 118
+  - `first_param` (function) — line 134
+  - `format_len_inches` (function) — line 174
+  - `_canon_rgb` (function) — line 196
+  - `try_get_color_rgb_from_elem` (function) — line 230
+  - `get_element_display_name` (function) — line 259
+  - `get_type_display_name` (function) — line 301
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+- Called by (high/medium-confidence static callers):
+  - `_as_bool_from_param (core/rows.py:128)`
+  - `_build_alternate_units_items (core/dimension_type_helpers.py:1066)`
+  - `_build_alternate_units_items (core/dimension_type_helpers.py:1067)`
+  - `_build_alternate_units_items (core/dimension_type_helpers.py:1075)`
+  - `_build_alternate_units_items (core/dimension_type_helpers.py:1076)`
+  - `_build_alternate_units_items (core/dimension_type_helpers.py:1084)`
+  - `_build_alternate_units_items (core/dimension_type_helpers.py:1085)`
+  - `_build_text_appearance_items (core/dimension_type_helpers.py:423)`
+  - `_build_text_appearance_items (core/dimension_type_helpers.py:428)`
+  - `_build_text_appearance_items (core/dimension_type_helpers.py:436)`
+  - `_build_text_appearance_items (core/dimension_type_helpers.py:441)`
+  - `_build_text_appearance_items (core/dimension_type_helpers.py:453)`
+  - `_build_text_appearance_items (core/dimension_type_helpers.py:454)`
+  - `_build_text_appearance_items (core/dimension_type_helpers.py:462)`
+  - `_build_text_appearance_items (core/dimension_type_helpers.py:463)`
+  - ... and 225 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`a57aba469cbf1d95…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/rows.py`)
+
+### `core/sig_hash_builder.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Policy-driven sig_hash creation for record.v2 records.
+  - filename/path terms: sig hash builder
+- Important symbols (4 total):
+  - `_items_to_map` (function) — line 18
+  - `_key_allowed` (function) — line 29
+  - `build_sig_hash_from_policy` (function) — line 38
+  - `apply_sig_hash_policy_to_record` (function) — line 105
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `_apply_sig_hash_to_phase0 (tools/run_extract_all.py:330)`
+  - `apply_sig_hash_policy_to_record (core/sig_hash_builder.py:110)`
+  - `build_sig_hash_from_policy (core/sig_hash_builder.py:63)`
+  - `build_sig_hash_from_policy (core/sig_hash_builder.py:70)`
+  - `test_apply_sig_hash_policy_to_record_uses_items_and_writes_sig_basis (tests/test_sig_hash_policy_builder.py:120)`
+  - `test_object_styles_model_sig_hash_excludes_area9_additions (tests/test_sig_hash_policy_builder.py:187)`
+  - `test_sig_hash_builder_blocks_when_required_not_ok (tests/test_sig_hash_policy_builder.py:42)`
+  - `test_sig_hash_builder_degrades_when_optional_hash_item_not_ok (tests/test_sig_hash_policy_builder.py:68)`
+  - `test_sig_hash_builder_degrades_when_required_not_ok_and_block_disabled (tests/test_sig_hash_policy_builder.py:82)`
+  - `test_sig_hash_builder_hashes_allowed_items_from_items_list_order_independent (tests/test_sig_hash_policy_builder.py:25)`
+  - `test_sig_hash_builder_prefix_and_first_writer_wins (tests/test_sig_hash_policy_builder.py:100)`
+  - `test_text_types_sig_hash_excludes_name_includes_behavioral_items (tests/test_sig_hash_policy_builder.py:149)`
+- Related tests:
+  - `tests/test_sig_hash_policy_builder.py`
+- Retrieval identity: sha256=`f0ba060401bc70b9…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/sig_hash_builder.py`)
+

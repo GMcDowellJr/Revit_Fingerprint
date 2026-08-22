@@ -1,0 +1,301 @@
+# Routing catalog: `tests (page 3)`
+
+- Generated (UTC): 2026-08-22T11:28:23Z
+- Tool version: 0.1.0
+- Files covered (this page): 9
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests` partition): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tests/test_compare_governance_populations.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test compare governance populations
+- Important symbols (16 total):
+  - `_row` (function) — line 24
+  - `_synthetic_manifest` (function) — line 35
+  - `_records_rows` (function) — line 55
+  - `test_same_role_peer_produces_expected_comparison_type_set` (function) — line 75
+  - `test_same_role_peer_excludes_project_and_generic` (function) — line 82
+  - `test_same_role_peer_excludes_project_scoped_template_or_container` (function) — line 92
+  - `test_comparison_type_still_unambiguous_with_project_scoped_template` (function) — line 110
+  - `test_generic_pairs_unconditionally_against_every_tc_project_population` (function) — line 131
+  - `test_directed_enterprise_to_project_is_unconditional_on_scope` (function) — line 140
+  - `test_directed_bc_to_project_matches_by_business_center_label_alone` (function) — line 152
+  - `test_directed_bc_to_project_matches_regardless_of_differing_client` (function) — line 165
+  - `test_directed_client_to_project_matches_by_client_label_alone` (function) — line 187
+  - `test_files_with_no_inventory_for_domain_are_excluded_not_zero_padded` (function) — line 206
+  - `test_zero_inventory_domain_produces_no_row` (function) — line 233
+  - `test_comparison_type_never_mixes_symmetric_and_directed_metric_shape` (function) — line 251
+  - `test_run_comparisons_end_to_end_type_coverage` (function) — line 268
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/compare_governance_populations.py`
+  - imports `tools/enterprise_policy.py`
+  - imports `tools/governance_manifest.py`
+- Called by (high/medium-confidence static callers):
+  - `_synthetic_manifest (tests/test_compare_governance_populations.py:41)`
+  - `_synthetic_manifest (tests/test_compare_governance_populations.py:42)`
+  - `_synthetic_manifest (tests/test_compare_governance_populations.py:43)`
+  - `_synthetic_manifest (tests/test_compare_governance_populations.py:44)`
+  - `_synthetic_manifest (tests/test_compare_governance_populations.py:45)`
+  - `_synthetic_manifest (tests/test_compare_governance_populations.py:46)`
+  - `_synthetic_manifest (tests/test_compare_governance_populations.py:47)`
+  - `_synthetic_manifest (tests/test_compare_governance_populations.py:48)`
+  - `test_comparison_type_never_mixes_symmetric_and_directed_metric_shape (tests/test_compare_governance_populations.py:252)`
+  - `test_comparison_type_never_mixes_symmetric_and_directed_metric_shape (tests/test_compare_governance_populations.py:253)`
+  - `test_comparison_type_still_unambiguous_with_project_scoped_template (tests/test_compare_governance_populations.py:112)`
+  - `test_comparison_type_still_unambiguous_with_project_scoped_template (tests/test_compare_governance_populations.py:113)`
+  - `test_comparison_type_still_unambiguous_with_project_scoped_template (tests/test_compare_governance_populations.py:114)`
+  - `test_comparison_type_still_unambiguous_with_project_scoped_template (tests/test_compare_governance_populations.py:118)`
+  - `test_directed_bc_to_project_matches_by_business_center_label_alone (tests/test_compare_governance_populations.py:153)`
+  - ... and 18 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_compare_governance_populations.py`
+- Retrieval identity: sha256=`64bb0765d6acdb53…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_compare_governance_populations.py`)
+
+### `tests/test_compound_types_wall.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test compound types wall
+- Important symbols (41 total):
+  - `_Id` (class) — line 8
+  - `_MatElem` (class) — line 13
+  - `_FillPatternDef` (class) — line 18
+  - `_FillPatternElem` (class) — line 23
+  - `_Param` (class) — line 32
+  - `_Layer` (class) — line 44
+  - `_LayerWidthError` (class) — line 63
+  - `_CS` (class) — line 85
+  - `_CSWrapError` (class) — line 109
+  - `_WallType` (class) — line 125
+  - `_ParamString` (class) — line 161
+  - `_Doc` (class) — line 169
+  - `_setup_module` (function) — line 183
+  - `_default_ctx` (function) — line 202
+  - `_basic_wall` (function) — line 212
+  - `test_basic_wall_produces_record` (function) — line 222
+  - `test_instance_count_present_on_wall_record` (function) — line 237
+  - `test_is_sole_type_in_category_true_when_single_wall` (function) — line 249
+  - `test_is_sole_type_in_category_false_when_multiple_walls` (function) — line 260
+  - `test_instance_count_not_in_identity_basis` (function) — line 272
+  - `test_is_sole_type_not_in_identity_basis` (function) — line 283
+  - `test_non_basic_wall_produces_blocked_record` (function) — line 294
+  - `test_core_boundary_in_layer_rows` (function) — line 313
+  - `test_layer_count_excludes_core_boundaries` (function) — line 324
+  - `test_stack_hash_loose_excludes_material_name` (function) — line 334
+  - ... and 16 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `domains/compound_layers.py`
+- Called by (high/medium-confidence static callers):
+  - `_Doc.GetElement (tests/test_compound_types_wall.py:179)`
+  - `_FillPatternElem.__init__ (tests/test_compound_types_wall.py:26)`
+  - `_Layer.__init__ (tests/test_compound_types_wall.py:58)`
+  - `_LayerWidthError.__init__ (tests/test_compound_types_wall.py:76)`
+  - `_WallType.get_Parameter (tests/test_compound_types_wall.py:152)`
+  - `_WallType.get_Parameter (tests/test_compound_types_wall.py:155)`
+  - `_WallType.get_Parameter (tests/test_compound_types_wall.py:157)`
+  - `_basic_wall (tests/test_compound_types_wall.py:214)`
+  - `_basic_wall (tests/test_compound_types_wall.py:215)`
+  - `_basic_wall (tests/test_compound_types_wall.py:216)`
+  - `_basic_wall (tests/test_compound_types_wall.py:218)`
+  - `_basic_wall (tests/test_compound_types_wall.py:219)`
+  - `test_basic_wall_produces_record (tests/test_compound_types_wall.py:223)`
+  - `test_basic_wall_produces_record (tests/test_compound_types_wall.py:224)`
+  - `test_basic_wall_produces_record (tests/test_compound_types_wall.py:227)`
+  - ... and 103 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_compound_types_wall.py`
+- Retrieval identity: sha256=`ce80e7c14274b82e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_compound_types_wall.py`)
+
+### `tests/test_contracts_bounded_errors.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test contracts bounded errors
+- Important symbols (2 total):
+  - `test_bounded_errors_caps_and_counts_dropped` (function) — line 6
+  - `test_bounded_errors_defensive_cap_nonpositive` (function) — line 25
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/contracts.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`ce26a3975db450f9…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_contracts_bounded_errors.py`)
+
+### `tests/test_contracts_run_status.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test contracts run status
+- Important symbols (9 total):
+  - `_env` (function) — line 22
+  - `test_run_status_all_ok` (function) — line 34
+  - `test_run_status_degraded_if_any_degraded` (function) — line 45
+  - `test_run_status_degraded_if_any_blocked` (function) — line 54
+  - `test_run_status_degraded_if_any_unsupported` (function) — line 63
+  - `test_run_status_failed_if_any_failed` (function) — line 72
+  - `test_invalid_domain_status_counts_as_failed_and_records_error` (function) — line 82
+  - `test_new_run_envelope_rejects_mismatched_version` (function) — line 94
+  - `test_new_run_envelope_accepts_current_version` (function) — line 106
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/contracts.py`
+- Called by (high/medium-confidence static callers):
+  - `test_invalid_domain_status_counts_as_failed_and_records_error (tests/test_contracts_run_status.py:84)`
+  - `test_new_run_envelope_accepts_current_version (tests/test_contracts_run_status.py:107)`
+  - `test_new_run_envelope_rejects_mismatched_version (tests/test_contracts_run_status.py:95)`
+  - `test_run_status_all_ok (tests/test_contracts_run_status.py:36)`
+  - `test_run_status_all_ok (tests/test_contracts_run_status.py:37)`
+  - `test_run_status_degraded_if_any_blocked (tests/test_contracts_run_status.py:56)`
+  - `test_run_status_degraded_if_any_blocked (tests/test_contracts_run_status.py:57)`
+  - `test_run_status_degraded_if_any_degraded (tests/test_contracts_run_status.py:47)`
+  - `test_run_status_degraded_if_any_degraded (tests/test_contracts_run_status.py:48)`
+  - `test_run_status_degraded_if_any_unsupported (tests/test_contracts_run_status.py:65)`
+  - `test_run_status_degraded_if_any_unsupported (tests/test_contracts_run_status.py:66)`
+  - `test_run_status_failed_if_any_failed (tests/test_contracts_run_status.py:74)`
+  - `test_run_status_failed_if_any_failed (tests/test_contracts_run_status.py:75)`
+- Related tests:
+  - `tests/test_contracts_run_status.py`
+- Retrieval identity: sha256=`fc83c6db3d65ef3c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_contracts_run_status.py`)
+
+### `tests/test_deployment_config.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test deployment config
+- Important symbols (13 total):
+  - `_write` (function) — line 14
+  - `test_no_configuration_is_empty` (function) — line 25
+  - `test_valid_name_only_configuration` (function) — line 29
+  - `test_valid_guid_is_canonicalized` (function) — line 36
+  - `test_rejects_non_object_top_level` (function) — line 45
+  - `test_rejects_missing_or_invalid_schema` (function) — line 56
+  - `test_rejects_non_list_mapping` (function) — line 64
+  - `test_rejects_invalid_mapping_entries` (function) — line 79
+  - `test_rejects_duplicate_guid_mapped_to_conflicting_keys` (function) — line 84
+  - `test_rejects_unknown_top_level_field` (function) — line 97
+  - `test_rejects_missing_mapping_field` (function) — line 102
+  - `test_missing_contract_fails` (function) — line 109
+  - `test_malformed_contract_fails` (function) — line 115
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/deployment_config.py`
+- Called by (high/medium-confidence static callers):
+  - `test_malformed_contract_fails (tests/test_deployment_config.py:119)`
+  - `test_missing_contract_fails (tests/test_deployment_config.py:111)`
+  - `test_rejects_duplicate_guid_mapped_to_conflicting_keys (tests/test_deployment_config.py:94)`
+  - `test_rejects_invalid_mapping_entries (tests/test_deployment_config.py:81)`
+  - `test_rejects_non_list_mapping (tests/test_deployment_config.py:66)`
+  - `test_rejects_unknown_top_level_field (tests/test_deployment_config.py:99)`
+  - `test_valid_guid_is_canonicalized (tests/test_deployment_config.py:38)`
+  - `test_valid_name_only_configuration (tests/test_deployment_config.py:31)`
+- Related tests:
+  - `tests/test_deployment_config.py`
+- Retrieval identity: sha256=`9ed3b823e06c6e06…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_deployment_config.py`)
+
+### `tests/test_deps_require_domain.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test deps require domain
+- Important symbols (4 total):
+  - `test_require_domain_missing_upstream_blocks` (function) — line 9
+  - `test_require_domain_invalid_envelope_blocks` (function) — line 18
+  - `test_require_domain_upstream_not_acceptable_blocks` (function) — line 26
+  - `test_require_domain_allows_degraded_by_default` (function) — line 45
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/contracts.py`
+  - imports `core/deps.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`b148e707ae28a8ae…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_deps_require_domain.py`)
+
+### `tests/test_dimension_types_placeholder_fields.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test dimension types placeholder fields
+- Important symbols (2 total):
+  - `test_attach_placeholder_metadata_ok` (function) — line 4
+  - `test_attach_placeholder_metadata_unreadable` (function) — line 11
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `domains/dimension_types.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`954a4de259582084…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_dimension_types_placeholder_fields.py`)
+
+### `tests/test_dimension_types_shape_gating.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for dimension_types domain split architecture.
+  - filename/path terms: test dimension types shape gating
+- Important symbols (5 total):
+  - `TestShapeConstants` (class) — line 62
+  - `TestFamilyMappings` (class) — line 131
+  - `TestSplitDomainPolicies` (class) — line 166
+  - `TestPolicyLoadPattern` (class) — line 241
+  - `TestCanonicalEvidenceSelectors` (class) — line 249
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/dimension_type_helpers.py`
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `TestSplitDomainPolicies.test_all_split_domains_have_schemas (tests/test_dimension_types_shape_gating.py:231)`
+  - `TestSplitDomainPolicies.test_angular_policy_has_unit_format_id (tests/test_dimension_types_shape_gating.py:191)`
+  - `TestSplitDomainPolicies.test_diameter_policy_exists (tests/test_dimension_types_shape_gating.py:197)`
+  - `TestSplitDomainPolicies.test_linear_policy_has_witness_line_control (tests/test_dimension_types_shape_gating.py:176)`
+  - `TestSplitDomainPolicies.test_radial_policy_has_center_marks (tests/test_dimension_types_shape_gating.py:184)`
+  - `TestSplitDomainPolicies.test_spot_coordinate_policy_exists (tests/test_dimension_types_shape_gating.py:209)`
+  - `TestSplitDomainPolicies.test_spot_elevation_policy_exists (tests/test_dimension_types_shape_gating.py:203)`
+  - `TestSplitDomainPolicies.test_spot_slope_policy_exists (tests/test_dimension_types_shape_gating.py:215)`
+- Related tests:
+  - `tests/test_dimension_types_shape_gating.py`
+- Retrieval identity: sha256=`568df132a3d6ac44…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_dimension_types_shape_gating.py`)
+
+### `tests/test_discover_hash_policy.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test discover hash policy
+- Important symbols (11 total):
+  - `_write_csv` (function) — line 6
+  - `test_discover_hash_policy_join_and_sig` (function) — line 12
+  - `test_validate_marks_blocked_when_required_fields_missing_from_selected` (function) — line 35
+  - `test_validate_pareto_auto_bumps_max_k_to_required_count` (function) — line 58
+  - `test_phase0_dir_can_be_results_root` (function) — line 85
+  - `test_phase0_dir_auto_resolves_results_records` (function) — line 106
+  - `test_phase0_dir_auto_resolves_records_subfolder` (function) — line 122
+  - `test_out_policy_creates_parent_directories` (function) — line 138
+  - `test_loaded_family_types_skips_orphan_gate_buckets` (function) — line 154
+  - `test_loaded_family_types_surfaces_missing_shape_gate_records` (function) — line 175
+  - `test_stratify_by_limits_overrepresentation` (function) — line 196
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_discover_hash_policy_join_and_sig (tests/test_discover_hash_policy.py:14)`
+  - `test_discover_hash_policy_join_and_sig (tests/test_discover_hash_policy.py:18)`
+  - `test_loaded_family_types_skips_orphan_gate_buckets (tests/test_discover_hash_policy.py:156)`
+  - `test_loaded_family_types_skips_orphan_gate_buckets (tests/test_discover_hash_policy.py:159)`
+  - `test_loaded_family_types_surfaces_missing_shape_gate_records (tests/test_discover_hash_policy.py:177)`
+  - `test_loaded_family_types_surfaces_missing_shape_gate_records (tests/test_discover_hash_policy.py:181)`
+  - `test_out_policy_creates_parent_directories (tests/test_discover_hash_policy.py:140)`
+  - `test_out_policy_creates_parent_directories (tests/test_discover_hash_policy.py:143)`
+  - `test_phase0_dir_auto_resolves_records_subfolder (tests/test_discover_hash_policy.py:125)`
+  - `test_phase0_dir_auto_resolves_records_subfolder (tests/test_discover_hash_policy.py:128)`
+  - `test_phase0_dir_auto_resolves_results_records (tests/test_discover_hash_policy.py:109)`
+  - `test_phase0_dir_auto_resolves_results_records (tests/test_discover_hash_policy.py:112)`
+  - `test_phase0_dir_can_be_results_root (tests/test_discover_hash_policy.py:88)`
+  - `test_phase0_dir_can_be_results_root (tests/test_discover_hash_policy.py:91)`
+  - `test_stratify_by_limits_overrepresentation (tests/test_discover_hash_policy.py:207)`
+  - ... and 5 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_discover_hash_policy.py`
+- Retrieval identity: sha256=`a9bdfdd6b73bc2f3…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_discover_hash_policy.py`)
+

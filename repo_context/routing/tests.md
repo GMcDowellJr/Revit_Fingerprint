@@ -1,9 +1,9 @@
 # Routing catalog: `tests`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 107
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
+- Files covered (this page): 11
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests` partition): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `tests/conftest.py`
@@ -360,19 +360,4 @@
 - Related tests:
   - `tests/test_compare_cross_segment_cardinality.py`
 - Retrieval identity: sha256=`481122bba732560a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_compare_cross_segment_cardinality.py`)
-
-## Omitted from this catalog (size limit reached)
-
-96 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
-
-- `tests/test_compare_cross_segment_comparison_registry.py`
-- `tests/test_compare_cross_segment_cross_client.py`
-- `tests/test_compare_cross_segment_governance.py`
-- `tests/test_compare_cross_segment_lineage.py`
-- `tests/test_compare_cross_segment_streamed_pairs.py`
-- `tests/test_compare_cross_segment_worker_count.py`
-- `tests/test_compare_governance_populations.py`
-- `tests/test_compound_types_wall.py`
-- `tests/test_contracts_bounded_errors.py`
-- `tests/test_contracts_run_status.py`
 

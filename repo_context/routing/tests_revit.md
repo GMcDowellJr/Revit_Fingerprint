@@ -1,9 +1,9 @@
 # Routing catalog: `tests/revit`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 4
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `e97d1be96513e9cfafd064cce5b118e1af4244bebf62d142f3685c397cbb5760`
+- Files covered (this page): 4
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests/revit` partition): `e97d1be96513e9cfafd064cce5b118e1af4244bebf62d142f3685c397cbb5760`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `tests/revit/_json_diff.py`
@@ -71,7 +71,7 @@
   - `tests/revit/revit_test_runner_pyrevit.py`
 - Retrieval identity: sha256=`982119a851b84e0d…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/revit/revit_test_runner_pyrevit.py`)
 
-## Other files (non-Python)
+## Other files (non-Python / boilerplate)
 
 | Path | Title/summary | Role |
 |---|---|---|

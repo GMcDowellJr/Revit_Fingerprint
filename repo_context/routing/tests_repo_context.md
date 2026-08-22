@@ -1,9 +1,9 @@
 # Routing catalog: `tests/repo_context`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 15
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `40ee46d811d7b9d7db59bede4d3bb9ec33709c3b67da2c3178d38a47800d7579`
+- Files covered (this page): 10
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests/repo_context` partition): `dbbcc019e880e86c4cb46c828a82bf20a7bcd7ba9738566d316ca81fea25a203`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/tests/conftest.py`
@@ -310,14 +310,4 @@
 - Related tests:
   - `dev_tools/repo_context/tests/test_python_symbols.py`
 - Retrieval identity: sha256=`e0662e729b61a221…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_python_symbols.py`)
-
-## Omitted from this catalog (size limit reached)
-
-5 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
-
-- `dev_tools/repo_context/tests/test_request_validation.py`
-- `dev_tools/repo_context/tests/test_routing.py`
-- `dev_tools/repo_context/tests/test_safety.py`
-- `dev_tools/repo_context/tests/test_symlinks.py`
-- `dev_tools/repo_context/tests/test_validate.py`
 

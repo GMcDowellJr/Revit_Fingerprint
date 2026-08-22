@@ -1,9 +1,9 @@
 # Routing catalog: `dev_tools`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 25
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `564e00d7f04bed4aaa145ccfcbe24838779ac22abe2d0ddf0e771b20abd57fa9`
+- Files covered (this page): 20
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `dev_tools` partition): `a77d907463b596d78e3643d64cf08cf24e3cd34cc79f41cd2f8406d26e982b10`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/rc_chunking.py`
@@ -311,20 +311,24 @@
 - Purpose clues:
   - module docstring: Hierarchical routing-catalog generation.
   - filename/path terms: rc routing
-- Important symbols (13 total):
+- Important symbols (17 total):
   - `RoutingOptions` (class) — line 37
   - `_sort_key` (function) — line 46
   - `_partition_files` (function) — line 50
   - `_byte_len` (function) — line 108
   - `_truncate_to_byte_limit` (function) — line 112
   - `_catalog_filenames` (function) — line 126
-  - `_top_level_symbols` (function) — line 162
-  - `_module_docstring` (function) — line 168
-  - `_filename_terms` (function) — line 175
-  - `_markdown_title` (function) — line 185
-  - `_render_file_entry` (function) — line 228
-  - `generate_routing` (function) — line 291
-  - `_render_index` (function) — line 572
+  - `_paged_filename` (function) — line 162
+  - `_top_level_symbols` (function) — line 184
+  - `_module_docstring` (function) — line 190
+  - `_filename_terms` (function) — line 197
+  - `_markdown_title` (function) — line 207
+  - `_docstring_title` (function) — line 250
+  - `_render_file_entry` (function) — line 262
+  - `_catalog_page_header` (function) — line 325
+  - `_render_catalog_page` (function) — line 338
+  - `generate_routing` (function) — line 499
+  - `_render_index` (function) — line 670
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
@@ -332,22 +336,22 @@
   - `_catalog_filenames (dev_tools/repo_context/rc_routing.py:151)`
   - `_catalog_filenames (dev_tools/repo_context/rc_routing.py:157)`
   - `_catalog_filenames (dev_tools/repo_context/rc_routing.py:158)`
-  - `_render_file_entry (dev_tools/repo_context/rc_routing.py:234)`
-  - `_render_file_entry (dev_tools/repo_context/rc_routing.py:235)`
-  - `_render_file_entry (dev_tools/repo_context/rc_routing.py:246)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:364)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:372)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:376)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:379)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:383)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:420)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:422)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:437)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:531)`
-  - ... and 1 more (see python_calls.csv)
+  - `_docstring_title (dev_tools/repo_context/rc_routing.py:256)`
+  - `_paged_filename (dev_tools/repo_context/rc_routing.py:178)`
+  - `_paged_filename (dev_tools/repo_context/rc_routing.py:180)`
+  - `_paged_filename (dev_tools/repo_context/rc_routing.py:181)`
+  - `_render_catalog_page (dev_tools/repo_context/rc_routing.py:371)`
+  - `_render_catalog_page (dev_tools/repo_context/rc_routing.py:384)`
+  - `_render_catalog_page (dev_tools/repo_context/rc_routing.py:386)`
+  - `_render_catalog_page (dev_tools/repo_context/rc_routing.py:390)`
+  - `_render_catalog_page (dev_tools/repo_context/rc_routing.py:415)`
+  - `_render_catalog_page (dev_tools/repo_context/rc_routing.py:445)`
+  - `_render_file_entry (dev_tools/repo_context/rc_routing.py:268)`
+  - `_render_file_entry (dev_tools/repo_context/rc_routing.py:269)`
+  - ... and 10 more (see python_calls.csv)
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`c5d518e7937a1645…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_routing.py`)
+- Retrieval identity: sha256=`235d2ab9b4edc3c3…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_routing.py`)
 
 ### `dev_tools/repo_context/rc_scan.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
@@ -412,7 +416,7 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`fcff5535df129fa5…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_tree.py`)
 
-## Other files (non-Python)
+## Other files (non-Python / boilerplate)
 
 | Path | Title/summary | Role |
 |---|---|---|
@@ -423,14 +427,4 @@
 | `dev_tools/repo_context/examples/packet_request.invalid_schema_version.json` | packet request.invalid schema version | `unknown` |
 | `dev_tools/repo_context/examples/packet_request.invalid_unknown_field.json` | packet request.invalid unknown field | `unknown` |
 | `dev_tools/repo_context/examples/packet_request.valid.json` | packet request.valid | `unknown` |
-| `dev_tools/repo_context/README.md` | repo_context | `unknown` |
-| `dev_tools/repo_context/schema/packet_request.schema.json` | packet request.schema | `unknown` |
-
-## Omitted from this catalog (size limit reached)
-
-3 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
-
-- `dev_tools/repo_context/rc_validate.py`
-- `dev_tools/repo_context/rc_writers.py`
-- `dev_tools/repo_context/repo_context.py`
 

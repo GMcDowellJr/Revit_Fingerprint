@@ -1,9 +1,9 @@
 # Routing catalog: `tools/probes`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 33
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `764135461a8a642b2f798a2b03eb1cb4bd5bd2629b37925ce66714173e6ad324`
+- Files covered (this page): 12
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/probes` partition): `764135461a8a642b2f798a2b03eb1cb4bd5bd2629b37925ce66714173e6ad324`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `tools/probes/build_probe_inventory.py`
@@ -434,32 +434,11 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`8cef12353edd1d5f…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_floor_types.py`)
 
-### `tools/probes/probe_roof_type_import.py`
-- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
-- Purpose clues:
-  - filename/path terms: probe roof type import
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`cd6aa63529e6fc97…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_roof_type_import.py`)
-
-## Other files (non-Python)
+## Other files (non-Python / boilerplate)
 
 | Path | Title/summary | Role |
 |---|---|---|
 | `tools/probes/Exports/README.md` | Probe export data | `unknown` |
 | `tools/probes/fingerprint_probe.dyn` | fingerprint probe | `unknown` |
 | `tools/probes/PROBE_EXPORTER_DELTA.md` | <!-- | `unknown` |
-
-## Omitted from this catalog (size limit reached)
-
-20 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
-
-- `tools/probes/probe_identity.py`
 

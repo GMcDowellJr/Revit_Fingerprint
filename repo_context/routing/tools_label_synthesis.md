@@ -1,25 +1,10 @@
 # Routing catalog: `tools/label_synthesis`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 26
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `f5c31f56b033647f17cf57d58ba06b001e89d4267d32522303a0f4daef3a06e6`
+- Files covered (this page): 16
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/label_synthesis` partition): `f5c31f56b033647f17cf57d58ba06b001e89d4267d32522303a0f4daef3a06e6`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
-
-### `tools/label_synthesis/__init__.py`
-- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
-- Purpose clues:
-  - filename/path terms: init
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`e6d87c9e837f845c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/__init__.py`)
 
 ### `tools/label_synthesis/build_identity_items_lookup.py`
 - Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
@@ -117,21 +102,6 @@
 - Related tests:
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`ecbac527e320e64b…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/build_semantic_groups.py`)
-
-### `tools/label_synthesis/domain_prompts/__init__.py`
-- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
-- Purpose clues:
-  - filename/path terms: init
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`e6d87c9e837f845c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/domain_prompts/__init__.py`)
 
 ### `tools/label_synthesis/domain_prompts/arrowheads.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
@@ -376,28 +346,39 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`92cff53ab984115a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/patch_all_domain_patterns.py`)
 
-### `tools/label_synthesis/synopsis_formatters/__init__.py`
-- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+### `tools/label_synthesis/patch_domain_patterns_labels.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
 - Purpose clues:
-  - filename/path terms: init
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
+  - module docstring: tools/label_synthesis/patch_domain_patterns_labels.py
+  - filename/path terms: patch domain patterns labels
+- Important symbols (7 total):
+  - `_read_csv` (function) — line 56
+  - `_write_csv` (function) — line 64
+  - `_load_cache` (function) — line 71
+  - `_load_label_population` (function) — line 78
+  - `_try_modal` (function) — line 114
+  - `patch` (function) — line 142
+  - `main` (function) — line 302
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
+  - `<module> (tools/label_synthesis/patch_domain_patterns_labels.py:349)`
+  - `main (tools/label_synthesis/patch_domain_patterns_labels.py:339)`
+  - `patch (tools/label_synthesis/patch_domain_patterns_labels.py:154)`
+  - `patch (tools/label_synthesis/patch_domain_patterns_labels.py:155)`
+  - `patch (tools/label_synthesis/patch_domain_patterns_labels.py:222)`
+  - `patch (tools/label_synthesis/patch_domain_patterns_labels.py:224)`
+  - `patch (tools/label_synthesis/patch_domain_patterns_labels.py:294)`
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`e6d87c9e837f845c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/synopsis_formatters/__init__.py`)
+- Retrieval identity: sha256=`28185cbf08680416…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/patch_domain_patterns_labels.py`)
 
-## Omitted from this catalog (size limit reached)
+## Other files (non-Python / boilerplate)
 
-11 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
-
-- `tools/label_synthesis/patch_domain_patterns_labels.py`
-- `tools/label_synthesis/synopsis_formatters/arrowheads.py`
-- `tools/label_synthesis/synopsis_formatters/dimension_types.py`
-- `tools/label_synthesis/synopsis_formatters/fill_patterns.py`
-- ... and 7 more (not listed here)
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/label_synthesis/__init__.py` | init | `developer_utility` |
+| `tools/label_synthesis/domain_prompts/__init__.py` | init | `developer_utility` |
+| `tools/label_synthesis/synopsis_formatters/__init__.py` | init | `developer_utility` |
 

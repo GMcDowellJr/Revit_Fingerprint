@@ -144,12 +144,22 @@ def test_routing_index_respects_max_chars(repo, out):
 
 
 def test_routing_catalog_respects_max_catalog_chars(repo, out):
+    # A directory with no subdirectories to split by (_partition_files())
+    # and more files than fit in one page (max_catalog_chars) spills the
+    # overflow into <key>__page2.md, __page3.md, etc. instead of dropping
+    # anything -- every file must still be covered by *some* page.
     files = {f"core/mod_{i}.py": f'"""Module {i} docstring."""\n\ndef f_{i}():\n    return {i}\n' for i in range(30)}
     write_files(repo, files)
     _scan(repo, out, ["--routing-max-catalog-chars", "2000", "--routing-max-files-per-catalog", "1000"])
     cat_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
-    assert len(cat_text) < 2000 + 2000  # header + at least one entry can slightly exceed; omission note caps the rest
-    assert "Omitted from this catalog" in cat_text
+    assert len(cat_text) < 2000 + 200  # page 1 itself still respects the cap
+    assert (out / "routing" / "core__page2.md").exists()  # overflow spilled into a further page
+
+    manifest = _manifest(out)
+    core_pages = [c for c in manifest["catalogs"] if c["key"] == "core" or c["key"].startswith("core (page")]
+    assert len(core_pages) > 1
+    assert sum(c["file_count"] for c in core_pages) == 30  # every file lands on some page
+    assert sum(c["omitted_file_count"] for c in core_pages) == 0  # nothing was actually dropped
 
 
 def test_catalog_appendix_respects_the_cap_when_header_alone_is_close_to_it(repo, out):
@@ -177,24 +187,41 @@ def test_omitted_path_appendix_is_bounded_regardless_of_omitted_count(repo, out)
     # --routing-max-catalog-chars, defeating the exact limit it exists to
     # respect.
     #
-    # 1000 (not an absurdly tiny 100) is deliberately still much smaller
-    # than what 300 full detailed entries would need -- everything still
-    # gets omitted -- but it's big enough to leave room for the (now
-    # budget-respecting) short notice plus a sample, which is the actual
-    # behavior this test verifies. A cap smaller than the catalog's own
-    # fixed header framing can no longer show any appendix at all -- see
-    # test_first_catalog_entry_is_also_capped_by_max_catalog_chars for
-    # that boundary case.
+    # Pagination (see test_routing_catalog_respects_max_catalog_chars) now
+    # handles the ordinary "too many files for one page" case by spilling
+    # into further pages -- a *hard* omission (this appendix) only occurs
+    # when even a single minimal path+role stub can't fit alongside a
+    # page's own header, which no page (however many) could ever fix,
+    # since every page has the same budget. Whenever that's true for one
+    # file it's true for every structurally-similar file too (a minimal
+    # stub's size tracks the path length, same as an appendix sample
+    # line's does), so this only ever happens with every file on the page
+    # simultaneously -- confirmed by construction below: at a 500-char
+    # cap, all 300 of these long-filename files hard-omit on page 1
+    # itself, and no further page is even attempted (see
+    # _render_catalog_page's docstring for why that's the correct
+    # stopping point). The appendix's own 30-path sample cap (still in
+    # place for defense-in-depth) isn't exercised by this scenario --
+    # there isn't room left for a single sample line either -- but the
+    # short notice plus the manifest's full list
+    # (test_manifest_stores_the_complete_omitted_path_list) together mean
+    # nothing is silently lost even here.
     files = {
         f"core/{'x' * 80}_module_number_{i:04d}.py": f'"""Docstring {i}."""\n\ndef f_{i}():\n    return {i}\n'
         for i in range(300)
     }
     write_files(repo, files)
-    _scan(repo, out, ["--routing-max-catalog-chars", "1000", "--routing-max-files-per-catalog", "1000"])
+    _scan(repo, out, ["--routing-max-catalog-chars", "600", "--routing-max-files-per-catalog", "1000"])
     cat_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
     assert "Omitted from this catalog" in cat_text
-    assert "more (not listed here" in cat_text
-    assert len(cat_text) < 1000 + 500  # small slack for the last sample line/trailer that pushed it over
+    assert "300 file(s) omitted" in cat_text
+    assert len(cat_text) < 600 + 100  # small slack for the short notice itself
+
+    manifest = _manifest(out)
+    core_cat = next(c for c in manifest["catalogs"] if c["key"] == "core")
+    assert core_cat["file_count"] == 0  # nothing fit at all -- confirms this is the hard-omission case, not paging
+    assert core_cat["omitted_file_count"] == 300
+    assert not (out / "routing" / "core__page2.md").exists()  # a further page could never help either
 
 
 def test_manifest_stores_the_complete_omitted_path_list(repo, out):
@@ -239,22 +266,31 @@ def test_first_catalog_entry_is_also_capped_by_max_catalog_chars(repo, out):
     minimal_stub = f"### `{first_path}`\n{role_line}\n"
     assert len(first_block) > len(minimal_stub) + 20  # the full entry is genuinely bigger than the stub
 
-    tight_limit = len(header_text) + len(minimal_stub) + 5
+    # +50 (not +5) so the margin comfortably covers the few extra
+    # characters a later page's own header needs for its "(page N)"
+    # label -- this cap is reused unchanged for every page (see
+    # generate_routing()), not just the first.
+    tight_limit = len(header_text) + len(minimal_stub) + 50
     _scan(repo, out, ["--routing-max-catalog-chars", str(tight_limit),
                        "--routing-max-files-per-catalog", "1000", "--force"])
     cat_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
     assert cat_text.count("### `") == 1  # only the (stubbed) first entry survives in detail
     assert "Purpose clues" not in cat_text  # full-detail sections did not sneak in for the first entry
     assert f"### `{first_path}`" in cat_text
-    # By construction there are only 5 spare characters left after the
-    # header + stub -- nowhere near enough room for even the appendix's
-    # short notice, so none is shown here (rather than being forced in
-    # over budget); the 4 omitted files are still fully tracked in the
-    # manifest (see test_manifest_stores_the_complete_omitted_path_list).
+    # By construction there's only a little spare room left after the
+    # header + stub -- not enough for the appendix's short notice, so
+    # none is shown here (rather than being forced in over budget). But
+    # unlike the old single-page/drop-the-rest design, the other 4 files
+    # are *not* omitted at all -- each is too big for the remainder of
+    # this (now-full) page, so each spills onto its own further page.
     assert "Omitted from this catalog" not in cat_text
+    for page_num in range(2, 6):
+        assert (out / "routing" / f"core__page{page_num}.md").exists()
     manifest = _manifest(out)
-    core_cat = next(c for c in manifest["catalogs"] if c["key"] == "core")
-    assert core_cat["omitted_file_count"] == 4
+    core_pages = [c for c in manifest["catalogs"] if c["key"] == "core" or c["key"].startswith("core (page")]
+    assert len(core_pages) == 5  # one file per page, all 5 files accounted for
+    assert sum(c["file_count"] for c in core_pages) == 5
+    assert sum(c["omitted_file_count"] for c in core_pages) == 0
 
 
 def test_non_python_files_get_a_lightweight_table_row_not_a_full_block(repo, out):
@@ -276,11 +312,32 @@ def test_non_python_files_get_a_lightweight_table_row_not_a_full_block(repo, out
     assert "### `core/a.py`" in cat_text  # Python files still get the full block
     assert "### `core/readme.md`" not in cat_text
     assert "### `core/data.json`" not in cat_text
-    assert "## Other files (non-Python)" in cat_text
+    assert "## Other files (non-Python / boilerplate)" in cat_text
     assert "| `core/readme.md` | Widget Factory | " in cat_text
     assert "| `core/data.json` |" in cat_text
     assert "Important symbols" not in cat_text.split("## Other files")[1]
     assert "(none resolved" not in cat_text.split("## Other files")[1]
+
+
+def test_init_py_gets_a_lightweight_table_row_with_docstring_title(repo, out):
+    # __init__.py is Python, but almost always a re-export/boilerplate
+    # stub -- rendering the full Role/symbols/deps/callers/tests block
+    # for it is the same low-information waste of catalog budget as doing
+    # so for a non-Python file, so it gets the same compact table-row
+    # treatment. Unlike an arbitrary non-Python file, it has no markdown
+    # content to draw a title from, but it often has a real module
+    # docstring -- use that instead of falling straight to filename terms
+    # ("init"), which carries no information.
+    write_files(repo, {
+        "core/__init__.py": '"""Core domain package."""\n',
+        "core/a.py": "def f():\n    return 1\n",
+    })
+    _scan(repo, out)
+    cat_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
+    assert "### `core/a.py`" in cat_text  # a regular module still gets the full block
+    assert "### `core/__init__.py`" not in cat_text
+    assert "## Other files (non-Python / boilerplate)" in cat_text
+    assert "| `core/__init__.py` | Core domain package. | " in cat_text
 
 
 def test_markdown_title_prefers_heading_falls_back_to_first_line_then_filename(repo, out):
@@ -301,13 +358,9 @@ def test_markdown_title_prefers_heading_falls_back_to_first_line_then_filename(r
 
 def test_other_files_table_rows_respect_the_catalog_cap(repo, out):
     # The lightweight table must be bounded by --routing-max-catalog-chars
-    # the same way the Python block list is -- omitted rows still land in
-    # the manifest's per-catalog omitted list, not silently dropped or
-    # left unbounded. (With many small, uniform-size rows like these, the
-    # greedy packing loop tends to fill right up to the cap and leave too
-    # little slack for the appendix's own short notice to fit too -- that
-    # is expected, not a bug; the manifest is the authoritative record
-    # regardless of whether the appendix text happens to render.)
+    # the same way the Python block list is -- rows that don't fit on one
+    # page spill onto further pages (docs__page2.md, ...) rather than
+    # being silently dropped or left unbounded.
     files = {f"docs/note_{i:03d}.md": f"# Note {i}\n\nBody.\n" for i in range(200)}
     write_files(repo, files)
     _scan(repo, out, ["--routing-max-catalog-chars", "2000"])
@@ -315,10 +368,33 @@ def test_other_files_table_rows_respect_the_catalog_cap(repo, out):
     assert len(cat_text) < 2000 + 200
     row_count = cat_text.count("| `docs/note_")
     assert 0 < row_count < 200
+    assert (out / "routing" / "docs__page2.md").exists()
+
     manifest = _manifest(out)
-    docs_cat = next(c for c in manifest["catalogs"] if c["key"] == "docs")
-    assert docs_cat["omitted_file_count"] == 200 - row_count
-    assert len(docs_cat["omitted_paths"]) == docs_cat["omitted_file_count"]
+    docs_pages = [c for c in manifest["catalogs"] if c["key"] == "docs" or c["key"].startswith("docs (page")]
+    assert len(docs_pages) > 1
+    assert sum(c["file_count"] for c in docs_pages) == 200  # every note lands on some page
+    assert sum(c["omitted_file_count"] for c in docs_pages) == 0
+
+
+def test_paged_catalog_filenames_stay_within_the_byte_cap(repo, out):
+    # A partition key long enough that its own (unpaged) filename is
+    # already near _MAX_CATALOG_FILENAME_BYTES must still produce a valid,
+    # within-cap filename once a "__pageN" suffix is appended for its
+    # overflow pages -- _paged_filename() has to re-truncate the base
+    # name, not just tack the suffix on unconditionally.
+    segment = "x" * 70
+    files = {f"{segment}/mod_{i}.py": f'"""Docstring {i}."""\n\ndef f_{i}():\n    return {i}\n' for i in range(40)}
+    write_files(repo, files)
+    _scan(repo, out, ["--routing-max-catalog-chars", "1000", "--routing-max-files-per-catalog", "1000"])
+    manifest = _manifest(out)
+    pages = [c for c in manifest["catalogs"] if c["key"] == segment or c["key"].startswith(f"{segment} (page")]
+    assert len(pages) > 1  # confirms this scenario actually exercises pagination
+    for c in pages:
+        filename = c["path"].rsplit("/", 1)[-1]
+        assert len(filename.encode("utf-8")) <= 150, f"paged catalog filename exceeds the byte cap: {filename!r}"
+        assert (out / c["path"]).exists()
+    assert sum(c["file_count"] for c in pages) == 40
 
 
 def test_changed_source_changes_source_manifest_hash(repo, out):

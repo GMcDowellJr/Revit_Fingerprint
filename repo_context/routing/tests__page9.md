@@ -1,0 +1,371 @@
+# Routing catalog: `tests (page 9)`
+
+- Generated (UTC): 2026-08-22T11:28:23Z
+- Tool version: 0.1.0
+- Files covered (this page): 12
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests` partition): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tests/test_identity_project_info.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for the project_info.* identity items added to domains/identity.py (D-025).
+  - filename/path terms: test identity project info
+- Important symbols (30 total):
+  - `FakeParameter` (class) — line 14
+  - `FakeBuiltInParameter` (class) — line 25
+  - `FakeGuid` (class) — line 40
+  - `_system_guid_available` (function) — line 57
+  - `FakeProjectInformation` (class) — line 62
+  - `_project_info_with_configured_business_center` (function) — line 117
+  - `_project_info_without_configured_business_center` (function) — line 130
+  - `_extract_items` (function) — line 153
+  - `_as_dict` (function) — line 173
+  - `_DocForPI` (class) — line 177
+  - `FakeDoc` (class) — line 186
+  - `test_extract_project_info_items_covers_exact_expected_keys` (function) — line 201
+  - `test_no_deployment_configuration_emits_only_builtin_fields` (function) — line 209
+  - `test_malformed_configured_guid_is_rejected` (function) — line 216
+  - `test_extract_project_info_items_keys_are_registered_in_contract` (function) — line 226
+  - `test_builtin_fields_resolve_regardless_of_configured_shared_parameter` (function) — line 233
+  - `test_business_center_and_ifc_guids_resolve_ok_when_present` (function) — line 252
+  - `test_business_center_is_read_via_shared_parameter_guid_when_available` (function) — line 263
+  - `test_guid_configuration_fails_closed_when_guid_type_unavailable` (function) — line 283
+  - `test_business_center_is_not_applicable_when_shared_param_absent_not_unreadable` (function) — line 292
+  - `test_ifc_guid_builtins_follow_same_semantics_as_other_builtins` (function) — line 311
+  - `test_named_field_present_but_blank_is_missing_not_not_applicable` (function) — line 335
+  - `test_named_field_read_exception_is_unreadable` (function) — line 349
+  - `test_configured_field_quality_states_participate_in_signature` (function) — line 368
+  - `test_builtin_field_unreadable_when_no_builtinparameter_enum` (function) — line 384
+  - ... and 5 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+  - imports `domains/identity.py`
+  - imports `tests/synthetic_governance_fixtures.py`
+- Called by (high/medium-confidence static callers):
+  - `FakeProjectInformation.LookupParameter (tests/test_identity_project_info.py:96)`
+  - `FakeProjectInformation.get_Parameter (tests/test_identity_project_info.py:88)`
+  - `FakeProjectInformation.get_Parameter (tests/test_identity_project_info.py:91)`
+  - `_project_info_with_configured_business_center (tests/test_identity_project_info.py:118)`
+  - `_project_info_without_configured_business_center (tests/test_identity_project_info.py:135)`
+  - `test_builtin_field_unreadable_when_no_builtinparameter_enum (tests/test_identity_project_info.py:386)`
+  - `test_builtin_fields_resolve_regardless_of_configured_shared_parameter (tests/test_identity_project_info.py:235)`
+  - `test_business_center_and_ifc_guids_resolve_ok_when_present (tests/test_identity_project_info.py:254)`
+  - `test_business_center_is_not_applicable_when_shared_param_absent_not_unreadable (tests/test_identity_project_info.py:294)`
+  - `test_business_center_is_read_via_shared_parameter_guid_when_available (tests/test_identity_project_info.py:272)`
+  - `test_business_center_is_read_via_shared_parameter_guid_when_available (tests/test_identity_project_info.py:278)`
+  - `test_configured_field_quality_states_participate_in_signature (tests/test_identity_project_info.py:372)`
+  - `test_configured_field_quality_states_participate_in_signature (tests/test_identity_project_info.py:373)`
+  - `test_configured_field_quality_states_participate_in_signature (tests/test_identity_project_info.py:377)`
+  - `test_extract_end_to_end_includes_project_info_in_sig_hash_and_leaves_status_ok (tests/test_identity_project_info.py:401)`
+  - ... and 19 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_identity_project_info.py`
+  - `tests/test_runner_extraction_context.py`
+- Retrieval identity: sha256=`3aab44fcb6669ce4…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_identity_project_info.py`)
+
+### `tests/test_join_key_builder_shape_gating_dedupe.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test join key builder shape gating dedupe
+- Important symbols (2 total):
+  - `_policy_with_overlap` (function) — line 12
+  - `test_join_key_builder_dedupes_required_and_optional` (function) — line 32
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/join_key_builder.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `test_join_key_builder_dedupes_required_and_optional (tests/test_join_key_builder_shape_gating_dedupe.py:33)`
+- Related tests:
+  - `tests/test_join_key_builder_shape_gating_dedupe.py`
+- Retrieval identity: sha256=`64c6fb789c68a73d…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_join_key_builder_shape_gating_dedupe.py`)
+
+### `tests/test_join_key_discovery_shape_matching.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test join key discovery shape matching
+- Important symbols (3 total):
+  - `test_shape_gating_matches_bool_case_variants` (function) — line 6
+  - `test_shape_gating_does_not_require_phase_filter_for_false` (function) — line 39
+  - `test_identity_index_keeps_q_only_rows_for_required_presence` (function) — line 71
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/join_key_discovery/eval.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`1376db307de4a532…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_join_key_discovery_shape_matching.py`)
+
+### `tests/test_join_key_migration.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for join_key migration for view_category_overrides and view_templates domains.
+  - filename/path terms: test join key migration
+- Important symbols (6 total):
+  - `TestViewCategoryOverridesOverrideHash` (class) — line 29
+  - `TestViewCategoryOverridesPhase2Partition` (class) — line 107
+  - `TestViewTemplatesJoinKey` (class) — line 156
+  - `TestJoinKeyPolicyStructure` (class) — line 195
+  - `TestJoinKeyStructureValidation` (class) — line 249
+  - `TestGroupingBasis` (class) — line 292
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/record_v2.py`
+  - imports `domains/view_category_overrides.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`e77c1ba6b820a187…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_join_key_migration.py`)
+
+### `tests/test_join_key_policy_validation.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test join key policy validation
+- Important symbols (6 total):
+  - `test_valid_shape_gated_policy_has_no_errors` (function) — line 28
+  - `test_rule_a1_discriminator_first_required` (function) — line 33
+  - `test_rule_a2_no_overlap_common_required` (function) — line 43
+  - `test_rule_a3_additional_required_in_optional_items` (function) — line 56
+  - `test_rule_a4_requires_non_empty_additional_required` (function) — line 66
+  - `test_rule_a5_orphaned_keys_warning_only` (function) — line 79
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/join_key_policy.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`69c81a49b22c8860…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_join_key_policy_validation.py`)
+
+### `tests/test_label_synthesis_domain_prompt_loader.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test label synthesis domain prompt loader
+- Important symbols (2 total):
+  - `test_domain_prompt_loader_supports_single_word_domains` (function) — line 4
+  - `test_domain_prompt_loader_falls_back_to_base_for_multi_segment_domains` (function) — line 10
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/label_synthesis/synthesize_fragmented_labels.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`68b2ff6348c12a15…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_label_synthesis_domain_prompt_loader.py`)
+
+### `tests/test_line_pattern_mapping_reconstruction.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Pure-Python tests for mapping/line_pattern_reconstruction.py.
+  - filename/path terms: test line pattern mapping reconstruction
+- Important symbols (27 total):
+  - `_seg_rows` (function) — line 42
+  - `_requested_join_hash_for` (function) — line 62
+  - `test_reconstruct_ok_with_full_evidence` (function) — line 74
+  - `test_reconstruct_degraded_when_forensic_evidence_absent` (function) — line 92
+  - `test_dot_length_normalization_forces_zero_and_degrades` (function) — line 104
+  - `test_block_settings_absent` (function) — line 126
+  - `test_block_no_items_marker` (function) — line 133
+  - `test_block_duplicate_segment_key` (function) — line 140
+  - `test_block_segment_count_mismatch` (function) — line 151
+  - `test_block_segment_indices_non_contiguous` (function) — line 158
+  - `test_block_quality_not_ok` (function) — line 172
+  - `test_block_segment_kind_unmapped` (function) — line 184
+  - `test_block_non_positive_length_for_non_dot_segment` (function) — line 191
+  - `test_block_segments_def_hash_mismatch` (function) — line 198
+  - `test_block_reconstructed_join_hash_mismatch` (function) — line 209
+  - `_reference_norm_hash_via_run_extract_all` (function) — line 222
+  - `test_segments_norm_hash_matches_run_extract_all_reference` (function) — line 262
+  - `test_select_observed_name_highest_files_count_wins` (function) — line 282
+  - `test_select_observed_name_ignores_non_ok_and_empty` (function) — line 294
+  - `test_select_observed_name_none_when_no_acceptable_rows` (function) — line 305
+  - `test_resolve_observed_name_synthetic_fallback_is_deterministic` (function) — line 312
+  - `test_build_mapping_name_candidates_deterministic_collision_name` (function) — line 321
+  - `test_sanitize_revit_name_replaces_illegal_characters` (function) — line 331
+  - `test_group_requested_join_hashes_dedupes_and_preserves_bundle_associations` (function) — line 341
+  - `test_dominant_status_ordering` (function) — line 366
+  - ... and 2 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/record_v2.py`
+  - imports `mapping/line_pattern_reconstruction.py`
+- Called by (high/medium-confidence static callers):
+  - `test_block_duplicate_segment_key (tests/test_line_pattern_mapping_reconstruction.py:141)`
+  - `test_block_non_positive_length_for_non_dot_segment (tests/test_line_pattern_mapping_reconstruction.py:192)`
+  - `test_block_quality_not_ok (tests/test_line_pattern_mapping_reconstruction.py:173)`
+  - `test_block_reconstructed_join_hash_mismatch (tests/test_line_pattern_mapping_reconstruction.py:212)`
+  - `test_block_segment_count_mismatch (tests/test_line_pattern_mapping_reconstruction.py:152)`
+  - `test_block_segment_kind_unmapped (tests/test_line_pattern_mapping_reconstruction.py:185)`
+  - `test_block_segments_def_hash_mismatch (tests/test_line_pattern_mapping_reconstruction.py:199)`
+  - `test_block_segments_def_hash_mismatch (tests/test_line_pattern_mapping_reconstruction.py:201)`
+  - `test_dot_length_normalization_forces_zero_and_degrades (tests/test_line_pattern_mapping_reconstruction.py:107)`
+  - `test_dot_length_normalization_forces_zero_and_degrades (tests/test_line_pattern_mapping_reconstruction.py:108)`
+  - `test_reconstruct_degraded_when_forensic_evidence_absent (tests/test_line_pattern_mapping_reconstruction.py:93)`
+  - `test_reconstruct_degraded_when_forensic_evidence_absent (tests/test_line_pattern_mapping_reconstruction.py:94)`
+  - `test_reconstruct_ok_with_full_evidence (tests/test_line_pattern_mapping_reconstruction.py:75)`
+  - `test_reconstruct_ok_with_full_evidence (tests/test_line_pattern_mapping_reconstruction.py:82)`
+  - `test_segments_norm_hash_matches_run_extract_all_reference (tests/test_line_pattern_mapping_reconstruction.py:274)`
+- Related tests:
+  - `tests/test_line_pattern_mapping_reconstruction.py`
+- Retrieval identity: sha256=`b61089d4642dc174…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_line_pattern_mapping_reconstruction.py`)
+
+### `tests/test_line_patterns_canonical_selectors.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test line patterns canonical selectors
+- Important symbols (3 total):
+  - `_Seg` (class) — line 12
+  - `_line_patterns_policy` (function) — line 18
+  - `test_line_patterns_canonical_evidence_selectors_and_hashing` (function) — line 23
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+  - imports `domains/line_patterns.py`
+- Called by (high/medium-confidence static callers):
+  - `test_line_patterns_canonical_evidence_selectors_and_hashing (tests/test_line_patterns_canonical_selectors.py:24)`
+  - `test_line_patterns_canonical_evidence_selectors_and_hashing (tests/test_line_patterns_canonical_selectors.py:46)`
+- Related tests:
+  - `tests/test_line_patterns_canonical_selectors.py`
+- Retrieval identity: sha256=`5900f9530ec6d873…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_line_patterns_canonical_selectors.py`)
+
+### `tests/test_line_styles_canonical_selectors.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test line styles canonical selectors
+- Important symbols (2 total):
+  - `_line_styles_policy` (function) — line 10
+  - `test_line_styles_canonical_evidence_selectors_and_hashing` (function) — line 15
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+  - imports `domains/line_styles.py`
+- Called by (high/medium-confidence static callers):
+  - `test_line_styles_canonical_evidence_selectors_and_hashing (tests/test_line_styles_canonical_selectors.py:26)`
+- Related tests:
+  - `tests/test_line_styles_canonical_selectors.py`
+- Retrieval identity: sha256=`ac56fa604c2458a9…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_line_styles_canonical_selectors.py`)
+
+### `tests/test_materials.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test materials
+- Important symbols (27 total):
+  - `_Id` (class) — line 8
+  - `_Color` (class) — line 13
+  - `_Param` (class) — line 20
+  - `_FillPatternElem` (class) — line 32
+  - `_Mat` (class) — line 38
+  - `_Doc` (class) — line 74
+  - `_identity_map` (function) — line 83
+  - `_material_payload` (function) — line 88
+  - `_make_ctx_with_fill_patterns` (function) — line 92
+  - `test_materials_emits_records_and_hash` (function) — line 103
+  - `test_identity_fields_captured_but_excluded_from_graphics_hash` (function) — line 119
+  - `test_use_render_appearance_captured_but_not_hashed` (function) — line 141
+  - `test_color_and_transparency_are_displayed_values` (function) — line 160
+  - `test_no_pattern_element_id_minus_one_maps_to_none` (function) — line 173
+  - `test_missing_fill_pattern_ctx_degrades_not_blocks` (function) — line 187
+  - `test_fill_pattern_ctx_resolution_populates_sig_hash` (function) — line 200
+  - `test_material_ctx_maps_populated` (function) — line 210
+  - `test_optional_identity_fields_do_not_emit_canonical_sentinel_literals` (function) — line 228
+  - `test_identity_basis_contains_uid_and_sig_basis_items` (function) — line 242
+  - `test_sig_basis_keys_used_reproduces_sig_hash` (function) — line 254
+  - `test_graphics_sig_basis_keys_used_reproduces_graphics_sig_hash_v2` (function) — line 270
+  - `test_label_uses_contract_provenance_token` (function) — line 283
+  - `test_fill_pattern_ctx_missing_is_evaluated_per_record` (function) — line 291
+  - `test_keynote_populated_emits_ok_item` (function) — line 308
+  - `test_keynote_blank_emits_missing_item_not_omitted` (function) — line 323
+  - ... and 2 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `_Mat.__init__ (tests/test_materials.py:41)`
+  - `_Mat.__init__ (tests/test_materials.py:46)`
+  - `_Mat.__init__ (tests/test_materials.py:49)`
+  - `_Mat.__init__ (tests/test_materials.py:50)`
+  - `_Mat.__init__ (tests/test_materials.py:51)`
+  - `_Mat.__init__ (tests/test_materials.py:52)`
+  - `_Mat.__init__ (tests/test_materials.py:53)`
+  - `_Mat.__init__ (tests/test_materials.py:54)`
+  - `_Mat.__init__ (tests/test_materials.py:55)`
+  - `_Mat.__init__ (tests/test_materials.py:56)`
+  - `_Mat.__init__ (tests/test_materials.py:59)`
+  - `_Mat.__init__ (tests/test_materials.py:60)`
+  - `_Mat.__init__ (tests/test_materials.py:61)`
+  - `_Mat.__init__ (tests/test_materials.py:62)`
+  - `_Mat.__init__ (tests/test_materials.py:63)`
+  - ... and 65 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_materials.py`
+- Retrieval identity: sha256=`8ba1b1083baa00ec…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_materials.py`)
+
+### `tests/test_na_token.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test na token
+- Important symbols (2 total):
+  - `TestIsNaToken` (class) — line 9
+  - `TestIsBlankOrNa` (class) — line 30
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`3b026915340615ad…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_na_token.py`)
+
+### `tests/test_name_key_inline_analysis_agreement.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Item 0 (PR2 brief): verify inline vs. analysis-side agreement for join_key_name_identity.
+  - filename/path terms: test name key inline analysis agreement
+- Important symbols (7 total):
+  - `_inline_equivalent` (function) — line 48
+  - `_native_case` (function) — line 70
+  - `_bucket_widened_case` (function) — line 80
+  - `_label_only_case` (function) — line 91
+  - `name_key_policies` (function) — line 142
+  - `test_inline_equivalent_matches_analysis_side` (function) — line 147
+  - `test_agreement_sample_size_and_match_rate` (function) — line 167
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/name_key_builder.py`
+  - imports `core/name_key_coverage.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:105)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:106)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:107)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:108)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:109)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:110)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:111)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:114)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:115)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:116)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:117)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:118)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:121)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:122)`
+  - `<module> (tests/test_name_key_inline_analysis_agreement.py:123)`
+  - ... and 12 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_name_key_inline_analysis_agreement.py`
+- Retrieval identity: sha256=`89660fba9a0988b4…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_name_key_inline_analysis_agreement.py`)
+

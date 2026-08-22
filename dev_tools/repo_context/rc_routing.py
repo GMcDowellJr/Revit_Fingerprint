@@ -159,6 +159,28 @@ def _catalog_filenames(keys: list) -> dict:
     return result
 
 
+def _paged_filename(filename: str, page_num: int) -> str:
+    """Filename for the Nth page of a catalog whose first page is
+    `filename` (already collision/byte-cap-safe, from _catalog_filenames()).
+    page_num 1 returns `filename` unchanged -- the common case, where a
+    partition's files fit on a single page, produces exactly the same
+    filenames as before this existed. page_num >= 2 appends a `__pageN`
+    suffix, re-truncating (preserving byte-cap safety) if `filename` was
+    already close to _MAX_CATALOG_FILENAME_BYTES. Two different keys can
+    never collide this way -- _catalog_filenames() already guarantees
+    their (unpaged) filenames are distinct, and this only ever appends to
+    one key's own filename."""
+    if page_num <= 1:
+        return filename
+    assert filename.endswith(".md")
+    stem = filename[:-3]
+    suffix = f"__page{page_num}.md"
+    if _byte_len(stem) + _byte_len(suffix) <= _MAX_CATALOG_FILENAME_BYTES:
+        return f"{stem}{suffix}"
+    prefix_budget_bytes = max(1, _MAX_CATALOG_FILENAME_BYTES - _byte_len(suffix))
+    return f"{_truncate_to_byte_limit(stem, prefix_budget_bytes)}{suffix}"
+
+
 def _top_level_symbols(rel_path: str, symbols_by_file: dict) -> list:
     rows = symbols_by_file.get(rel_path, [])
     top = [s for s in rows if s.parent_symbol == "<module>" and s.symbol_type != "module"]
@@ -225,6 +247,18 @@ def _markdown_title(root: Path, rel_path: str) -> str:
     return redact_secrets(title)[:_MAX_CONTENT_TITLE_CHARS]
 
 
+def _docstring_title(rel_path: str, symbols_by_file: dict) -> str:
+    """Same redact-then-truncate content-derived title as _markdown_title(),
+    but drawn from a Python file's own module docstring -- used for
+    __init__.py, which (unlike an arbitrary non-Python file) has no
+    filename worth extracting terms from but often has a real one-line
+    docstring describing the package."""
+    docstring = _module_docstring(rel_path, symbols_by_file)
+    if not docstring:
+        return ""
+    return redact_secrets(docstring)[:_MAX_CONTENT_TITLE_CHARS]
+
+
 def _render_file_entry(f, symbols_by_file: dict, role: str, role_evidence: str,
                         entrypoint_reason: Optional[str], internal_deps: list,
                         called_by: list, related_tests: list, communities: list,
@@ -286,6 +320,180 @@ def _render_file_entry(f, symbols_by_file: dict, role: str, role_evidence: str,
     lines.append(f"- Retrieval identity: sha256=`{f.sha256[:16]}…`, chunked={'yes' if f.chunked else 'no'} "
                  f"(see chunk_manifest.csv / file_inventory.csv for `{f.relative_path}`)")
     return "\n".join(lines) + "\n"
+
+
+def _catalog_page_header(key: str, page_num: int, cat_hash: str, started_at_utc: str, files_covered) -> str:
+    page_label = key if page_num <= 1 else f"{key} (page {page_num})"
+    return (
+        f"# Routing catalog: `{page_label}`\n\n"
+        f"- Generated (UTC): {started_at_utc}\n"
+        f"- Tool version: {TOOL_VERSION}\n"
+        f"- Files covered (this page): {files_covered}\n"
+        f"- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `{key}` partition): `{cat_hash}`\n"
+        f"- If this hash differs from a previous copy of this file, the underlying source changed "
+        f"and this catalog should be regenerated via `scan`.\n\n"
+    )
+
+
+def _render_catalog_page(files: list, key: str, page_num: int, cat_hash: str, started_at_utc: str, root: Path,
+                          symbols_by_file: dict, roles: dict, role_evidence: dict,
+                          entrypoint_reason_by_path: dict, internal_deps_by_file: dict, called_by_file: dict,
+                          tests_by_target: dict, communities_by_file: dict, routing_opts: "RoutingOptions") -> tuple:
+    """Renders as many of `files` (processed strictly in the given order)
+    as fit within routing_opts.max_catalog_chars for one catalog page.
+
+    Returns (page_text, consumed_count, hard_omitted_paths):
+    - `consumed_count` is how many of `files` -- always a *prefix* -- were
+      actually placed on this page (as a full block, a minimal stub, or a
+      lightweight table row). The caller advances to the next page
+      starting at `files[consumed_count:]`; nothing before that index is
+      ever silently dropped -- an oversized, unsplittable directory
+      (e.g. a flat `tests/` with 100+ files) spills into `<key>__page2.md`,
+      `<key>__page3.md`, etc. instead of quietly losing everything past
+      the first page's budget.
+    - `hard_omitted_paths` names files that could not be represented at
+      all -- not even a minimal path+role stub fits alongside this page's
+      own header, which only happens when max_catalog_chars is smaller
+      than that fixed framing. Since every page has the identical budget,
+      such a file could never fit on *any* page, paged or not; it is
+      genuinely omitted (tracked here and in the manifest), not deferred.
+      `consumed_count` can only be 0 (nothing placed at all) when every
+      file in `files` hit this case -- the caller must stop paging in
+      that situation instead of retrying the same, still-unconsumed list
+      forever.
+
+    The exact character-budget used to decide what fits is computed
+    against a worst-case (6-digit) placeholder for "Files covered" in the
+    header, since the true count isn't known until this walk finishes --
+    the real header (built afterward, once `consumed_count` is known) is
+    therefore always <= the size already budgeted for, never larger.
+    """
+    header_placeholder = _catalog_page_header(key, page_num, cat_hash, started_at_utc, "999999")
+    body_len = len(header_placeholder)
+
+    blocks = []
+    other_rows = []
+    table_header_added = False
+    hard_omitted_paths = []
+    table_header = "\n## Other files (non-Python / boilerplate)\n\n| Path | Title/summary | Role |\n|---|---|---|\n"
+    consumed = 0
+    for f in files:
+        rel = f.relative_path
+        if f.extension != ".py" or f.filename == "__init__.py":
+            if f.extension == ".md":
+                title = _markdown_title(root, rel)
+            elif f.filename == "__init__.py":
+                title = _docstring_title(rel, symbols_by_file)
+            else:
+                title = ""
+            if not title:
+                title = _filename_terms(rel) or "(no title)"
+            title = title.replace("|", "\\|").replace("\n", " ")
+            row = f"| `{rel}` | {title} | `{roles[rel]}` |\n"
+            extra_header_cost = 0 if table_header_added else len(table_header)
+            if body_len + extra_header_cost + len(row) > routing_opts.max_catalog_chars:
+                if consumed > 0:
+                    break  # this file (and everything after it) starts the next page
+                # First entry attempted on a fresh page and even a single
+                # lightweight row doesn't fit -- this page's own header
+                # framing alone already consumes the whole budget. No
+                # page (paged or not) could ever fit this file; skip it
+                # and keep trying the rest of `files`, which may be
+                # smaller (or may all be equally unfittable, in which
+                # case the caller sees consumed == 0 and stops).
+                hard_omitted_paths.append(rel)
+                continue
+            if not table_header_added:
+                other_rows.append(table_header)
+                body_len += len(table_header)
+                table_header_added = True
+            other_rows.append(row)
+            body_len += len(row)
+            consumed += 1
+            continue
+
+        block = _render_file_entry(
+            f, symbols_by_file, roles[rel], role_evidence[rel],
+            entrypoint_reason_by_path.get(rel), sorted(internal_deps_by_file.get(rel, ())),
+            sorted(called_by_file.get(rel, ())), sorted(tests_by_target.get(rel, ())),
+            communities_by_file.get(rel, []), routing_opts.max_symbols_per_file_entry,
+        )
+        # Blocks are joined with "\n".join() below, which inserts one
+        # extra separator character before every block after the first --
+        # account for that here too, or body_len silently undercounts the
+        # real assembled length by (len(blocks) - 1) characters.
+        join_cost = 1 if blocks else 0
+        if body_len + join_cost + len(block) > routing_opts.max_catalog_chars:
+            if consumed > 0:
+                break
+            # The very first entry attempted on a fresh page already
+            # exceeds the limit on its own -- fall back to a minimal stub
+            # (path + role only) so the page still names this file
+            # directly instead of skipping straight to the next page.
+            minimal = f"### `{rel}`\n- Role: `{roles[rel]}` (evidence: {role_evidence[rel]})\n"
+            if body_len + len(minimal) > routing_opts.max_catalog_chars:
+                hard_omitted_paths.append(rel)
+                continue
+            blocks.append(minimal)
+            body_len += len(minimal)
+            consumed += 1
+            continue
+        blocks.append(block)
+        body_len += join_cost + len(block)
+        consumed += 1
+
+    header = _catalog_page_header(key, page_num, cat_hash, started_at_utc, consumed)
+    text = header + "\n".join(blocks)
+    if other_rows:
+        text += "".join(other_rows)
+    # The header above is fixed, mandatory framing (revision/hash
+    # provenance) that always renders in full regardless of the
+    # configured cap -- but the appendix below is optional annotation and
+    # must respect whatever budget is actually left. Split into a short,
+    # near-mandatory notice (just the count and where to look) and an
+    # optional, further-bounded detailed sample list -- a full
+    # explanatory paragraph for *every* page with a hard omission would
+    # itself often not fit within a realistic (not absurdly tiny) cap,
+    # silently losing even the fact that omission happened.
+    if hard_omitted_paths:
+        remaining = routing_opts.max_catalog_chars - len(text)
+        short_notice = (
+            f"\n## Omitted from this catalog (size limit reached)\n\n"
+            f"{len(hard_omitted_paths)} file(s) omitted; see `file_inventory.csv` / "
+            f"`routing/routing_manifest.json` for the complete list.\n"
+        )
+        if len(short_notice) <= remaining:
+            text += short_notice
+            remaining -= len(short_notice)
+            # Bounded regardless of how many files were omitted -- listing
+            # every single one here (a partition can have hundreds) would
+            # itself defeat --routing-max-catalog-chars. A capped sample
+            # is enough to show the shape; the full list already lives in
+            # file_inventory.csv (filtered to this directory) and the
+            # per-catalog manifest entry.
+            omitted_sample_cap = 30
+            sample = ""
+            shown = 0
+            for p in hard_omitted_paths[:omitted_sample_cap]:
+                line = f"- `{p}`\n"
+                if len(line) > remaining:
+                    break
+                sample += line
+                remaining -= len(line)
+                shown += 1
+            not_shown = len(hard_omitted_paths) - shown
+            if not_shown > 0 and shown > 0:
+                trailer = f"- ... and {not_shown} more (not listed here)\n"
+                if len(trailer) <= remaining:
+                    sample += trailer
+            if sample:
+                text += f"\n{sample}"
+        # else: not even the short notice fits -- omit the appendix
+        # entirely rather than force it in over budget. The complete
+        # omitted-path list is still in routing_manifest.json's per-page
+        # omitted_paths.
+
+    return text, consumed, hard_omitted_paths
 
 
 def generate_routing(root: Path, output_dir: Path, result, routing_opts: RoutingOptions,
@@ -386,163 +594,53 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
             "\n".join(f"{f.relative_path}:{f.sha256}" for f in cat_files)
         )
 
-        blocks = []
-        other_rows = []   # non-Python files: lightweight table rows, see below
-        table_header_added = False
-        omitted_paths = []
-        header = (
-            f"# Routing catalog: `{key}`\n\n"
-            f"- Generated (UTC): {started_at_utc}\n"
-            f"- Tool version: {TOOL_VERSION}\n"
-            f"- Files covered: {len(cat_files)}\n"
-            f"- Catalog source hash (sha256 of sorted `path:sha256` pairs): `{cat_hash}`\n"
-            f"- If this hash differs from a previous copy of this file, the underlying source changed "
-            f"and this catalog should be regenerated via `scan`.\n\n"
-        )
-        body_len = len(header)
-        # "## Other files (non-Python)" table header, added once and
-        # budget-checked like everything else -- see the branch below.
-        table_header = "\n## Other files (non-Python)\n\n| Path | Title/summary | Role |\n|---|---|---|\n"
-        for f in cat_files:
-            rel = f.relative_path
-            if f.extension != ".py":
-                # Every field in _render_file_entry below (Role, top-level
-                # symbols, internal deps, callers, related tests) is a
-                # Python-specific fact that simply doesn't exist for a
-                # non-Python file -- rendering the full block produced six
-                # lines of "(none)"/"unknown" per entry and nothing else
-                # useful beyond the filename itself. A markdown file also
-                # has genuine content to draw a purpose clue from (its
-                # first heading or first line) that a bare filename can't
-                # give you. A compact table row carries that clue at a
-                # fraction of the cost of the Python block format, so more
-                # of these files fit before the catalog's own cap kicks in.
-                title = _markdown_title(root, rel) if f.extension == ".md" else ""
-                if not title:
-                    title = _filename_terms(rel) or "(no title)"
-                title = title.replace("|", "\\|").replace("\n", " ")
-                row = f"| `{rel}` | {title} | `{roles[rel]}` |\n"
-                extra_header_cost = 0 if table_header_added else len(table_header)
-                if body_len + extra_header_cost + len(row) > routing_opts.max_catalog_chars:
-                    omitted_paths.append(rel)
-                    continue
-                if not table_header_added:
-                    other_rows.append(table_header)
-                    body_len += len(table_header)
-                    table_header_added = True
-                other_rows.append(row)
-                body_len += len(row)
-                continue
-
-            block = _render_file_entry(
-                f, symbols_by_file, roles[rel], role_evidence[rel],
-                entrypoint_reason_by_path.get(rel), sorted(internal_deps_by_file.get(rel, ())),
-                sorted(called_by_file.get(rel, ())), sorted(tests_by_target.get(rel, ())),
-                communities_by_file.get(rel, []), routing_opts.max_symbols_per_file_entry,
+        # A partition that doesn't fit in one page (an oversized, flat
+        # directory _partition_files() had no subdirectory left to split
+        # by) spills into additional pages -- <filename>, then
+        # <filename>__page2.md, __page3.md, and so on -- rather than
+        # silently dropping every file past the first page's budget. Each
+        # page is rendered strictly in order (cat_files sorted by path),
+        # so a page's files are always a contiguous range; the loop stops
+        # only once every file has landed on some page, or (the
+        # degenerate case: max_catalog_chars smaller than one page's own
+        # fixed header) a page manages to place nothing at all, in which
+        # case its hard_omitted_paths names the files that could never
+        # fit on any page and no further pages are attempted.
+        remaining = cat_files
+        page_num = 1
+        while True:
+            page_filename = _paged_filename(filename, page_num)
+            text, consumed, hard_omitted_paths = _render_catalog_page(
+                remaining, key, page_num, cat_hash, started_at_utc, root, symbols_by_file, roles,
+                role_evidence, entrypoint_reason_by_path, internal_deps_by_file, called_by_file,
+                tests_by_target, communities_by_file, routing_opts,
             )
-            # Blocks are joined with "\n".join() below, which inserts one
-            # extra separator character before every block after the
-            # first -- account for that here too, or body_len silently
-            # undercounts the real assembled length by (len(blocks) - 1)
-            # characters, letting the packed text end up a few characters
-            # over max_catalog_chars even when every individual decision
-            # above looked like it fit.
-            join_cost = 1 if blocks else 0
-            if body_len + join_cost + len(block) > routing_opts.max_catalog_chars:
-                if blocks:
-                    omitted_paths.append(rel)
-                    continue
-                # The very first entry alone already exceeds the limit --
-                # unconditionally including it (the old behavior) let a
-                # single oversized file entry blow past
-                # --routing-max-catalog-chars on its own. Fall back to a
-                # minimal stub (path + role only) so the catalog still
-                # names at least this file directly instead of jumping
-                # straight to an empty-detail catalog.
-                minimal = f"### `{rel}`\n- Role: `{roles[rel]}` (evidence: {role_evidence[rel]})\n"
-                if body_len + len(minimal) > routing_opts.max_catalog_chars:
-                    omitted_paths.append(rel)
-                    continue
-                blocks.append(minimal)
-                body_len += len(minimal)
-                continue
-            blocks.append(block)
-            body_len += join_cost + len(block)
+            atomic_write_text(routing_dir / page_filename, text + "\n")
 
-        text = header + "\n".join(blocks)
-        if other_rows:
-            text += "".join(other_rows)
-        # The header above is fixed, mandatory framing (revision/hash
-        # provenance) that always renders in full regardless of the
-        # configured cap -- but the appendix below is optional annotation,
-        # same as everything else optional in this tool, and must respect
-        # whatever budget is actually left. Previously it was appended
-        # unconditionally with no size accounting at all, so a very small
-        # --routing-max-catalog-chars (e.g. 100) still produced output far
-        # larger than the cap once the header and appendix's own fixed
-        # framing text were added on top of it.
-        #
-        # Split into a short, near-mandatory notice (just the count and
-        # where to look) and an optional, further-bounded detailed sample
-        # list -- a full explanatory paragraph for *every* catalog that
-        # omits anything would itself often not fit within a realistic
-        # (not absurdly tiny) cap, silently losing even the fact that
-        # omission happened.
-        if omitted_paths:
-            remaining = routing_opts.max_catalog_chars - len(text)
-            short_notice = (
-                f"\n## Omitted from this catalog (size limit reached)\n\n"
-                f"{len(omitted_paths)} file(s) omitted; see `file_inventory.csv` / "
-                f"`routing/routing_manifest.json` for the complete list.\n"
-            )
-            if len(short_notice) <= remaining:
-                text += short_notice
-                remaining -= len(short_notice)
-                # Bounded regardless of how many files were omitted --
-                # listing every single one here (a partition can have
-                # hundreds) would itself defeat --routing-max-catalog-chars.
-                # A capped sample is enough to show the shape; the full
-                # list already lives in file_inventory.csv (filtered to
-                # this directory) and the per-catalog manifest entry.
-                omitted_sample_cap = 30
-                sample = ""
-                shown = 0
-                for p in omitted_paths[:omitted_sample_cap]:
-                    line = f"- `{p}`\n"
-                    if len(line) > remaining:
-                        break
-                    sample += line
-                    remaining -= len(line)
-                    shown += 1
-                not_shown = len(omitted_paths) - shown
-                if not_shown > 0 and shown > 0:
-                    trailer = f"- ... and {not_shown} more (not listed here)\n"
-                    if len(trailer) <= remaining:
-                        sample += trailer
-                if sample:
-                    text += f"\n{sample}"
-            # else: not even the short notice fits -- omit the appendix
-            # entirely rather than force it in over budget. The complete
-            # omitted-path list is still in routing_manifest.json's
-            # per-catalog omitted_paths.
-        atomic_write_text(routing_dir / filename, text + "\n")
+            page_files = remaining[:consumed]
+            by_role = Counter(roles[f.relative_path] for f in page_files)
+            symbol_count = sum(len(_top_level_symbols(f.relative_path, symbols_by_file)) for f in page_files)
+            catalog_entries.append({
+                "key": key if page_num == 1 else f"{key} (page {page_num})",
+                "path": f"routing/{page_filename}",
+                "file_count": len(page_files),
+                "symbol_count": symbol_count,
+                "roles": dict(sorted(by_role.items())),
+                "omitted_file_count": len(hard_omitted_paths),
+                "source_hash": cat_hash,
+                "sample_paths": [f.relative_path for f in page_files[:3]],
+                # The page's own appendix only samples the first 30
+                # omitted paths (keeping that file bounded); the manifest
+                # is where a machine consumer can get the complete list.
+                "omitted_paths": hard_omitted_paths,
+            })
 
-        by_role = Counter(roles[f.relative_path] for f in cat_files)
-        symbol_count = sum(len(_top_level_symbols(f.relative_path, symbols_by_file)) for f in cat_files)
-        catalog_entries.append({
-            "key": key,
-            "path": f"routing/{filename}",
-            "file_count": len(cat_files),
-            "symbol_count": symbol_count,
-            "roles": dict(sorted(by_role.items())),
-            "omitted_file_count": len(omitted_paths),
-            "source_hash": cat_hash,
-            "sample_paths": [f.relative_path for f in cat_files[:3]],
-            # The catalog's own appendix only samples the first 30 omitted
-            # paths (keeping that file bounded); the manifest is where a
-            # machine consumer can get the complete list.
-            "omitted_paths": omitted_paths,
-        })
+            if consumed == 0:
+                break  # nothing more could ever fit; hard_omitted_paths covers the rest
+            remaining = remaining[consumed:]
+            if not remaining:
+                break
+            page_num += 1
 
     index_text = _render_index(
         root, started_at_utc, git_info, source_manifest_hash, catalog_entries,

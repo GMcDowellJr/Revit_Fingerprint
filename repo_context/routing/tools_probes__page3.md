@@ -1,0 +1,450 @@
+# Routing catalog: `tools/probes (page 3)`
+
+- Generated (UTC): 2026-08-22T11:28:23Z
+- Tool version: 0.1.0
+- Files covered (this page): 9
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/probes` partition): `764135461a8a642b2f798a2b03eb1cb4bd5bd2629b37925ce66714173e6ad324`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tools/probes/probe_roof_type_import.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: probe roof type import
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`cd6aa63529e6fc97…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_roof_type_import.py`)
+
+### `tools/probes/probe_roof_types.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: probe roof types
+- Important symbols (26 total):
+  - `_safe` (function) — line 79
+  - `_safe_capture` (function) — line 85
+  - `_multi_repr` (function) — line 91
+  - `_safe_type_name` (function) — line 111
+  - `_safe_param_def_name` (function) — line 126
+  - `_safe_get_datatype` (function) — line 133
+  - `_is_length_datatype` (function) — line 142
+  - `_is_angle_datatype` (function) — line 150
+  - `_fmt_display` (function) — line 158
+  - `_format_param_contract` (function) — line 169
+  - `_contract_from_value` (function) — line 221
+  - `_to_inches` (function) — line 224
+  - `_resolve_material` (function) — line 267
+  - `_resolve_similar_type` (function) — line 278
+  - `_resolve_workset` (function) — line 292
+  - `_ensure_entry` (function) — line 314
+  - `_maybe_set_example` (function) — line 320
+  - `_observe` (function) — line 331
+  - `_reflect_member_names` (function) — line 477
+  - `_reflect_try_get` (function) — line 625
+  - `_reflect_contract` (function) — line 647
+  - `_run_reflection_sweep` (function) — line 718
+  - `_probe_revit_version` (function) — line 765
+  - `_probe_document_identity` (function) — line 774
+  - `_probe_run_id` (function) — line 781
+  - ... and 1 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/probes/probe_roof_types.py:234)`
+  - `<module> (tools/probes/probe_roof_types.py:258)`
+  - `<module> (tools/probes/probe_roof_types.py:262)`
+  - `<module> (tools/probes/probe_roof_types.py:353)`
+  - `<module> (tools/probes/probe_roof_types.py:354)`
+  - `<module> (tools/probes/probe_roof_types.py:355)`
+  - `<module> (tools/probes/probe_roof_types.py:356)`
+  - `<module> (tools/probes/probe_roof_types.py:357)`
+  - `<module> (tools/probes/probe_roof_types.py:359)`
+  - `<module> (tools/probes/probe_roof_types.py:361)`
+  - `<module> (tools/probes/probe_roof_types.py:362)`
+  - `<module> (tools/probes/probe_roof_types.py:374)`
+  - `<module> (tools/probes/probe_roof_types.py:376)`
+  - `<module> (tools/probes/probe_roof_types.py:378)`
+  - `<module> (tools/probes/probe_roof_types.py:381)`
+  - ... and 71 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`f14aa1c4b3a455c5…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_roof_types.py`)
+
+### `tools/probes/probe_text_types.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: probe text types
+- Important symbols (29 total):
+  - `_safe` (function) — line 87
+  - `_safe_type_name` (function) — line 93
+  - `_safe_param_def_name` (function) — line 108
+  - `_safe_get_datatype` (function) — line 115
+  - `_is_length_datatype` (function) — line 124
+  - `_is_angle_datatype` (function) — line 132
+  - `_fmt_display` (function) — line 140
+  - `_format_param_contract` (function) — line 151
+  - `_contract_value` (function) — line 227
+  - `_rgb_triplet_from_int` (function) — line 231
+  - `_hex32_from_int` (function) — line 249
+  - `_rgb_rrggbb_from_int` (function) — line 258
+  - `_rgb_bbgrr_from_int` (function) — line 271
+  - `_hex_rgb_from_triplet` (function) — line 284
+  - `_slug` (function) — line 296
+  - `_looks_like_text_type` (function) — line 302
+  - `_text_font_key` (function) — line 334
+  - `_maybe_set_example` (function) — line 432
+  - `_find_leader_arrow_param` (function) — line 594
+  - `_resolve_workset` (function) — line 602
+  - `_resolve_similar_type` (function) — line 621
+  - `_reflect_member_names` (function) — line 736
+  - `_reflect_try_get` (function) — line 884
+  - `_reflect_contract` (function) — line 906
+  - `_run_reflection_sweep` (function) — line 977
+  - ... and 4 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/probes/probe_text_types.py:1015)`
+  - `<module> (tools/probes/probe_text_types.py:1072)`
+  - `<module> (tools/probes/probe_text_types.py:1073)`
+  - `<module> (tools/probes/probe_text_types.py:1092)`
+  - `<module> (tools/probes/probe_text_types.py:1114)`
+  - `<module> (tools/probes/probe_text_types.py:353)`
+  - `<module> (tools/probes/probe_text_types.py:366)`
+  - `<module> (tools/probes/probe_text_types.py:380)`
+  - `<module> (tools/probes/probe_text_types.py:395)`
+  - `<module> (tools/probes/probe_text_types.py:412)`
+  - `<module> (tools/probes/probe_text_types.py:456)`
+  - `<module> (tools/probes/probe_text_types.py:458)`
+  - `<module> (tools/probes/probe_text_types.py:460)`
+  - `<module> (tools/probes/probe_text_types.py:463)`
+  - `<module> (tools/probes/probe_text_types.py:468)`
+  - ... and 65 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`87bfb05b1c55eb50…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_text_types.py`)
+
+### `tools/probes/probe_units.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: probe units
+- Important symbols (31 total):
+  - `_safe` (function) — line 73
+  - `_try` (function) — line 79
+  - `_safe_str` (function) — line 85
+  - `_is_forge_type_id` (function) — line 91
+  - `_forge_id_string` (function) — line 102
+  - `_pv_missing` (function) — line 111
+  - `_pv_unreadable` (function) — line 114
+  - `_pv_unsupported` (function) — line 117
+  - `_pv_from_string` (function) — line 120
+  - `_pv_from_int` (function) — line 123
+  - `_pv_from_double` (function) — line 127
+  - `_pv_from_forge_type_id` (function) — line 131
+  - `_pv_from_bool` (function) — line 137
+  - `_pv_from_enum` (function) — line 144
+  - `_unitutils_get_discipline_id` (function) — line 152
+  - `_label_for_spec_id` (function) — line 168
+  - `_label_for_discipline_id` (function) — line 188
+  - `_units_get_format_options` (function) — line 205
+  - `_pv_from_prop_any` (function) — line 250
+  - `_pv_from_format_surface` (function) — line 269
+  - `_discover_specs` (function) — line 323
+  - `_maybe_set_example` (function) — line 386
+  - `_touch_param` (function) — line 399
+  - `_reflect_member_names` (function) — line 564
+  - `_reflect_try_get` (function) — line 712
+  - ... and 6 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/probes/probe_units.py:432)`
+  - `<module> (tools/probes/probe_units.py:434)`
+  - `<module> (tools/probes/probe_units.py:453)`
+  - `<module> (tools/probes/probe_units.py:467)`
+  - `<module> (tools/probes/probe_units.py:500)`
+  - `<module> (tools/probes/probe_units.py:501)`
+  - `<module> (tools/probes/probe_units.py:507)`
+  - `<module> (tools/probes/probe_units.py:513)`
+  - `<module> (tools/probes/probe_units.py:515)`
+  - `<module> (tools/probes/probe_units.py:524)`
+  - `<module> (tools/probes/probe_units.py:526)`
+  - `<module> (tools/probes/probe_units.py:528)`
+  - `<module> (tools/probes/probe_units.py:529)`
+  - `<module> (tools/probes/probe_units.py:843)`
+  - `<module> (tools/probes/probe_units.py:844)`
+  - ... and 77 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`99dd3c9a2de76f2d…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_units.py`)
+
+### `tools/probes/probe_view_category_overrides.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: probe view category overrides
+- Important symbols (34 total):
+  - `_safe` (function) — line 80
+  - `_get_name` (function) — line 86
+  - `_eid_int` (function) — line 89
+  - `_eid_name` (function) — line 101
+  - `_rgb_triplet` (function) — line 107
+  - `_hex_from_rgb_triplet` (function) — line 116
+  - `_contract_missing` (function) — line 128
+  - `_contract_unreadable` (function) — line 131
+  - `_contract_unsupported` (function) — line 134
+  - `_contract_string` (function) — line 137
+  - `_contract_int` (function) — line 140
+  - `_contract_eid` (function) — line 144
+  - `_maybe_set_example` (function) — line 151
+  - `_bool_int` (function) — line 159
+  - `_ogs_default` (function) — line 162
+  - `_ogs_has_override_for_field` (function) — line 165
+  - `_iter_categories_from_object_styles` (function) — line 181
+  - `_category_path` (function) — line 230
+  - `_baseline_for_cat` (function) — line 242
+  - `_bucket_for_view` (function) — line 314
+  - `_select_views` (function) — line 326
+  - `_touch_param` (function) — line 376
+  - `_pv_from_field` (function) — line 396
+  - `_pv_bool_flag` (function) — line 428
+  - `_value_norm_for_compare` (function) — line 431
+  - ... and 9 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/probes/probe_view_category_overrides.py:218)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:293)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:303)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:306)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:342)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:438)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:446)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:447)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:448)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:449)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:451)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:452)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:453)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:457)`
+  - `<module> (tools/probes/probe_view_category_overrides.py:459)`
+  - ... and 101 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`885aec9e9e15aca2…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_view_category_overrides.py`)
+
+### `tools/probes/probe_view_filter_applications.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: probe view filter applications
+- Important symbols (29 total):
+  - `_safe` (function) — line 75
+  - `_safe_type_name` (function) — line 81
+  - `_eid_int` (function) — line 96
+  - `_color_rgb_hex` (function) — line 106
+  - `_contract` (function) — line 119
+  - `_as_int_contract` (function) — line 129
+  - `_as_bool_int_contract` (function) — line 138
+  - `_as_string_contract` (function) — line 147
+  - `_as_elementid_contract` (function) — line 156
+  - `_ogs_get` (function) — line 169
+  - `_hash_sig` (function) — line 190
+  - `_ensure_param` (function) — line 208
+  - `_q_rank` (function) — line 220
+  - `_maybe_set_example` (function) — line 226
+  - `_observe` (function) — line 248
+  - `_view_bucket_key` (function) — line 302
+  - `_view_has_filters` (function) — line 307
+  - `_pv_from_ogs_field` (function) — line 390
+  - `_is_defaultish_ogs_value` (function) — line 426
+  - `_collect_applied_filters_in_order` (function) — line 446
+  - `_resolve_workset` (function) — line 553
+  - `_reflect_member_names` (function) — line 711
+  - `_reflect_try_get` (function) — line 859
+  - `_reflect_contract` (function) — line 881
+  - `_run_reflection_sweep` (function) — line 952
+  - ... and 4 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/probes/probe_view_filter_applications.py:1047)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:1048)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:1067)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:1089)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:289)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:320)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:335)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:467)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:470)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:471)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:473)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:474)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:477)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:478)`
+  - `<module> (tools/probes/probe_view_filter_applications.py:482)`
+  - ... and 95 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`54662f061e5f0ad2…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_view_filter_applications.py`)
+
+### `tools/probes/probe_view_filter_definitions.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: probe view filter definitions
+- Important symbols (23 total):
+  - `_safe` (function) — line 101
+  - `_sha1` (function) — line 107
+  - `_as_param_payload` (function) — line 114
+  - `_maybe_set_example` (function) — line 123
+  - `_observe` (function) — line 146
+  - `_bucket_label_from_categories` (function) — line 170
+  - `_resolve_category_name` (function) — line 179
+  - `_element_filter_kind` (function) — line 192
+  - `_get_subfilters` (function) — line 200
+  - `_get_rules_from_element_parameter_filter` (function) — line 212
+  - `_rule_parameter_id` (function) — line 231
+  - `_rule_evaluator_name` (function) — line 249
+  - `_rule_value_best_effort` (function) — line 262
+  - `_flatten_element_filter` (function) — line 275
+  - `_reflect_member_names` (function) — line 574
+  - `_reflect_try_get` (function) — line 722
+  - `_reflect_contract` (function) — line 744
+  - `_run_reflection_sweep` (function) — line 815
+  - `_resolve_workset` (function) — line 902
+  - `_probe_revit_version` (function) — line 983
+  - `_probe_document_identity` (function) — line 992
+  - `_probe_run_id` (function) — line 999
+  - `_probe_wrap` (function) — line 1008
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/probes/probe_view_filter_definitions.py:1005)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:1006)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:1025)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:1029)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:1044)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:340)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:357)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:397)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:405)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:408)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:409)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:412)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:414)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:416)`
+  - `<module> (tools/probes/probe_view_filter_definitions.py:420)`
+  - ... and 64 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`55514de8160889f7…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_view_filter_definitions.py`)
+
+### `tools/probes/probe_view_templates.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: probe view templates
+- Important symbols (20 total):
+  - `_safe` (function) — line 86
+  - `_safe_view_name` (function) — line 92
+  - `_safe_param_def_name` (function) — line 104
+  - `_safe_get_datatype` (function) — line 111
+  - `_is_length_datatype` (function) — line 120
+  - `_is_angle_datatype` (function) — line 128
+  - `_fmt_display` (function) — line 136
+  - `_format_param_contract` (function) — line 147
+  - `_viewtype_bucket` (function) — line 238
+  - `_maybe_set_example` (function) — line 321
+  - `_resolve_workset` (function) — line 436
+  - `_resolve_filter_name` (function) — line 472
+  - `_reflect_member_names` (function) — line 606
+  - `_reflect_try_get` (function) — line 754
+  - `_reflect_contract` (function) — line 776
+  - `_run_reflection_sweep` (function) — line 847
+  - `_probe_revit_version` (function) — line 920
+  - `_probe_document_identity` (function) — line 929
+  - `_probe_run_id` (function) — line 936
+  - `_probe_wrap` (function) — line 945
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/probes/probe_view_templates.py:249)`
+  - `<module> (tools/probes/probe_view_templates.py:264)`
+  - `<module> (tools/probes/probe_view_templates.py:281)`
+  - `<module> (tools/probes/probe_view_templates.py:303)`
+  - `<module> (tools/probes/probe_view_templates.py:348)`
+  - `<module> (tools/probes/probe_view_templates.py:353)`
+  - `<module> (tools/probes/probe_view_templates.py:359)`
+  - `<module> (tools/probes/probe_view_templates.py:361)`
+  - `<module> (tools/probes/probe_view_templates.py:363)`
+  - `<module> (tools/probes/probe_view_templates.py:366)`
+  - `<module> (tools/probes/probe_view_templates.py:371)`
+  - `<module> (tools/probes/probe_view_templates.py:388)`
+  - `<module> (tools/probes/probe_view_templates.py:411)`
+  - `<module> (tools/probes/probe_view_templates.py:463)`
+  - `<module> (tools/probes/probe_view_templates.py:465)`
+  - ... and 69 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`b0921cb72f21e3d7…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_view_templates.py`)
+
+### `tools/probes/probe_views.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: probe views
+- Important symbols (22 total):
+  - `_safe` (function) — line 124
+  - `_safe_elem_name` (function) — line 131
+  - `_safe_param_def_name` (function) — line 150
+  - `_safe_get_datatype` (function) — line 158
+  - `_is_length_datatype` (function) — line 168
+  - `_is_angle_datatype` (function) — line 177
+  - `_fmt_display` (function) — line 186
+  - `_format_param_contract` (function) — line 198
+  - `_pv` (function) — line 253
+  - `_int_enum` (function) — line 277
+  - `_view_kind_classification` (function) — line 284
+  - `_maybe_set_example` (function) — line 352
+  - `_add_inventory_obs` (function) — line 363
+  - `_resolve_workset` (function) — line 466
+  - `_reflect_member_names` (function) — line 565
+  - `_reflect_try_get` (function) — line 714
+  - `_reflect_contract` (function) — line 733
+  - `_run_reflection_sweep` (function) — line 805
+  - `_probe_revit_version` (function) — line 875
+  - `_probe_document_identity` (function) — line 885
+  - `_probe_run_id` (function) — line 893
+  - `_probe_wrap` (function) — line 904
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/probes/probe_views.py:303)`
+  - `<module> (tools/probes/probe_views.py:312)`
+  - `<module> (tools/probes/probe_views.py:318)`
+  - `<module> (tools/probes/probe_views.py:385)`
+  - `<module> (tools/probes/probe_views.py:389)`
+  - `<module> (tools/probes/probe_views.py:391)`
+  - `<module> (tools/probes/probe_views.py:394)`
+  - `<module> (tools/probes/probe_views.py:397)`
+  - `<module> (tools/probes/probe_views.py:398)`
+  - `<module> (tools/probes/probe_views.py:401)`
+  - `<module> (tools/probes/probe_views.py:403)`
+  - `<module> (tools/probes/probe_views.py:404)`
+  - `<module> (tools/probes/probe_views.py:406)`
+  - `<module> (tools/probes/probe_views.py:407)`
+  - `<module> (tools/probes/probe_views.py:409)`
+  - ... and 74 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`75e88bea09d7879a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_views.py`)
+

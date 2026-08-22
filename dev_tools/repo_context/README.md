@@ -114,24 +114,32 @@ Natural-language question
      `archived.md`; everything else buckets by top-level directory,
      further split by an additional path segment once a directory exceeds
      `--routing-max-files-per-catalog`, default 60). Each **Python** file
-     entry lists its operational-role classification (with the
-     evidence/rule that produced it — see below), purpose clues (module
-     docstring + filename terms, never an invented summary), top-level
-     symbols with exact line numbers, entrypoint evidence, resolved
-     internal imports, statically resolved callers, related tests, and
-     (if `graphify-out/graph.json` is present and its `built_at_commit`
-     matches the current HEAD) a clearly-labeled Graphify community.
-     **Non-Python files** (docs, config, data, etc.) get a compact table
-     row instead, under a separate "Other files (non-Python)" section —
-     the full Python-oriented entry format is mostly inapplicable
-     boilerplate for them (no symbols/imports/callers to report). A `.md`
-     file's row includes a real content-derived title (its first `#`
-     heading, or first non-empty line if it has none) rather than just
-     filename tokens; other non-Python types fall back to filename terms.
-     Capped at `--routing-max-catalog-chars` (default 24000); anything
-     over the cap is listed by bare path instead of a full entry, never
-     dropped
-     silently.
+     entry (except `__init__.py` — see below) lists its operational-role
+     classification (with the evidence/rule that produced it — see
+     below), purpose clues (module docstring + filename terms, never an
+     invented summary), top-level symbols with exact line numbers,
+     entrypoint evidence, resolved internal imports, statically resolved
+     callers, related tests, and (if `graphify-out/graph.json` is present
+     and its `built_at_commit` matches the current HEAD) a clearly-labeled
+     Graphify community. **Non-Python files** (docs, config, data, etc.)
+     and **`__init__.py`** (almost always a re-export/boilerplate stub)
+     get a compact table row instead, under a separate "Other files
+     (non-Python / boilerplate)" section — the full Python-oriented entry
+     format is mostly inapplicable boilerplate for them (no
+     symbols/imports/callers worth reporting). A `.md` file's row includes
+     a real content-derived title (its first `#` heading, or first
+     non-empty line if it has none); `__init__.py`'s row uses its module
+     docstring instead; other non-Python types fall back to filename
+     terms. Each page is capped at `--routing-max-catalog-chars` (default
+     24000); a partition too large for one page spills its overflow into
+     further pages (`<key>__page2.md`, `__page3.md`, ...) rather than
+     dropping anything — `index.md` and `routing_manifest.json` list every
+     page. A file is only ever left out of the manifest entirely in the
+     degenerate case where not even its own minimal path+role stub fits
+     within a single, otherwise-empty page (an unrealistically small
+     `--routing-max-catalog-chars`); that's noted directly in the
+     catalog's own "Omitted from this catalog" section and tracked in the
+     manifest's `omitted_paths`, never silent.
    - `routing/routing_manifest.json` — the same data in machine-readable
      form (per-catalog file/symbol counts and source hashes, git revision,
      options used), for tooling that wants to consume routing output

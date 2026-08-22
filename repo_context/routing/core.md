@@ -1,26 +1,10 @@
 # Routing catalog: `core`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 25
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `95ded63fe541519763c99967adc6f97648d4e96457f54cb1a76ee6b91f78c293`
+- Files covered (this page): 12
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `core` partition): `95ded63fe541519763c99967adc6f97648d4e96457f54cb1a76ee6b91f78c293`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
-
-### `core/__init__.py`
-- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
-- Purpose clues:
-  - module docstring: Core utilities package (pure Python + minimal Revit-aware helpers).
-  - filename/path terms: init
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`f6bda52cd73a263b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/__init__.py`)
 
 ### `core/canon.py`
 - Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
@@ -432,4 +416,10 @@
   - `tests/test_object_styles_canonical_selectors.py`
   - `tests/test_phase_filters_canonical_selectors.py`
 - Retrieval identity: sha256=`ccdf5160115495da…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/hashing.py`)
+
+## Other files (non-Python / boilerplate)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `core/__init__.py` | Core utilities package (pure Python + minimal Revit-aware helpers). | `library_module` |
 

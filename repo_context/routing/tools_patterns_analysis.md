@@ -1,26 +1,10 @@
 # Routing catalog: `tools/patterns_analysis`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 4
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `da0ebc1375cf4c0496273574fe01f8d7b08cd8cdde56732904e754c7dda0b07a`
+- Files covered (this page): 4
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/patterns_analysis` partition): `da0ebc1375cf4c0496273574fe01f8d7b08cd8cdde56732904e754c7dda0b07a`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
-
-### `tools/patterns_analysis/__init__.py`
-- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
-- Purpose clues:
-  - module docstring: Phase-2 (post-export) analysis helpers.
-  - filename/path terms: init
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`958be24754ba0511…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/__init__.py`)
 
 ### `tools/patterns_analysis/split_detection.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
@@ -130,4 +114,10 @@
 - Related tests:
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`c55b6950850fd915…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/split_detection_file_level.py`)
+
+## Other files (non-Python / boilerplate)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/patterns_analysis/__init__.py` | Phase-2 (post-export) analysis helpers. | `developer_utility` |
 

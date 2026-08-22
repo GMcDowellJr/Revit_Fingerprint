@@ -1,9 +1,9 @@
 # Routing catalog: `archived`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 35
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `a10201250a29a18d2265a41f13d9edd500558df3e37d62b9f0c989d241809fc3`
+- Files covered (this page): 13
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `archived` partition): `a10201250a29a18d2265a41f13d9edd500558df3e37d62b9f0c989d241809fc3`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `legacy/fingerprint_mvp.py`
@@ -391,14 +391,4 @@
 - Related tests:
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`1867273871302ffc…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/index.py`)
-
-## Omitted from this catalog (size limit reached)
-
-22 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
-
-- `tools/patterns_analysis/_archive/intradomain_summary.py`
-- `tools/patterns_analysis/_archive/io.py`
-- `tools/patterns_analysis/_archive/pareto_join_keys_by_ids.py`
-- `tools/patterns_analysis/_archive/pareto_with_splits.py`
-- `tools/patterns_analysis/_archive/report.py`
 

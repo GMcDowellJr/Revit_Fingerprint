@@ -1,9 +1,9 @@
 # Routing catalog: `tools`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 49
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `186bd8fb5e648d3853b278c2db4aa9f2801dc7c2a2d2be25436967cc0d21bae6`
+- Files covered (this page): 15
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools` partition): `186bd8fb5e648d3853b278c2db4aa9f2801dc7c2a2d2be25436967cc0d21bae6`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `tools/acc_scan_dc.py`
@@ -403,16 +403,11 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`f3d1aff20f843d91…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/discover_hash_policy.py`)
 
-## Other files (non-Python)
+## Other files (non-Python / boilerplate)
 
 | Path | Title/summary | Role |
 |---|---|---|
 | `tools/corpus_update_runbook.ps1` | corpus update runbook | `unknown` |
 | `tools/dimension_types.join_key.json` | dimension types.join key | `unknown` |
 | `tools/dimension_types.join_key.md` | { | `unknown` |
-| `tools/label_refresh_runbook.ps1` | label refresh runbook | `unknown` |
-| `tools/probe_config.json` | probe config | `unknown` |
-| `tools/refreshed_revit_governance_dod.md` | Refreshed Definition of Done — Revit Standards Governance Narrative Outputs | `unknown` |
-| `tools/run_config.json` | run config | `unknown` |
-| `tools/run_discovery_sweep.ps1` | run discovery sweep | `unknown` |
 

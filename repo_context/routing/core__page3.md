@@ -1,0 +1,107 @@
+# Routing catalog: `core (page 3)`
+
+- Generated (UTC): 2026-08-22T11:28:23Z
+- Tool version: 0.1.0
+- Files covered (this page): 3
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `core` partition): `95ded63fe541519763c99967adc6f97648d4e96457f54cb1a76ee6b91f78c293`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `core/sig_hash_policy.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Sig-hash policy loader.
+  - filename/path terms: sig hash policy
+- Important symbols (4 total):
+  - `_is_list_of_str` (function) — line 15
+  - `validate_domain_sig_hash_policy` (function) — line 19
+  - `load_sig_hash_policies` (function) — line 38
+  - `get_domain_sig_hash_policy` (function) — line 53
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_apply_sig_hash_to_phase0 (tools/run_extract_all.py:253)`
+  - `_apply_sig_hash_to_phase0 (tools/run_extract_all.py:320)`
+  - `load_sig_hash_policies (core/sig_hash_policy.py:49)`
+  - `test_generated_sig_hash_policy_loads (tests/test_sig_hash_policy_builder.py:10)`
+  - `test_generated_sig_hash_policy_loads (tests/test_sig_hash_policy_builder.py:12)`
+  - `test_object_styles_model_sig_hash_excludes_area9_additions (tests/test_sig_hash_policy_builder.py:165)`
+  - `test_text_types_sig_hash_excludes_name_includes_behavioral_items (tests/test_sig_hash_policy_builder.py:132)`
+  - `validate_domain_sig_hash_policy (core/sig_hash_policy.py:26)`
+  - `validate_domain_sig_hash_policy (core/sig_hash_policy.py:29)`
+  - `validate_domain_sig_hash_policy (core/sig_hash_policy.py:31)`
+- Related tests:
+  - `tests/test_sig_hash_policy_builder.py`
+- Retrieval identity: sha256=`016c2a9a56cffe1f…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/sig_hash_policy.py`)
+
+### `core/timing_collector.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: core/timing_collector.py
+  - filename/path terms: timing collector
+- Important symbols (1 total):
+  - `TimingCollector` (class) — line 21
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (runner/run_dynamo.py:1265)`
+  - `TestHashingTimingIntegration.test_make_hash_determinism_with_timing (tests/test_timing_collector.py:289)`
+  - `TestTimingCollectorBasic.test_multiple_calls_same_label (tests/test_timing_collector.py:38)`
+  - `TestTimingCollectorBasic.test_overlapping_timers (tests/test_timing_collector.py:73)`
+  - `TestTimingCollectorBasic.test_record_elapsed_multiple_calls (tests/test_timing_collector.py:57)`
+  - `TestTimingCollectorBasic.test_record_elapsed_single_call (tests/test_timing_collector.py:48)`
+  - `TestTimingCollectorBasic.test_single_timer (tests/test_timing_collector.py:26)`
+  - `TestTimingCollectorBasic.test_unmatched_end_timer_silently_ignored (tests/test_timing_collector.py:66)`
+  - `TestTimingCollectorDefensive.test_end_timer_with_none_label (tests/test_timing_collector.py:261)`
+  - `TestTimingCollectorDefensive.test_record_elapsed_defensive (tests/test_timing_collector.py:266)`
+  - `TestTimingCollectorDefensive.test_set_active_domain_none (tests/test_timing_collector.py:276)`
+  - `TestTimingCollectorDefensive.test_start_timer_with_none_label (tests/test_timing_collector.py:256)`
+  - `TestTimingCollectorDomainScoping.test_multiple_domains_scoped_independently (tests/test_timing_collector.py:139)`
+  - `TestTimingCollectorDomainScoping.test_record_elapsed_domain_scoped (tests/test_timing_collector.py:107)`
+  - `TestTimingCollectorDomainScoping.test_record_elapsed_no_active_domain (tests/test_timing_collector.py:120)`
+  - ... and 11 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_timing_collector.py`
+- Retrieval identity: sha256=`c5d4e08c42c96cb1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/timing_collector.py`)
+
+### `core/vg_sig.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: core/vg_sig.py
+  - filename/path terms: vg sig
+- Important symbols (8 total):
+  - `_read_bip_int` (function) — line 168
+  - `emit_builtin_params` (function) — line 211
+  - `emit_shared_params_stub` (function) — line 274
+  - `_phase2_items_from_def_signature` (function) — line 285
+  - `_canonical_identity_items_from_signature` (function) — line 335
+  - `_semantic_keys_from_identity_items` (function) — line 358
+  - `_traceability_unknown_items` (function) — line 407
+  - `_compute_delta_items` (function) — line 432
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `_canonical_identity_items_from_signature (core/vg_sig.py:354)`
+  - `emit_builtin_params (core/vg_sig.py:256)`
+  - `extract_ceiling_plans (domains/view_templates.py:1062)`
+  - `extract_ceiling_plans (domains/view_templates.py:1066)`
+  - `extract_ceiling_plans (domains/view_templates.py:1140)`
+  - `extract_elevations_sections_detail (domains/view_templates.py:1505)`
+  - `extract_elevations_sections_detail (domains/view_templates.py:1509)`
+  - `extract_elevations_sections_detail (domains/view_templates.py:1583)`
+  - `extract_floor_structural_area_plans (domains/view_templates.py:645)`
+  - `extract_floor_structural_area_plans (domains/view_templates.py:649)`
+  - `extract_floor_structural_area_plans (domains/view_templates.py:723)`
+  - `extract_renderings_drafting (domains/view_templates.py:1925)`
+  - `extract_renderings_drafting (domains/view_templates.py:1929)`
+  - `extract_renderings_drafting (domains/view_templates.py:2003)`
+  - `extract_schedules (domains/view_templates.py:2357)`
+  - ... and 2 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`2eca32d4583300ba…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/vg_sig.py`)
+

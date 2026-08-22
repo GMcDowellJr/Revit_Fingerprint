@@ -1,26 +1,10 @@
 # Routing catalog: `tools/bundle_analysis`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 19
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `f736b277d9e1f6fd82b4fe97f9be754014de1e4e507b028c1e996c87ecd81442`
+- Files covered (this page): 11
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/bundle_analysis` partition): `f736b277d9e1f6fd82b4fe97f9be754014de1e4e507b028c1e996c87ecd81442`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
-
-### `tools/bundle_analysis/__init__.py`
-- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
-- Purpose clues:
-  - module docstring: Bundle analysis post-process pipeline.
-  - filename/path terms: init
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`1101fa2b0d208f18…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/bundle_analysis/__init__.py`)
 
 ### `tools/bundle_analysis/common.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
@@ -308,37 +292,10 @@
   - `tests/test_bundle_analysis_name_projection.py`
 - Retrieval identity: sha256=`4ada0e721a8d51d0…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/bundle_analysis/step2_find_bundles.py`)
 
-### `tools/bundle_analysis/step3_build_dag.py`
-- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
-- Purpose clues:
-  - filename/path terms: step3 build dag
-- Important symbols (3 total):
-  - `build_dag_for_domain` (function) — line 18
-  - `_parse_args` (function) — line 228
-  - `main` (function) — line 235
-- Entrypoint evidence: contains `if __name__ == "__main__":` guard
-- Internal dependencies (resolved imports within this repository):
-  - imports `tools/bundle_analysis/common.py`
-- Called by (high/medium-confidence static callers):
-  - `<module> (tools/bundle_analysis/step3_build_dag.py:242)`
-  - `_run_pipeline_once (tools/bundle_analysis/run_bundle_analysis.py:238)`
-  - `_run_step2_to_step7 (tools/bundle_analysis/run_bundle_analysis.py:320)`
-  - `main (tools/bundle_analysis/step3_build_dag.py:236)`
-  - `main (tools/bundle_analysis/step3_build_dag.py:237)`
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`b0e54a7ae5de0558…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/bundle_analysis/step3_build_dag.py`)
-
-## Other files (non-Python)
+## Other files (non-Python / boilerplate)
 
 | Path | Title/summary | Role |
 |---|---|---|
+| `tools/bundle_analysis/__init__.py` | Bundle analysis post-process pipeline. | `developer_utility` |
 | `tools/bundle_analysis/README.md` | Bundle Analysis Pipeline | `unknown` |
-
-## Omitted from this catalog (size limit reached)
-
-7 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
-
-- `tools/bundle_analysis/step2b_bundle_share_profile.py`
-- `tools/bundle_analysis/step4_difference_sets.py`
 

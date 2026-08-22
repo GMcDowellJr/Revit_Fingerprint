@@ -1,9 +1,9 @@
 # Routing catalog: `tools/migration`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 5
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `f26a653c52fdc4bc1ab31c5da9f42d11fcbf4d363db37cc6721522fa242179cd`
+- Files covered (this page): 5
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/migration` partition): `f26a653c52fdc4bc1ab31c5da9f42d11fcbf4d363db37cc6721522fa242179cd`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `tools/migration/compress_fingerprint_json.py`
@@ -116,7 +116,7 @@
   - `tests/test_text_types_conversion_convergence.py`
 - Retrieval identity: sha256=`41588940f4577bb8…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/migration/reformat_to_flat_items.py`)
 
-## Other files (non-Python)
+## Other files (non-Python / boilerplate)
 
 | Path | Title/summary | Role |
 |---|---|---|

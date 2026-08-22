@@ -85,36 +85,13 @@
       "symbol_count": 0
     },
     {
-      "file_count": 35,
+      "file_count": 13,
       "key": "archived",
-      "omitted_file_count": 22,
-      "omitted_paths": [
-        "tools/patterns_analysis/_archive/intradomain_summary.py",
-        "tools/patterns_analysis/_archive/io.py",
-        "tools/patterns_analysis/_archive/pareto_join_keys_by_ids.py",
-        "tools/patterns_analysis/_archive/pareto_with_splits.py",
-        "tools/patterns_analysis/_archive/report.py",
-        "tools/patterns_analysis/_archive/run_attribute_stress.py",
-        "tools/patterns_analysis/_archive/run_attribute_stress_all_joinable.py",
-        "tools/patterns_analysis/_archive/run_candidate_joinkey_simulation.py",
-        "tools/patterns_analysis/_archive/run_change_type.py",
-        "tools/patterns_analysis/_archive/run_collision_differencing.py",
-        "tools/patterns_analysis/_archive/run_dimension_types_by_family.py",
-        "tools/patterns_analysis/_archive/run_identity_collision_diagnostics.py",
-        "tools/patterns_analysis/_archive/run_joinhash_label_population.py",
-        "tools/patterns_analysis/_archive/run_joinhash_parameter_population.py",
-        "tools/patterns_analysis/_archive/run_population_stability.py",
-        "tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py",
-        "tools/patterns_analysis/_archive/run_view_category_overrides_joinkey_analysis.py",
-        "tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py",
-        "tools/patterns_analysis/_archive/split_detection.py",
-        "tools/patterns_analysis/_archive/split_detection_element_level.py",
-        "tools/patterns_analysis/_archive/split_detection_file_level.py",
-        "tools/patterns_analysis/_archive/stability.py"
-      ],
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/archived.md",
       "roles": {
-        "archived_or_legacy": 35
+        "archived_or_legacy": 13
       },
       "sample_paths": [
         "legacy/fingerprint_mvp.py",
@@ -122,7 +99,41 @@
         "tools/patterns_analysis/_archive/annotate_cluster_labels.py"
       ],
       "source_hash": "a10201250a29a18d2265a41f13d9edd500558df3e37d62b9f0c989d241809fc3",
-      "symbol_count": 260
+      "symbol_count": 109
+    },
+    {
+      "file_count": 11,
+      "key": "archived (page 2)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/archived__page2.md",
+      "roles": {
+        "archived_or_legacy": 11
+      },
+      "sample_paths": [
+        "tools/patterns_analysis/_archive/intradomain_summary.py",
+        "tools/patterns_analysis/_archive/io.py",
+        "tools/patterns_analysis/_archive/pareto_join_keys_by_ids.py"
+      ],
+      "source_hash": "a10201250a29a18d2265a41f13d9edd500558df3e37d62b9f0c989d241809fc3",
+      "symbol_count": 79
+    },
+    {
+      "file_count": 11,
+      "key": "archived (page 3)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/archived__page3.md",
+      "roles": {
+        "archived_or_legacy": 11
+      },
+      "sample_paths": [
+        "tools/patterns_analysis/_archive/run_identity_collision_diagnostics.py",
+        "tools/patterns_analysis/_archive/run_joinhash_label_population.py",
+        "tools/patterns_analysis/_archive/run_joinhash_parameter_population.py"
+      ],
+      "source_hash": "a10201250a29a18d2265a41f13d9edd500558df3e37d62b9f0c989d241809fc3",
+      "symbol_count": 72
     },
     {
       "file_count": 16,
@@ -174,27 +185,13 @@
       "symbol_count": 0
     },
     {
-      "file_count": 25,
+      "file_count": 12,
       "key": "core",
-      "omitted_file_count": 13,
-      "omitted_paths": [
-        "core/join_key_builder.py",
-        "core/join_key_policy.py",
-        "core/manifest.py",
-        "core/name_key_builder.py",
-        "core/name_key_coverage.py",
-        "core/naming.py",
-        "core/phase2.py",
-        "core/record_v2.py",
-        "core/rows.py",
-        "core/sig_hash_builder.py",
-        "core/sig_hash_policy.py",
-        "core/timing_collector.py",
-        "core/vg_sig.py"
-      ],
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/core.md",
       "roles": {
-        "library_module": 25
+        "library_module": 12
       },
       "sample_paths": [
         "core/__init__.py",
@@ -202,30 +199,78 @@
         "core/canonical_items.py"
       ],
       "source_hash": "95ded63fe541519763c99967adc6f97648d4e96457f54cb1a76ee6b91f78c293",
-      "symbol_count": 159
+      "symbol_count": 83
     },
     {
-      "file_count": 25,
-      "key": "dev_tools",
-      "omitted_file_count": 3,
-      "omitted_paths": [
-        "dev_tools/repo_context/rc_validate.py",
-        "dev_tools/repo_context/rc_writers.py",
-        "dev_tools/repo_context/repo_context.py"
+      "file_count": 10,
+      "key": "core (page 2)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/core__page2.md",
+      "roles": {
+        "library_module": 10
+      },
+      "sample_paths": [
+        "core/join_key_builder.py",
+        "core/join_key_policy.py",
+        "core/manifest.py"
       ],
+      "source_hash": "95ded63fe541519763c99967adc6f97648d4e96457f54cb1a76ee6b91f78c293",
+      "symbol_count": 63
+    },
+    {
+      "file_count": 3,
+      "key": "core (page 3)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/core__page3.md",
+      "roles": {
+        "library_module": 3
+      },
+      "sample_paths": [
+        "core/sig_hash_policy.py",
+        "core/timing_collector.py",
+        "core/vg_sig.py"
+      ],
+      "source_hash": "95ded63fe541519763c99967adc6f97648d4e96457f54cb1a76ee6b91f78c293",
+      "symbol_count": 13
+    },
+    {
+      "file_count": 20,
+      "key": "dev_tools",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/dev_tools.md",
       "roles": {
-        "developer_utility": 14,
-        "operator_entrypoint": 1,
-        "unknown": 10
+        "developer_utility": 12,
+        "unknown": 8
       },
       "sample_paths": [
         "dev_tools/repo_context/E2E_VERIFICATION.md",
         "dev_tools/repo_context/examples/packet_request.invalid_ambiguous_line_range.json",
         "dev_tools/repo_context/examples/packet_request.invalid_empty_selectors.json"
       ],
-      "source_hash": "564e00d7f04bed4aaa145ccfcbe24838779ac22abe2d0ddf0e771b20abd57fa9",
-      "symbol_count": 154
+      "source_hash": "a77d907463b596d78e3643d64cf08cf24e3cd34cc79f41cd2f8406d26e982b10",
+      "symbol_count": 133
+    },
+    {
+      "file_count": 5,
+      "key": "dev_tools (page 2)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/dev_tools__page2.md",
+      "roles": {
+        "developer_utility": 2,
+        "operator_entrypoint": 1,
+        "unknown": 2
+      },
+      "sample_paths": [
+        "dev_tools/repo_context/rc_validate.py",
+        "dev_tools/repo_context/rc_writers.py",
+        "dev_tools/repo_context/README.md"
+      ],
+      "source_hash": "a77d907463b596d78e3643d64cf08cf24e3cd34cc79f41cd2f8406d26e982b10",
+      "symbol_count": 25
     },
     {
       "file_count": 41,
@@ -245,28 +290,13 @@
       "symbol_count": 0
     },
     {
-      "file_count": 31,
+      "file_count": 16,
       "key": "domains",
-      "omitted_file_count": 14,
-      "omitted_paths": [
-        "domains/object_styles.py",
-        "domains/phase_graphics.py",
-        "domains/phases.py",
-        "domains/roof_types.py",
-        "domains/text_types.py",
-        "domains/units.py",
-        "domains/view_category_overrides.py",
-        "domains/view_category_overrides_annotation.py",
-        "domains/view_category_overrides_model.py",
-        "domains/view_filter_applications_view_templates.py",
-        "domains/view_filter_definitions.py",
-        "domains/view_templates.py",
-        "domains/wall_types.py",
-        "domains/worksets.py"
-      ],
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/domains.md",
       "roles": {
-        "library_module": 28,
+        "library_module": 13,
         "unknown": 3
       },
       "sample_paths": [
@@ -275,7 +305,24 @@
         "domains/browser_organization.py"
       ],
       "source_hash": "77af39c4f48ed1872bc8aee884b47866cc5896647bdbd27c8e5678467294a3cb",
-      "symbol_count": 165
+      "symbol_count": 86
+    },
+    {
+      "file_count": 15,
+      "key": "domains (page 2)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/domains__page2.md",
+      "roles": {
+        "library_module": 15
+      },
+      "sample_paths": [
+        "domains/object_styles.py",
+        "domains/phase_filters.py",
+        "domains/phase_graphics.py"
+      ],
+      "source_hash": "77af39c4f48ed1872bc8aee884b47866cc5896647bdbd27c8e5678467294a3cb",
+      "symbol_count": 79
     },
     {
       "file_count": 5,
@@ -413,110 +460,13 @@
       "symbol_count": 2
     },
     {
-      "file_count": 107,
+      "file_count": 11,
       "key": "tests",
-      "omitted_file_count": 96,
-      "omitted_paths": [
-        "tests/test_compare_cross_segment_comparison_registry.py",
-        "tests/test_compare_cross_segment_cross_client.py",
-        "tests/test_compare_cross_segment_governance.py",
-        "tests/test_compare_cross_segment_lineage.py",
-        "tests/test_compare_cross_segment_streamed_pairs.py",
-        "tests/test_compare_cross_segment_worker_count.py",
-        "tests/test_compare_governance_populations.py",
-        "tests/test_compound_types_wall.py",
-        "tests/test_contracts_bounded_errors.py",
-        "tests/test_contracts_run_status.py",
-        "tests/test_deployment_config.py",
-        "tests/test_deps_require_domain.py",
-        "tests/test_dimension_types_placeholder_fields.py",
-        "tests/test_dimension_types_shape_gating.py",
-        "tests/test_discover_hash_policy.py",
-        "tests/test_discover_join_policy_verification.py",
-        "tests/test_discover_vfd_edges.py",
-        "tests/test_dynamo_bootstrap.py",
-        "tests/test_enterprise_policy.py",
-        "tests/test_export_bundle_pattern_detail_quality_resolution.py",
-        "tests/test_export_layer_stacks.py",
-        "tests/test_extractor_unit_system.py",
-        "tests/test_fill_patterns_canonical_selectors.py",
-        "tests/test_fill_patterns_is_import_coercion.py",
-        "tests/test_fingerprint_export_discovery.py",
-        "tests/test_generate_governance_narrative_bc_client_sections.py",
-        "tests/test_generate_governance_narrative_brief.py",
-        "tests/test_generate_governance_narrative_classification.py",
-        "tests/test_generate_governance_narrative_comparison_registry.py",
-        "tests/test_generate_governance_narrative_evidence_package.py",
-        "tests/test_generate_governance_narrative_findings.py",
-        "tests/test_generate_governance_narrative_group1_bc_pooled.py",
-        "tests/test_generate_governance_narrative_policy.py",
-        "tests/test_generate_governance_narrative_scope_breakdown.py",
-        "tests/test_generate_governance_narrative_state_types.py",
-        "tests/test_generate_governance_narrative_static_docs_copy.py",
-        "tests/test_generate_governance_narrative_union_breadth.py",
-        "tests/test_generate_governance_narrative_unscoped_segment.py",
-        "tests/test_generate_governance_narrative_wp_reliability_resolved.py",
-        "tests/test_generate_name_key_patterns.py",
-        "tests/test_governance_evidence_package.py",
-        "tests/test_governance_field_completeness_gate.py",
-        "tests/test_governance_manifest.py",
-        "tests/test_governance_policy.py",
-        "tests/test_governance_relationships.py",
-        "tests/test_graphic_overrides.py",
-        "tests/test_hashing_incremental.py",
-        "tests/test_identity_canonical_selectors.py",
-        "tests/test_identity_project_info.py",
-        "tests/test_join_key_builder_shape_gating_dedupe.py",
-        "tests/test_join_key_discovery_shape_matching.py",
-        "tests/test_join_key_migration.py",
-        "tests/test_join_key_policy_validation.py",
-        "tests/test_label_synthesis_domain_prompt_loader.py",
-        "tests/test_line_pattern_mapping_reconstruction.py",
-        "tests/test_line_patterns_canonical_selectors.py",
-        "tests/test_line_styles_canonical_selectors.py",
-        "tests/test_materials.py",
-        "tests/test_na_token.py",
-        "tests/test_name_key_inline_analysis_agreement.py",
-        "tests/test_name_key_policy.py",
-        "tests/test_no_direct_filtered_element_collector_in_domains.py",
-        "tests/test_object_styles_canonical_selectors.py",
-        "tests/test_pareto_shape_gating.py",
-        "tests/test_phase_filters_canonical_selectors.py",
-        "tests/test_phases_canonical_selectors.py",
-        "tests/test_placeholder_exclusions.py",
-        "tests/test_probe_inventory_builder.py",
-        "tests/test_record_contract_v2.py",
-        "tests/test_record_id_determinism.py",
-        "tests/test_record_v2_utils.py",
-        "tests/test_reference_bundle.py",
-        "tests/test_reformat_to_flat_items_identity_lineage.py",
-        "tests/test_repository_data_remediation.py",
-        "tests/test_revitlookup_audit_regressions.py",
-        "tests/test_run_segment_orchestrator_name_projection.py",
-        "tests/test_run_segment_orchestrator_worker_split.py",
-        "tests/test_runner_canonicalization.py",
-        "tests/test_runner_extraction_context.py",
-        "tests/test_sentinel_policy.py",
-        "tests/test_sig_hash_policy_builder.py",
-        "tests/test_split_export.py",
-        "tests/test_split_named_clusters_and_thresholds.py",
-        "tests/test_suggest_discovery_params.py",
-        "tests/test_text_types_canonical_selectors.py",
-        "tests/test_text_types_conversion_convergence.py",
-        "tests/test_text_types_flat_items_export.py",
-        "tests/test_timing_collector.py",
-        "tests/test_units_canonical_selectors.py",
-        "tests/test_v21_join_policy_compat.py",
-        "tests/test_view_category_overrides_canonical_selectors.py",
-        "tests/test_view_filter_applications_view_templates_canonical_selectors.py",
-        "tests/test_view_filter_definitions_canonical_selectors.py",
-        "tests/test_view_filter_definitions_empty_domain.py",
-        "tests/test_view_instances_cache_key_consistency.py",
-        "tests/test_view_templates_canonical_selectors.py"
-      ],
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tests.md",
       "roles": {
-        "test_harness": 107
+        "test_harness": 11
       },
       "sample_paths": [
         "tests/conftest.py",
@@ -524,7 +474,194 @@
         "tests/synthetic_governance_fixtures.py"
       ],
       "source_hash": "ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252",
-      "symbol_count": 1411
+      "symbol_count": 211
+    },
+    {
+      "file_count": 6,
+      "key": "tests (page 2)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tests__page2.md",
+      "roles": {
+        "test_harness": 6
+      },
+      "sample_paths": [
+        "tests/test_compare_cross_segment_comparison_registry.py",
+        "tests/test_compare_cross_segment_cross_client.py",
+        "tests/test_compare_cross_segment_governance.py"
+      ],
+      "source_hash": "ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252",
+      "symbol_count": 187
+    },
+    {
+      "file_count": 9,
+      "key": "tests (page 3)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tests__page3.md",
+      "roles": {
+        "test_harness": 9
+      },
+      "sample_paths": [
+        "tests/test_compare_governance_populations.py",
+        "tests/test_compound_types_wall.py",
+        "tests/test_contracts_bounded_errors.py"
+      ],
+      "source_hash": "ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252",
+      "symbol_count": 103
+    },
+    {
+      "file_count": 9,
+      "key": "tests (page 4)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tests__page4.md",
+      "roles": {
+        "test_harness": 9
+      },
+      "sample_paths": [
+        "tests/test_discover_join_policy_verification.py",
+        "tests/test_discover_vfd_edges.py",
+        "tests/test_dynamo_bootstrap.py"
+      ],
+      "source_hash": "ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252",
+      "symbol_count": 107
+    },
+    {
+      "file_count": 5,
+      "key": "tests (page 5)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tests__page5.md",
+      "roles": {
+        "test_harness": 5
+      },
+      "sample_paths": [
+        "tests/test_fingerprint_export_discovery.py",
+        "tests/test_generate_governance_narrative_bc_client_sections.py",
+        "tests/test_generate_governance_narrative_brief.py"
+      ],
+      "source_hash": "ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252",
+      "symbol_count": 119
+    },
+    {
+      "file_count": 5,
+      "key": "tests (page 6)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tests__page6.md",
+      "roles": {
+        "test_harness": 5
+      },
+      "sample_paths": [
+        "tests/test_generate_governance_narrative_evidence_package.py",
+        "tests/test_generate_governance_narrative_findings.py",
+        "tests/test_generate_governance_narrative_group1_bc_pooled.py"
+      ],
+      "source_hash": "ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252",
+      "symbol_count": 154
+    },
+    {
+      "file_count": 6,
+      "key": "tests (page 7)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tests__page7.md",
+      "roles": {
+        "test_harness": 6
+      },
+      "sample_paths": [
+        "tests/test_generate_governance_narrative_state_types.py",
+        "tests/test_generate_governance_narrative_static_docs_copy.py",
+        "tests/test_generate_governance_narrative_union_breadth.py"
+      ],
+      "source_hash": "ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252",
+      "symbol_count": 74
+    },
+    {
+      "file_count": 8,
+      "key": "tests (page 8)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tests__page8.md",
+      "roles": {
+        "test_harness": 8
+      },
+      "sample_paths": [
+        "tests/test_governance_evidence_package.py",
+        "tests/test_governance_field_completeness_gate.py",
+        "tests/test_governance_manifest.py"
+      ],
+      "source_hash": "ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252",
+      "symbol_count": 144
+    },
+    {
+      "file_count": 12,
+      "key": "tests (page 9)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tests__page9.md",
+      "roles": {
+        "test_harness": 12
+      },
+      "sample_paths": [
+        "tests/test_identity_project_info.py",
+        "tests/test_join_key_builder_shape_gating_dedupe.py",
+        "tests/test_join_key_discovery_shape_matching.py"
+      ],
+      "source_hash": "ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252",
+      "symbol_count": 117
+    },
+    {
+      "file_count": 15,
+      "key": "tests (page 10)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tests__page10.md",
+      "roles": {
+        "test_harness": 15
+      },
+      "sample_paths": [
+        "tests/test_name_key_policy.py",
+        "tests/test_no_direct_filtered_element_collector_in_domains.py",
+        "tests/test_object_styles_canonical_selectors.py"
+      ],
+      "source_hash": "ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252",
+      "symbol_count": 65
+    },
+    {
+      "file_count": 14,
+      "key": "tests (page 11)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tests__page11.md",
+      "roles": {
+        "test_harness": 14
+      },
+      "sample_paths": [
+        "tests/test_run_segment_orchestrator_name_projection.py",
+        "tests/test_run_segment_orchestrator_worker_split.py",
+        "tests/test_runner_canonicalization.py"
+      ],
+      "source_hash": "ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252",
+      "symbol_count": 102
+    },
+    {
+      "file_count": 7,
+      "key": "tests (page 12)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tests__page12.md",
+      "roles": {
+        "test_harness": 7
+      },
+      "sample_paths": [
+        "tests/test_v21_join_policy_compat.py",
+        "tests/test_view_category_overrides_canonical_selectors.py",
+        "tests/test_view_filter_applications_view_templates_canonical_selectors.py"
+      ],
+      "source_hash": "ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252",
+      "symbol_count": 28
     },
     {
       "file_count": 2,
@@ -558,27 +695,38 @@
       "symbol_count": 10
     },
     {
-      "file_count": 15,
+      "file_count": 10,
       "key": "tests/repo_context",
-      "omitted_file_count": 5,
-      "omitted_paths": [
-        "dev_tools/repo_context/tests/test_request_validation.py",
-        "dev_tools/repo_context/tests/test_routing.py",
-        "dev_tools/repo_context/tests/test_safety.py",
-        "dev_tools/repo_context/tests/test_symlinks.py",
-        "dev_tools/repo_context/tests/test_validate.py"
-      ],
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tests_repo_context.md",
       "roles": {
-        "test_harness": 15
+        "test_harness": 10
       },
       "sample_paths": [
         "dev_tools/repo_context/tests/conftest.py",
         "dev_tools/repo_context/tests/test_chunking.py",
         "dev_tools/repo_context/tests/test_determinism_incremental.py"
       ],
-      "source_hash": "40ee46d811d7b9d7db59bede4d3bb9ec33709c3b67da2c3178d38a47800d7579",
-      "symbol_count": 208
+      "source_hash": "dbbcc019e880e86c4cb46c828a82bf20a7bcd7ba9738566d316ca81fea25a203",
+      "symbol_count": 127
+    },
+    {
+      "file_count": 5,
+      "key": "tests/repo_context (page 2)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tests_repo_context__page2.md",
+      "roles": {
+        "test_harness": 5
+      },
+      "sample_paths": [
+        "dev_tools/repo_context/tests/test_request_validation.py",
+        "dev_tools/repo_context/tests/test_routing.py",
+        "dev_tools/repo_context/tests/test_safety.py"
+      ],
+      "source_hash": "dbbcc019e880e86c4cb46c828a82bf20a7bcd7ba9738566d316ca81fea25a203",
+      "symbol_count": 83
     },
     {
       "file_count": 4,
@@ -599,45 +747,14 @@
       "symbol_count": 11
     },
     {
-      "file_count": 49,
+      "file_count": 15,
       "key": "tools",
-      "omitted_file_count": 29,
-      "omitted_paths": [
-        "tools/discover_join_policy.py",
-        "tools/domain_authority.py",
-        "tools/emit_element_dominance.py",
-        "tools/enterprise_policy.py",
-        "tools/export_bundle_pattern_detail.py",
-        "tools/export_to_flat_tables.py",
-        "tools/extract_segment_subtree.py",
-        "tools/extractor.py",
-        "tools/generate_governance_narrative.py",
-        "tools/generate_name_key_patterns.py",
-        "tools/generate_sig_hash_policy.py",
-        "tools/governance_evidence_package.py",
-        "tools/governance_manifest.py",
-        "tools/governance_policy.py",
-        "tools/governance_relationships.py",
-        "tools/inspect_lft_similarity.py",
-        "tools/jenks_utils.py",
-        "tools/join_key_derivation.py",
-        "tools/na_token.py",
-        "tools/pairwise_analysis.py",
-        "tools/pareto_joinkey_search.py",
-        "tools/pattern_id_utils.py",
-        "tools/population_framing.py",
-        "tools/reset_wall_types_for_reapply.py",
-        "tools/run_extract_all.py",
-        "tools/run_segment_orchestrator.py",
-        "tools/run_split_detection_all.py",
-        "tools/similarity_compare.py",
-        "tools/suggest_discovery_params.py"
-      ],
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tools.md",
       "roles": {
-        "active_pipeline": 33,
-        "developer_utility": 8,
-        "unknown": 8
+        "active_pipeline": 12,
+        "unknown": 3
       },
       "sample_paths": [
         "tools/acc_scan_dc.py",
@@ -645,21 +762,73 @@
         "tools/analyze_promotion_candidates.py"
       ],
       "source_hash": "186bd8fb5e648d3853b278c2db4aa9f2801dc7c2a2d2be25436967cc0d21bae6",
-      "symbol_count": 559
+      "symbol_count": 184
     },
     {
-      "file_count": 19,
-      "key": "tools/archetype",
-      "omitted_file_count": 2,
-      "omitted_paths": [
-        "tools/archetype/vfd_bip_target_domain_hints.json",
-        "tools/archetype/vfd_category_domain_map.json"
+      "file_count": 9,
+      "key": "tools (page 2)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tools__page2.md",
+      "roles": {
+        "active_pipeline": 7,
+        "developer_utility": 2
+      },
+      "sample_paths": [
+        "tools/discover_join_policy.py",
+        "tools/domain_authority.py",
+        "tools/emit_element_dominance.py"
       ],
+      "source_hash": "186bd8fb5e648d3853b278c2db4aa9f2801dc7c2a2d2be25436967cc0d21bae6",
+      "symbol_count": 195
+    },
+    {
+      "file_count": 14,
+      "key": "tools (page 3)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tools__page3.md",
+      "roles": {
+        "active_pipeline": 7,
+        "developer_utility": 6,
+        "unknown": 1
+      },
+      "sample_paths": [
+        "tools/generate_name_key_patterns.py",
+        "tools/generate_sig_hash_policy.py",
+        "tools/governance_evidence_package.py"
+      ],
+      "source_hash": "186bd8fb5e648d3853b278c2db4aa9f2801dc7c2a2d2be25436967cc0d21bae6",
+      "symbol_count": 88
+    },
+    {
+      "file_count": 11,
+      "key": "tools (page 4)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tools__page4.md",
+      "roles": {
+        "active_pipeline": 7,
+        "unknown": 4
+      },
+      "sample_paths": [
+        "tools/population_framing.py",
+        "tools/probe_config.json",
+        "tools/refreshed_revit_governance_dod.md"
+      ],
+      "source_hash": "186bd8fb5e648d3853b278c2db4aa9f2801dc7c2a2d2be25436967cc0d21bae6",
+      "symbol_count": 92
+    },
+    {
+      "file_count": 17,
+      "key": "tools/archetype",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tools_archetype.md",
       "roles": {
         "active_pipeline": 10,
         "developer_utility": 1,
-        "unknown": 8
+        "unknown": 6
       },
       "sample_paths": [
         "tools/archetype/_common.py",
@@ -670,22 +839,30 @@
       "symbol_count": 140
     },
     {
-      "file_count": 19,
-      "key": "tools/bundle_analysis",
-      "omitted_file_count": 7,
-      "omitted_paths": [
-        "tools/bundle_analysis/step2b_bundle_share_profile.py",
-        "tools/bundle_analysis/step4_difference_sets.py",
-        "tools/bundle_analysis/step5_classify_patterns.py",
-        "tools/bundle_analysis/step6_classify_files.py",
-        "tools/bundle_analysis/step7_overlap_report.py",
-        "tools/bundle_analysis/step_compare.py",
-        "tools/bundle_analysis/utils.py"
+      "file_count": 2,
+      "key": "tools/archetype (page 2)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tools_archetype__page2.md",
+      "roles": {
+        "unknown": 2
+      },
+      "sample_paths": [
+        "tools/archetype/vfd_bip_target_domain_hints.json",
+        "tools/archetype/vfd_category_domain_map.json"
       ],
+      "source_hash": "c5dfc15c8ac63c3bd8e5c140c081e69d97eb5fb91d4f2ed43f57ac619d6f3163",
+      "symbol_count": 0
+    },
+    {
+      "file_count": 11,
+      "key": "tools/bundle_analysis",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tools_bundle_analysis.md",
       "roles": {
-        "active_pipeline": 12,
-        "developer_utility": 6,
+        "active_pipeline": 6,
+        "developer_utility": 4,
         "unknown": 1
       },
       "sample_paths": [
@@ -694,7 +871,25 @@
         "tools/bundle_analysis/name_projection_adapter.py"
       ],
       "source_hash": "f736b277d9e1f6fd82b4fe97f9be754014de1e4e507b028c1e996c87ecd81442",
-      "symbol_count": 79
+      "symbol_count": 54
+    },
+    {
+      "file_count": 8,
+      "key": "tools/bundle_analysis (page 2)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tools_bundle_analysis__page2.md",
+      "roles": {
+        "active_pipeline": 6,
+        "developer_utility": 2
+      },
+      "sample_paths": [
+        "tools/bundle_analysis/step2b_bundle_share_profile.py",
+        "tools/bundle_analysis/step3_build_dag.py",
+        "tools/bundle_analysis/step4_difference_sets.py"
+      ],
+      "source_hash": "f736b277d9e1f6fd82b4fe97f9be754014de1e4e507b028c1e996c87ecd81442",
+      "symbol_count": 25
     },
     {
       "file_count": 2,
@@ -747,26 +942,14 @@
       "symbol_count": 29
     },
     {
-      "file_count": 26,
+      "file_count": 16,
       "key": "tools/label_synthesis",
-      "omitted_file_count": 11,
-      "omitted_paths": [
-        "tools/label_synthesis/patch_domain_patterns_labels.py",
-        "tools/label_synthesis/synopsis_formatters/arrowheads.py",
-        "tools/label_synthesis/synopsis_formatters/dimension_types.py",
-        "tools/label_synthesis/synopsis_formatters/fill_patterns.py",
-        "tools/label_synthesis/synopsis_formatters/line_patterns.py",
-        "tools/label_synthesis/synopsis_formatters/line_styles.py",
-        "tools/label_synthesis/synopsis_formatters/object_styles_annotation.py",
-        "tools/label_synthesis/synopsis_formatters/object_styles_model.py",
-        "tools/label_synthesis/synopsis_formatters/phase_filters.py",
-        "tools/label_synthesis/synopsis_formatters/text_types.py",
-        "tools/label_synthesis/synthesize_fragmented_labels.py"
-      ],
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tools_label_synthesis.md",
       "roles": {
-        "active_pipeline": 6,
-        "developer_utility": 20
+        "active_pipeline": 5,
+        "developer_utility": 11
       },
       "sample_paths": [
         "tools/label_synthesis/__init__.py",
@@ -774,7 +957,25 @@
         "tools/label_synthesis/build_label_population.py"
       ],
       "source_hash": "f5c31f56b033647f17cf57d58ba06b001e89d4267d32522303a0f4daef3a06e6",
-      "symbol_count": 141
+      "symbol_count": 104
+    },
+    {
+      "file_count": 10,
+      "key": "tools/label_synthesis (page 2)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tools_label_synthesis__page2.md",
+      "roles": {
+        "active_pipeline": 1,
+        "developer_utility": 9
+      },
+      "sample_paths": [
+        "tools/label_synthesis/synopsis_formatters/arrowheads.py",
+        "tools/label_synthesis/synopsis_formatters/dimension_types.py",
+        "tools/label_synthesis/synopsis_formatters/fill_patterns.py"
+      ],
+      "source_hash": "f5c31f56b033647f17cf57d58ba06b001e89d4267d32522303a0f4daef3a06e6",
+      "symbol_count": 37
     },
     {
       "file_count": 4,
@@ -829,35 +1030,14 @@
       "symbol_count": 31
     },
     {
-      "file_count": 33,
+      "file_count": 12,
       "key": "tools/probes",
-      "omitted_file_count": 20,
-      "omitted_paths": [
-        "tools/probes/probe_identity.py",
-        "tools/probes/probe_line_patterns.py",
-        "tools/probes/probe_line_styles.py",
-        "tools/probes/probe_loaded_family_types.py",
-        "tools/probes/probe_materials.py",
-        "tools/probes/probe_object_styles.py",
-        "tools/probes/probe_phase_filters.py",
-        "tools/probes/probe_phase_graphics.py",
-        "tools/probes/probe_phases.py",
-        "tools/probes/probe_roof_types.py",
-        "tools/probes/probe_text_types.py",
-        "tools/probes/probe_units.py",
-        "tools/probes/probe_view_category_overrides.py",
-        "tools/probes/probe_view_filter_applications.py",
-        "tools/probes/probe_view_filter_definitions.py",
-        "tools/probes/probe_view_templates.py",
-        "tools/probes/probe_views.py",
-        "tools/probes/probe_wall_types.py",
-        "tools/probes/probe_worksets.py",
-        "tools/probes/sweep_line_pattern_normhash_precision.py"
-      ],
+      "omitted_file_count": 0,
+      "omitted_paths": [],
       "path": "routing/tools_probes.md",
       "roles": {
-        "active_pipeline": 3,
-        "developer_utility": 27,
+        "active_pipeline": 2,
+        "developer_utility": 7,
         "unknown": 3
       },
       "sample_paths": [
@@ -866,7 +1046,59 @@
         "tools/probes/Exports/README.md"
       ],
       "source_hash": "764135461a8a642b2f798a2b03eb1cb4bd5bd2629b37925ce66714173e6ad324",
-      "symbol_count": 633
+      "symbol_count": 181
+    },
+    {
+      "file_count": 9,
+      "key": "tools/probes (page 2)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tools_probes__page2.md",
+      "roles": {
+        "developer_utility": 9
+      },
+      "sample_paths": [
+        "tools/probes/probe_identity.py",
+        "tools/probes/probe_line_patterns.py",
+        "tools/probes/probe_line_styles.py"
+      ],
+      "source_hash": "764135461a8a642b2f798a2b03eb1cb4bd5bd2629b37925ce66714173e6ad324",
+      "symbol_count": 199
+    },
+    {
+      "file_count": 9,
+      "key": "tools/probes (page 3)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tools_probes__page3.md",
+      "roles": {
+        "developer_utility": 9
+      },
+      "sample_paths": [
+        "tools/probes/probe_roof_type_import.py",
+        "tools/probes/probe_roof_types.py",
+        "tools/probes/probe_text_types.py"
+      ],
+      "source_hash": "764135461a8a642b2f798a2b03eb1cb4bd5bd2629b37925ce66714173e6ad324",
+      "symbol_count": 214
+    },
+    {
+      "file_count": 3,
+      "key": "tools/probes (page 4)",
+      "omitted_file_count": 0,
+      "omitted_paths": [],
+      "path": "routing/tools_probes__page4.md",
+      "roles": {
+        "active_pipeline": 1,
+        "developer_utility": 2
+      },
+      "sample_paths": [
+        "tools/probes/probe_wall_types.py",
+        "tools/probes/probe_worksets.py",
+        "tools/probes/sweep_line_pattern_normhash_precision.py"
+      ],
+      "source_hash": "764135461a8a642b2f798a2b03eb1cb4bd5bd2629b37925ce66714173e6ad324",
+      "symbol_count": 39
     },
     {
       "file_count": 1,
@@ -884,14 +1116,14 @@
       "symbol_count": 8
     }
   ],
-  "generated_at_utc": "2026-08-22T10:53:20Z",
+  "generated_at_utc": "2026-08-22T11:28:23Z",
   "git": {
     "available": true,
-    "commit": "3ce812e43803066392d5d19d2457f81179c44a1b",
+    "commit": "227dcc5711e377a55a5352503e133364a29ef36e",
     "dirty": true
   },
   "graphify_warnings": [
-    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 3ce812e43803; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
+    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 227dcc5711e3; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
   ],
   "options": {
     "allow_stale_graphify": false,
@@ -900,6 +1132,6 @@
     "max_index_chars": 10000,
     "max_symbols_per_file_entry": 25
   },
-  "source_manifest_hash": "ed4a5c9f8b1268ab0bf427bdabd84c036e7b7838bc9dd2208b610a4265709bb3",
+  "source_manifest_hash": "ecad660d830724b8331a2d91393c183856b662723165ec9e5380edec4ab3d5f1",
   "tool_version": "0.1.0"
 }

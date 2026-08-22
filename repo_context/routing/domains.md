@@ -1,26 +1,10 @@
 # Routing catalog: `domains`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 31
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `77af39c4f48ed1872bc8aee884b47866cc5896647bdbd27c8e5678467294a3cb`
+- Files covered (this page): 16
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `domains` partition): `77af39c4f48ed1872bc8aee884b47866cc5896647bdbd27c8e5678467294a3cb`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
-
-### `domains/__init__.py`
-- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
-- Purpose clues:
-  - module docstring: Domain extractors package.
-  - filename/path terms: init
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`1d49228d1d50d38a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/__init__.py`)
 
 ### `domains/arrowheads.py`
 - Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
@@ -460,50 +444,12 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`5cdd5ac408856778…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/materials.py`)
 
-### `domains/phase_filters.py`
-- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
-- Purpose clues:
-  - module docstring: Phase Filters domain extractor.
-  - filename/path terms: phase filters
-- Important symbols (1 total):
-  - `extract` (function) — line 64
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - imports `core/canon.py`
-  - imports `core/collect.py`
-  - imports `core/hashing.py`
-  - imports `core/join_key_builder.py`
-  - imports `core/join_key_policy.py`
-  - imports `core/phase2.py`
-  - imports `core/record_v2.py`
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`dfc2137bfef55c13…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/phase_filters.py`)
-
-## Other files (non-Python)
+## Other files (non-Python / boilerplate)
 
 | Path | Title/summary | Role |
 |---|---|---|
+| `domains/__init__.py` | Domain extractors package. | `library_module` |
 | `domains/graph_2024.json` | graph 2024 | `unknown` |
 | `domains/graph_2025.json` | graph 2025 | `unknown` |
 | `domains/graph_2026.json` | graph 2026 | `unknown` |
-
-## Omitted from this catalog (size limit reached)
-
-14 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
-
-- `domains/object_styles.py`
-- `domains/phase_graphics.py`
-- `domains/phases.py`
-- `domains/roof_types.py`
-- `domains/text_types.py`
-- `domains/units.py`
-- `domains/view_category_overrides.py`
-- `domains/view_category_overrides_annotation.py`
-- `domains/view_category_overrides_model.py`
-- `domains/view_filter_applications_view_templates.py`
-- `domains/view_filter_definitions.py`
-- `domains/view_templates.py`
 

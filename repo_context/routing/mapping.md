@@ -1,26 +1,10 @@
 # Routing catalog: `mapping`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 5
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `433bc87f020c5adf4ea6791839cd72bbb0245a8d5454fb5ba76e39c5384bc03e`
+- Files covered (this page): 5
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `mapping` partition): `433bc87f020c5adf4ea6791839cd72bbb0245a8d5454fb5ba76e39c5384bc03e`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
-
-### `mapping/__init__.py`
-- Role: `library_module` (evidence: no `__main__` guard; located under 'mapping/')
-- Purpose clues:
-  - module docstring: mapping/ -- Revit-side downstream utility that materializes governance mapping
-  - filename/path terms: init
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`17611893c1d397bd…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `mapping/__init__.py`)
 
 ### `mapping/_dynamo_bootstrap.py`
 - Role: `library_module` (evidence: no `__main__` guard; located under 'mapping/')
@@ -168,4 +152,10 @@
 - Related tests:
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`d5fc7abed3ac0e0b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `mapping/line_pattern_revit_apply.py`)
+
+## Other files (non-Python / boilerplate)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `mapping/__init__.py` | mapping/ -- Revit-side downstream utility that materializes governance mapping | `library_module` |
 

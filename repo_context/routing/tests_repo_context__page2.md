@@ -1,0 +1,190 @@
+# Routing catalog: `tests/repo_context (page 2)`
+
+- Generated (UTC): 2026-08-22T11:28:23Z
+- Tool version: 0.1.0
+- Files covered (this page): 5
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests/repo_context` partition): `dbbcc019e880e86c4cb46c828a82bf20a7bcd7ba9738566d316ca81fea25a203`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `dev_tools/repo_context/tests/test_request_validation.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: White-box tests for rc_request.py's schema validation (no CLI/subprocess
+  - filename/path terms: test request validation
+- Important symbols (26 total):
+  - `_valid_base` (function) — line 9
+  - `test_valid_minimal_request_passes` (function) — line 17
+  - `test_valid_full_request_passes` (function) — line 22
+  - `test_missing_schema_version_is_rejected` (function) — line 37
+  - `test_unsupported_schema_version_is_rejected` (function) — line 44
+  - `test_missing_question_is_rejected` (function) — line 51
+  - `test_overlong_question_is_rejected` (function) — line 58
+  - `test_question_at_max_length_is_accepted` (function) — line 68
+  - `test_unknown_top_level_field_is_rejected` (function) — line 75
+  - `test_empty_selectors_are_rejected` (function) — line 82
+  - `test_path_traversal_in_files_is_rejected` (function) — line 89
+  - `test_absolute_unix_path_is_rejected` (function) — line 96
+  - `test_windows_drive_letter_path_is_rejected` (function) — line 103
+  - `test_invalid_line_range_end_before_start_is_rejected` (function) — line 110
+  - `test_negative_line_number_is_rejected` (function) — line 118
+  - `test_excessive_expansion_depth_is_rejected` (function) — line 126
+  - `test_unknown_field_under_selectors_is_rejected` (function) — line 133
+  - `test_unknown_field_under_symbol_object_is_rejected` (function) — line 140
+  - `test_symbol_missing_name_is_rejected` (function) — line 147
+  - `test_non_boolean_strict_is_rejected` (function) — line 154
+  - `test_non_integer_limit_is_rejected` (function) — line 161
+  - `test_parse_and_validate_request_rejects_malformed_json` (function) — line 168
+  - `test_non_string_schema_version_is_rejected_not_a_crash` (function) — line 174
+  - `test_boolean_line_value_is_rejected` (function) — line 188
+  - `test_boolean_end_line_value_is_rejected` (function) — line 199
+  - ... and 1 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_absolute_unix_path_is_rejected (dev_tools/repo_context/tests/test_request_validation.py:97)`
+  - `test_boolean_end_line_value_is_rejected (dev_tools/repo_context/tests/test_request_validation.py:200)`
+  - `test_boolean_line_value_is_rejected (dev_tools/repo_context/tests/test_request_validation.py:192)`
+  - `test_empty_selectors_are_rejected (dev_tools/repo_context/tests/test_request_validation.py:83)`
+  - `test_excessive_expansion_depth_is_rejected (dev_tools/repo_context/tests/test_request_validation.py:127)`
+  - `test_invalid_line_range_end_before_start_is_rejected (dev_tools/repo_context/tests/test_request_validation.py:111)`
+  - `test_missing_question_is_rejected (dev_tools/repo_context/tests/test_request_validation.py:52)`
+  - `test_missing_schema_version_is_rejected (dev_tools/repo_context/tests/test_request_validation.py:38)`
+  - `test_negative_line_number_is_rejected (dev_tools/repo_context/tests/test_request_validation.py:119)`
+  - `test_non_boolean_strict_is_rejected (dev_tools/repo_context/tests/test_request_validation.py:155)`
+  - `test_non_integer_limit_is_rejected (dev_tools/repo_context/tests/test_request_validation.py:162)`
+  - `test_non_string_schema_version_is_rejected_not_a_crash (dev_tools/repo_context/tests/test_request_validation.py:178)`
+  - `test_overlong_question_is_rejected (dev_tools/repo_context/tests/test_request_validation.py:62)`
+  - `test_parse_and_validate_request_applies_defaults (dev_tools/repo_context/tests/test_request_validation.py:208)`
+  - `test_path_traversal_in_files_is_rejected (dev_tools/repo_context/tests/test_request_validation.py:90)`
+  - ... and 9 more (see python_calls.csv)
+- Related tests:
+  - `dev_tools/repo_context/tests/test_request_validation.py`
+- Retrieval identity: sha256=`84b3611bc48cafe5…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_request_validation.py`)
+
+### `dev_tools/repo_context/tests/test_routing.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test routing
+- Important symbols (31 total):
+  - `_scan` (function) — line 6
+  - `_manifest` (function) — line 12
+  - `test_routing_catalogs_are_generated_and_deterministic` (function) — line 16
+  - `test_every_included_file_has_exactly_one_primary_catalog` (function) — line 38
+  - `test_test_and_archived_files_get_dedicated_catalogs` (function) — line 67
+  - `test_catalog_line_anchors_match_python_symbols_csv` (function) — line 86
+  - `test_routing_catalog_splits_oversized_directory_by_subdirectory` (function) — line 99
+  - `test_routing_index_respects_max_chars` (function) — line 119
+  - `test_routing_catalog_respects_max_catalog_chars` (function) — line 146
+  - `test_catalog_appendix_respects_the_cap_when_header_alone_is_close_to_it` (function) — line 165
+  - `test_omitted_path_appendix_is_bounded_regardless_of_omitted_count` (function) — line 183
+  - `test_manifest_stores_the_complete_omitted_path_list` (function) — line 227
+  - `test_first_catalog_entry_is_also_capped_by_max_catalog_chars` (function) — line 246
+  - `test_non_python_files_get_a_lightweight_table_row_not_a_full_block` (function) — line 296
+  - `test_init_py_gets_a_lightweight_table_row_with_docstring_title` (function) — line 322
+  - `test_markdown_title_prefers_heading_falls_back_to_first_line_then_filename` (function) — line 343
+  - `test_other_files_table_rows_respect_the_catalog_cap` (function) — line 359
+  - `test_paged_catalog_filenames_stay_within_the_byte_cap` (function) — line 380
+  - `test_changed_source_changes_source_manifest_hash` (function) — line 400
+  - `test_routing_disabled_with_no_routing_flag` (function) — line 410
+  - `test_no_routing_removes_stale_routing_from_earlier_scan` (function) — line 416
+  - `test_catalog_filenames_do_not_collide_across_partition_keys` (function) — line 429
+  - `test_purpose_clues_are_traceable_to_deterministic_evidence` (function) — line 463
+  - `test_scan_survives_a_malformed_graphify_top_level_structure` (function) — line 471
+  - `test_scan_survives_a_graphify_node_with_unhashable_community` (function) — line 486
+  - ... and 6 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_catalog_appendix_respects_the_cap_when_header_alone_is_close_to_it (dev_tools/repo_context/tests/test_routing.py:177)`
+  - `test_catalog_filenames_are_capped_by_encoded_byte_length_not_char_count (dev_tools/repo_context/tests/test_routing.py:590)`
+  - `test_catalog_filenames_are_capped_by_encoded_byte_length_not_char_count (dev_tools/repo_context/tests/test_routing.py:591)`
+  - `test_catalog_filenames_do_not_collide_across_partition_keys (dev_tools/repo_context/tests/test_routing.py:441)`
+  - `test_catalog_filenames_do_not_collide_across_partition_keys (dev_tools/repo_context/tests/test_routing.py:442)`
+  - `test_catalog_filenames_stay_within_filesystem_limits (dev_tools/repo_context/tests/test_routing.py:610)`
+  - `test_catalog_filenames_stay_within_filesystem_limits (dev_tools/repo_context/tests/test_routing.py:611)`
+  - `test_catalog_line_anchors_match_python_symbols_csv (dev_tools/repo_context/tests/test_routing.py:90)`
+  - `test_changed_source_changes_source_manifest_hash (dev_tools/repo_context/tests/test_routing.py:402)`
+  - `test_changed_source_changes_source_manifest_hash (dev_tools/repo_context/tests/test_routing.py:403)`
+  - `test_changed_source_changes_source_manifest_hash (dev_tools/repo_context/tests/test_routing.py:405)`
+  - `test_changed_source_changes_source_manifest_hash (dev_tools/repo_context/tests/test_routing.py:406)`
+  - `test_content_derived_purpose_clues_are_redacted (dev_tools/repo_context/tests/test_routing.py:554)`
+  - `test_every_included_file_has_exactly_one_primary_catalog (dev_tools/repo_context/tests/test_routing.py:45)`
+  - `test_every_included_file_has_exactly_one_primary_catalog (dev_tools/repo_context/tests/test_routing.py:46)`
+  - ... and 33 more (see python_calls.csv)
+- Related tests:
+  - `dev_tools/repo_context/tests/test_routing.py`
+- Retrieval identity: sha256=`8dc15d6b8b7ac2e1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_routing.py`)
+
+### `dev_tools/repo_context/tests/test_safety.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test safety
+- Important symbols (10 total):
+  - `test_refuses_output_dir_equal_to_root` (function) — line 6
+  - `test_output_dir_inside_root_is_never_scanned_into_itself` (function) — line 12
+  - `test_custom_named_output_dir_inside_root_is_auto_excluded` (function) — line 24
+  - `test_nested_output_dir_excludes_only_itself_not_its_whole_parent` (function) — line 36
+  - `test_invalid_root_returns_nonzero` (function) — line 55
+  - `test_missing_subcommand_returns_nonzero` (function) — line 62
+  - `test_non_positive_chunk_target_lines_rejected` (function) — line 67
+  - `test_validate_does_not_require_packets_dir` (function) — line 75
+  - `test_redaction_does_not_remove_valid_code_statements_naming_token_or_secret` (function) — line 90
+  - `test_redaction_regression_flows_through_generated_chunks` (function) — line 136
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`ec5676a2c3693bd3…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_safety.py`)
+
+### `dev_tools/repo_context/tests/test_symlinks.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test symlinks
+- Important symbols (6 total):
+  - `test_symlink_escaping_root_is_excluded` (function) — line 13
+  - `test_file_symlink_escaping_root_is_excluded_without_being_read` (function) — line 36
+  - `test_symlink_cycle_inside_root_does_not_hang` (function) — line 53
+  - `test_symlink_pointing_at_output_dir_is_excluded` (function) — line 62
+  - `test_symlink_into_output_subdirectory_is_excluded` (function) — line 84
+  - `test_fifo_directly_under_root_does_not_hang` (function) — line 103
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`52a30fb823073bd5…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_symlinks.py`)
+
+### `dev_tools/repo_context/tests/test_validate.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test validate
+- Important symbols (10 total):
+  - `_big_text` (function) — line 6
+  - `test_validate_passes_on_freshly_generated_output` (function) — line 10
+  - `test_validate_detects_modified_chunk` (function) — line 22
+  - `test_validate_detects_missing_chunk` (function) — line 38
+  - `test_validate_catches_entirely_deleted_chunk_rows` (function) — line 54
+  - `test_scan_does_not_crash_on_malformed_prior_chunk_manifest` (function) — line 69
+  - `test_validate_reports_bad_chunk_manifest_header_instead_of_crashing` (function) — line 89
+  - `test_validate_reports_malformed_chunk_manifest_instead_of_crashing` (function) — line 110
+  - `test_validate_reports_invalid_utf8_instead_of_crashing` (function) — line 131
+  - `test_validate_fails_on_missing_required_file` (function) — line 147
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_validate_catches_entirely_deleted_chunk_rows (dev_tools/repo_context/tests/test_validate.py:55)`
+  - `test_validate_detects_missing_chunk (dev_tools/repo_context/tests/test_validate.py:39)`
+  - `test_validate_detects_modified_chunk (dev_tools/repo_context/tests/test_validate.py:23)`
+  - `test_validate_passes_on_freshly_generated_output (dev_tools/repo_context/tests/test_validate.py:13)`
+- Related tests:
+  - `dev_tools/repo_context/tests/test_validate.py`
+- Retrieval identity: sha256=`a2f72254cf88e0e4…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_validate.py`)
+

@@ -1,26 +1,10 @@
 # Routing catalog: `runner`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 6
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `32ef4a133eb37263d57bdb1da6d8b65de921bb7f2afffa410fdaed3717fc6e00`
+- Files covered (this page): 6
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `runner` partition): `32ef4a133eb37263d57bdb1da6d8b65de921bb7f2afffa410fdaed3717fc6e00`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
-
-### `runner/__init__.py`
-- Role: `library_module` (evidence: no `__main__` guard; located under 'runner/')
-- Purpose clues:
-  - module docstring: Host-specific runners package.
-  - filename/path terms: init
-- Important symbols (0 total):
-  - (none)
-- Entrypoint evidence: none
-- Internal dependencies (resolved imports within this repository):
-  - (none resolved; see python_imports.csv for unresolved/external imports)
-- Called by (high/medium-confidence static callers):
-  - (none resolved statically; see python_calls.csv)
-- Related tests:
-  - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`b084569a48092e43…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `runner/__init__.py`)
 
 ### `runner/extraction_context.py`
 - Role: `library_module` (evidence: no `__main__` guard; located under 'runner/')
@@ -213,4 +197,10 @@
 - Related tests:
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`8493891d602d005a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `runner/thin_runner.py`)
+
+## Other files (non-Python / boilerplate)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `runner/__init__.py` | Host-specific runners package. | `library_module` |
 

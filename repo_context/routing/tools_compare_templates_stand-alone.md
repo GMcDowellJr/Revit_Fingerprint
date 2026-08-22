@@ -1,9 +1,9 @@
 # Routing catalog: `tools/compare_templates_stand-alone`
 
-- Generated (UTC): 2026-08-22T10:53:20Z
+- Generated (UTC): 2026-08-22T11:28:23Z
 - Tool version: 0.1.0
-- Files covered: 2
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `8f0edbcd1530934fbe09b667ad93747ea5ae50be36ff5785ffa37546c59df6c8`
+- Files covered (this page): 2
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/compare_templates_stand-alone` partition): `8f0edbcd1530934fbe09b667ad93747ea5ae50be36ff5785ffa37546c59df6c8`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `tools/compare_templates_stand-alone/compare_view_templates_stand-alone.py`
@@ -60,7 +60,7 @@
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`5d941df515762a01…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/compare_templates_stand-alone/compare_view_templates_stand-alone.py`)
 
-## Other files (non-Python)
+## Other files (non-Python / boilerplate)
 
 | Path | Title/summary | Role |
 |---|---|---|
