@@ -1,0 +1,413 @@
+# Routing catalog: `tools`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 15
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools` partition): `186bd8fb5e648d3853b278c2db4aa9f2801dc7c2a2d2be25436967cc0d21bae6`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tools/acc_scan_dc.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: acc_scan_dc.py — Desktop Connector / network folder scanner
+  - filename/path terms: acc scan dc
+- Important symbols (6 total):
+  - `read_rvt_version` (function) — line 83
+  - `scan` (function) — line 112
+  - `load_existing_includes` (function) — line 175
+  - `write_manifest` (function) — line 188
+  - `parse_types` (function) — line 210
+  - `main` (function) — line 227
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/acc_scan_dc.py:316)`
+  - `main (tools/acc_scan_dc.py:263)`
+  - `main (tools/acc_scan_dc.py:280)`
+  - `main (tools/acc_scan_dc.py:285)`
+  - `main (tools/acc_scan_dc.py:306)`
+  - `scan (tools/acc_scan_dc.py:155)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`e69073c678ff5940…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/acc_scan_dc.py`)
+
+### `tools/acc_sync_dc.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: acc_sync_dc.py — Desktop Connector pre-sync tool
+  - filename/path terms: acc sync dc
+- Important symbols (6 total):
+  - `is_stub` (function) — line 59
+  - `_trigger_read` (function) — line 91
+  - `hydrate` (function) — line 101
+  - `load_included_entries` (function) — line 170
+  - `write_log` (function) — line 193
+  - `main` (function) — line 271
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/acc_sync_dc.py:405)`
+  - `hydrate (tools/acc_sync_dc.py:147)`
+  - `main (tools/acc_sync_dc.py:303)`
+  - `main (tools/acc_sync_dc.py:317)`
+  - `main (tools/acc_sync_dc.py:338)`
+  - `main (tools/acc_sync_dc.py:364)`
+  - `main (tools/acc_sync_dc.py:381)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`17b5b93c134ada64…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/acc_sync_dc.py`)
+
+### `tools/analyze_promotion_candidates.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Scope-consistency analysis for governed patterns.
+  - filename/path terms: analyze promotion candidates
+- Important symbols (7 total):
+  - `parse_args` (function) — line 172
+  - `require_columns` (function) — line 318
+  - `safe_bool_series` (function) — line 324
+  - `apply_export_cap` (function) — line 336
+  - `compute_seeded_scope` (function) — line 346
+  - `compute_reuse_scope` (function) — line 399
+  - `main` (function) — line 574
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/analyze_promotion_candidates.py:1066)`
+  - `main (tools/analyze_promotion_candidates.py:575)`
+  - `main (tools/analyze_promotion_candidates.py:617)`
+  - `main (tools/analyze_promotion_candidates.py:629)`
+  - `main (tools/analyze_promotion_candidates.py:648)`
+  - `main (tools/analyze_promotion_candidates.py:727)`
+  - `main (tools/analyze_promotion_candidates.py:728)`
+  - `main (tools/analyze_promotion_candidates.py:887)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`1e5dbc478f5d1e9f…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/analyze_promotion_candidates.py`)
+
+### `tools/apply_join_policy.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - filename/path terms: apply join policy
+- Important symbols (3 total):
+  - `_read_csv` (function) — line 19
+  - `_write_csv` (function) — line 24
+  - `main` (function) — line 33
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/join_key_derivation.py`
+  - imports `tools/join_key_discovery/eval.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/apply_join_policy.py:207)`
+  - `main (tools/apply_join_policy.py:197)`
+  - `main (tools/apply_join_policy.py:199)`
+  - `main (tools/apply_join_policy.py:51)`
+  - `main (tools/apply_join_policy.py:81)`
+  - `main._get_domain_items (tools/apply_join_policy.py:88)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`c26fe780de8fb321…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/apply_join_policy.py`)
+
+### `tools/apply_name_key_policy.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Analysis-side reconstruction of the Canonical Name Identity Projection (PR1).
+  - filename/path terms: apply name key policy
+- Important symbols (4 total):
+  - `_iter_export_paths` (function) — line 52
+  - `_iter_domain_payloads` (function) — line 76
+  - `_rows_for_export` (function) — line 84
+  - `main` (function) — line 113
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/join_key_policy.py`
+  - imports `core/name_key_builder.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/apply_name_key_policy.py:142)`
+  - `_rows_for_export (tools/apply_name_key_policy.py:91)`
+  - `main (tools/apply_name_key_policy.py:127)`
+  - `main (tools/apply_name_key_policy.py:128)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`b97932e130ba9d92…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/apply_name_key_policy.py`)
+
+### `tools/build_results_registry.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Build a BI-friendly results_registry.csv from segment_manifest.csv and run_registry.csv.
+  - filename/path terms: build results registry
+- Important symbols (6 total):
+  - `read_csv_rows` (function) — line 30
+  - `atomic_write_csv` (function) — line 40
+  - `build_results_registry_rows` (function) — line 59
+  - `_safe_int` (function) — line 92
+  - `write_results_registry` (function) — line 99
+  - `main` (function) — line 108
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/build_results_registry.py:136)`
+  - `build_results_registry_rows (tools/build_results_registry.py:89)`
+  - `main (tools/build_results_registry.py:130)`
+  - `write_results_registry (tools/build_results_registry.py:101)`
+  - `write_results_registry (tools/build_results_registry.py:102)`
+  - `write_results_registry (tools/build_results_registry.py:103)`
+  - `write_results_registry (tools/build_results_registry.py:104)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`1bb02636189fc5cc…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/build_results_registry.py`)
+
+### `tools/build_segment_manifest.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - filename/path terms: build segment manifest
+- Important symbols (15 total):
+  - `_read_csv` (function) — line 43
+  - `_atomic_write_csv` (function) — line 50
+  - `_population_hash` (function) — line 58
+  - `_sanitize_folder` (function) — line 68
+  - `_build_membership_rows` (function) — line 89
+  - `_membership_by_segment` (function) — line 108
+  - `_append_note` (function) — line 120
+  - `_invalid_required_value_reason` (function) — line 130
+  - `_invalid_dimension_value_reason` (function) — line 154
+  - `_validate_required_metadata` (function) — line 169
+  - `_normalize_rows` (function) — line 225
+  - `_build_segments` (function) — line 307
+  - `_build_registry` (function) — line 571
+  - `_print_summary` (function) — line 711
+  - `main` (function) — line 746
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/build_segment_manifest.py:886)`
+  - `_build_registry (tools/build_segment_manifest.py:633)`
+  - `_build_registry (tools/build_segment_manifest.py:659)`
+  - `_build_registry (tools/build_segment_manifest.py:672)`
+  - `_build_registry (tools/build_segment_manifest.py:674)`
+  - `_build_registry (tools/build_segment_manifest.py:676)`
+  - `_build_registry (tools/build_segment_manifest.py:678)`
+  - `_build_segments (tools/build_segment_manifest.py:326)`
+  - `_build_segments (tools/build_segment_manifest.py:417)`
+  - `_build_segments (tools/build_segment_manifest.py:566)`
+  - `_validate_required_metadata (tools/build_segment_manifest.py:199)`
+  - `_validate_required_metadata (tools/build_segment_manifest.py:201)`
+  - `main (tools/build_segment_manifest.py:770)`
+  - `main (tools/build_segment_manifest.py:796)`
+  - `main (tools/build_segment_manifest.py:817)`
+  - ... and 10 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`0fb7d0a7eae2cdb6…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/build_segment_manifest.py`)
+
+### `tools/compare_cross_segment.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Cross-segment comparison tool.
+  - filename/path terms: compare cross segment
+- Important symbols (101 total):
+  - `read_csv_rows` (function) — line 172
+  - `atomic_write_csv` (function) — line 180
+  - `_classify_delta` (function) — line 499
+  - `_bool_str` (function) — line 535
+  - `_role_key` (function) — line 539
+  - `_is_generic_role` (function) — line 543
+  - `_role_matches` (function) — line 547
+  - `_usage_interpretable_for_role` (function) — line 553
+  - `_recommended_primary_view` (function) — line 559
+  - `_comparison_role_semantics` (function) — line 565
+  - `_classify_governance_state` (function) — line 583
+  - `load_manifest` (function) — line 618
+  - `load_registry` (function) — line 636
+  - `load_file_metadata` (function) — line 643
+  - `load_membership` (function) — line 651
+  - `validate_membership_against_manifest` (function) — line 676
+  - `load_comparison_registry` (function) — line 773
+  - `_segment_status_complete` (function) — line 787
+  - `build_comparison_registry_rows` (function) — line 791
+  - `comparison_is_stale` (function) — line 849
+  - `segment_output_dir` (function) — line 881
+  - `bundle_analysis_dir` (function) — line 895
+  - `domain_patterns_path` (function) — line 899
+  - `pattern_presence_file_path` (function) — line 903
+  - `_load_export_run_ids_for_segment` (function) — line 907
+  - ... and 76 more (see python_symbols.csv)
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/compare_cross_segment.py:5383)`
+  - `_bc_of (tools/compare_cross_segment.py:1964)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4058)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4068)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4084)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4091)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4094)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4100)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4103)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4112)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4113)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4139)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4154)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4162)`
+  - `_build_pooled_row (tools/compare_cross_segment.py:4189)`
+  - ... and 369 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_governance_manifest.py`
+- Retrieval identity: sha256=`972c63d7ad4cfd0b…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/compare_cross_segment.py`)
+
+### `tools/compare_governance_populations.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: tools/compare_governance_populations.py
+  - filename/path terms: compare governance populations
+- Important symbols (9 total):
+  - `load_join_hashes_by_domain` (function) — line 96
+  - `_files_for_population` (function) — line 111
+  - `_disc_match` (function) — line 128
+  - `discover_same_role_peer_pairs` (function) — line 134
+  - `discover_directed_tc_to_project_pairs` (function) — line 180
+  - `discover_generic_pairs` (function) — line 224
+  - `_pop_export_run_ids` (function) — line 251
+  - `run_comparisons` (function) — line 255
+  - `main` (function) — line 329
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/compare_governance_populations.py:364)`
+  - `discover_directed_tc_to_project_pairs (tools/compare_governance_populations.py:207)`
+  - `discover_generic_pairs (tools/compare_governance_populations.py:240)`
+  - `discover_same_role_peer_pairs (tools/compare_governance_populations.py:169)`
+  - `main (tools/compare_governance_populations.py:351)`
+  - `run_comparisons (tools/compare_governance_populations.py:261)`
+  - `run_comparisons (tools/compare_governance_populations.py:268)`
+  - `run_comparisons (tools/compare_governance_populations.py:270)`
+  - `run_comparisons (tools/compare_governance_populations.py:271)`
+  - `run_comparisons (tools/compare_governance_populations.py:296)`
+  - `run_comparisons (tools/compare_governance_populations.py:297)`
+  - `run_comparisons (tools/compare_governance_populations.py:313)`
+  - `run_comparisons (tools/compare_governance_populations.py:314)`
+  - `test_comparison_type_never_mixes_symmetric_and_directed_metric_shape (tests/test_compare_governance_populations.py:254)`
+  - `test_comparison_type_still_unambiguous_with_project_scoped_template (tests/test_compare_governance_populations.py:121)`
+  - ... and 11 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_compare_governance_populations.py`
+- Retrieval identity: sha256=`d612614ef9c8d659…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/compare_governance_populations.py`)
+
+### `tools/compute_governance_thresholds.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Compute governance thresholds for the Fingerprint BI model.
+  - filename/path terms: compute governance thresholds
+- Important symbols (6 total):
+  - `_read_csv` (function) — line 25
+  - `_write_csv` (function) — line 30
+  - `compute_alignment_rates` (function) — line 38
+  - `jenks_natural_breaks` (function) — line 92
+  - `compute_thresholds` (function) — line 156
+  - `main` (function) — line 188
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/compute_governance_thresholds.py:242)`
+  - `compute_alignment_rates (tools/compute_governance_thresholds.py:63)`
+  - `compute_thresholds (tools/compute_governance_thresholds.py:174)`
+  - `main (tools/compute_governance_thresholds.py:205)`
+  - `main (tools/compute_governance_thresholds.py:210)`
+  - `main (tools/compute_governance_thresholds.py:236)`
+  - `test_compute_alignment_rates_and_contract_header_preserves_is_named_cluster (tests/test_split_named_clusters_and_thresholds.py:90)`
+  - `test_compute_alignment_rates_falls_back_to_percentage_when_size_absent (tests/test_split_named_clusters_and_thresholds.py:142)`
+  - `test_compute_alignment_rates_falls_back_to_percentage_when_size_values_are_invalid (tests/test_split_named_clusters_and_thresholds.py:158)`
+  - `test_compute_alignment_rates_uses_raw_share_or_size_for_unrounded_result (tests/test_split_named_clusters_and_thresholds.py:126)`
+  - `test_thresholds_breaks_and_ordering (tests/test_split_named_clusters_and_thresholds.py:58)`
+  - `test_thresholds_breaks_and_ordering (tests/test_split_named_clusters_and_thresholds.py:61)`
+  - `test_thresholds_reject_non_three_classes (tests/test_split_named_clusters_and_thresholds.py:68)`
+- Related tests:
+  - `tests/test_split_named_clusters_and_thresholds.py`
+- Retrieval identity: sha256=`b8c10cbe72b5f4ba…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/compute_governance_thresholds.py`)
+
+### `tools/compute_latent_purgeable.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Compute latent purgeable signal for reference domains.
+  - filename/path terms: compute latent purgeable
+- Important symbols (16 total):
+  - `_is_vfd_ref_key` (function) — line 139
+  - `_is_vfa_filter_ref_key` (function) — line 146
+  - `_build_matcher` (function) — line 153
+  - `_is_purgeable_true` (function) — line 169
+  - `_is_purgeable_false` (function) — line 173
+  - `_make_zero_counts` (function) — line 177
+  - `_select_chains` (function) — line 181
+  - `_domains_of_interest` (function) — line 195
+  - `_load_records` (function) — line 207
+  - `_accumulate_item_rows` (function) — line 268
+  - `_load_chain_ref_data` (function) — line 307
+  - `_classify` (function) — line 423
+  - `_write_output` (function) — line 487
+  - `_fmt_consumers` (function) — line 499
+  - `_print_summary` (function) — line 524
+  - `main` (function) — line 600
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/compute_latent_purgeable.py:828)`
+  - `_accumulate_item_rows (tools/compute_latent_purgeable.py:302)`
+  - `_build_matcher (tools/compute_latent_purgeable.py:157)`
+  - `_classify (tools/compute_latent_purgeable.py:445)`
+  - `_load_chain_ref_data (tools/compute_latent_purgeable.py:325)`
+  - `_load_chain_ref_data (tools/compute_latent_purgeable.py:358)`
+  - `_load_chain_ref_data (tools/compute_latent_purgeable.py:405)`
+  - `_print_summary (tools/compute_latent_purgeable.py:540)`
+  - `main (tools/compute_latent_purgeable.py:659)`
+  - `main (tools/compute_latent_purgeable.py:660)`
+  - `main (tools/compute_latent_purgeable.py:663)`
+  - `main (tools/compute_latent_purgeable.py:683)`
+  - `main (tools/compute_latent_purgeable.py:703)`
+  - `main (tools/compute_latent_purgeable.py:763)`
+  - `main (tools/compute_latent_purgeable.py:781)`
+  - ... and 3 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`f829463581fe612b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/compute_latent_purgeable.py`)
+
+### `tools/discover_hash_policy.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - filename/path terms: discover hash policy
+- Important symbols (5 total):
+  - `_resolve_phase0_dir` (function) — line 19
+  - `_load_items` (function) — line 39
+  - `_domain_rows` (function) — line 45
+  - `_run_target` (function) — line 72
+  - `main` (function) — line 157
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/discover_join_policy.py`
+  - imports `tools/join_key_discovery/eval.py`
+  - imports `tools/join_key_discovery/greedy.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/discover_hash_policy.py:235)`
+  - `_run_target (tools/discover_hash_policy.py:94)`
+  - `main (tools/discover_hash_policy.py:205)`
+  - `main (tools/discover_hash_policy.py:225)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`f3d1aff20f843d91…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/discover_hash_policy.py`)
+
+## Other files (non-Python / boilerplate)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/corpus_update_runbook.ps1` | corpus update runbook | `unknown` |
+| `tools/dimension_types.join_key.json` | dimension types.join key | `unknown` |
+| `tools/dimension_types.join_key.md` | { | `unknown` |
+

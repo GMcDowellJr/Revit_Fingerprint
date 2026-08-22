@@ -55,12 +55,67 @@ BINARY_EXTENSIONS = {
     # entirely for a text format.
 }
 
-SECRET_LINE_PATTERNS = [
-    re.compile(r"(?i)(api[_-]?key|secret|token|access[_-]?key|password|passwd)\s*[:=]\s*['\"]?[A-Za-z0-9/+_\-\.]{12,}['\"]?"),
+_SECRET_ASSIGNMENT_PATTERN = re.compile(
+    r"(?i)(?:api[_-]?key|secret|token|access[_-]?key|password|passwd)\s*[:=]\s*"
+    r"(?P<q>['\"]?)(?P<value>[A-Za-z0-9/+_\-\.]{12,})(?P=q)"
+)
+_STANDALONE_SECRET_PATTERNS = [
     re.compile(r"AKIA[0-9A-Z]{16}"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
 ]
 REDACTION_TEXT = "[REDACTED-POSSIBLE-SECRET]"
+
+_PLAIN_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+# Substrings that mark an unquoted, underscore-containing identifier as
+# *demonstrably* a reference/provenance description rather than a secret
+# value that merely happens to look like one -- a real lowercase
+# snake_case credential (e.g. a Diceware-style password like
+# `correct_horse_battery_staple`, or a token literal like
+# `real_secret_value`) has the exact same shape (all-lowercase, no digit,
+# underscore-separated words) as a legitimate reference like
+# `user_provided_value_from_config`, so shape alone (the previous check)
+# cannot tell them apart. Requiring one of these markers narrows the
+# exemption to identifiers that name *where a value comes from*
+# (config/env/provider lookups, or an explicit placeholder), which a real
+# secret's spelling essentially never does.
+_REFERENCE_MARKERS = ("config", "provider", "environ", "_env", "env_", "placeholder", "default", "template",
+                      "example")
+
+
+def _looks_secret_shaped(value: str, quoted: bool) -> bool:
+    """Bounded false-positive guard for _SECRET_ASSIGNMENT_PATTERN.
+
+    A *quoted* value after `token =` / `password:` / etc. is redacted
+    unconditionally, as before -- a literal string in that position is
+    almost always meant to be a real secret. An *unquoted* value is only
+    left alone when it (a) is a plain identifier (letters/digits/
+    underscores only), (b) contains an underscore, (c) has no digit and no
+    mixed case, AND (d) contains one of `_REFERENCE_MARKERS` -- i.e. it
+    reads as a description of *where a value comes from*, like
+    `token = user_provided_value_from_config` or `access_token =
+    fetch_token_from_provider`, not an opaque value. Requirement (d) is
+    what keeps this exemption from also swallowing a real lowercase
+    snake_case credential like `password = correct_horse_battery_staple`
+    or `token = real_secret_value`: those have the identical shape ((a)-
+    (c)) but name no config/env/provider/placeholder origin, so they stay
+    redacted. A single-word unquoted value with no underscore (e.g.
+    `token: abcdefghijklmnopqrstuvwxyz`) is exactly the shape a real
+    lowercase credential/token takes and is still redacted, even though it
+    also happens to be a valid identifier. This does not eliminate every
+    false positive (e.g. a reference identifier that happens to omit any
+    marker word) -- closing that gap fully would need real entropy scoring
+    or an allowlist, which is a separate, broader redesign rather than a
+    bounded fix.
+    """
+    if quoted:
+        return True
+    if _PLAIN_IDENTIFIER.match(value) and "_" in value:
+        has_digit = any(c.isdigit() for c in value)
+        has_mixed_case = any(c.islower() for c in value) and any(c.isupper() for c in value)
+        looks_like_reference = any(marker in value.lower() for marker in _REFERENCE_MARKERS)
+        return (has_digit or has_mixed_case) or not looks_like_reference
+    return True  # single-word identifier, or contains '/', '+', '.', '-' -- secret-shaped
 
 
 def redact_secrets(text: str) -> str:
@@ -68,7 +123,16 @@ def redact_secrets(text: str) -> str:
     changed = False
     for line in text.split("\n"):
         new_line = line
-        for pat in SECRET_LINE_PATTERNS:
+
+        def _sub(m):
+            nonlocal changed
+            if _looks_secret_shaped(m.group("value"), bool(m.group("q"))):
+                changed = True
+                return REDACTION_TEXT
+            return m.group(0)
+
+        new_line = _SECRET_ASSIGNMENT_PATTERN.sub(_sub, new_line)
+        for pat in _STANDALONE_SECRET_PATTERNS:
             if pat.search(new_line):
                 new_line = pat.sub(REDACTION_TEXT, new_line)
                 changed = True
@@ -267,3 +331,61 @@ def atomic_write_bytes(path: Path, data: bytes) -> None:
 
 def estimate_tokens(char_count: int) -> int:
     return max(1, round(char_count / 4))
+
+
+def get_git_info(root: Path, timeout: float = 5.0, exclude_paths: Optional[list] = None) -> dict:
+    """Best-effort, read-only git metadata for the scanned root: current
+    commit hash and dirty-worktree state. Never raises -- any failure
+    (not a git repo, git not installed, timeout) yields
+    {"available": False}. Used only for provenance/freshness reporting,
+    never to gate whether a scan or packet can run.
+
+    exclude_paths: repo-relative directories to exclude from the
+    dirty-worktree determination (e.g. this tool's own --output directory,
+    or graphify-out/ -- both are routinely rewritten by this tool's own
+    normal operation, so dirtiness confined to them says nothing about
+    whether the scanned *source* changed; see generated_output_exclude_paths()).
+    """
+    import subprocess
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=str(root), capture_output=True,
+            text=True, timeout=timeout,
+        )
+        if commit.returncode != 0:
+            return {"available": False}
+        status_cmd = ["git", "status", "--porcelain"]
+        if exclude_paths:
+            status_cmd.append("--")
+            status_cmd.extend(f":(exclude){p}" for p in exclude_paths)
+        status = subprocess.run(
+            status_cmd, cwd=str(root), capture_output=True,
+            text=True, timeout=timeout,
+        )
+        dirty = bool(status.stdout.strip()) if status.returncode == 0 else None
+        return {
+            "available": True,
+            "commit": commit.stdout.strip(),
+            "dirty": dirty,
+        }
+    except (OSError, subprocess.SubprocessError):
+        return {"available": False}
+
+
+def generated_output_exclude_paths(root: Path, output_dir: Path) -> list:
+    """Repo-relative paths get_git_info()'s dirty-worktree check should
+    exclude: the configured --output directory (if it's inside root) and
+    graphify-out/ (Graphify's own generated artifacts -- see AGENTS.md's
+    "dirty graphify-out/ files are expected" note for this exact
+    repository). Both are routinely rewritten as a side effect of this
+    tool's own (or Graphify's own) normal operation; if that's the only
+    thing making the worktree look dirty, callers like the Graphify
+    revision-alignment check would otherwise withhold evidence for a
+    reason that has nothing to do with the scanned source changing."""
+    excludes = ["graphify-out"]
+    try:
+        rel = output_dir.resolve().relative_to(root.resolve())
+        excludes.append(str(rel).replace("\\", "/"))
+    except ValueError:
+        pass  # output_dir isn't inside root -- nothing to exclude for it
+    return excludes

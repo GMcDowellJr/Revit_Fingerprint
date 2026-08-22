@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "question": "Why is comparison_target absent from cross-segment outputs?",
+  "selectors": {
+    "files": ["tools/compare_cross_segment.py"],
+    "symbols": [{"name": "build_comparison_registry_rows", "file": "tools/compare_cross_segment.py"}],
+    "search_terms": ["comparison_target"],
+    "lines": []
+  },
+  "expansion": {
+    "include_callers": true,
+    "include_callees": true,
+    "include_imports": true,
+    "include_related_tests": true,
+    "max_hops": 1
+  },
+  "limits": {
+    "max_estimated_tokens": 12000,
+    "max_files": 12
+  }
+}

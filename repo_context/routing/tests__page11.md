@@ -1,0 +1,358 @@
+# Routing catalog: `tests (page 11)`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 14
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests` partition): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tests/test_run_segment_orchestrator_name_projection.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for PR4 (Segment-Orchestrator Name-Projection Support).
+  - filename/path terms: test run segment orchestrator name projection
+- Important symbols (12 total):
+  - `_write_csv` (function) — line 41
+  - `_read_csv` (function) — line 50
+  - `TestFilterNameKeyCsvToSegment` (class) — line 55
+  - `TestActiveDomainsFromNamePatterns` (class) — line 127
+  - `TestMergeBiOutputsExcludesStaleDomainsForEmptySegment` (class) — line 156
+  - `TestSegmentHasNameLegOutput` (class) — line 224
+  - `TestCLIComparisonTarget` (class) — line 235
+  - `TestCompleteSegmentSkipHonorsNameTarget` (class) — line 313
+  - `TestStaleNameBundleOutputClearedBeforeRerun` (class) — line 423
+  - `TestClearStaleNameAllBeforeRun` (class) — line 543
+  - `TestAnnotationFailureFailsTheSegment` (class) — line 599
+  - `TestClearStaleNameAllFailureFailsTheSegment` (class) — line 683
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/generate_name_key_patterns.py`
+- Called by (high/medium-confidence static callers):
+  - `TestActiveDomainsFromNamePatterns.test_reads_domain_column (tests/test_run_segment_orchestrator_name_projection.py:130)`
+  - `TestActiveDomainsFromNamePatterns.test_returns_empty_frozenset_when_present_but_empty (tests/test_run_segment_orchestrator_name_projection.py:150)`
+  - `TestAnnotationFailureFailsTheSegment._run (tests/test_run_segment_orchestrator_name_projection.py:646)`
+  - `TestAnnotationFailureFailsTheSegment.test_annotation_failure_marks_segment_failed_not_complete (tests/test_run_segment_orchestrator_name_projection.py:671)`
+  - `TestAnnotationFailureFailsTheSegment.test_no_annotation_failure_still_marks_segment_complete (tests/test_run_segment_orchestrator_name_projection.py:679)`
+  - `TestCLIComparisonTarget._build_fixture (tests/test_run_segment_orchestrator_name_projection.py:244)`
+  - `TestCLIComparisonTarget._build_fixture (tests/test_run_segment_orchestrator_name_projection.py:248)`
+  - `TestCLIComparisonTarget._build_fixture (tests/test_run_segment_orchestrator_name_projection.py:252)`
+  - `TestCLIComparisonTarget.test_config_target_dry_run_has_no_name_leg_lines (tests/test_run_segment_orchestrator_name_projection.py:287)`
+  - `TestCLIComparisonTarget.test_config_target_dry_run_has_no_name_leg_lines (tests/test_run_segment_orchestrator_name_projection.py:288)`
+  - `TestCLIComparisonTarget.test_name_target_dry_run_includes_name_leg_commands (tests/test_run_segment_orchestrator_name_projection.py:295)`
+  - `TestCLIComparisonTarget.test_name_target_dry_run_includes_name_leg_commands (tests/test_run_segment_orchestrator_name_projection.py:297)`
+  - `TestCLIComparisonTarget.test_name_target_dry_run_includes_name_leg_commands (tests/test_run_segment_orchestrator_name_projection.py:299)`
+  - `TestCLIComparisonTarget.test_name_target_requires_name_key_results_csv (tests/test_run_segment_orchestrator_name_projection.py:278)`
+  - `TestCLIComparisonTarget.test_name_target_requires_name_key_results_csv (tests/test_run_segment_orchestrator_name_projection.py:280)`
+  - ... and 42 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_run_segment_orchestrator_name_projection.py`
+- Retrieval identity: sha256=`99c35dc3c4bc0506…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_run_segment_orchestrator_name_projection.py`)
+
+### `tests/test_run_segment_orchestrator_worker_split.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for compute_worker_split() in tools/run_segment_orchestrator.py.
+  - filename/path terms: test run segment orchestrator worker split
+- Important symbols (8 total):
+  - `test_small_budget_gives_low_single_digits` (function) — line 11
+  - `test_large_budget_gives_expected_split` (function) — line 17
+  - `test_budget_of_one_never_returns_zero` (function) — line 22
+  - `test_explicit_segment_workers_coordinates_domain_workers` (function) — line 28
+  - `test_explicit_segment_workers_never_returns_zero_domain_workers` (function) — line 36
+  - `test_explicit_segment_workers_small_n_gets_larger_domain_share` (function) — line 42
+  - `test_explicit_segment_workers_with_no_cpu_count_falls_back_to_four_budget` (function) — line 48
+  - `test_auto_with_no_cpu_count_falls_back_to_hardcoded_four_four` (function) — line 56
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`a138990e77b97257…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_run_segment_orchestrator_worker_split.py`)
+
+### `tests/test_runner_canonicalization.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test runner canonicalization
+- Important symbols (1 total):
+  - `test_canonicalize_record_merges_all_sources_and_strips_legacy_keys` (function) — line 4
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canonical_items.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`03d30a78a21049b1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_runner_canonicalization.py`)
+
+### `tests/test_runner_extraction_context.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test runner extraction context
+- Important symbols (2 total):
+  - `test_operator_environment_boundary` (function) — line 11
+  - `test_runner_loaded_mapping_reaches_identity_and_signature` (function) — line 16
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `domains/identity.py`
+  - imports `runner/extraction_context.py`
+  - imports `tests/test_identity_project_info.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`0b36a09b29e897b5…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_runner_extraction_context.py`)
+
+### `tests/test_sentinel_policy.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test sentinel policy
+- Important symbols (2 total):
+  - `_repo_root` (function) — line 10
+  - `test_domains_do_not_emit_extra_angle_bracket_tokens` (function) — line 14
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_domains_do_not_emit_extra_angle_bracket_tokens (tests/test_sentinel_policy.py:23)`
+- Related tests:
+  - `tests/test_sentinel_policy.py`
+- Retrieval identity: sha256=`bd0757f1636d03cf…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_sentinel_policy.py`)
+
+### `tests/test_sig_hash_policy_builder.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test sig hash policy builder
+- Important symbols (9 total):
+  - `test_generated_sig_hash_policy_loads` (function) — line 9
+  - `test_sig_hash_builder_hashes_allowed_items_from_items_list_order_independent` (function) — line 15
+  - `test_sig_hash_builder_blocks_when_required_not_ok` (function) — line 32
+  - `test_sig_hash_builder_degrades_when_optional_hash_item_not_ok` (function) — line 52
+  - `test_sig_hash_builder_degrades_when_required_not_ok_and_block_disabled` (function) — line 75
+  - `test_sig_hash_builder_prefix_and_first_writer_wins` (function) — line 88
+  - `test_apply_sig_hash_policy_to_record_uses_items_and_writes_sig_basis` (function) — line 106
+  - `test_text_types_sig_hash_excludes_name_includes_behavioral_items` (function) — line 128
+  - `test_object_styles_model_sig_hash_excludes_area9_additions` (function) — line 159
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/record_v2.py`
+  - imports `core/sig_hash_builder.py`
+  - imports `core/sig_hash_policy.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`7f7a1f33db50b908…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_sig_hash_policy_builder.py`)
+
+### `tests/test_split_export.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Smoke tests for monolithic fingerprint exports.
+  - filename/path terms: test split export
+- Important symbols (3 total):
+  - `_sample_monolithic` (function) — line 15
+  - `test_monolithic_manifest_surface` (function) — line 50
+  - `test_monolithic_features_surface` (function) — line 60
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/features.py`
+  - imports `core/manifest.py`
+- Called by (high/medium-confidence static callers):
+  - `test_monolithic_features_surface (tests/test_split_export.py:61)`
+  - `test_monolithic_manifest_surface (tests/test_split_export.py:51)`
+- Related tests:
+  - `tests/test_split_export.py`
+- Retrieval identity: sha256=`0719a8d9574a6b22…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_split_export.py`)
+
+### `tests/test_split_named_clusters_and_thresholds.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test split named clusters and thresholds
+- Important symbols (9 total):
+  - `_write_csv` (function) — line 15
+  - `test_compute_named_cluster_flags_largest_gap_and_equal_shares` (function) — line 23
+  - `test_compute_named_cluster_flags_uses_raw_share_not_rounded_percentage` (function) — line 45
+  - `test_thresholds_breaks_and_ordering` (function) — line 56
+  - `test_thresholds_reject_non_three_classes` (function) — line 65
+  - `test_compute_alignment_rates_and_contract_header_preserves_is_named_cluster` (function) — line 71
+  - `test_compute_alignment_rates_uses_raw_share_or_size_for_unrounded_result` (function) — line 114
+  - `test_compute_alignment_rates_falls_back_to_percentage_when_size_absent` (function) — line 130
+  - `test_compute_alignment_rates_falls_back_to_percentage_when_size_values_are_invalid` (function) — line 146
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/compute_governance_thresholds.py`
+  - imports `tools/patterns_analysis/_archive/split_detection_file_level.py`
+  - imports `tools/run_split_detection_all.py`
+- Called by (high/medium-confidence static callers):
+  - `test_compute_alignment_rates_and_contract_header_preserves_is_named_cluster (tests/test_split_named_clusters_and_thresholds.py:73)`
+  - `test_compute_alignment_rates_and_contract_header_preserves_is_named_cluster (tests/test_split_named_clusters_and_thresholds.py:81)`
+  - `test_compute_alignment_rates_and_contract_header_preserves_is_named_cluster (tests/test_split_named_clusters_and_thresholds.py:94)`
+  - `test_compute_alignment_rates_falls_back_to_percentage_when_size_absent (tests/test_split_named_clusters_and_thresholds.py:132)`
+  - `test_compute_alignment_rates_falls_back_to_percentage_when_size_values_are_invalid (tests/test_split_named_clusters_and_thresholds.py:148)`
+  - `test_compute_alignment_rates_uses_raw_share_or_size_for_unrounded_result (tests/test_split_named_clusters_and_thresholds.py:116)`
+- Related tests:
+  - `tests/test_split_named_clusters_and_thresholds.py`
+- Retrieval identity: sha256=`254a09ff141d833b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_split_named_clusters_and_thresholds.py`)
+
+### `tests/test_suggest_discovery_params.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test suggest discovery params
+- Important symbols (30 total):
+  - `_write_csv` (function) — line 19
+  - `test_compute_domain_stats_counts_n_g_f_and_candidates` (function) — line 27
+  - `test_compute_domain_stats_file_hhi_treats_blank_file_id_as_unknown_bucket` (function) — line 51
+  - `test_compute_domain_stats_file_hhi_perfectly_even_distribution` (function) — line 64
+  - `test_compute_domain_stats_file_hhi_fully_concentrated_in_one_file` (function) — line 73
+  - `test_suggest_sample_size_scales_with_diversity_not_just_population` (function) — line 80
+  - `test_suggest_sample_size_never_exceeds_population` (function) — line 87
+  - `test_suggest_sample_size_zero_population` (function) — line 91
+  - `test_cumulative_subset_count_matches_manual_sum` (function) — line 95
+  - `test_solve_candidate_fields_and_k_keeps_all_fields_when_budget_allows` (function) — line 100
+  - `test_solve_candidate_fields_and_k_trims_fields_when_budget_too_small_for_min_k` (function) — line 106
+  - `test_suggest_params_for_domain_required_baseline_never_makes_harsh_infeasible` (function) — line 115
+  - `test_suggest_params_for_domain_harsh_max_k_grows_independently_of_discover_max_k` (function) — line 132
+  - `test_suggest_params_for_domain_harsh_infeasible_only_when_subset_budget_below_one` (function) — line 145
+  - `test_suggest_params_for_domain_optional_items_inflate_extra_pool_not_the_required_floor` (function) — line 156
+  - `test_suggest_params_for_domain_required_items_alone_bump_harsh_max_k_independent_of_optional` (function) — line 174
+  - `test_suggest_params_for_domain_dedupes_extra_pool_when_required_fields_overlap_candidates` (function) — line 187
+  - `test_suggest_params_for_domain_recommends_stratify_by_file_id_on_real_concentration` (function) — line 224
+  - `test_suggest_params_for_domain_no_stratify_recommendation_when_records_evenly_spread` (function) — line 237
+  - `test_suggest_params_for_domain_no_stratify_recommendation_when_no_sampling_needed` (function) — line 247
+  - `test_cli_writes_suggestions_csv_and_reads_required_counts_from_policy` (function) — line 258
+  - `test_load_policy_fields_falls_back_to_selected_fields_like_normalize_policy_block` (function) — line 285
+  - `test_load_policy_fields_prefers_required_fields_over_required_items_like_normalize_policy_block` (function) — line 302
+  - `test_cli_emit_commands_prints_ready_to_run_invocations` (function) — line 314
+  - `test_cli_emit_commands_uses_resolved_phase0_dir_not_unresolved_argument` (function) — line 330
+  - ... and 5 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/suggest_discovery_params.py`
+- Called by (high/medium-confidence static callers):
+  - `test_cli_emit_commands_prints_ready_to_run_invocations (tests/test_suggest_discovery_params.py:316)`
+  - `test_cli_emit_commands_prints_ready_to_run_invocations (tests/test_suggest_discovery_params.py:319)`
+  - `test_cli_emit_commands_uses_resolved_phase0_dir_not_unresolved_argument (tests/test_suggest_discovery_params.py:340)`
+  - `test_cli_emit_commands_uses_resolved_phase0_dir_not_unresolved_argument (tests/test_suggest_discovery_params.py:343)`
+  - `test_cli_writes_suggestions_csv_and_reads_required_counts_from_policy (tests/test_suggest_discovery_params.py:260)`
+  - `test_cli_writes_suggestions_csv_and_reads_required_counts_from_policy (tests/test_suggest_discovery_params.py:264)`
+- Related tests:
+  - `tests/test_suggest_discovery_params.py`
+- Retrieval identity: sha256=`60242f20deae68cd…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_suggest_discovery_params.py`)
+
+### `tests/test_text_types_canonical_selectors.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test text types canonical selectors
+- Important symbols (2 total):
+  - `_text_types_policy` (function) — line 10
+  - `test_text_types_canonical_evidence_selectors_and_hashing` (function) — line 15
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+  - imports `domains/text_types.py`
+- Called by (high/medium-confidence static callers):
+  - `test_text_types_canonical_evidence_selectors_and_hashing (tests/test_text_types_canonical_selectors.py:35)`
+- Related tests:
+  - `tests/test_text_types_canonical_selectors.py`
+- Retrieval identity: sha256=`3cbf5b53ed045598…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_text_types_canonical_selectors.py`)
+
+### `tests/test_text_types_conversion_convergence.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test text types conversion convergence
+- Important symbols (4 total):
+  - `_Id` (class) — line 6
+  - `_Type` (class) — line 11
+  - `_extract_record` (function) — line 17
+  - `test_converted_old_and_new_records_converge` (function) — line 33
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `domains/text_types.py`
+  - imports `tools/migration/reformat_to_flat_items.py`
+- Called by (high/medium-confidence static callers):
+  - `_Type.__init__ (tests/test_text_types_conversion_convergence.py:13)`
+  - `_extract_record (tests/test_text_types_conversion_convergence.py:18)`
+  - `test_converted_old_and_new_records_converge (tests/test_text_types_conversion_convergence.py:34)`
+- Related tests:
+  - `tests/test_text_types_conversion_convergence.py`
+- Retrieval identity: sha256=`43d931cceb865cfd…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_text_types_conversion_convergence.py`)
+
+### `tests/test_text_types_flat_items_export.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test text types flat items export
+- Important symbols (3 total):
+  - `_Id` (class) — line 5
+  - `_Type` (class) — line 10
+  - `test_text_types_extract_emits_flat_items_only` (function) — line 16
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `domains/text_types.py`
+- Called by (high/medium-confidence static callers):
+  - `_Type.__init__ (tests/test_text_types_flat_items_export.py:12)`
+  - `test_text_types_extract_emits_flat_items_only (tests/test_text_types_flat_items_export.py:17)`
+- Related tests:
+  - `tests/test_text_types_flat_items_export.py`
+- Retrieval identity: sha256=`9ed15e9820cc7a69…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_text_types_flat_items_export.py`)
+
+### `tests/test_timing_collector.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for core/timing_collector.py
+  - filename/path terms: test timing collector
+- Important symbols (6 total):
+  - `TestTimingCollectorBasic` (class) — line 22
+  - `TestTimingCollectorDomainScoping` (class) — line 84
+  - `TestTimingCollectorReport` (class) — line 164
+  - `TestTimingCollectorThreadSafety` (class) — line 218
+  - `TestTimingCollectorDefensive` (class) — line 252
+  - `TestHashingTimingIntegration` (class) — line 282
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/timing_collector.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`facbbf14b72d3e7c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_timing_collector.py`)
+
+### `tests/test_units_canonical_selectors.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test units canonical selectors
+- Important symbols (11 total):
+  - `_units_policy` (function) — line 14
+  - `_domain_identity_registry_v2` (function) — line 19
+  - `test_units_join_selectors_and_sig_basis_are_distinct` (function) — line 24
+  - `test_units_boolean_formatting_flags_are_semantic` (function) — line 61
+  - `_FakeDecimalSymbol` (class) — line 73
+  - `_FakeDigitGroupingSymbol` (class) — line 78
+  - `_FakeUnits` (class) — line 83
+  - `_FakeDoc` (class) — line 89
+  - `_FakeDocUnitsUnreadable` (class) — line 94
+  - `test_extract_units_doc_emits_exactly_one_populated_record` (function) — line 99
+  - `test_extract_units_doc_never_blocks_on_read_failure` (function) — line 125
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+  - imports `domains/units.py`
+  - imports `validators/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `_FakeDoc.GetUnits (tests/test_units_canonical_selectors.py:91)`
+  - `test_extract_units_doc_emits_exactly_one_populated_record (tests/test_units_canonical_selectors.py:100)`
+  - `test_extract_units_doc_emits_exactly_one_populated_record (tests/test_units_canonical_selectors.py:121)`
+  - `test_extract_units_doc_never_blocks_on_read_failure (tests/test_units_canonical_selectors.py:126)`
+  - `test_units_join_selectors_and_sig_basis_are_distinct (tests/test_units_canonical_selectors.py:35)`
+- Related tests:
+  - `tests/test_units_canonical_selectors.py`
+- Retrieval identity: sha256=`a3fe665ed04b8730…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_units_canonical_selectors.py`)
+

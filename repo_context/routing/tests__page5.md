@@ -1,0 +1,243 @@
+# Routing catalog: `tests (page 5)`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 5
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests` partition): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tests/test_fingerprint_export_discovery.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test fingerprint export discovery
+- Important symbols (7 total):
+  - `_write_json` (function) — line 23
+  - `_fingerprint_payload` (function) — line 27
+  - `test_iter_export_files_prioritizes_fingerprint_and_uses_none_secondary` (function) — line 38
+  - `test_pick_sample_file_prefers_fingerprint_and_falls_back_to_split` (function) — line 58
+  - `test_detect_surfaces_counts_fingerprint_separately` (function) — line 82
+  - `test_domain_discovery_prefers_fingerprint_candidates` (function) — line 93
+  - `test_load_exports_prefers_fingerprint_files_before_plain_fallback` (function) — line 107
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/extractor.py`
+  - imports `tools/patterns_analysis/_archive/io.py`
+  - imports `tools/run_extract_all.py`
+- Called by (high/medium-confidence static callers):
+  - `test_detect_surfaces_counts_fingerprint_separately (tests/test_fingerprint_export_discovery.py:83)`
+  - `test_detect_surfaces_counts_fingerprint_separately (tests/test_fingerprint_export_discovery.py:84)`
+  - `test_domain_discovery_prefers_fingerprint_candidates (tests/test_fingerprint_export_discovery.py:94)`
+  - `test_domain_discovery_prefers_fingerprint_candidates (tests/test_fingerprint_export_discovery.py:95)`
+  - `test_domain_discovery_prefers_fingerprint_candidates (tests/test_fingerprint_export_discovery.py:97)`
+  - `test_iter_export_files_prioritizes_fingerprint_and_uses_none_secondary (tests/test_fingerprint_export_discovery.py:39)`
+  - `test_iter_export_files_prioritizes_fingerprint_and_uses_none_secondary (tests/test_fingerprint_export_discovery.py:40)`
+  - `test_iter_export_files_prioritizes_fingerprint_and_uses_none_secondary (tests/test_fingerprint_export_discovery.py:41)`
+  - `test_iter_export_files_prioritizes_fingerprint_and_uses_none_secondary (tests/test_fingerprint_export_discovery.py:42)`
+  - `test_iter_export_files_prioritizes_fingerprint_and_uses_none_secondary (tests/test_fingerprint_export_discovery.py:43)`
+  - `test_load_exports_prefers_fingerprint_files_before_plain_fallback (tests/test_fingerprint_export_discovery.py:108)`
+  - `test_load_exports_prefers_fingerprint_files_before_plain_fallback (tests/test_fingerprint_export_discovery.py:109)`
+  - `test_load_exports_prefers_fingerprint_files_before_plain_fallback (tests/test_fingerprint_export_discovery.py:110)`
+  - `test_pick_sample_file_prefers_fingerprint_and_falls_back_to_split (tests/test_fingerprint_export_discovery.py:60)`
+  - `test_pick_sample_file_prefers_fingerprint_and_falls_back_to_split (tests/test_fingerprint_export_discovery.py:61)`
+  - ... and 3 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_fingerprint_export_discovery.py`
+- Retrieval identity: sha256=`9b43bf308b9d1421…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_fingerprint_export_discovery.py`)
+
+### `tests/test_generate_governance_narrative_bc_client_sections.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for render_bc_composition_section() / render_client_bc_distribution_section()
+  - filename/path terms: test generate governance narrative bc client sections
+- Important symbols (8 total):
+  - `_bc_client_row` (function) — line 17
+  - `_client_bc_row` (function) — line 28
+  - `test_bc_composition_section_absent_when_no_rows` (function) — line 38
+  - `test_bc_composition_section_lists_clients_by_descending_share` (function) — line 42
+  - `test_client_bc_distribution_section_absent_when_no_rows` (function) — line 55
+  - `test_client_bc_distribution_section_renders_per_bc_rows_when_both_matrices_supplied` (function) — line 59
+  - `test_client_bc_distribution_falls_back_to_business_centers_list_when_bc_matrix_missing` (function) — line 71
+  - `test_client_bc_distribution_no_fallback_bullets_when_business_centers_blank` (function) — line 87
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_bc_composition_section_lists_clients_by_descending_share (tests/test_generate_governance_narrative_bc_client_sections.py:44)`
+  - `test_bc_composition_section_lists_clients_by_descending_share (tests/test_generate_governance_narrative_bc_client_sections.py:45)`
+  - `test_client_bc_distribution_falls_back_to_business_centers_list_when_bc_matrix_missing (tests/test_generate_governance_narrative_bc_client_sections.py:77)`
+  - `test_client_bc_distribution_no_fallback_bullets_when_business_centers_blank (tests/test_generate_governance_narrative_bc_client_sections.py:88)`
+  - `test_client_bc_distribution_section_renders_per_bc_rows_when_both_matrices_supplied (tests/test_generate_governance_narrative_bc_client_sections.py:60)`
+  - `test_client_bc_distribution_section_renders_per_bc_rows_when_both_matrices_supplied (tests/test_generate_governance_narrative_bc_client_sections.py:62)`
+  - `test_client_bc_distribution_section_renders_per_bc_rows_when_both_matrices_supplied (tests/test_generate_governance_narrative_bc_client_sections.py:63)`
+- Related tests:
+  - `tests/test_generate_governance_narrative_bc_client_sections.py`
+- Retrieval identity: sha256=`d70364c609d1f75e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_bc_client_sections.py`)
+
+### `tests/test_generate_governance_narrative_brief.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for PR4 (interpretation & routing split): render_governance_brief(),
+  - filename/path terms: test generate governance narrative brief
+- Important symbols (35 total):
+  - `_finding` (function) — line 29
+  - `test_brief_states_its_own_convenience_summary_role` (function) — line 53
+  - `test_brief_points_at_interpretation_guide_and_question_routes` (function) — line 59
+  - `test_brief_reports_package_health_and_corpus_counts` (function) — line 67
+  - `test_brief_groups_findings_by_type_with_domain_label` (function) — line 73
+  - `test_brief_omits_empty_sections` (function) — line 80
+  - `test_brief_caps_long_lists_and_points_to_findings_json` (function) — line 86
+  - `test_brief_lists_leadership_questions_as_numbered_list_not_findings` (function) — line 95
+  - `test_brief_includes_low_client_coherence_section` (function) — line 106
+  - `test_brief_does_not_recompute_only_consumes_passed_findings` (function) — line 113
+  - `test_file_inventory_section_omitted_when_no_files` (function) — line 127
+  - `test_file_inventory_section_lists_each_file_with_narrative` (function) — line 132
+  - `test_brief_omits_file_inventory_section_when_absent` (function) — line 144
+  - `test_brief_omits_file_inventory_section_when_files_list_empty` (function) — line 149
+  - `test_brief_includes_file_inventory_section_when_files_present` (function) — line 154
+  - `test_authority_header_points_to_brief_when_interpretation_layer_on` (function) — line 167
+  - `test_authority_header_omits_brief_pointer_when_interpretation_layer_off` (function) — line 173
+  - `test_authority_header_always_points_to_static_docs` (function) — line 179
+  - `test_interpretation_guide_and_question_routes_docs_exist` (function) — line 195
+  - `_summary_row` (function) — line 206
+  - `_pooled_row` (function) — line 212
+  - `_write_csv` (function) — line 218
+  - `_minimal_fixture` (function) — line 225
+  - `_run_main` (function) — line 252
+  - `test_default_invocation_writes_governance_brief` (function) — line 257
+  - ... and 10 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_minimal_fixture (tests/test_generate_governance_narrative_brief.py:227)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_brief.py:238)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_brief.py:247)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_brief.py:248)`
+  - `test_brief_caps_long_lists_and_points_to_findings_json (tests/test_generate_governance_narrative_brief.py:88)`
+  - `test_brief_does_not_recompute_only_consumes_passed_findings (tests/test_generate_governance_narrative_brief.py:117)`
+  - `test_brief_groups_findings_by_type_with_domain_label (tests/test_generate_governance_narrative_brief.py:74)`
+  - `test_brief_includes_low_client_coherence_section (tests/test_generate_governance_narrative_brief.py:107)`
+  - `test_brief_lists_leadership_questions_as_numbered_list_not_findings (tests/test_generate_governance_narrative_brief.py:97)`
+  - `test_default_invocation_writes_governance_brief (tests/test_generate_governance_narrative_brief.py:258)`
+  - `test_default_invocation_writes_governance_brief (tests/test_generate_governance_narrative_brief.py:259)`
+  - `test_evidence_map_governance_brief_absent_when_layer_off (tests/test_generate_governance_narrative_brief.py:326)`
+  - `test_evidence_map_governance_brief_absent_when_layer_off (tests/test_generate_governance_narrative_brief.py:327)`
+  - `test_evidence_map_governance_brief_present_true_by_default (tests/test_generate_governance_narrative_brief.py:317)`
+  - `test_evidence_map_governance_brief_present_true_by_default (tests/test_generate_governance_narrative_brief.py:318)`
+  - ... and 18 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_generate_governance_narrative_brief.py`
+- Retrieval identity: sha256=`07b432e270446413…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_brief.py`)
+
+### `tests/test_generate_governance_narrative_classification.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for discipline-vocabulary and client-sector classification in
+  - filename/path terms: test generate governance narrative classification
+- Important symbols (38 total):
+  - `_summary_row` (function) — line 29
+  - `_pooled_row` (function) — line 35
+  - `test_disc_label_uses_override_for_known_discipline` (function) — line 45
+  - `test_disc_label_humanizes_unknown_discipline` (function) — line 49
+  - `test_render_discipline_section_includes_disciplines_beyond_disc_labels` (function) — line 55
+  - `test_load_client_sectors_empty_when_absent` (function) — line 81
+  - `test_load_client_sectors_builds_map` (function) — line 86
+  - `_client_fixture` (function) — line 94
+  - `test_known_healthcare_client_is_flagged_healthcare` (function) — line 114
+  - `test_known_non_healthcare_sector_gets_non_comparable_tier` (function) — line 123
+  - `test_unclassified_client_falls_through_to_normal_tiering` (function) — line 132
+  - `test_cascade_cross_client_jaccard_uses_sector_map` (function) — line 145
+  - `test_default_client_sector_path_exists_and_loads` (function) — line 173
+  - `test_unclassified_client_not_treated_as_confirmed_non_healthcare` (function) — line 183
+  - `test_within_client_sibling_projects_excluded_from_cross_client_xc` (function) — line 215
+  - `test_cascade_cross_client_requires_both_healthcare_like_sibling_projects` (function) — line 247
+  - `test_cascade_cross_client_feeds_xc_when_both_sides_healthcare` (function) — line 271
+  - `test_cascade_cross_client_and_sibling_projects_both_feed_xc` (function) — line 287
+  - `test_cascade_cross_client_excludes_pair_with_one_non_healthcare_side` (function) — line 312
+  - `test_build_client_summary_xc_mean_uses_cross_client_rows` (function) — line 336
+  - `test_build_client_summary_xc_mean_uses_client_label_not_segment_id_shape` (function) — line 357
+  - `test_build_client_summary_backfills_n_files_for_cross_client_only_clients` (function) — line 381
+  - `test_within_client_cross_client_like_pair_excluded_from_xc_mean` (function) — line 405
+  - `test_build_client_summary_excludes_confirmed_non_healthcare_partner_from_xc_mean` (function) — line 434
+  - `test_build_client_summary_unclassified_partner_still_feeds_xc_mean` (function) — line 461
+  - ... and 13 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_client_fixture (tests/test_generate_governance_narrative_classification.py:105)`
+  - `_client_fixture (tests/test_generate_governance_narrative_classification.py:98)`
+  - `test_build_client_summary_backfills_n_files_for_cross_client_only_clients (tests/test_generate_governance_narrative_classification.py:389)`
+  - `test_build_client_summary_excludes_confirmed_non_healthcare_partner_from_xc_mean (tests/test_generate_governance_narrative_classification.py:444)`
+  - `test_build_client_summary_excludes_policy_excluded_domain_from_xc_mean (tests/test_generate_governance_narrative_classification.py:493)`
+  - `test_build_client_summary_excludes_policy_excluded_domain_from_xc_mean (tests/test_generate_governance_narrative_classification.py:500)`
+  - `test_build_client_summary_unclassified_partner_still_feeds_xc_mean (tests/test_generate_governance_narrative_classification.py:467)`
+  - `test_build_client_summary_xc_mean_uses_client_label_not_segment_id_shape (tests/test_generate_governance_narrative_classification.py:365)`
+  - `test_build_client_summary_xc_mean_uses_cross_client_rows (tests/test_generate_governance_narrative_classification.py:341)`
+  - `test_cascade_cross_client_and_sibling_projects_both_feed_xc (tests/test_generate_governance_narrative_classification.py:289)`
+  - `test_cascade_cross_client_and_sibling_projects_both_feed_xc (tests/test_generate_governance_narrative_classification.py:296)`
+  - `test_cascade_cross_client_excludes_pair_with_one_non_healthcare_side (tests/test_generate_governance_narrative_classification.py:314)`
+  - `test_cascade_cross_client_excludes_pair_with_one_non_healthcare_side (tests/test_generate_governance_narrative_classification.py:321)`
+  - `test_cascade_cross_client_feeds_xc_when_both_sides_healthcare (tests/test_generate_governance_narrative_classification.py:273)`
+  - `test_cascade_cross_client_jaccard_uses_sector_map (tests/test_generate_governance_narrative_classification.py:147)`
+  - ... and 23 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_generate_governance_narrative_classification.py`
+- Retrieval identity: sha256=`6766fb6a3a498b2a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_classification.py`)
+
+### `tests/test_generate_governance_narrative_comparison_registry.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for D-032's comparison-registry input-completeness note:
+  - filename/path terms: test generate governance narrative comparison registry
+- Important symbols (31 total):
+  - `_summary_row` (function) — line 22
+  - `_pooled_row` (function) — line 28
+  - `_registry_row` (function) — line 34
+  - `_gov_state_summary_row` (function) — line 40
+  - `_write_csv` (function) — line 46
+  - `_minimal_fixture` (function) — line 53
+  - `_run_main` (function) — line 80
+  - `test_completeness_present_when_registry_row_matches` (function) — line 89
+  - `test_completeness_missing_when_no_matching_registry_row` (function) — line 98
+  - `test_completeness_stale_when_registry_computed_utc_predates_summary_executed_utc` (function) — line 105
+  - `test_completeness_not_stale_when_registry_computed_utc_is_current` (function) — line 114
+  - `test_completeness_counts_registry_only_entry_as_present_and_stale` (function) — line 123
+  - `test_completeness_registry_only_entry_uses_registry_own_domain_for_grouping` (function) — line 135
+  - `test_completeness_registry_only_entry_with_matching_state_evidence_is_not_stale` (function) — line 143
+  - `test_completeness_registry_only_entry_without_state_evidence_is_still_stale` (function) — line 157
+  - `test_completeness_registry_only_entry_with_state_evidence_is_stale_when_registry_predates_state` (function) — line 164
+  - `test_completeness_registry_only_entry_with_state_evidence_not_stale_when_registry_is_current` (function) — line 179
+  - `test_completeness_state_evidence_uses_newest_timestamp_across_both_state_sources` (function) — line 189
+  - `test_completeness_state_evidence_from_detailed_rows_also_prevents_stale` (function) — line 216
+  - `test_completeness_state_only_key_with_no_registry_or_summary_row_is_counted_missing` (function) — line 232
+  - `test_completeness_summary_row_stale_check_also_considers_newer_state_evidence` (function) — line 246
+  - `test_completeness_ignores_rows_with_no_domain` (function) — line 262
+  - `test_completeness_registry_content_never_appears_in_result` (function) — line 268
+  - `test_health_reports_comparison_registry_absent_when_not_supplied` (function) — line 284
+  - `test_health_reports_comparison_registry_present_and_completeness_when_supplied` (function) — line 292
+  - ... and 6 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_minimal_fixture (tests/test_generate_governance_narrative_comparison_registry.py:55)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_comparison_registry.py:66)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_comparison_registry.py:75)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_comparison_registry.py:76)`
+  - `test_completeness_counts_registry_only_entry_as_present_and_stale (tests/test_generate_governance_narrative_comparison_registry.py:129)`
+  - `test_completeness_ignores_rows_with_no_domain (tests/test_generate_governance_narrative_comparison_registry.py:263)`
+  - `test_completeness_missing_when_no_matching_registry_row (tests/test_generate_governance_narrative_comparison_registry.py:99)`
+  - `test_completeness_not_stale_when_registry_computed_utc_is_current (tests/test_generate_governance_narrative_comparison_registry.py:115)`
+  - `test_completeness_not_stale_when_registry_computed_utc_is_current (tests/test_generate_governance_narrative_comparison_registry.py:117)`
+  - `test_completeness_present_when_registry_row_matches (tests/test_generate_governance_narrative_comparison_registry.py:90)`
+  - `test_completeness_present_when_registry_row_matches (tests/test_generate_governance_narrative_comparison_registry.py:92)`
+  - `test_completeness_registry_content_never_appears_in_result (tests/test_generate_governance_narrative_comparison_registry.py:271)`
+  - `test_completeness_registry_content_never_appears_in_result (tests/test_generate_governance_narrative_comparison_registry.py:273)`
+  - `test_completeness_registry_only_entry_uses_registry_own_domain_for_grouping (tests/test_generate_governance_narrative_comparison_registry.py:136)`
+  - `test_completeness_registry_only_entry_with_matching_state_evidence_is_not_stale (tests/test_generate_governance_narrative_comparison_registry.py:149)`
+  - ... and 40 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_generate_governance_narrative_comparison_registry.py`
+- Retrieval identity: sha256=`852e896f19a28f9f…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_comparison_registry.py`)
+

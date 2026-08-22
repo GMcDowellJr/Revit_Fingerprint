@@ -1,17 +1,17 @@
 # Repository Overview: Revit_Fingerprint
 
-- Scan time (UTC): 2026-08-22T00:04:06Z
+- Scan time (UTC): 2026-08-22T17:32:12Z
 - Generator: repo_context.py v0.1.0
-- Total files considered: 648
-- Included: 645
-- Excluded: 3
+- Total files considered: 669
+- Included: 669
+- Excluded: 0
 
 ## Files by extension
 
-- `.py`: 378
+- `.py`: 386
 - `.cs`: 118
-- `.md`: 99
-- `.json`: 27
+- `.md`: 101
+- `.json`: 41
 - `(none)`: 6
 - `.csv`: 6
 - `.ps1`: 3
@@ -22,33 +22,33 @@
 
 ## Files by classification
 
-- python_source: 257
+- python_source: 261
 - unsupported_text: 127
-- test: 121
-- documentation: 99
-- data: 32
+- test: 125
+- documentation: 101
+- data: 44
+- json_schema: 3
 - script_powershell: 3
 - script_shell: 3
 - configuration: 2
-- json_schema: 1
 
 ## Largest text files
 
+- `graphify-out/graph.json` — 8590764 bytes, 235457 lines
+- `domains/graph_2025.json` — 3446096 bytes, 83874 lines
+- `domains/graph_2024.json` — 3356296 bytes, 81864 lines
+- `domains/graph_2026.json` — 3313027 bytes, 82715 lines
 - `tools/generate_governance_narrative.py` — 374542 bytes, 6890 lines
 - `tools/compare_cross_segment.py` — 254650 bytes, 5383 lines
 - `tools/archetype/bip_lookup.json` — 179066 bytes, 3630 lines
 - `CHANGELOG.md` — 173732 bytes, 2477 lines
 - `domains/dimension_types.py` — 146708 bytes, 3103 lines
 - `DECISIONS.md` — 109006 bytes, 1674 lines
+- `graphify-out/manifest.json` — 105286 bytes, 2831 lines
+- `graphify-out/GRAPH_REPORT.md` — 105199 bytes, 1511 lines
 - `tests/test_compare_cross_segment_governance.py` — 96239 bytes, 2213 lines
 - `domains/view_templates.py` — 91960 bytes, 2557 lines
 - `tests/test_build_segment_manifest.py` — 91342 bytes, 1886 lines
-- `audit_results/audit_11_domain_extractor_delta_step0_findings.md` — 91153 bytes, 517 lines
-- `tools/governance_evidence_package.py` — 90748 bytes, 1621 lines
-- `tools/run_segment_orchestrator.py` — 89715 bytes, 1867 lines
-- `domains/fill_patterns.py` — 77455 bytes, 1945 lines
-- `docs/research/semantic_label_review.csv` — 70375 bytes, 106 lines
-- `tools/extractor.py` — 68307 bytes, 1515 lines
 
 ## Largest Python files by line count
 
@@ -63,29 +63,29 @@
 - `tools/governance_evidence_package.py` — 1621 lines
 - `runner/run_dynamo.py` — 1581 lines
 - `tools/extractor.py` — 1515 lines
+- `dev_tools/repo_context/tests/test_packet_from_request.py` — 1457 lines
 - `legacy/fingerprint_mvp.py` — 1402 lines
 - `tools/archetype/discover_vfd_edges.py` — 1353 lines
-- `tools/run_extract_all.py` — 1234 lines
-- `tools/bundle_analysis/run_bundle_analysis.py` — 1202 lines
+- `dev_tools/repo_context/rc_request.py` — 1342 lines
 
-## Files that required chunking (37)
+## Files that required chunking (46)
 
 - `CHANGELOG.md`
 - `DECISIONS.md`
 - `audit_results/audit_11_domain_extractor_delta_step0_findings.md`
 - `contracts/domain_identity_keys_v2.json`
 - `core/dimension_type_helpers.py`
+- `dev_tools/repo_context/rc_request.py`
+- `dev_tools/repo_context/tests/test_packet_from_request.py`
 - `domains/dimension_types.py`
 - `domains/fill_patterns.py`
+- `domains/graph_2024.json`
+- `domains/graph_2025.json`
+- `domains/graph_2026.json`
 - `domains/view_templates.py`
-- `legacy/fingerprint_mvp.py`
-- `policies/domain_join_key_policies.json`
-- `policies/domain_sig_hash_policies.json`
-- `runner/run_dynamo.py`
-- `tests/test_build_segment_manifest.py`
-- `tests/test_compare_cross_segment_governance.py`
-- `tests/test_generate_governance_narrative_evidence_package.py`
-- ... and 22 more (see chunk_manifest.csv)
+- `graphify-out/GRAPH_REPORT.md`
+- `graphify-out/cache/stat-index.json`
+- ... and 31 more (see chunk_manifest.csv)
 
 ## Python parse failures (0)
 
@@ -202,14 +202,14 @@
 _Derived only from file classification counts in each top-level directory; not a claim about architecture._
 
 - test: dev_tools, tests, tools
-- documentation: (repository root), .agents, .codex, .copilot, .github, audit_results, contracts, dev_tools, docs, policies, reference, tests, tools
+- documentation: (repository root), .agents, .codex, .copilot, .github, audit_results, contracts, dev_tools, docs, graphify-out, policies, reference, tests, tools
 - configuration: .github
-- json_schema: contracts
+- json_schema: contracts, dev_tools
 - script_shell: .claude, .codex
 - script_powershell: tools
 - python_source: (repository root), core, dev_tools, domains, legacy, mapping, runner, scripts, tools, validators
 
-## Unusually large or structurally complex Python modules (177)
+## Unusually large or structurally complex Python modules (184)
 
 _Heuristic only: line count > 800 or any symbol with approximate cyclomatic complexity > 15._
 
@@ -226,7 +226,7 @@ _Heuristic only: line count > 800 or any symbol with approximate cyclomatic comp
 - `core/sig_hash_builder.py` — 123 lines, max symbol complexity ~25
 - `core/vg_sig.py` — 462 lines, max symbol complexity ~18
 - `dev_tools/repo_context/rc_chunking.py` — 202 lines, max symbol complexity ~24
-- `dev_tools/repo_context/rc_classify.py` — 106 lines, max symbol complexity ~21
-- `dev_tools/repo_context/rc_overview.py` — 245 lines, max symbol complexity ~42
-- ... and 162 more
+- `dev_tools/repo_context/rc_classify.py` — 182 lines, max symbol complexity ~21
+- `dev_tools/repo_context/rc_discover.py` — 248 lines, max symbol complexity ~52
+- ... and 169 more
 

@@ -7,17 +7,17 @@
     "redact_secrets": true
   },
   "counts": {
-    "calls": 50645,
-    "chunked_files": 37,
-    "chunks": 170,
+    "calls": 52374,
+    "chunked_files": 46,
+    "chunks": 1433,
     "entrypoint_candidates": 103,
-    "excluded_directories": 23,
-    "files_excluded": 3,
-    "files_included": 645,
-    "imports": 4607,
+    "excluded_directories": 7,
+    "files_excluded": 0,
+    "files_included": 669,
+    "imports": 4696,
     "parse_failures": 0,
-    "python_files": 378,
-    "symbols": 5018
+    "python_files": 386,
+    "symbols": 5213
   },
   "exclude_dir_names_default_count": null,
   "excluded_directories_sample": [
@@ -27,10 +27,6 @@
     },
     {
       "path": ".pytest_cache",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "core/__pycache__",
       "reason": "excluded_directory_name"
     },
     {
@@ -46,88 +42,24 @@
       "reason": "excluded_directory_name"
     },
     {
-      "path": "domains/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "graphify-out",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "mapping/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
       "path": "repo_context",
       "reason": "output_directory"
     },
     {
-      "path": "runner/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
       "path": "tests/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "tools/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "tools/_archive/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "tools/archetype/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "tools/bundle_analysis/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "tools/join_key_discovery/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "tools/label_synthesis/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "tools/label_synthesis/domain_prompts/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "tools/migration/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "tools/patterns_analysis/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "tools/patterns_analysis/_archive/__pycache__",
-      "reason": "excluded_directory_name"
-    },
-    {
-      "path": "validators/__pycache__",
       "reason": "excluded_directory_name"
     }
   ],
-  "generated_at_utc": "2026-08-22T00:04:06Z",
+  "generated_at_utc": "2026-08-22T17:32:12Z",
   "incremental": {
-    "chunks_regenerated_for_files": 37,
+    "chunks_regenerated_for_files": 46,
     "chunks_reused_for_files": 0,
     "reuse_active": false,
     "stale_chunks_removed": 0
   },
   "options": {
-    "exclude_globs": [
-      "domains/graph_202*.json"
-    ],
-    "extra_exclude_dirs": [
-      "graphify-out"
-    ],
+    "exclude_globs": [],
+    "extra_exclude_dirs": [],
     "include_globs": [],
     "include_secrets": false,
     "show_excluded_dirs": false

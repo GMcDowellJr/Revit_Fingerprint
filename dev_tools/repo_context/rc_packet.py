@@ -50,7 +50,27 @@ def _file_is_fresh(root: Path, rel_path: str, expected_sha256: str) -> bool:
         return False
 
 
-def _safe_excerpt(root: Path, rel_path: str, start: int, end: int) -> Optional[list]:
+def _iter_safe_lines(root: Path, rel_path: str, start: int, end: int):
+    """Same path-safety/existence checks as _safe_excerpt(), but returns a
+    *generator* of (line_no, text) tuples instead of a materialized list --
+    a caller that only needs to inspect a few lines, or bail out once some
+    condition is met (a search match found, a budget exceeded), can stop
+    iterating without ever reading the rest of a large [start, end] range
+    into memory. `end` can be far larger than what a caller actually ends
+    up consuming (an oversized file's real line_count, or a fixed large
+    ceiling used for an open-ended scan) -- this is exactly why callers
+    that might not need the whole range should prefer this over
+    _safe_excerpt().
+
+    Returns None (not an empty generator) for a missing/unreadable file or
+    an unsafe path, matching _safe_excerpt()'s "None means unavailable"
+    contract -- callers must check for None before iterating. The file is
+    opened eagerly (so an open() failure is reported as None immediately,
+    not lazily on first iteration); callers that don't exhaust the
+    generator must call its .close() to release the underlying file
+    handle promptly (breaking a `for` loop alone does not close a
+    generator deterministically).
+    """
     abs_path = (root / rel_path)
     try:
         resolved = abs_path.resolve()
@@ -60,16 +80,29 @@ def _safe_excerpt(root: Path, rel_path: str, start: int, end: int) -> Optional[l
     if not resolved.exists():
         return None
     try:
-        with open(resolved, "r", encoding="utf-8", errors="replace") as fh:
-            out = []
-            for i, line in enumerate(fh, start=1):
-                if i > end:
-                    break
-                if i >= start:
-                    out.append((i, line.rstrip("\n")))
-            return out
+        fh = open(resolved, "r", encoding="utf-8", errors="replace")
     except OSError:
         return None
+
+    def _gen():
+        try:
+            with fh:
+                for i, line in enumerate(fh, start=1):
+                    if i > end:
+                        break
+                    if i >= start:
+                        yield (i, line.rstrip("\n"))
+        except OSError:
+            return
+
+    return _gen()
+
+
+def _safe_excerpt(root: Path, rel_path: str, start: int, end: int) -> Optional[list]:
+    lines = _iter_safe_lines(root, rel_path, start, end)
+    if lines is None:
+        return None
+    return list(lines)
 
 
 def _symbol_matches(name: str, row: dict) -> bool:

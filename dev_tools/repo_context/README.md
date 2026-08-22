@@ -21,7 +21,8 @@ repository, including this one.
 
 ```bash
 python repo_context.py scan ROOT --output OUTPUT_DIR [options]
-python repo_context.py packet ROOT --output OUTPUT_DIR [selector options]
+python repo_context.py packet ROOT --output OUTPUT_DIR [selector options | --request packet_request.json]
+python repo_context.py discover ROOT --output OUTPUT_DIR --question "..." [options]
 python repo_context.py validate OUTPUT_DIR [options]
 ```
 
@@ -80,6 +81,118 @@ Validate a generated output directory:
 python repo_context.py validate C:\path\to\repo_context
 ```
 
+## Discovery-to-packet workflow (starting from a question, not a symbol)
+
+A user does not need to already know an exact file, symbol, or line to get
+a bounded, source-backed answer. The intended flow:
+
+```
+Natural-language question
+    -> LLM (or you) reads routing/index.md, then a routing/<catalog>.md
+    -> LLM (or you) writes packet_request.json (schema/packet_request.schema.json)
+    -> repo_context.py packet ROOT --output OUT --request packet_request.json
+    -> repo_context.py validates every selector and reports resolution/ambiguity
+    -> packets/packet_<name>.md: bounded, exact, current source excerpts
+       with an explicit "why included" origin per item, plus
+       packets/packet_<name>.resolution.json for machine consumption
+```
+
+1. **`scan`** now also generates `routing/` (skip with `--no-routing`):
+   - `routing/index.md` — a small, persistent guide: repository revision +
+     dirty-worktree state, a source-manifest hash (freshness evidence),
+     every catalog's path/coverage/counts, and instructions for writing a
+     `packet_request.json`. Tries to stay under `--routing-index-max-chars`
+     (default 10000) by first dropping the richer per-catalog summary
+     (roles/sample paths), but every catalog's bare entry (path + coverage
+     counts) is always listed regardless -- a catalog's name/path is never
+     omitted from the index, even if that means running over the
+     configured limit. An overage is called out with an explicit note
+     rather than silently truncating the catalog list.
+   - `routing/<key>.md` — one catalog per partition (derived from actual
+     repository paths, not a hardcoded domain list: test-classified files
+     always get their own `tests.md`; archived/legacy files get
+     `archived.md`; everything else buckets by top-level directory,
+     further split by an additional path segment once a directory exceeds
+     `--routing-max-files-per-catalog`, default 60). Each **Python** file
+     entry (except `__init__.py` — see below) lists its operational-role
+     classification (with the evidence/rule that produced it — see
+     below), purpose clues (module docstring + filename terms, never an
+     invented summary), top-level symbols with exact line numbers,
+     entrypoint evidence, resolved internal imports, statically resolved
+     callers, related tests, and (if `graphify-out/graph.json` is present
+     and its `built_at_commit` matches the current HEAD) a clearly-labeled
+     Graphify community. **Non-Python files** (docs, config, data, etc.)
+     and **`__init__.py`** (almost always a re-export/boilerplate stub)
+     get a compact table row instead, under a separate "Other files
+     (non-Python / boilerplate)" section — the full Python-oriented entry
+     format is mostly inapplicable boilerplate for them (no
+     symbols/imports/callers worth reporting). A `.md` file's row includes
+     a real content-derived title (its first `#` heading, or first
+     non-empty line if it has none); `__init__.py`'s row uses its module
+     docstring instead; other non-Python types fall back to filename
+     terms. Each page is capped at `--routing-max-catalog-chars` (default
+     24000); a partition too large for one page spills its overflow into
+     further pages (`<key>__page2.md`, `__page3.md`, ...) rather than
+     dropping anything — `index.md` and `routing_manifest.json` list every
+     page. A file is only ever left out of the manifest entirely in the
+     degenerate case where not even its own minimal path+role stub fits
+     within a single, otherwise-empty page (an unrealistically small
+     `--routing-max-catalog-chars`); that's noted directly in the
+     catalog's own "Omitted from this catalog" section and tracked in the
+     manifest's `omitted_paths`, never silent.
+   - `routing/routing_manifest.json` — the same data in machine-readable
+     form (per-catalog file/symbol counts and source hashes, git revision,
+     options used), for tooling that wants to consume routing output
+     directly instead of parsing Markdown.
+   - **Operational-role classification** (evidence-based, conservative —
+     an uncertain case is `unknown`, never silently `active`):
+     `operator_entrypoint`, `active_pipeline`, `developer_utility`,
+     `test_harness`, `migration`, `archived_or_legacy`, `library_module`,
+     `unknown`.
+
+2. **`packet --request packet_request.json`** validates the request
+   against `schema/packet_request.schema.json` (rejected: unknown schema
+   version, unknown fields, paths outside the scanned repository, invalid
+   line ranges — see `examples/packet_request.invalid_*.json`), resolves
+   every selector deterministically, and reports the outcome:
+   - `resolved` — exact file/symbol/line identity, included in the packet.
+   - `ambiguous` — an unqualified symbol matched more than one definition;
+     **never silently picked** — every qualified alternative is listed so
+     the request can be narrowed (add a `"file"` field or a fully
+     qualified name).
+   - `missing` / `invalid` — reported, and (unless `"strict": true` in the
+     request) every other selector is still processed rather than
+     aborting the whole packet.
+   - A hard `limits.max_estimated_tokens` budget is enforced, but an
+     **explicit** selector (a file/symbol/line the request named directly)
+     is never silently truncated to make room — if it doesn't fit, packet
+     generation stops and reports exactly which selector(s) conflict with
+     the budget, asking for the request or the limit to be revised.
+     Non-explicit content (caller/callee/import/test expansions, search
+     matches) is budgeted normally and reported under "Omitted /
+     unresolved" if it doesn't fit.
+   - Every included item states its origin(s) — `explicit_file_selector`,
+     `explicit_symbol_selector`, `explicit_line_selector`,
+     `exact_search_match`, `caller_expansion`, `callee_expansion`,
+     `import_expansion`, `related_test_expansion` — never a merged
+     relevance score.
+   - Direct `--file`/`--symbol`/`--search`/`--line`/`--changed` selectors
+     keep working exactly as before; `--request` is a separate, additional
+     path through the same `packet` command.
+
+3. **`discover ROOT --output OUT --question "..."`** (optional, fully
+   deterministic, no embeddings/LLM call) groups literal matches for the
+   question's terms by channel — exact terminology, symbol name, path,
+   docstring, structural neighbor (caller/callee of a matched symbol), and
+   Graphify candidate (if available) — **without merging them into a
+   score**. It never answers the question; it writes
+   `packets/discover_<question>.md` (the grouped report) and
+   `packets/discover_<question>.packet_request.json` (a draft request to
+   review/edit, then run through `packet --request`).
+
+See `schema/packet_request.schema.json` for the full contract and
+`examples/` for one valid and several invalid request files.
+
 ## What each generated file contains
 
 - `repository_overview.md` — concise statistics and navigation info (file
@@ -128,6 +241,9 @@ python repo_context.py validate C:\path\to\repo_context
 - `packets/` — targeted context packets from the `packet` command.
 - `generation_manifest.json` — tool version, options used, counts, and
   incremental-reuse stats for this run.
+- `routing/` — `index.md`, one catalog per partition, and
+  `routing_manifest.json`; see "Discovery-to-packet workflow" above.
+  Skippable with `scan --no-routing`.
 
 ## How the data was produced
 
@@ -171,6 +287,11 @@ call resolution is deliberately conservative — a target is only marked
 
 ## Microsoft 365 Copilot workflow
 
+- **Don't already know a file/symbol/line?** → attach `routing/index.md`
+  (small enough to keep as persistent context), let Copilot pick a
+  `routing/<catalog>.md`, have it write a `packet_request.json`, then run
+  `packet ROOT --output OUT --request packet_request.json`. See
+  "Discovery-to-packet workflow" above.
 - **Orientation questions** ("what is this repo", "where's the test
   suite") → attach `repository_overview.md` and `repository_tree.txt`.
 - **"What does this file do"** → attach the file's chunk(s) from

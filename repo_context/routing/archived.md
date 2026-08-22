@@ -1,0 +1,394 @@
+# Routing catalog: `archived`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 13
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `archived` partition): `a10201250a29a18d2265a41f13d9edd500558df3e37d62b9f0c989d241809fc3`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `legacy/fingerprint_mvp.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment 'legacy')
+- Purpose clues:
+  - filename/path terms: fingerprint mvp
+- Important symbols (28 total):
+  - `add_origin` (function) — line 35
+  - `rgb_sig_from_color` (function) — line 64
+  - `canon_str` (function) — line 70
+  - `sig_val` (function) — line 79
+  - `get_element_display_name` (function) — line 85
+  - `_param` (function) — line 115
+  - `_as_string` (function) — line 121
+  - `_as_double` (function) — line 131
+  - `_as_int` (function) — line 139
+  - `_as_bool_from_param` (function) — line 147
+  - `first_param` (function) — line 153
+  - `fnum` (function) — line 180
+  - `format_len_inches` (function) — line 183
+  - `rgb_dict_from_color` (function) — line 194
+  - `try_get_color_rgb_from_elem` (function) — line 200
+  - `get_type_display_name` (function) — line 219
+  - `safe_str` (function) — line 246
+  - `make_hash` (function) — line 255
+  - `get_doc` (function) — line 269
+  - `get_linestyles_fingerprint` (function) — line 274
+  - `get_fillpattern_fingerprint` (function) — line 379
+  - `get_identity_fingerprint` (function) — line 601
+  - `get_units_fingerprint` (function) — line 631
+  - `get_objectstyles_fingerprint` (function) — line 695
+  - `get_linepattern_fingerprint` (function) — line 884
+  - ... and 3 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (legacy/fingerprint_mvp.py:1389)`
+  - `<module> (legacy/fingerprint_mvp.py:1392)`
+  - `<module> (legacy/fingerprint_mvp.py:1393)`
+  - `<module> (legacy/fingerprint_mvp.py:1394)`
+  - `<module> (legacy/fingerprint_mvp.py:1395)`
+  - `<module> (legacy/fingerprint_mvp.py:1396)`
+  - `<module> (legacy/fingerprint_mvp.py:1397)`
+  - `<module> (legacy/fingerprint_mvp.py:1398)`
+  - `<module> (legacy/fingerprint_mvp.py:1399)`
+  - `<module> (legacy/fingerprint_mvp.py:1400)`
+  - `_as_bool_from_param (legacy/fingerprint_mvp.py:148)`
+  - `_as_string (legacy/fingerprint_mvp.py:126)`
+  - `canon_str (legacy/fingerprint_mvp.py:74)`
+  - `get_dimtype_fingerprint (legacy/fingerprint_mvp.py:1252)`
+  - `get_dimtype_fingerprint (legacy/fingerprint_mvp.py:1254)`
+  - ... and 139 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`2b3c4e30443f4500…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `legacy/fingerprint_mvp.py`)
+
+### `tools/_archive/join_key_derivation_phase05.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: join key derivation phase05
+- Important symbols (19 total):
+  - `safe_str` (function) — line 39
+  - `stable_serialize_value` (function) — line 42
+  - `serialize_identity_items` (function) — line 51
+  - `md5_utf8_join_pipe` (function) — line 74
+  - `JoinKeyPolicy` (class) — line 84
+  - `_as_str_list` (function) — line 94
+  - `load_join_key_policies` (function) — line 104
+  - `index_items_by_k` (function) — line 186
+  - `choose_candidate_deterministically` (function) — line 198
+  - `is_usable_q` (function) — line 205
+  - `choose_record_handle` (function) — line 208
+  - `select_items_for_policy` (function) — line 215
+  - `read_json` (function) — line 369
+  - `extract_file_id` (function) — line 373
+  - `extract_records` (function) — line 388
+  - `derive_join_keys` (function) — line 416
+  - `write_csv` (function) — line 497
+  - `expand_globs` (function) — line 509
+  - `main` (function) — line 523
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/_archive/join_key_derivation_phase05.py:550)`
+  - `choose_candidate_deterministically (tools/_archive/join_key_derivation_phase05.py:202)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:417)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:423)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:424)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:426)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:427)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:428)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:445)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:447)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:456)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:457)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:482)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:483)`
+  - `derive_join_keys (tools/_archive/join_key_derivation_phase05.py:484)`
+  - ... and 27 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`2c6ef63c18d15a50…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/_archive/join_key_derivation_phase05.py`)
+
+### `tools/patterns_analysis/_archive/annotate_cluster_labels.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: annotate cluster labels
+- Important symbols (13 total):
+  - `_is_unknown` (function) — line 38
+  - `_split_common_path_parts` (function) — line 45
+  - `_first_non_noise` (function) — line 54
+  - `_parse_bool` (function) — line 61
+  - `_clean_text` (function) — line 69
+  - `resolve_provenance_label` (function) — line 75
+  - `_identity_items_from_representatives` (function) — line 102
+  - `_key_suffix` (function) — line 118
+  - `_extract_cluster_id` (function) — line 124
+  - `resolve_content_label` (function) — line 134
+  - `_iter_domains` (function) — line 191
+  - `annotate_cluster_labels` (function) — line 199
+  - `main` (function) — line 290
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/annotate_cluster_labels.py:327)`
+  - `annotate_cluster_labels (tools/patterns_analysis/_archive/annotate_cluster_labels.py:246)`
+  - `annotate_cluster_labels (tools/patterns_analysis/_archive/annotate_cluster_labels.py:247)`
+  - `annotate_cluster_labels (tools/patterns_analysis/_archive/annotate_cluster_labels.py:249)`
+  - `annotate_cluster_labels (tools/patterns_analysis/_archive/annotate_cluster_labels.py:250)`
+  - `annotate_cluster_labels (tools/patterns_analysis/_archive/annotate_cluster_labels.py:252)`
+  - `annotate_cluster_labels (tools/patterns_analysis/_archive/annotate_cluster_labels.py:259)`
+  - `main (tools/patterns_analysis/_archive/annotate_cluster_labels.py:310)`
+  - `main (tools/patterns_analysis/_archive/annotate_cluster_labels.py:318)`
+  - `resolve_content_label (tools/patterns_analysis/_archive/annotate_cluster_labels.py:143)`
+  - `resolve_content_label (tools/patterns_analysis/_archive/annotate_cluster_labels.py:157)`
+  - `resolve_content_label (tools/patterns_analysis/_archive/annotate_cluster_labels.py:181)`
+  - `resolve_content_label (tools/patterns_analysis/_archive/annotate_cluster_labels.py:185)`
+  - `resolve_provenance_label (tools/patterns_analysis/_archive/annotate_cluster_labels.py:85)`
+  - `resolve_provenance_label (tools/patterns_analysis/_archive/annotate_cluster_labels.py:87)`
+  - ... and 1 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`6a7dfc5cb37acdad…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/annotate_cluster_labels.py`)
+
+### `tools/patterns_analysis/_archive/apply_join_keys_by_ids.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - module docstring: Apply IDS-scoped join-key policies to compute join_hash_ids (verification output).
+  - filename/path terms: apply join keys by ids
+- Important symbols (5 total):
+  - `md5_utf8_join_pipe` (function) — line 21
+  - `extract_identity_map` (function) — line 26
+  - `compute_join_hash` (function) — line 44
+  - `apply_join_keys_by_ids` (function) — line 59
+  - `main` (function) — line 165
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/io.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/apply_join_keys_by_ids.py:194)`
+  - `apply_join_keys_by_ids (tools/patterns_analysis/_archive/apply_join_keys_by_ids.py:127)`
+  - `apply_join_keys_by_ids (tools/patterns_analysis/_archive/apply_join_keys_by_ids.py:99)`
+  - `compute_join_hash (tools/patterns_analysis/_archive/apply_join_keys_by_ids.py:48)`
+  - `compute_join_hash (tools/patterns_analysis/_archive/apply_join_keys_by_ids.py:56)`
+  - `main (tools/patterns_analysis/_archive/apply_join_keys_by_ids.py:183)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`69e97ce7398e15b2…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/apply_join_keys_by_ids.py`)
+
+### `tools/patterns_analysis/_archive/attributes.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: attributes
+- Important symbols (4 total):
+  - `AttrStabilityRow` (class) — line 27
+  - `StressRow` (class) — line 40
+  - `compute_attr_stability` (function) — line 55
+  - `compute_stress_rank` (function) — line 64
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/index.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`cd730b3ff0174bb6…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/attributes.py`)
+
+### `tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: backfill cluster label inputs
+- Important symbols (12 total):
+  - `_file_map` (function) — line 25
+  - `_load_json` (function) — line 37
+  - `_normalize_parts` (function) — line 42
+  - `_common_components_from_paths` (function) — line 55
+  - `_extract_cluster_common_path_parts` (function) — line 70
+  - `_update_cluster_summary` (function) — line 153
+  - `_build_discriminator_lookup` (function) — line 201
+  - `_build_cluster_representative_items` (function) — line 219
+  - `_validate_domain_inputs` (function) — line 290
+  - `_iter_domains` (function) — line 301
+  - `run_backfill` (function) — line 311
+  - `main` (function) — line 347
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:371)`
+  - `_build_cluster_representative_items (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:226)`
+  - `_build_cluster_representative_items (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:228)`
+  - `_extract_cluster_common_path_parts (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:145)`
+  - `_extract_cluster_common_path_parts._extract_parts_from_entry (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:83)`
+  - `_extract_cluster_common_path_parts._extract_parts_from_entry (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:86)`
+  - `_extract_cluster_common_path_parts._extract_parts_from_entry (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:97)`
+  - `_update_cluster_summary (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:155)`
+  - `_update_cluster_summary (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:156)`
+  - `_validate_domain_inputs (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:291)`
+  - `main (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:367)`
+  - `run_backfill (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:312)`
+  - `run_backfill (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:320)`
+  - `run_backfill (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:325)`
+  - `run_backfill (tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py:329)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`703d0b63a7a12cdc…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/backfill_cluster_label_inputs.py`)
+
+### `tools/patterns_analysis/_archive/build_reference_standards.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - module docstring: Build reference standards from file clusters.
+  - filename/path terms: build reference standards
+- Important symbols (2 total):
+  - `build_reference_standards_from_clusters` (function) — line 18
+  - `main` (function) — line 125
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/io.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/build_reference_standards.py:167)`
+  - `main (tools/patterns_analysis/_archive/build_reference_standards.py:157)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`10d3e7f18b57998f…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/build_reference_standards.py`)
+
+### `tools/patterns_analysis/_archive/calibrate_join_key_gates.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: calibrate join key gates
+- Important symbols (2 total):
+  - `calibrate` (function) — line 7
+  - `main` (function) — line 63
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/calibrate_join_key_gates.py:79)`
+  - `main (tools/patterns_analysis/_archive/calibrate_join_key_gates.py:71)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`1f38a2dc0156aa8f…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/calibrate_join_key_gates.py`)
+
+### `tools/patterns_analysis/_archive/compare.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: compare
+- Important symbols (3 total):
+  - `ChangeCounts` (class) — line 10
+  - `_phase2_items_map` (function) — line 27
+  - `classify_pair` (function) — line 82
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/index.py`
+- Called by (high/medium-confidence static callers):
+  - `classify_pair (tools/patterns_analysis/_archive/compare.py:124)`
+  - `classify_pair (tools/patterns_analysis/_archive/compare.py:125)`
+  - `classify_pair (tools/patterns_analysis/_archive/compare.py:142)`
+  - `run_change_type (tools/patterns_analysis/_archive/run_change_type.py:46)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`64811b88f67c9f4a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/compare.py`)
+
+### `tools/patterns_analysis/_archive/derive_join_keys_by_ids.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - module docstring: Derive IDS-scoped join-key policies using identity_basis.items evidence.
+  - filename/path terms: derive join keys by ids
+- Important symbols (12 total):
+  - `md5_utf8_join_pipe` (function) — line 35
+  - `is_eligible_join_key_item` (function) — line 53
+  - `extract_identity_map` (function) — line 56
+  - `compute_join_hash_for_record` (function) — line 75
+  - `evaluate_keyset` (function) — line 89
+  - `compute_coverage` (function) — line 138
+  - `jaccard_similarity` (function) — line 145
+  - `sample_records_by_file` (function) — line 155
+  - `evaluate_gates` (function) — line 176
+  - `greedy_select_keys` (function) — line 204
+  - `derive_join_keys_by_ids` (function) — line 275
+  - `main` (function) — line 537
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/io.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:570)`
+  - `compute_join_hash_for_record (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:79)`
+  - `compute_join_hash_for_record (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:86)`
+  - `derive_join_keys_by_ids (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:342)`
+  - `derive_join_keys_by_ids (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:350)`
+  - `derive_join_keys_by_ids (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:358)`
+  - `derive_join_keys_by_ids (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:362)`
+  - `derive_join_keys_by_ids (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:369)`
+  - `derive_join_keys_by_ids (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:373)`
+  - `derive_join_keys_by_ids (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:379)`
+  - `derive_join_keys_by_ids (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:383)`
+  - `evaluate_keyset (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:98)`
+  - `greedy_select_keys (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:212)`
+  - `greedy_select_keys (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:234)`
+  - `main (tools/patterns_analysis/_archive/derive_join_keys_by_ids.py:557)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`223ebaac7e7d613e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/derive_join_keys_by_ids.py`)
+
+### `tools/patterns_analysis/_archive/domain_identity_contract.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: domain identity contract
+- Important symbols (1 total):
+  - `DomainIdentityContract` (class) — line 7
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `DomainIdentityContract.is_key_allowed (tools/patterns_analysis/_archive/domain_identity_contract.py:36)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`5eaa67c63ad69fab…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/domain_identity_contract.py`)
+
+### `tools/patterns_analysis/_archive/emit_intradomain_definition.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - module docstring: Emit stable intradomain artifacts from file-level clustering output.
+  - filename/path terms: emit intradomain definition
+- Important symbols (4 total):
+  - `IDS` (class) — line 23
+  - `_make_ids_ids` (function) — line 28
+  - `emit_ids_artifacts` (function) — line 36
+  - `main` (function) — line 126
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/emit_intradomain_definition.py:141)`
+  - `emit_ids_artifacts (tools/patterns_analysis/_archive/emit_intradomain_definition.py:50)`
+  - `main (tools/patterns_analysis/_archive/emit_intradomain_definition.py:133)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`b20fd922adb85e6d…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/emit_intradomain_definition.py`)
+
+### `tools/patterns_analysis/_archive/index.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: index
+- Important symbols (4 total):
+  - `DomainIndex` (class) — line 8
+  - `_get_join_hash` (function) — line 34
+  - `_phase2_items_by_k` (function) — line 48
+  - `build_domain_index` (function) — line 103
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `build_domain_index (tools/patterns_analysis/_archive/index.py:118)`
+  - `build_domain_index (tools/patterns_analysis/_archive/index.py:136)`
+  - `build_domain_index (tools/patterns_analysis/_archive/index.py:142)`
+  - `run_attribute_stress (tools/patterns_analysis/_archive/run_attribute_stress.py:43)`
+  - `run_attribute_stress_all_joinable (tools/patterns_analysis/_archive/run_attribute_stress_all_joinable.py:68)`
+  - `run_change_type (tools/patterns_analysis/_archive/run_change_type.py:37)`
+  - `run_change_type (tools/patterns_analysis/_archive/run_change_type.py:45)`
+  - `run_identity_collision_diagnostics (tools/patterns_analysis/_archive/run_identity_collision_diagnostics.py:47)`
+  - `run_population_stability (tools/patterns_analysis/_archive/run_population_stability.py:28)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`1867273871302ffc…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/index.py`)
+

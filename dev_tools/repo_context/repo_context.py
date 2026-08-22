@@ -8,6 +8,7 @@ importing, or modifying any scanned code.
 Usage:
     repo_context.py scan ROOT [options]
     repo_context.py packet ROOT [options]
+    repo_context.py discover ROOT --output OUTPUT_DIR --question "..." [options]
     repo_context.py validate OUTPUT_DIRECTORY [options]
 
 Run with -h / --help, or see README.md in a generated output directory.
@@ -28,6 +29,9 @@ import rc_tree
 import rc_overview
 import rc_packet
 import rc_validate
+import rc_routing
+import rc_request
+import rc_discover
 from rc_common import TOOL_VERSION
 
 
@@ -126,6 +130,16 @@ def cmd_scan(args: argparse.Namespace) -> int:
         ]},
     )
 
+    routing_opts = rc_routing.RoutingOptions(
+        enabled=not args.no_routing,
+        max_files_per_catalog=args.routing_max_files_per_catalog,
+        max_catalog_chars=args.routing_max_catalog_chars,
+        max_index_chars=args.routing_index_max_chars,
+        max_symbols_per_file_entry=args.routing_max_symbols_per_file,
+        allow_stale_graphify=args.allow_stale_graphify,
+    )
+    rc_routing.generate_routing(root, output_dir, result, routing_opts, started_at)
+
     if args.verbose:
         included = sum(1 for f in result.files if f.included)
         print(f"repo_context.py: done. {included} files included, "
@@ -145,8 +159,24 @@ def cmd_packet(args: argparse.Namespace) -> int:
         print(f"error: no prior scan found in {output_dir}. Run `repo_context.py scan` first.", file=sys.stderr)
         return 1
 
+    if args.request:
+        request_path = Path(args.request)
+        if not request_path.exists():
+            print(f"error: request file not found: {request_path}", file=sys.stderr)
+            return 2
+        packet_path, resolution_report, err = rc_request.generate_packet_from_request(
+            root, output_dir, request_path, name_override=args.name,
+        )
+        if err:
+            print(f"error: {err}", file=sys.stderr)
+            return 1
+        print(f"wrote {packet_path}")
+        for r in resolution_report:
+            print(f"  [{r['status']}] {r['selector_type']} '{r['requested']}': {r['detail']}")
+        return 0
+
     if not any([args.file, args.symbol, args.search, args.line, args.changed]):
-        print("error: packet requires at least one of --file, --symbol, --search, --line, --changed",
+        print("error: packet requires --request, or at least one of --file, --symbol, --search, --line, --changed",
               file=sys.stderr)
         return 2
 
@@ -160,6 +190,29 @@ def cmd_packet(args: argparse.Namespace) -> int:
     )
     packet_path = rc_packet.generate_packet(opts)
     print(f"wrote {packet_path}")
+    return 0
+
+
+def cmd_discover(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    if not root.exists() or not root.is_dir():
+        print(f"error: ROOT is not a directory: {root}", file=sys.stderr)
+        return 2
+
+    output_dir = Path(args.output)
+    if not (output_dir / "file_inventory.csv").exists():
+        print(f"error: no prior scan found in {output_dir}. Run `repo_context.py scan` first.", file=sys.stderr)
+        return 1
+
+    report_path, request_path = rc_discover.run_discover(
+        root, output_dir, args.question, max_per_channel=args.max_per_channel,
+    )
+    print(f"wrote {report_path}")
+    if request_path is None:
+        print("no draft packet_request.json written: no usable path/symbol/search-term selectors "
+              "were found for this question (see the report for why)", file=sys.stderr)
+        return 1
+    print(f"wrote {request_path}")
     return 0
 
 
@@ -199,6 +252,21 @@ def build_parser() -> argparse.ArgumentParser:
                          help="Mark excluded directories in the tree without recursing into them")
     p_scan.add_argument("--no-redact-secrets", action="store_true",
                          help="Disable best-effort secret-line redaction in generated chunks")
+    p_scan.add_argument("--no-routing", action="store_true",
+                         help="Skip routing/ catalog generation (index.md + per-partition catalogs)")
+    p_scan.add_argument("--routing-max-files-per-catalog", type=_positive_int, default=rc_routing.DEFAULT_MAX_FILES_PER_CATALOG,
+                         help="Split a directory partition into sub-catalogs once it exceeds this many files")
+    p_scan.add_argument("--routing-max-catalog-chars", type=_positive_int, default=rc_routing.DEFAULT_MAX_CATALOG_CHARS,
+                         help="Hard size cap (characters) per routing catalog file")
+    p_scan.add_argument("--routing-index-max-chars", type=_positive_int, default=rc_routing.DEFAULT_MAX_INDEX_CHARS,
+                         help="Hard size cap (characters) for routing/index.md, so it stays small enough "
+                              "to keep as persistent LLM context")
+    p_scan.add_argument("--routing-max-symbols-per-file", type=_positive_int,
+                         default=rc_routing.DEFAULT_MAX_SYMBOLS_PER_FILE_ENTRY,
+                         help="Cap on top-level symbols listed per file entry in a routing catalog")
+    p_scan.add_argument("--allow-stale-graphify", action="store_true",
+                         help="Use graphify-out/graph.json even if its built_at_commit does not match the "
+                              "current HEAD (diagnostic; normally stale Graphify evidence is omitted)")
     p_scan.set_defaults(func=cmd_scan)
 
     p_packet = sub.add_parser("packet", help="Generate a targeted context packet")
@@ -209,6 +277,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_packet.add_argument("--search", help="Literal text to search for across included text files")
     p_packet.add_argument("--line", help="RELATIVE_PATH:LINE")
     p_packet.add_argument("--changed", nargs="+", help="One or more repository-relative file paths")
+    p_packet.add_argument("--request", help="Path to a packet_request.json (schema/packet_request.schema.json); "
+                                             "generates a request-driven packet instead of using --file/--symbol/etc.")
     p_packet.add_argument("--caller-depth", type=int, default=1)
     p_packet.add_argument("--callee-depth", type=int, default=1)
     p_packet.add_argument("--max-files", type=int, default=8)
@@ -218,6 +288,18 @@ def build_parser() -> argparse.ArgumentParser:
                            help="Include every candidate when a --symbol request is ambiguous")
     p_packet.add_argument("--name", help="Override the generated packet's output filename stem")
     p_packet.set_defaults(func=cmd_packet)
+
+    p_discover = sub.add_parser(
+        "discover",
+        help="Deterministic, channel-grouped discovery from a natural-language question "
+             "(suggests selectors / a draft packet_request.json; does not answer the question)",
+    )
+    p_discover.add_argument("root", help="Repository or folder root (must match a prior scan)")
+    p_discover.add_argument("--output", required=True, help="Output directory from a prior `scan`")
+    p_discover.add_argument("--question", required=True, help="Natural-language question")
+    p_discover.add_argument("--max-per-channel", type=_positive_int, default=15,
+                             help="Maximum matches shown per channel before truncating with a count")
+    p_discover.set_defaults(func=cmd_discover)
 
     p_validate = sub.add_parser("validate", help="Validate a previously generated output directory")
     p_validate.add_argument("output_directory", help="Output directory produced by `scan`")
