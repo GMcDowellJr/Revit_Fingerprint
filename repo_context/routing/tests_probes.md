@@ -1,6 +1,6 @@
 # Routing catalog: `tests/probes`
 
-- Generated (UTC): 2026-08-22T11:28:23Z
+- Generated (UTC): 2026-08-22T17:32:12Z
 - Tool version: 0.1.0
 - Files covered (this page): 1
 - Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests/probes` partition): `f6fbdaf3c6533dd6a106bb8b7bcdd056c8430ef0abeb21b6176012d175a42eed`

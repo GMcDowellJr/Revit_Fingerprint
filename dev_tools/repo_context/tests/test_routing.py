@@ -397,6 +397,38 @@ def test_paged_catalog_filenames_stay_within_the_byte_cap(repo, out):
     assert sum(c["file_count"] for c in pages) == 40
 
 
+def test_hard_omission_before_a_render_does_not_get_credited_as_covered(repo, out):
+    # Regression: when the *first* file examined on a page hard-omits
+    # (not even its minimal stub fits) but a *later*, smaller file on the
+    # same page does fit, the page's own render count reflects only the
+    # actually-rendered file(s) -- not a naive `files[:consumed]` prefix
+    # slice, which would credit the omitted first file as "covered" (its
+    # position, not the rendered file's) while leaving the actually-
+    # rendered file to be silently reprocessed on the next page.
+    #
+    # A long filename sorts first and is too long to fit even as a
+    # minimal stub at this cap; a short filename sorts second and fits
+    # comfortably. Both fit within one page's normal per-file cost, so
+    # this isn't about pagination overflow -- it's specifically about the
+    # hard-omission-before-a-successful-render ordering.
+    write_files(repo, {
+        f"core/a{'x' * 100}.py": "def f():\n    return 1\n",
+        "core/z.py": "def g():\n    return 2\n",
+    })
+    _scan(repo, out, ["--routing-max-catalog-chars", "560", "--routing-max-files-per-catalog", "1000"])
+    manifest = _manifest(out)
+    core_cat = next(c for c in manifest["catalogs"] if c["key"] == "core")
+    assert core_cat["file_count"] == 1
+    assert core_cat["sample_paths"] == ["core/z.py"]  # the file that actually rendered, not the omitted one
+    assert core_cat["omitted_file_count"] == 1
+    assert core_cat["omitted_paths"][0].startswith("core/a")
+
+    cat_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
+    assert "### `core/z.py`" in cat_text
+    assert f"### `core/a{'x' * 100}.py`" not in cat_text  # the omitted file has no rendered entry at all
+    assert not (out / "routing" / "core__page2.md").exists()  # both files were fully accounted for on page 1
+
+
 def test_changed_source_changes_source_manifest_hash(repo, out):
     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
     _scan(repo, out)
@@ -424,6 +456,32 @@ def test_no_routing_removes_stale_routing_from_earlier_scan(repo, out):
 
     _scan(repo, out, ["--no-routing", "--force"])
     assert not (out / "routing").exists()
+
+
+def test_paged_catalog_filename_does_not_collide_with_another_key(repo, out):
+    # Regression: an overflowing key "core" naively pages to
+    # "core__page2.md" -- but a *different*, real top-level partition
+    # literally named "core__page2" naively maps to that exact same
+    # filename via _catalog_filenames()'s own "/" -> "_" + ".md" rule.
+    # _catalog_filenames() only reasons about collisions among keys'
+    # *unpaged* filenames, so it has no way to see this collision coming;
+    # without _paged_filename() checking the same shared name pool, the
+    # later write would silently overwrite the earlier one, and both
+    # catalog_entries would point at one surviving file.
+    files = {f"core/mod_{i}.py": f'"""Module {i} docstring."""\n\ndef f_{i}():\n    return {i}\n' for i in range(30)}
+    files["core__page2/real.py"] = "def real_marker():\n    return 42\n"
+    write_files(repo, files)
+    _scan(repo, out, ["--routing-max-catalog-chars", "2000", "--routing-max-files-per-catalog", "1000"])
+    manifest = _manifest(out)
+    core_page2 = next(c for c in manifest["catalogs"] if c["key"] == "core (page 2)")
+    real_dir_cat = next(c for c in manifest["catalogs"] if c["key"] == "core__page2")
+    assert core_page2["path"] != real_dir_cat["path"]  # no shared filename between the two distinct catalogs
+    assert (out / real_dir_cat["path"]).exists()
+    assert (out / core_page2["path"]).exists()
+    real_dir_text = (out / real_dir_cat["path"]).read_text(encoding="utf-8")
+    assert "core__page2/real.py" in real_dir_text
+    core_page2_text = (out / core_page2["path"]).read_text(encoding="utf-8")
+    assert "core__page2/real.py" not in core_page2_text  # each catalog's own content stayed intact
 
 
 def test_catalog_filenames_do_not_collide_across_partition_keys(repo, out):

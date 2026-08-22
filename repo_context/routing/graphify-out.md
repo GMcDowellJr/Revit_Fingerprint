@@ -1,6 +1,6 @@
 # Routing catalog: `graphify-out`
 
-- Generated (UTC): 2026-08-22T11:28:23Z
+- Generated (UTC): 2026-08-22T17:32:12Z
 - Tool version: 0.1.0
 - Files covered (this page): 5
 - Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `graphify-out` partition): `7fcb32528f3ae444fa8b183e142d8ea09b88c223bfd0eaba2e1aaceca8b9c1da`

@@ -1,6 +1,6 @@
 # Routing catalog: `domains (page 2)`
 
-- Generated (UTC): 2026-08-22T11:28:23Z
+- Generated (UTC): 2026-08-22T17:32:12Z
 - Tool version: 0.1.0
 - Files covered (this page): 15
 - Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `domains` partition): `77af39c4f48ed1872bc8aee884b47866cc5896647bdbd27c8e5678467294a3cb`

@@ -1,6 +1,6 @@
 # Routing catalog: `tools/governance`
 
-- Generated (UTC): 2026-08-22T11:28:23Z
+- Generated (UTC): 2026-08-22T17:32:12Z
 - Tool version: 0.1.0
 - Files covered (this page): 1
 - Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/governance` partition): `8459e1d7a9f75084f0798295491ad400ef39c92f0b58dcbb582a5ce921092c8d`

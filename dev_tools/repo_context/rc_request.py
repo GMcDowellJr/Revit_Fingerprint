@@ -563,7 +563,9 @@ def _render_excerpt_block(root: Path, rel_path: str, start: int, end: int, budge
     # -- it only ever *skips* reading further, never changes what content
     # that does get read is judged against.
     body_lines = []
-    remaining_chars = budget.max_characters - budget.chars_used
+    # Reserve room for the "```\n"/"\n```\n" fence markers up front too --
+    # they're charged along with `body` below (see `fragment`).
+    remaining_chars = budget.max_characters - budget.chars_used - len("```\n\n```\n")
     raw_chars = 0
     too_large = False
     try:
@@ -584,10 +586,16 @@ def _render_excerpt_block(root: Path, rel_path: str, start: int, end: int, budge
     # body and only redacting afterward let the actually-written content
     # end up bigger than what was verified to fit.
     body = redact_secrets("\n".join(body_lines))
-    if not budget.allow(body, len(body_lines)):
+    # Charge the *rendered fragment actually appended to `out`* -- the
+    # fenced code block, not just its inner `body` -- or the "```\n"/
+    # "\n```\n" fence markers (9 chars) ride along uncounted on every
+    # excerpt, letting the packet's true size creep past
+    # limits.max_estimated_tokens by a few characters per excerpt.
+    fragment = "```\n" + body + "\n```\n"
+    if not budget.allow(fragment, len(body_lines)):
         return "too_large"
-    out.append("```\n" + body + "\n```\n")
-    budget.spend(body, len(body_lines))
+    out.append(fragment)
+    budget.spend(fragment, len(body_lines))
     return "rendered"
 
 
@@ -609,7 +617,7 @@ def _symbol_expansion(row: dict, calls_rows: list, req: ResolvedRequest, budget:
                 for c in callers:
                     line = (f"- `{c['caller_symbol']}` in `{c['caller_file']}`:{c['line']} "
                             f"— `{c['call_expression']}` ({c['confidence']}: {c['explanation']}) "
-                            f"[origin: caller_expansion]")
+                            f"[origin: caller_expansion]\n")
                     # Budget-check before reserving a focus-file slot -- a
                     # caller entry that ultimately doesn't fit must not
                     # consume the slot on behalf of content that was never
@@ -644,7 +652,7 @@ def _symbol_expansion(row: dict, calls_rows: list, req: ResolvedRequest, budget:
                 for c in callees:
                     line = (f"- `{c['call_expression']}` at line {c['line']} -> `{c['candidate_symbol']}` "
                             f"in `{c['candidate_file']}` ({c['confidence']}: {c['explanation']}) "
-                            f"[origin: callee_expansion]")
+                            f"[origin: callee_expansion]\n")
                     if not budget.allow(line, 1):
                         budget.omissions.append(f"More callees of `{qn}` omitted (packet size limit reached); see python_calls.csv.")
                         break
@@ -679,7 +687,7 @@ def _file_expansion(rel: str, imports_rows: list, calls_rows: list, files_by_pat
                 out.append(header); budget.spend(header, 1)
                 max_files_note_emitted = False
                 for i in file_imports[:20]:
-                    line = f"- line {i['line']}: `{i['imported_name'] or i['imported_module']}` -> `{i['resolved_file']}`"
+                    line = f"- line {i['line']}: `{i['imported_name'] or i['imported_module']}` -> `{i['resolved_file']}`\n"
                     if not budget.allow(line, 1):
                         break
                     if not note_focus_file(i["resolved_file"]):
@@ -699,7 +707,7 @@ def _file_expansion(rel: str, imports_rows: list, calls_rows: list, files_by_pat
                 out.append(header); budget.spend(header, 1)
                 max_files_note_emitted = False
                 for t in tests:
-                    line = f"- `{t}`"
+                    line = f"- `{t}`\n"
                     if not budget.allow(line, 1):
                         break
                     if not note_focus_file(t):
@@ -729,7 +737,7 @@ def _file_expansion(rel: str, imports_rows: list, calls_rows: list, files_by_pat
                     out.append(header); budget.spend(header, 1)
                     max_files_note_emitted = False
                     for p in peers:
-                        line = f"- `{p}` [origin: graphify_expansion]"
+                        line = f"- `{p}` [origin: graphify_expansion]\n"
                         if not budget.allow(line, 1):
                             budget.omissions.append(
                                 f"More Graphify community peers of `{rel}` omitted (packet size limit reached)."
@@ -836,24 +844,34 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
     # subtracted) instead of a "successful" packet whose true size is
     # larger than what was requested.
     git_info = get_git_info(root, exclude_paths=generated_output_exclude_paths(root, output_dir))
+    # Every entry below carries its own trailing "\n" -- header_lines is
+    # assembled with plain concatenation ("".join), not "\n".join(), so
+    # that the *number* of entries (which grows later: the "Estimated
+    # tokens used" line, then every resolution-report line) can never
+    # introduce an uncharged join-separator character. An earlier version
+    # relied on "\n".join(header_lines) for spacing, which silently added
+    # one character per entry that was never included in any budget.spend()
+    # call -- harmless for the fixed initial entries (accounted for
+    # correctly at the time header_text below was computed), but wrong
+    # once more entries were extended in afterward.
     header_lines = [
         "# Repo Context Packet (from packet_request.json)\n",
-        f"- Root: `{root.resolve().name}`",
-        f"- Question: {resolved.question}",
-        f"- schema_version: {resolved.schema_version}",
-        f"- Tool version: {TOOL_VERSION}",
-        f"- Request file: `{request_path.name}` (sha256: `{request_hash[:16]}…`)",
+        f"- Root: `{root.resolve().name}`\n",
+        f"- Question: {resolved.question}\n",
+        f"- schema_version: {resolved.schema_version}\n",
+        f"- Tool version: {TOOL_VERSION}\n",
+        f"- Request file: `{request_path.name}` (sha256: `{request_hash[:16]}…`)\n",
     ]
     if git_info.get("available"):
         dirty = "dirty" if git_info.get("dirty") else ("clean" if git_info.get("dirty") is False else "unknown")
-        header_lines.append(f"- Repository revision: `{git_info['commit']}` ({dirty} worktree)")
+        header_lines.append(f"- Repository revision: `{git_info['commit']}` ({dirty} worktree)\n")
     else:
-        header_lines.append("- Repository revision: not available (not a git repository, or git is not installed)")
+        header_lines.append("- Repository revision: not available (not a git repository, or git is not installed)\n")
     header_lines.append(
         f"- Limits: max_estimated_tokens={resolved.max_estimated_tokens}, max_files={resolved.max_files}, "
-        f"max_hops={resolved.max_hops}"
+        f"max_hops={resolved.max_hops}\n"
     )
-    header_text = "\n".join(header_lines) + "\n"
+    header_text = "".join(header_lines)
 
     # Same fixed-framing reasoning as the header -- always rendered in
     # full, reserved together with it (see below) so nothing else can
@@ -861,43 +879,74 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
     footer = ("\n_Static analysis only. Call/import relationships above are candidates, not proof of runtime "
               "dispatch. See README.md in this output directory for full limitations._\n")
 
-    # Header and footer must be reserved *together*, in one atomic check,
-    # before anything else (including the selector-resolution report
-    # below) is allowed to spend -- reserving the header alone first (an
-    # earlier version of this fix) still let a resolution-report entry's
-    # own budget.allow() check pass against a budget that hadn't yet
-    # accounted for the footer, so the footer's later unconditional spend
-    # pushed the total over the cap anyway. Both are mandatory and
-    # unshrinkable, so if they don't fit *together* in the requested
-    # budget, no amount of Tier-1/Tier-2 selector content could ever have
-    # fit either -- fail the request outright instead of writing a packet
-    # whose true size exceeds what was asked for.
-    framing_text = header_text + footer
-    if not budget.allow(framing_text, len(header_lines) + 1):
+    # The "Estimated tokens used" summary line (appended at the very end,
+    # once Tier-1/Tier-2 are done) reports budget.chars_used itself -- its
+    # own exact text isn't knowable up front, but its *worst-case width*
+    # is: chars_used can never exceed budget.max_characters (every spend
+    # of variable content is gated by budget.allow() first), so building
+    # the placeholder with max_characters standing in for both the
+    # rounded-token and raw-char figures is guaranteed to be at least as
+    # wide as the real line will be. Reserving that placeholder now, atomically
+    # with the header and footer, means the real line (substituted in
+    # unchanged at the end, needing no separate spend) can never be the
+    # thing that pushes the packet over budget.
+    estimated_line_placeholder = (
+        f"- Estimated tokens used: ~{resolved.max_estimated_tokens} "
+        f"(chars_used={budget.max_characters}/{budget.max_characters})\n"
+    )
+
+    # The "## Selector resolution report" section heading is, like the
+    # header/footer/summary line, always rendered in full regardless of
+    # request content (every valid request resolves at least one
+    # selector) -- reserve it in the same atomic check rather than as a
+    # separate, easy-to-forget budget.spend() of its own.
+    resolution_report_header = "## Selector resolution report\n"
+
+    # Header, footer, the summary-line placeholder, and the resolution-
+    # report heading must be reserved *together*, in one atomic check,
+    # before anything else (including individual resolution-report
+    # entries below) is allowed to spend -- reserving the header alone
+    # first (an earlier version of this fix) still let a resolution-
+    # report entry's own budget.allow() check pass against a budget that
+    # hadn't yet accounted for the footer, so the footer's later
+    # unconditional spend pushed the total over the cap anyway. All four
+    # are mandatory and unshrinkable, so if they don't fit *together* in
+    # the requested budget, no amount of Tier-1/Tier-2 selector content
+    # could ever have fit either -- fail the request outright instead of
+    # writing a packet whose true size exceeds what was asked for.
+    framing_text = header_text + estimated_line_placeholder + resolution_report_header + footer
+    if not budget.allow(framing_text, len(header_lines) + 3):
         return None, [_res_to_dict(r) for r in all_resolutions], (
             f"limits.max_estimated_tokens ({resolved.max_estimated_tokens}) is too small to fit this packet's "
-            f"fixed framing (header + footer, before any selector content or the selector-resolution report) "
-            f"alone; increase limits.max_estimated_tokens."
+            f"fixed framing (header + footer + packet-size summary line + resolution-report heading, before "
+            f"any selector content or individual resolution-report entries) alone; increase "
+            f"limits.max_estimated_tokens."
         )
-    budget.spend(framing_text, len(header_lines) + 1)
+    budget.spend(framing_text, len(header_lines) + 3)
 
-    # The resolution report scales with the *request*, not the source
-    # repository (a request naming hundreds of missing/ambiguous
-    # selectors could otherwise render an unbounded report regardless of
-    # limits.max_estimated_tokens) -- charge it against the same budget as
-    # everything else, with a count-of-omitted note rather than an
+    # The resolution report's *entries* scale with the *request* (a
+    # request naming hundreds of missing/ambiguous selectors could
+    # otherwise render an unbounded report regardless of
+    # limits.max_estimated_tokens) -- charge each against the same budget
+    # as everything else, with a count-of-omitted note rather than an
     # unbounded listing. The full, untruncated report is always available
     # in the accompanying packet_<name>.resolution.json sidecar. Computed
     # here (reserved up front, alongside the header/footer) rather than
     # after Tier-1/Tier-2 render, since it depends only on
     # `all_resolutions` (already resolved above), not on anything
     # Tier-1/Tier-2 produce.
-    resolution_lines = ["## Selector resolution report\n"]
+    # Same self-terminated-line convention as header_lines above -- every
+    # entry ends with its own "\n" so resolution_lines can be concatenated
+    # (not "\n".join()'d) into header_lines without an uncharged separator
+    # per entry. The section heading itself was already reserved above
+    # (as part of framing_text), so it's included here only for
+    # rendering, not spent a second time.
+    resolution_lines = [resolution_report_header]
     omitted_selector_count = 0
     for idx, r in enumerate(all_resolutions):
-        entry = [f"- {r.selector_type} `{r.requested}`: **{r.status}** — {r.detail}"]
-        entry.extend(f"  - candidate: `{c}`" for c in r.candidates)
-        entry_text = "\n".join(entry)
+        entry = [f"- {r.selector_type} `{r.requested}`: **{r.status}** — {r.detail}\n"]
+        entry.extend(f"  - candidate: `{c}`\n" for c in r.candidates)
+        entry_text = "".join(entry)
         if not budget.allow(entry_text, len(entry)):
             omitted_selector_count = len(all_resolutions) - idx
             break
@@ -905,11 +954,10 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         budget.spend(entry_text, len(entry))
     if omitted_selector_count:
         note = (f"- ... and {omitted_selector_count} more selector(s) omitted from this report (packet size "
-                f"limit reached); see the accompanying packet_*.resolution.json for the complete report.")
+                f"limit reached); see the accompanying packet_*.resolution.json for the complete report.\n")
         if budget.allow(note, 1):
             resolution_lines.append(note)
             budget.spend(note, 1)
-    resolution_lines.append("")
 
     # --- Tier 1: explicit selectors (never silently dropped) ---
     # explicit_conflicts collects only "the explicit excerpt itself doesn't
@@ -1091,12 +1139,12 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
     # selector.
     for rel, top_level in file_expansion_items:
         if top_level:
-            header = "Top-level symbols:"
+            header = "Top-level symbols:\n"
             if budget.allow(header, 1):
                 out.append(header)
                 budget.spend(header, 1)
                 for idx, r in enumerate(top_level):
-                    line = f"- `{r['qualified_name']}` ({r['symbol_type']}, lines {r['start_line']}-{r['end_line']})"
+                    line = f"- `{r['qualified_name']}` ({r['symbol_type']}, lines {r['start_line']}-{r['end_line']})\n"
                     if not budget.allow(line, 1):
                         budget.omissions.append(
                             f"{len(top_level) - idx} more top-level symbol(s) in `{rel}` omitted from the "
@@ -1176,7 +1224,7 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             # backreference so redact_secrets() never matches and the
             # (truncated) secret prefix leaks into the packet.
             line_text = redact_secrets(text.strip())[:200]
-            line = f"- `{rel}:{ln}` — `{line_text}`"
+            line = f"- `{rel}:{ln}` — `{line_text}`\n"
             # Check the budget *before* reserving a focus-file slot for
             # this match -- otherwise a match that ultimately doesn't fit
             # (and is never rendered) could still consume the one
@@ -1221,7 +1269,7 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             budget.spend(header, 1)
             omitted_omissions = 0
             for idx, o in enumerate(budget.omissions):
-                line = f"- {o}"
+                line = f"- {o}\n"
                 if not budget.allow(line, 1):
                     omitted_omissions = len(budget.omissions) - idx
                     break
@@ -1230,7 +1278,7 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             if omitted_omissions:
                 note = (f"- ... and {omitted_omissions} more omission(s) not listed here (packet size limit "
                         f"reached); see the accompanying packet_*.resolution.json's \"omissions\" field for "
-                        f"the complete list.")
+                        f"the complete list.\n")
                 if budget.allow(note, 1):
                     out.append(note)
                     budget.spend(note, 1)
@@ -1243,7 +1291,11 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
     # comment above.)
 
     # Computed last so it reflects Tier-1/Tier-2's and the resolution
-    # report's/footer's own budget spend too.
+    # report's/footer's own budget spend too. Its width was already
+    # reserved (as a worst-case placeholder) atomically with the header/
+    # footer above, so this real line -- guaranteed no wider than that
+    # placeholder, since chars_used can never exceed max_characters --
+    # needs no separate budget.spend() of its own.
     header_lines.append(
         f"- Estimated tokens used: ~{round(budget.chars_used / 4)} "
         f"(chars_used={budget.chars_used}/{budget.max_characters})\n"
@@ -1252,7 +1304,14 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
 
     out.append(footer)
 
-    text = "\n".join(header_lines) + "\n".join(out) + "\n"
+    # Plain concatenation, not "\n".join() -- every element of both lists
+    # is self-terminated with its own "\n" (see the comments where
+    # header_lines/resolution_lines/out entries are built), so no
+    # separator character needs inserting between them. A join here would
+    # silently add one uncharged character per element -- exactly the gap
+    # that let a packet's true rendered size exceed limits.max_estimated_tokens
+    # while the sidecar reported it fit.
+    text = "".join(header_lines) + "".join(out) + "\n"
 
     stem = sanitize_stem(name_override) if name_override else sanitize_stem(request_path.stem)
     packet_path = output_dir / "packets" / f"packet_{stem}.md"

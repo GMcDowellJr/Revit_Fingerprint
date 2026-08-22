@@ -250,7 +250,7 @@
         "dev_tools/repo_context/examples/packet_request.invalid_ambiguous_line_range.json",
         "dev_tools/repo_context/examples/packet_request.invalid_empty_selectors.json"
       ],
-      "source_hash": "a77d907463b596d78e3643d64cf08cf24e3cd34cc79f41cd2f8406d26e982b10",
+      "source_hash": "9aa3e3deeb23069b772796499560ce1afc45675df5c88f61bbfc31e1ba96197a",
       "symbol_count": 133
     },
     {
@@ -269,7 +269,7 @@
         "dev_tools/repo_context/rc_writers.py",
         "dev_tools/repo_context/README.md"
       ],
-      "source_hash": "a77d907463b596d78e3643d64cf08cf24e3cd34cc79f41cd2f8406d26e982b10",
+      "source_hash": "9aa3e3deeb23069b772796499560ce1afc45675df5c88f61bbfc31e1ba96197a",
       "symbol_count": 25
     },
     {
@@ -708,8 +708,8 @@
         "dev_tools/repo_context/tests/test_chunking.py",
         "dev_tools/repo_context/tests/test_determinism_incremental.py"
       ],
-      "source_hash": "dbbcc019e880e86c4cb46c828a82bf20a7bcd7ba9738566d316ca81fea25a203",
-      "symbol_count": 127
+      "source_hash": "123ffced870fbe8c6d8b6755812b5fecdc04f49c6a2b9caf3e4e7d4a4bd5b8a3",
+      "symbol_count": 128
     },
     {
       "file_count": 5,
@@ -725,8 +725,8 @@
         "dev_tools/repo_context/tests/test_routing.py",
         "dev_tools/repo_context/tests/test_safety.py"
       ],
-      "source_hash": "dbbcc019e880e86c4cb46c828a82bf20a7bcd7ba9738566d316ca81fea25a203",
-      "symbol_count": 83
+      "source_hash": "123ffced870fbe8c6d8b6755812b5fecdc04f49c6a2b9caf3e4e7d4a4bd5b8a3",
+      "symbol_count": 85
     },
     {
       "file_count": 4,
@@ -1116,14 +1116,14 @@
       "symbol_count": 8
     }
   ],
-  "generated_at_utc": "2026-08-22T11:28:23Z",
+  "generated_at_utc": "2026-08-22T17:32:12Z",
   "git": {
     "available": true,
-    "commit": "227dcc5711e377a55a5352503e133364a29ef36e",
+    "commit": "7e8cc1cee3345b5fde4e5beca080c8bc8ffafda0",
     "dirty": true
   },
   "graphify_warnings": [
-    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 227dcc5711e3; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
+    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 7e8cc1cee334; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
   ],
   "options": {
     "allow_stale_graphify": false,
@@ -1132,6 +1132,6 @@
     "max_index_chars": 10000,
     "max_symbols_per_file_entry": 25
   },
-  "source_manifest_hash": "ecad660d830724b8331a2d91393c183856b662723165ec9e5380edec4ab3d5f1",
+  "source_manifest_hash": "636df4291898e5bade51625d2442c19fa5b316f8940a05deafae0759c5f968e8",
   "tool_version": "0.1.0"
 }

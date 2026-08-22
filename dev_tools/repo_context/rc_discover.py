@@ -17,7 +17,7 @@ from pathlib import Path
 import rc_graphify
 import rc_request as rr
 from rc_common import atomic_write_text, generated_output_exclude_paths, get_git_info, sanitize_stem
-from rc_packet import _load_csv, _safe_excerpt, _file_is_fresh, _bfs_callers, _bfs_callees
+from rc_packet import _load_csv, _iter_safe_lines, _file_is_fresh, _bfs_callers, _bfs_callees
 
 _STOPWORDS = {
     "the", "a", "an", "is", "are", "was", "were", "of", "in", "on", "for", "to", "and", "or",
@@ -99,15 +99,24 @@ def run_discover(root: Path, output_dir: Path, question: str, max_per_channel: i
                 continue
             if not _file_is_fresh(root, r["relative_path"], r.get("sha256", "")):
                 continue
-            excerpt = _safe_excerpt(root, r["relative_path"], 1, 10_000_000)
-            if excerpt is None:
+            # Stream lines in rather than materializing up to 10 million
+            # of them via _safe_excerpt() first -- the scanner deliberately
+            # keeps files over MAX_TEXT_READ_BYTES in the inventory without
+            # ever reading them into memory whole (see rc_scan.py), so a
+            # large included file could otherwise exhaust memory checking
+            # for a term that appears once, or not at all.
+            lines = _iter_safe_lines(root, r["relative_path"], 1, 10_000_000)
+            if lines is None:
                 continue
-            for ln, text in excerpt:
-                if term in text:
-                    exact_matches.append((term, r["relative_path"], ln))
-                    count += 1
-                    if count >= max_per_channel:
-                        break
+            try:
+                for ln, text in lines:
+                    if term in text:
+                        exact_matches.append((term, r["relative_path"], ln))
+                        count += 1
+                        if count >= max_per_channel:
+                            break
+            finally:
+                lines.close()
 
     test_matches = [pm for pm in path_matches if pm[0].startswith("tests/") or "/tests/" in f"/{pm[0].lower()}"]
 

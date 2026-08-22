@@ -1,6 +1,6 @@
 # Routing catalog: `tools (page 2)`
 
-- Generated (UTC): 2026-08-22T11:28:23Z
+- Generated (UTC): 2026-08-22T17:32:12Z
 - Tool version: 0.1.0
 - Files covered (this page): 9
 - Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools` partition): `186bd8fb5e648d3853b278c2db4aa9f2801dc7c2a2d2be25436967cc0d21bae6`

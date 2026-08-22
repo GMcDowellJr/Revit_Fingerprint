@@ -1,6 +1,6 @@
 # Routing catalog: `mapping`
 
-- Generated (UTC): 2026-08-22T11:28:23Z
+- Generated (UTC): 2026-08-22T17:32:12Z
 - Tool version: 0.1.0
 - Files covered (this page): 5
 - Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `mapping` partition): `433bc87f020c5adf4ea6791839cd72bbb0245a8d5454fb5ba76e39c5384bc03e`

@@ -1,9 +1,9 @@
 # Routing catalog: `tests/repo_context (page 2)`
 
-- Generated (UTC): 2026-08-22T11:28:23Z
+- Generated (UTC): 2026-08-22T17:32:12Z
 - Tool version: 0.1.0
 - Files covered (this page): 5
-- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests/repo_context` partition): `dbbcc019e880e86c4cb46c828a82bf20a7bcd7ba9738566d316ca81fea25a203`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests/repo_context` partition): `123ffced870fbe8c6d8b6755812b5fecdc04f49c6a2b9caf3e4e7d4a4bd5b8a3`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/tests/test_request_validation.py`
@@ -66,7 +66,7 @@
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
 - Purpose clues:
   - filename/path terms: test routing
-- Important symbols (31 total):
+- Important symbols (33 total):
   - `_scan` (function) — line 6
   - `_manifest` (function) — line 12
   - `test_routing_catalogs_are_generated_and_deterministic` (function) — line 16
@@ -85,37 +85,37 @@
   - `test_markdown_title_prefers_heading_falls_back_to_first_line_then_filename` (function) — line 343
   - `test_other_files_table_rows_respect_the_catalog_cap` (function) — line 359
   - `test_paged_catalog_filenames_stay_within_the_byte_cap` (function) — line 380
-  - `test_changed_source_changes_source_manifest_hash` (function) — line 400
-  - `test_routing_disabled_with_no_routing_flag` (function) — line 410
-  - `test_no_routing_removes_stale_routing_from_earlier_scan` (function) — line 416
-  - `test_catalog_filenames_do_not_collide_across_partition_keys` (function) — line 429
-  - `test_purpose_clues_are_traceable_to_deterministic_evidence` (function) — line 463
-  - `test_scan_survives_a_malformed_graphify_top_level_structure` (function) — line 471
-  - `test_scan_survives_a_graphify_node_with_unhashable_community` (function) — line 486
-  - ... and 6 more (see python_symbols.csv)
+  - `test_hard_omission_before_a_render_does_not_get_credited_as_covered` (function) — line 400
+  - `test_changed_source_changes_source_manifest_hash` (function) — line 432
+  - `test_routing_disabled_with_no_routing_flag` (function) — line 442
+  - `test_no_routing_removes_stale_routing_from_earlier_scan` (function) — line 448
+  - `test_paged_catalog_filename_does_not_collide_with_another_key` (function) — line 461
+  - `test_catalog_filenames_do_not_collide_across_partition_keys` (function) — line 487
+  - `test_purpose_clues_are_traceable_to_deterministic_evidence` (function) — line 521
+  - ... and 8 more (see python_symbols.csv)
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
   - `test_catalog_appendix_respects_the_cap_when_header_alone_is_close_to_it (dev_tools/repo_context/tests/test_routing.py:177)`
-  - `test_catalog_filenames_are_capped_by_encoded_byte_length_not_char_count (dev_tools/repo_context/tests/test_routing.py:590)`
-  - `test_catalog_filenames_are_capped_by_encoded_byte_length_not_char_count (dev_tools/repo_context/tests/test_routing.py:591)`
-  - `test_catalog_filenames_do_not_collide_across_partition_keys (dev_tools/repo_context/tests/test_routing.py:441)`
-  - `test_catalog_filenames_do_not_collide_across_partition_keys (dev_tools/repo_context/tests/test_routing.py:442)`
-  - `test_catalog_filenames_stay_within_filesystem_limits (dev_tools/repo_context/tests/test_routing.py:610)`
-  - `test_catalog_filenames_stay_within_filesystem_limits (dev_tools/repo_context/tests/test_routing.py:611)`
+  - `test_catalog_filenames_are_capped_by_encoded_byte_length_not_char_count (dev_tools/repo_context/tests/test_routing.py:648)`
+  - `test_catalog_filenames_are_capped_by_encoded_byte_length_not_char_count (dev_tools/repo_context/tests/test_routing.py:649)`
+  - `test_catalog_filenames_do_not_collide_across_partition_keys (dev_tools/repo_context/tests/test_routing.py:499)`
+  - `test_catalog_filenames_do_not_collide_across_partition_keys (dev_tools/repo_context/tests/test_routing.py:500)`
+  - `test_catalog_filenames_stay_within_filesystem_limits (dev_tools/repo_context/tests/test_routing.py:668)`
+  - `test_catalog_filenames_stay_within_filesystem_limits (dev_tools/repo_context/tests/test_routing.py:669)`
   - `test_catalog_line_anchors_match_python_symbols_csv (dev_tools/repo_context/tests/test_routing.py:90)`
-  - `test_changed_source_changes_source_manifest_hash (dev_tools/repo_context/tests/test_routing.py:402)`
-  - `test_changed_source_changes_source_manifest_hash (dev_tools/repo_context/tests/test_routing.py:403)`
-  - `test_changed_source_changes_source_manifest_hash (dev_tools/repo_context/tests/test_routing.py:405)`
-  - `test_changed_source_changes_source_manifest_hash (dev_tools/repo_context/tests/test_routing.py:406)`
-  - `test_content_derived_purpose_clues_are_redacted (dev_tools/repo_context/tests/test_routing.py:554)`
+  - `test_changed_source_changes_source_manifest_hash (dev_tools/repo_context/tests/test_routing.py:434)`
+  - `test_changed_source_changes_source_manifest_hash (dev_tools/repo_context/tests/test_routing.py:435)`
+  - `test_changed_source_changes_source_manifest_hash (dev_tools/repo_context/tests/test_routing.py:437)`
+  - `test_changed_source_changes_source_manifest_hash (dev_tools/repo_context/tests/test_routing.py:438)`
+  - `test_content_derived_purpose_clues_are_redacted (dev_tools/repo_context/tests/test_routing.py:612)`
   - `test_every_included_file_has_exactly_one_primary_catalog (dev_tools/repo_context/tests/test_routing.py:45)`
   - `test_every_included_file_has_exactly_one_primary_catalog (dev_tools/repo_context/tests/test_routing.py:46)`
-  - ... and 33 more (see python_calls.csv)
+  - ... and 37 more (see python_calls.csv)
 - Related tests:
   - `dev_tools/repo_context/tests/test_routing.py`
-- Retrieval identity: sha256=`8dc15d6b8b7ac2e1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_routing.py`)
+- Retrieval identity: sha256=`18f58eeef71fb563…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_routing.py`)
 
 ### `dev_tools/repo_context/tests/test_safety.py`
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))

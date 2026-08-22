@@ -187,14 +187,15 @@ def test_search_match_does_not_reserve_focus_file_slot_unless_rendered(repo, out
     # evidence for it.
     write_files(repo, {"a.py": f"needle = {'x' * 500!r}\n"})
     _scan(repo, out)
-    # 130 tokens is just above the fixed framing's own floor (header +
-    # resolution report + footer must be reserved first -- see
-    # rc_request.py's "Reserve the fixed framing's budget cost up front")
-    # but well short of also fitting the ~500-char match line.
+    # 150 tokens is just above the fixed framing's own floor (header +
+    # resolution-report heading + footer + packet-size summary line must
+    # be reserved first -- see rc_request.py's "Reserve the fixed
+    # framing's budget cost up front") but well short of also fitting the
+    # ~500-char match line.
     req = _request(out, "req.json", {
         "schema_version": "1.0", "question": "q",
         "selectors": {"files": [], "symbols": [], "search_terms": ["needle"], "lines": []},
-        "limits": {"max_estimated_tokens": 130, "max_files": 1},
+        "limits": {"max_estimated_tokens": 150, "max_files": 1},
     })
     result = _packet(repo, out, req)
     assert result.returncode == 0, result.stderr
@@ -1406,3 +1407,51 @@ def test_search_term_scan_streams_and_stops_once_collect_cap_is_reached(repo, ou
     # collect_cap is 5 here -- the scan must stop shortly after finding
     # the 5th match, not read all ~5010 lines of the file.
     assert counter["count"] < 500, f"read {counter['count']} lines after collect_cap was reached -- not streaming"
+
+
+def test_every_rendered_fragment_is_charged_against_the_budget(repo, out):
+    # Regression: several pieces of the rendered packet were appended to
+    # `out`/`header_lines` without ever being passed to budget.spend() at
+    # their own true size -- the excerpt code-fence markers ("```\n"/
+    # "\n```\n"), the "Estimated tokens used" summary line itself, the
+    # "## Selector resolution report" section heading, and (most subtly)
+    # the "\n".join(out)/"\n".join(header_lines) separators inserted
+    # *between* every other already-charged fragment, none of which any
+    # individual budget.spend() call accounted for. Each was individually
+    # small, but together they let a packet's real rendered size exceed
+    # limits.max_estimated_tokens while the sidecar still reported success
+    # at (or under) the requested cap. At the minimal successful budget
+    # for a plain one-file selector, the packet's true byte size must
+    # never exceed limits.max_estimated_tokens * 4.
+    write_files(repo, {"a.py": "def f():\n    return 1\n"})
+    _scan(repo, out)
+
+    name = "req"
+
+    def _gen(max_tokens):
+        req = _request(out, f"{name}.json", {
+            "schema_version": "1.0", "question": "q",
+            "selectors": {"files": ["a.py"], "symbols": [], "search_terms": [], "lines": []},
+            "expansion": {"include_callers": False, "include_callees": False, "include_imports": False,
+                          "include_related_tests": False},
+            "limits": {"max_estimated_tokens": max_tokens, "max_files": 12},
+        })
+        return rr.generate_packet_from_request(repo, out, req, name_override=name)
+
+    lo, hi = 1, 2000
+    while lo < hi:
+        mid = (lo + hi) // 2
+        packet_path, _, _ = _gen(mid)
+        if packet_path is not None:
+            hi = mid
+        else:
+            lo = mid + 1
+    min_success_tokens = hi
+
+    packet_path, _, err = _gen(min_success_tokens)
+    assert packet_path is not None, err
+    text = packet_path.read_text(encoding="utf-8")
+    assert len(text) <= min_success_tokens * 4, (
+        f"packet's real size ({len(text)} chars) exceeds the requested budget "
+        f"({min_success_tokens * 4} chars) at the minimal successful token count"
+    )

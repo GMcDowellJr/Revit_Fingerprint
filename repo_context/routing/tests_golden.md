@@ -1,6 +1,6 @@
 # Routing catalog: `tests/golden`
 
-- Generated (UTC): 2026-08-22T11:28:23Z
+- Generated (UTC): 2026-08-22T17:32:12Z
 - Tool version: 0.1.0
 - Files covered (this page): 2
 - Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests/golden` partition): `4a1e2c21c243d743eaafb721dbc106535f8a457aeabcc3d30cf850b4ed153f24`

@@ -1,6 +1,6 @@
 # Routing catalog: `scripts`
 
-- Generated (UTC): 2026-08-22T11:28:23Z
+- Generated (UTC): 2026-08-22T17:32:12Z
 - Tool version: 0.1.0
 - Files covered (this page): 1
 - Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `scripts` partition): `1044d477605091c8509afb1daf308f801b71c6c8e1c4d8429e9375252617d32d`

@@ -1,9 +1,9 @@
 # Routing catalog: `dev_tools (page 2)`
 
-- Generated (UTC): 2026-08-22T11:28:23Z
+- Generated (UTC): 2026-08-22T17:32:12Z
 - Tool version: 0.1.0
 - Files covered (this page): 5
-- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `dev_tools` partition): `a77d907463b596d78e3643d64cf08cf24e3cd34cc79f41cd2f8406d26e982b10`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `dev_tools` partition): `9aa3e3deeb23069b772796499560ce1afc45675df5c88f61bbfc31e1ba96197a`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/rc_validate.py`

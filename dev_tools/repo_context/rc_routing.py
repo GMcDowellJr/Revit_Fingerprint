@@ -159,26 +159,42 @@ def _catalog_filenames(keys: list) -> dict:
     return result
 
 
-def _paged_filename(filename: str, page_num: int) -> str:
+def _paged_filename(filename: str, page_num: int, key: str, used_filenames: set) -> str:
     """Filename for the Nth page of a catalog whose first page is
     `filename` (already collision/byte-cap-safe, from _catalog_filenames()).
     page_num 1 returns `filename` unchanged -- the common case, where a
     partition's files fit on a single page, produces exactly the same
     filenames as before this existed. page_num >= 2 appends a `__pageN`
     suffix, re-truncating (preserving byte-cap safety) if `filename` was
-    already close to _MAX_CATALOG_FILENAME_BYTES. Two different keys can
-    never collide this way -- _catalog_filenames() already guarantees
-    their (unpaged) filenames are distinct, and this only ever appends to
-    one key's own filename."""
+    already close to _MAX_CATALOG_FILENAME_BYTES.
+
+    _catalog_filenames() only reasons about collisions among partition
+    keys' own (unpaged) filenames -- it has no way to know a *different*
+    key might later collide with one key's *paged* name. Concretely: key
+    "a" overflowing to page 2 naively produces "a__page2.md", which
+    collides outright with a distinct top-level partition key literally
+    named "a__page2" (whose own unpaged filename is also "a__page2.md")
+    -- the later write would silently overwrite the earlier one on disk
+    while both manifest entries still pointed at the same path. Checking
+    every candidate against `used_filenames` (seeded by the caller with
+    every key's already-assigned base filename, and grown here as pages
+    are handed out) catches that -- and any subsequent collision a page
+    name might cause against another page name -- falling back to the
+    same stable per-key hash suffix _catalog_filenames() uses for its own
+    base-name collisions, so the result stays deterministic.
+    """
     if page_num <= 1:
-        return filename
-    assert filename.endswith(".md")
-    stem = filename[:-3]
-    suffix = f"__page{page_num}.md"
-    if _byte_len(stem) + _byte_len(suffix) <= _MAX_CATALOG_FILENAME_BYTES:
-        return f"{stem}{suffix}"
-    prefix_budget_bytes = max(1, _MAX_CATALOG_FILENAME_BYTES - _byte_len(suffix))
-    return f"{_truncate_to_byte_limit(stem, prefix_budget_bytes)}{suffix}"
+        candidate = filename
+    else:
+        assert filename.endswith(".md")
+        stem = filename[:-3]
+        candidate = f"{stem}__page{page_num}.md"
+        if _byte_len(candidate) > _MAX_CATALOG_FILENAME_BYTES or candidate in used_filenames:
+            suffix = f"__page{page_num}__{stable_path_id(key, length=6)}.md"
+            prefix_budget_bytes = max(1, _MAX_CATALOG_FILENAME_BYTES - _byte_len(suffix))
+            candidate = f"{_truncate_to_byte_limit(stem, prefix_budget_bytes)}{suffix}"
+    used_filenames.add(candidate)
+    return candidate
 
 
 def _top_level_symbols(rel_path: str, symbols_by_file: dict) -> list:
@@ -342,30 +358,40 @@ def _render_catalog_page(files: list, key: str, page_num: int, cat_hash: str, st
     """Renders as many of `files` (processed strictly in the given order)
     as fit within routing_opts.max_catalog_chars for one catalog page.
 
-    Returns (page_text, consumed_count, hard_omitted_paths):
-    - `consumed_count` is how many of `files` -- always a *prefix* -- were
-      actually placed on this page (as a full block, a minimal stub, or a
-      lightweight table row). The caller advances to the next page
-      starting at `files[consumed_count:]`; nothing before that index is
-      ever silently dropped -- an oversized, unsplittable directory
-      (e.g. a flat `tests/` with 100+ files) spills into `<key>__page2.md`,
-      `<key>__page3.md`, etc. instead of quietly losing everything past
-      the first page's budget.
+    Returns (page_text, next_index, rendered_files, hard_omitted_paths):
+    - `next_index` is how many of `files` -- a prefix, by *position* --
+      this page examined, whether a given file was rendered or hard-
+      omitted. The caller advances to the next page starting at
+      `files[next_index:]`. This is deliberately tracked separately from
+      how many files were *rendered*: a hard omission doesn't stop the
+      walk (a later, smaller file may still fit on this same page), so a
+      page can hard-omit file 0, render file 1, and hit its cap at file 2
+      -- `next_index` is then 2 (both 0 and 1 were examined), not 1 (the
+      render count). Conflating the two previously let the caller slice
+      `files[:consumed]` as "the rendered files" when position 0 (the
+      omitted one, not the rendered one) landed there instead -- silently
+      crediting an omitted file as covered while reprocessing the
+      actually-rendered file again on the next page.
+    - `rendered_files` is the actual FileRecord list placed on this page
+      (full block, minimal stub, or table row) -- what the caller's
+      manifest entry (roles/symbol_count/sample_paths) should reflect.
     - `hard_omitted_paths` names files that could not be represented at
       all -- not even a minimal path+role stub fits alongside this page's
       own header, which only happens when max_catalog_chars is smaller
       than that fixed framing. Since every page has the identical budget,
       such a file could never fit on *any* page, paged or not; it is
       genuinely omitted (tracked here and in the manifest), not deferred.
-      `consumed_count` can only be 0 (nothing placed at all) when every
-      file in `files` hit this case -- the caller must stop paging in
-      that situation instead of retrying the same, still-unconsumed list
-      forever.
+      Whenever `rendered_files` ends up empty, every file in `files` hit
+      this case and `next_index` equals `len(files)` -- the walk never
+      breaks early without having rendered at least one file (see the
+      `if rendered_files:` guards below) -- so the caller's `while
+      remaining:` loop terminates on its own without a special "nothing
+      rendered" case.
 
     The exact character-budget used to decide what fits is computed
     against a worst-case (6-digit) placeholder for "Files covered" in the
     header, since the true count isn't known until this walk finishes --
-    the real header (built afterward, once `consumed_count` is known) is
+    the real header (built afterward, once the render count is known) is
     therefore always <= the size already budgeted for, never larger.
     """
     header_placeholder = _catalog_page_header(key, page_num, cat_hash, started_at_utc, "999999")
@@ -375,9 +401,10 @@ def _render_catalog_page(files: list, key: str, page_num: int, cat_hash: str, st
     other_rows = []
     table_header_added = False
     hard_omitted_paths = []
+    rendered_files = []
     table_header = "\n## Other files (non-Python / boilerplate)\n\n| Path | Title/summary | Role |\n|---|---|---|\n"
-    consumed = 0
-    for f in files:
+    next_index = len(files)
+    for idx, f in enumerate(files):
         rel = f.relative_path
         if f.extension != ".py" or f.filename == "__init__.py":
             if f.extension == ".md":
@@ -392,7 +419,8 @@ def _render_catalog_page(files: list, key: str, page_num: int, cat_hash: str, st
             row = f"| `{rel}` | {title} | `{roles[rel]}` |\n"
             extra_header_cost = 0 if table_header_added else len(table_header)
             if body_len + extra_header_cost + len(row) > routing_opts.max_catalog_chars:
-                if consumed > 0:
+                if rendered_files:
+                    next_index = idx
                     break  # this file (and everything after it) starts the next page
                 # First entry attempted on a fresh page and even a single
                 # lightweight row doesn't fit -- this page's own header
@@ -400,7 +428,8 @@ def _render_catalog_page(files: list, key: str, page_num: int, cat_hash: str, st
                 # page (paged or not) could ever fit this file; skip it
                 # and keep trying the rest of `files`, which may be
                 # smaller (or may all be equally unfittable, in which
-                # case the caller sees consumed == 0 and stops).
+                # case rendered_files stays empty and next_index reaches
+                # len(files) naturally).
                 hard_omitted_paths.append(rel)
                 continue
             if not table_header_added:
@@ -409,7 +438,7 @@ def _render_catalog_page(files: list, key: str, page_num: int, cat_hash: str, st
                 table_header_added = True
             other_rows.append(row)
             body_len += len(row)
-            consumed += 1
+            rendered_files.append(f)
             continue
 
         block = _render_file_entry(
@@ -424,7 +453,8 @@ def _render_catalog_page(files: list, key: str, page_num: int, cat_hash: str, st
         # real assembled length by (len(blocks) - 1) characters.
         join_cost = 1 if blocks else 0
         if body_len + join_cost + len(block) > routing_opts.max_catalog_chars:
-            if consumed > 0:
+            if rendered_files:
+                next_index = idx
                 break
             # The very first entry attempted on a fresh page already
             # exceeds the limit on its own -- fall back to a minimal stub
@@ -436,13 +466,13 @@ def _render_catalog_page(files: list, key: str, page_num: int, cat_hash: str, st
                 continue
             blocks.append(minimal)
             body_len += len(minimal)
-            consumed += 1
+            rendered_files.append(f)
             continue
         blocks.append(block)
         body_len += join_cost + len(block)
-        consumed += 1
+        rendered_files.append(f)
 
-    header = _catalog_page_header(key, page_num, cat_hash, started_at_utc, consumed)
+    header = _catalog_page_header(key, page_num, cat_hash, started_at_utc, len(rendered_files))
     text = header + "\n".join(blocks)
     if other_rows:
         text += "".join(other_rows)
@@ -493,7 +523,7 @@ def _render_catalog_page(files: list, key: str, page_num: int, cat_hash: str, st
         # omitted-path list is still in routing_manifest.json's per-page
         # omitted_paths.
 
-    return text, consumed, hard_omitted_paths
+    return text, next_index, rendered_files, hard_omitted_paths
 
 
 def generate_routing(root: Path, output_dir: Path, result, routing_opts: RoutingOptions,
@@ -585,6 +615,12 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
     )
 
     filenames_by_key = _catalog_filenames(list(partitions.keys()))
+    # Every key's own base filename is "reserved" up front -- _paged_filename()
+    # checks (and grows) this set so a key's overflow page can never
+    # collide with another key's own filename (or another key's overflow
+    # page); see _paged_filename()'s docstring for the concrete collision
+    # shape this prevents.
+    used_filenames = set(filenames_by_key.values())
 
     catalog_entries = []  # for index.md, in key-sorted order
     for key in sorted(partitions):
@@ -599,47 +635,43 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
         # by) spills into additional pages -- <filename>, then
         # <filename>__page2.md, __page3.md, and so on -- rather than
         # silently dropping every file past the first page's budget. Each
-        # page is rendered strictly in order (cat_files sorted by path),
-        # so a page's files are always a contiguous range; the loop stops
-        # only once every file has landed on some page, or (the
-        # degenerate case: max_catalog_chars smaller than one page's own
-        # fixed header) a page manages to place nothing at all, in which
-        # case its hard_omitted_paths names the files that could never
-        # fit on any page and no further pages are attempted.
+        # page is rendered strictly in order (cat_files sorted by path);
+        # the loop stops once every file has been *examined* (rendered or
+        # hard-omitted) by some page.
         remaining = cat_files
         page_num = 1
-        while True:
-            page_filename = _paged_filename(filename, page_num)
-            text, consumed, hard_omitted_paths = _render_catalog_page(
+        while remaining:
+            page_filename = _paged_filename(filename, page_num, key, used_filenames)
+            text, next_index, rendered_files, hard_omitted_paths = _render_catalog_page(
                 remaining, key, page_num, cat_hash, started_at_utc, root, symbols_by_file, roles,
                 role_evidence, entrypoint_reason_by_path, internal_deps_by_file, called_by_file,
                 tests_by_target, communities_by_file, routing_opts,
             )
             atomic_write_text(routing_dir / page_filename, text + "\n")
 
-            page_files = remaining[:consumed]
-            by_role = Counter(roles[f.relative_path] for f in page_files)
-            symbol_count = sum(len(_top_level_symbols(f.relative_path, symbols_by_file)) for f in page_files)
+            by_role = Counter(roles[f.relative_path] for f in rendered_files)
+            symbol_count = sum(len(_top_level_symbols(f.relative_path, symbols_by_file)) for f in rendered_files)
             catalog_entries.append({
                 "key": key if page_num == 1 else f"{key} (page {page_num})",
                 "path": f"routing/{page_filename}",
-                "file_count": len(page_files),
+                "file_count": len(rendered_files),
                 "symbol_count": symbol_count,
                 "roles": dict(sorted(by_role.items())),
                 "omitted_file_count": len(hard_omitted_paths),
                 "source_hash": cat_hash,
-                "sample_paths": [f.relative_path for f in page_files[:3]],
+                "sample_paths": [f.relative_path for f in rendered_files[:3]],
                 # The page's own appendix only samples the first 30
                 # omitted paths (keeping that file bounded); the manifest
                 # is where a machine consumer can get the complete list.
                 "omitted_paths": hard_omitted_paths,
             })
 
-            if consumed == 0:
-                break  # nothing more could ever fit; hard_omitted_paths covers the rest
-            remaining = remaining[consumed:]
-            if not remaining:
-                break
+            # next_index == len(remaining) whenever rendered_files ended up
+            # empty (every file on this page hard-omitted) -- see
+            # _render_catalog_page()'s docstring -- so this always makes
+            # forward progress and terminates without a separate
+            # "nothing rendered" check.
+            remaining = remaining[next_index:]
             page_num += 1
 
     index_text = _render_index(

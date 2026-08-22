@@ -1,6 +1,6 @@
 # Routing catalog: `archived (page 2)`
 
-- Generated (UTC): 2026-08-22T11:28:23Z
+- Generated (UTC): 2026-08-22T17:32:12Z
 - Tool version: 0.1.0
 - Files covered (this page): 11
 - Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `archived` partition): `a10201250a29a18d2265a41f13d9edd500558df3e37d62b9f0c989d241809fc3`

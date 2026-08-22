@@ -1,6 +1,6 @@
 # Routing catalog: `tools/archetype (page 2)`
 
-- Generated (UTC): 2026-08-22T11:28:23Z
+- Generated (UTC): 2026-08-22T17:32:12Z
 - Tool version: 0.1.0
 - Files covered (this page): 2
 - Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/archetype` partition): `c5dfc15c8ac63c3bd8e5c140c081e69d97eb5fb91d4f2ed43f57ac619d6f3163`
