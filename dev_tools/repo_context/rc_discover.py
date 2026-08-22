@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 
 import rc_graphify
+import rc_request as rr
 from rc_common import atomic_write_text, generated_output_exclude_paths, get_git_info, sanitize_stem
 from rc_packet import _load_csv, _safe_excerpt, _file_is_fresh, _bfs_callers, _bfs_callees
 
@@ -198,9 +199,20 @@ def run_discover(root: Path, output_dir: Path, question: str, max_per_channel: i
     if not has_usable_selectors:
         return report_path, None
 
+    # packet --request's own validation rejects a question over
+    # MAX_QUESTION_LENGTH outright -- truncate it here instead of writing
+    # a draft that a successful discovery run would hand off as
+    # immediately unusable. The question is documentation only (never
+    # used to resolve selectors), so truncating it costs nothing
+    # functional; the full original is still in the report above.
+    draft_question = question
+    if len(draft_question) > rr.MAX_QUESTION_LENGTH:
+        suffix = "... (truncated for packet_request.json; see the discovery report for the full question)"
+        draft_question = draft_question[:rr.MAX_QUESTION_LENGTH - len(suffix)] + suffix
+
     draft = {
         "schema_version": "1.0",
-        "question": question,
+        "question": draft_question,
         "selectors": {
             "files": draft_files,
             "symbols": draft_symbols,

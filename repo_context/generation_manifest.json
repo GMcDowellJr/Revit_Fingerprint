@@ -7,17 +7,17 @@
     "redact_secrets": true
   },
   "counts": {
-    "calls": 52078,
-    "chunked_files": 45,
-    "chunks": 1429,
+    "calls": 52181,
+    "chunked_files": 46,
+    "chunks": 1432,
     "entrypoint_candidates": 103,
     "excluded_directories": 7,
     "files_excluded": 0,
-    "files_included": 670,
-    "imports": 4691,
+    "files_included": 669,
+    "imports": 4695,
     "parse_failures": 0,
     "python_files": 386,
-    "symbols": 5170
+    "symbols": 5180
   },
   "exclude_dir_names_default_count": null,
   "excluded_directories_sample": [
@@ -50,9 +50,9 @@
       "reason": "excluded_directory_name"
     }
   ],
-  "generated_at_utc": "2026-08-22T06:29:19Z",
+  "generated_at_utc": "2026-08-22T09:43:57Z",
   "incremental": {
-    "chunks_regenerated_for_files": 45,
+    "chunks_regenerated_for_files": 46,
     "chunks_reused_for_files": 0,
     "reuse_active": false,
     "stale_chunks_removed": 0

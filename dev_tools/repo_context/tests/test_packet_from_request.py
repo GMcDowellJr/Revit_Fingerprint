@@ -311,6 +311,162 @@ def test_line_selector_resolves_enclosing_symbol(repo, out):
     assert "def f():" in text
 
 
+def test_line_range_extending_past_enclosing_symbol_renders_in_full(repo, out):
+    # Regression: the enclosing-symbol lookup only checked that the
+    # requested range's *start* line fell inside a symbol, not that the
+    # symbol also contained the *end* line. A range starting inside a
+    # tiny function that ends immediately (line 2) but requested through
+    # line 7 got silently truncated to just that function's own bounds
+    # (line 2) -- the resolution report still claimed "resolved" while
+    # lines 3-7 were dropped entirely from the packet.
+    write_files(repo, {"core/a.py": (
+        "x = 0\n"             # 1
+        "def tiny(): pass\n"  # 2 (a symbol whose own bounds are just this one line)
+        "y = 1\n"             # 3
+        "z = 2\n"             # 4
+        "w = 3\n"             # 5
+        "v = 4\n"             # 6
+        "u = 5\n"             # 7
+    )})
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [], "search_terms": [],
+                      "lines": [{"file": "core/a.py", "line": 2, "end_line": 7}]},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    # The full requested range must render -- not truncated to `tiny`'s
+    # own 1-line bounds.
+    assert "def tiny(): pass" in text
+    assert "u = 5" in text
+    assert "Enclosing symbol:" not in text  # no symbol contains both endpoints
+
+
+def test_enclosing_symbol_note_is_charged_against_budget(repo, out):
+    # Regression: the "Enclosing symbol: ..." metadata line for a line
+    # selector was appended with no budget.allow()/spend() at all -- a
+    # long qualified name could make the actual packet bigger than the
+    # sidecar's reported estimated_tokens_used implied.
+    write_files(repo, {"core/a.py": "def " + "x" * 80 + "():\n    y = 1\n    return y\n"})
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [], "search_terms": [], "lines": [{"file": "core/a.py", "line": 2}]},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+    assert "Enclosing symbol:" in text
+    assert sidecar["estimated_tokens_used"] * 4 >= len(text) * 0.5
+
+
+def test_search_match_collection_is_capped(repo, out):
+    # Regression: every matching line was collected into an in-memory
+    # list before max_files/the packet budget were ever applied during
+    # Tier-2 rendering -- a common term across a large repository could
+    # accumulate an unbounded number of tuples. The direct --search
+    # packet path already caps collection at max_files * 5; the request
+    # path needs the same bound.
+    files = {f"core/mod_{i:03d}.py": "needle\n" * 50 for i in range(50)}
+    write_files(repo, files)
+    _scan(repo, out)
+    files_rows = rr._load_csv(out / "file_inventory.csv")
+    resolutions, matches_by_term, _ = rr.resolve_search_terms(repo, ["needle"], False, files_rows, 3)
+    assert len(matches_by_term["needle"]) <= 3 * 5
+
+
+def test_redacted_excerpt_is_charged_not_the_raw_source(repo, out):
+    # Regression: budget.allow() was checked against the *raw* excerpt
+    # text, and redact_secrets() (which can make a secret-shaped value
+    # longer via its placeholder) only ran afterward on content already
+    # verified to fit -- so the actually-written (redacted) body could
+    # end up bigger than what the budget check had approved.
+    # The assignment key must be literally "token" (etc.) immediately
+    # followed by `=`/`:` for _SECRET_ASSIGNMENT_PATTERN to match at all
+    # -- a value just short enough that the fixed-length
+    # "[REDACTED-POSSIBLE-SECRET]" placeholder (26 chars) is *longer*
+    # than the whole original "token = '...'" span it replaces (~22
+    # chars for a 12-char value), so redaction measurably grows the text.
+    lines = [f"token = 'abcdefghi{i:03d}'" for i in range(100)]
+    write_files(repo, {"core/a.py": "\n".join(lines) + "\n"})
+    _scan(repo, out)
+    # Measure the real (redacted) cost via a generous run rather than
+    # guessing a token limit -- an explicit file selector hard-aborts the
+    # whole packet if it doesn't fit (a separate, correct invariant), so
+    # the budget must be sized to comfortably fit the redacted excerpt.
+    generous_req = _request(out, "generous.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["core/a.py"], "symbols": [], "search_terms": [], "lines": []},
+        "limits": {"max_estimated_tokens": 200000, "max_files": 12},
+    })
+    generous_result = _packet(repo, out, generous_req)
+    assert generous_result.returncode == 0, generous_result.stderr
+    full_tokens = json.loads(
+        (out / "packets" / "packet_generous.resolution.json").read_text(encoding="utf-8")
+    )["estimated_tokens_used"]
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["core/a.py"], "symbols": [], "search_terms": [], "lines": []},
+        "limits": {"max_estimated_tokens": full_tokens + 10, "max_files": 12},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    # The reported usage must not understate the packet's actual size --
+    # this bug's own repro showed ~890 tokens actually used while a 750
+    # limit was reported as satisfied.
+    assert sidecar["estimated_tokens_used"] * 4 >= len(text) * 0.5
+
+
+def test_regex_search_rejected_when_bounding_is_unsupported(repo, out, monkeypatch):
+    # Regression: on a platform without SIGALRM (Windows), search_as_regex
+    # fell back to running the pattern completely unbounded -- exactly
+    # the hang this whole mechanism exists to prevent, just gated behind
+    # a platform check instead of being fixed. Simulate that platform by
+    # removing signal.SIGALRM for the duration of this test.
+    import signal
+    monkeypatch.delattr(signal, "SIGALRM", raising=False)
+    write_files(repo, {"core/a.py": "hello\n"})
+    _scan(repo, out)
+    files_rows = rr._load_csv(out / "file_inventory.csv")
+    resolutions, matches_by_term, _ = rr.resolve_search_terms(repo, ["(a+)+$"], True, files_rows, 12)
+    assert resolutions[0].status == "invalid"
+    assert "SIGALRM" in resolutions[0].detail or "unbounded" in resolutions[0].detail.lower()
+    assert matches_by_term["(a+)+$"] == []
+
+
+def test_packet_header_and_footer_charged_against_budget(repo, out):
+    # Regression: the fixed header (title/root/question/provenance/
+    # limits) and footer were written with no budget accounting
+    # whatsoever -- an accepted (<=4000-char) question alone could make
+    # the real packet many times bigger than limits.max_estimated_tokens
+    # while the sidecar still reported a number near zero.
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    _scan(repo, out)
+    long_question = "why? " * 700  # comfortably under MAX_QUESTION_LENGTH (4000), still substantial
+    # A search-term selector, not an explicit file/symbol/line selector --
+    # the latter now correctly hard-aborts the whole packet if it can't
+    # fit alongside the (now-charged) header, which is a separate, correct
+    # invariant this test isn't about. A search term is soft/omittable, so
+    # the packet still succeeds even when the header alone consumes most
+    # of an unreasonably tiny budget.
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": long_question,
+        "selectors": {"files": [], "symbols": [], "search_terms": ["nonexistent_term_xyz"], "lines": []},
+        "limits": {"max_estimated_tokens": 1, "max_files": 12},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+    assert sidecar["estimated_tokens_used"] > 100  # the question alone is ~700+ chars
+    assert sidecar["estimated_tokens_used"] * 4 >= len(text) * 0.5
+
+
 def test_stale_source_since_scan_withholds_excerpt(repo, out):
     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
     _scan(repo, out)
@@ -547,7 +703,7 @@ def test_pathological_regex_search_term_times_out_instead_of_hanging(repo, out, 
     write_files(repo, {"core/a.py": "x = '" + "a" * 35 + "!'\n"})
     _scan(repo, out)
     files_rows = rr._load_csv(out / "file_inventory.csv")
-    resolutions, matches_by_term, _ = rr.resolve_search_terms(repo, ["(a+)+$"], True, files_rows)
+    resolutions, matches_by_term, _ = rr.resolve_search_terms(repo, ["(a+)+$"], True, files_rows, 12)
     assert resolutions[0].status == "invalid"
     assert "exceeded" in resolutions[0].detail
     assert matches_by_term["(a+)+$"] == []
@@ -555,7 +711,7 @@ def test_pathological_regex_search_term_times_out_instead_of_hanging(repo, out, 
     # A normal (non-pathological) regex must still work correctly under
     # the same bounded path -- the timeout mechanism must not break
     # ordinary regex search.
-    resolutions2, matches_by_term2, _ = rr.resolve_search_terms(repo, ["a{3}"], True, files_rows)
+    resolutions2, matches_by_term2, _ = rr.resolve_search_terms(repo, ["a{3}"], True, files_rows, 12)
     assert resolutions2[0].status == "resolved"
     assert matches_by_term2["a{3}"]
 
@@ -580,7 +736,7 @@ def test_aggregate_regex_search_time_is_capped_across_all_terms(repo, out, monke
     # run of `a` characters (a term repeated verbatim would risk being
     # deduplicated by a caller upstream of this function; these aren't).
     resolutions, matches_by_term, _ = rr.resolve_search_terms(
-        repo, ["(a+)+$", "(a+)*$", "(a|aa)+$"], True, files_rows,
+        repo, ["(a+)+$", "(a+)*$", "(a|aa)+$"], True, files_rows, 12,
     )
     elapsed = time.monotonic() - start
     assert elapsed < 2.5  # comfortably bounded, not the ~3.0s+ three full per-term timeouts would take
@@ -877,11 +1033,17 @@ def test_selector_resolution_report_is_charged_against_budget(repo, out):
     result = _packet(repo, out, req)
     assert result.returncode == 0, result.stderr
     text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
     # With a 4-character budget, almost nothing should have rendered --
-    # certainly not a full 200-entry resolution report.
+    # certainly not a full 200-entry resolution report. The fixed header
+    # framing is itself now charged (a separate fix), so the reported
+    # figure is the framing's own honest cost, not exactly 0 -- but it
+    # must stay small and, above all, must not be a wild understatement
+    # of the packet's actual size the way ~0 tokens for an 18KB packet
+    # was before either fix.
     assert len(text) < 2000
     assert text.count("missing_") < 200
-    assert "Estimated tokens used: ~0" in text
+    assert sidecar["estimated_tokens_used"] * 4 >= len(text) * 0.5
 
 
 def test_related_test_expansion_respects_global_max_files(repo, out):

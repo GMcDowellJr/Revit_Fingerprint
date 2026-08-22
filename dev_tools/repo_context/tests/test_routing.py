@@ -405,3 +405,56 @@ def test_scan_survives_a_malformed_graphify_top_level_structure(repo, out):
     (repo / "graphify-out" / "graph.json").write_text("[]", encoding="utf-8")
     _scan(repo, out)  # must not crash -- _scan() itself asserts returncode == 0
     assert (out / "routing" / "index.md").exists()
+
+
+def test_scan_survives_a_graphify_node_with_unhashable_community(repo, out):
+    # Regression: a node with a non-hashable `community` value (e.g. a
+    # list) crashed `by_file.setdefault(...).add((community, name))` with
+    # TypeError: unhashable type -- the top-level-object check alone
+    # (previous fix) doesn't catch a malformed *node* inside an otherwise
+    # well-formed graph.json. This is otherwise valid JSON, just malformed
+    # in a way this tool's own reader must tolerate rather than crash on.
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    (repo / "graphify-out").mkdir(parents=True, exist_ok=True)
+    graph = {
+        "built_at_commit": "",
+        "nodes": [{"source_file": "core/a.py", "community": []}],
+    }
+    (repo / "graphify-out" / "graph.json").write_text(json.dumps(graph), encoding="utf-8")
+    _scan(repo, out)  # must not crash
+    assert (out / "routing" / "index.md").exists()
+
+
+def test_content_derived_purpose_clues_are_redacted(repo, out):
+    # Regression: _markdown_title() and the module-docstring purpose clue
+    # both pull real content directly from the scanned file, unlike
+    # filename terms -- but neither went through redact_secrets() before
+    # being written into a routing catalog meant for attachment to an
+    # LLM, unlike every excerpt/chunk elsewhere in this tool.
+    write_files(repo, {
+        "docs/secret.md": "token = 'abcdefghijklmnopqrstuvwxyz'\n\nMore text.\n",
+        "core/secret_module.py": '"""token = \'abcdefghijklmnopqrstuvwxyz\'"""\n\ndef f():\n    return 1\n',
+    })
+    _scan(repo, out)
+    docs_text = (out / "routing" / "docs.md").read_text(encoding="utf-8")
+    core_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
+    assert "abcdefghijklmnopqrstuvwxyz" not in docs_text
+    assert "abcdefghijklmnopqrstuvwxyz" not in core_text
+
+
+def test_catalog_filenames_stay_within_filesystem_limits(repo, out):
+    # Regression: an oversized partition split through several long
+    # directory segments flattened its entire key ("/" -> "_") into a
+    # filename with no length cap, which could exceed the filesystem's
+    # per-component name limit (compounded by atomic_write_text's own
+    # temp-file suffix) and make the write itself fail with OSError:
+    # File name too long.
+    segment = "x" * 70
+    files = {f"{segment}/{segment}/{segment}/{segment}/mod_{i}.py": f"def f_{i}():\n    return {i}\n"
+             for i in range(61)}
+    write_files(repo, files)
+    _scan(repo, out, ["--routing-max-files-per-catalog", "30"])
+    manifest = _manifest(out)
+    for cat in manifest["catalogs"]:
+        assert len(cat["path"]) < 200
+        assert (out / cat["path"]).exists()

@@ -21,7 +21,8 @@ from typing import Optional
 import rc_classify
 import rc_graphify
 from rc_common import (
-    TOOL_VERSION, atomic_write_text, generated_output_exclude_paths, get_git_info, sha256_text, stable_path_id,
+    TOOL_VERSION, atomic_write_text, generated_output_exclude_paths, get_git_info, redact_secrets, sha256_text,
+    stable_path_id,
 )
 from rc_packet import _safe_excerpt
 
@@ -99,24 +100,38 @@ def _partition_files(files_with_role: list, max_files: int) -> dict:
     return final
 
 
+_MAX_CATALOG_FILENAME_CHARS = 150  # well under typical filesystem name-length limits (~255 bytes),
+# leaving headroom for atomic_write_text's own temp-file suffix.
+
+
 def _catalog_filenames(keys: list) -> dict:
     """Injective key -> filename mapping. A naive "/" -> "_" substitution
     can collide (partition key "a/b" and a separate top-level partition
     "a_b" would both naively become "a_b.md", silently overwriting one),
     so any keys that collide under that substitution get a short stable
     hash suffix appended -- deterministic, and only paid for the
-    (uncommon) colliding keys, so the common case stays readable."""
+    (uncommon) colliding keys, so the common case stays readable.
+
+    Also caps the readable portion when the naive filename alone would
+    exceed the filesystem's per-component name limit -- an oversized
+    partition split through several long directory segments (e.g. four
+    70-character directory names) can otherwise flatten into a filename
+    long enough to make the write itself fail with OSError: File name too
+    long, independent of whether it collides with anything."""
     naive = {key: key.replace("/", "_") + ".md" for key in keys}
     by_filename: dict = defaultdict(list)
     for key, filename in naive.items():
         by_filename[filename].append(key)
     result = {}
     for filename, colliding_keys in by_filename.items():
-        if len(colliding_keys) == 1:
+        if len(colliding_keys) == 1 and len(filename) <= _MAX_CATALOG_FILENAME_CHARS:
             result[colliding_keys[0]] = filename
-        else:
-            for key in colliding_keys:
-                result[key] = f"{key.replace('/', '_')}__{stable_path_id(key, length=6)}.md"
+            continue
+        for key in colliding_keys:
+            flat = key.replace("/", "_")
+            suffix = f"__{stable_path_id(key, length=6)}.md"
+            prefix_budget = max(1, _MAX_CATALOG_FILENAME_CHARS - len(suffix))
+            result[key] = f"{flat[:prefix_budget]}{suffix}"
     return result
 
 
@@ -151,20 +166,31 @@ def _markdown_title(root: Path, rel_path: str) -> str:
     all the routing catalog previously had to go on for a .md file).
     Bounded to the first few dozen lines and a short excerpt -- this is a
     routing hint, not a summary. Returns "" if the file is unreadable, has
-    no content, or (rare) sits outside root."""
+    no content, or (rare) sits outside root.
+
+    This is content pulled directly from the file (unlike filename
+    terms), so it goes through the same redact_secrets() pass as
+    excerpts/chunks before being returned -- a markdown file that happens
+    to start with a secret-shaped line (e.g. a stray `token = "..."`)
+    must not have that value land unredacted in a routing catalog meant
+    for attachment to an LLM."""
     excerpt = _safe_excerpt(root, rel_path, 1, _MARKDOWN_TITLE_SCAN_LINES)
     if not excerpt:
         return ""
+    title = ""
     first_line = ""
     for _, text in excerpt:
         stripped = text.strip()
         if not stripped:
             continue
         if stripped.startswith("#"):
-            return stripped.lstrip("#").strip()[:_MAX_CONTENT_TITLE_CHARS]
+            title = stripped.lstrip("#").strip()[:_MAX_CONTENT_TITLE_CHARS]
+            break
         if not first_line:
             first_line = stripped
-    return first_line[:_MAX_CONTENT_TITLE_CHARS]
+    if not title:
+        title = first_line[:_MAX_CONTENT_TITLE_CHARS]
+    return redact_secrets(title) if title else ""
 
 
 def _render_file_entry(f, symbols_by_file: dict, role: str, role_evidence: str,
@@ -177,7 +203,12 @@ def _render_file_entry(f, symbols_by_file: dict, role: str, role_evidence: str,
     terms = _filename_terms(f.relative_path)
     lines.append("- Purpose clues:")
     if docstring:
-        lines.append(f"  - module docstring: {docstring}")
+        # Content-derived, unlike filename terms below -- a docstring
+        # beginning with a secret-shaped line (e.g. a stray `token = "..."`
+        # left at module scope) must go through the same redaction as
+        # excerpts/chunks before landing in a routing catalog meant for
+        # attachment to an LLM.
+        lines.append(f"  - module docstring: {redact_secrets(docstring)}")
     lines.append(f"  - filename/path terms: {terms}")
 
     top_syms = _top_level_symbols(f.relative_path, symbols_by_file)

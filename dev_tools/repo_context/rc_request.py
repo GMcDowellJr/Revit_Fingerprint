@@ -343,12 +343,20 @@ def resolve_lines(lines: list, files_by_path: dict) -> list:
 _REGEX_SEARCH_TIMEOUT_SECONDS = 5.0
 
 
-def _scan_term_matches(term: str, pattern: Optional["re.Pattern"], files_rows: list, root: Path) -> tuple:
+def _scan_term_matches(term: str, pattern: Optional["re.Pattern"], files_rows: list, root: Path,
+                        collect_cap: int) -> tuple:
     term_matches = []
     stale = 0
     for frow in files_rows:
         if frow.get("included") != "true" or frow.get("text_or_binary") == "binary":
             continue
+        if len(term_matches) >= collect_cap:
+            break
+        # A single common term (or a repetitive/generated file) can
+        # otherwise produce an unbounded number of matches before
+        # max_files or the packet budget is ever applied during Tier-2
+        # rendering -- cap collection itself, the same bound the direct
+        # `--search` path (rc_packet.py) already uses.
         if not _file_is_fresh(root, frow["relative_path"], frow.get("sha256", "")):
             stale += 1
             continue
@@ -359,6 +367,8 @@ def _scan_term_matches(term: str, pattern: Optional["re.Pattern"], files_rows: l
             hit = pattern.search(text) if pattern else (term in text)
             if hit:
                 term_matches.append((frow["relative_path"], ln, text))
+                if len(term_matches) >= collect_cap:
+                    break
     return term_matches, stale
 
 
@@ -370,12 +380,17 @@ def _raise_regex_timeout(signum, frame) -> None:
     raise _RegexSearchTimeout()
 
 
-def _scan_term_matches_bounded(term: str, pattern, files_rows: list, root: Path,
+_UNSUPPORTED_PLATFORM = "unsupported_platform"
+
+
+def _scan_term_matches_bounded(term: str, pattern, files_rows: list, root: Path, collect_cap: int,
                                 timeout: Optional[float] = None):
     """Runs _scan_term_matches with a wall-clock ceiling, to bound a
     pathological `search_as_regex` pattern's catastrophic-backtracking
     blowup (e.g. `(a+)+$` against a long, nearly-matching source line)
-    instead of hanging the CLI indefinitely. Returns None on timeout.
+    instead of hanging the CLI indefinitely. Returns None on timeout, or
+    the module-level _UNSUPPORTED_PLATFORM sentinel if this platform has
+    no way to bound the match at all.
 
     Uses SIGALRM (POSIX only) rather than a background thread: CPython's
     regex engine checks for pending signals periodically even mid-match,
@@ -388,17 +403,20 @@ def _scan_term_matches_bounded(term: str, pattern, files_rows: list, root: Path,
     itself returning at 5s).
 
     On platforms without SIGALRM (Windows), there's no safe way to
-    interrupt a C-level regex match from Python at all, so this runs
-    unbounded there -- the same behavior as before this fix, not a
-    regression, just a gap this fix doesn't close on that platform."""
+    interrupt a C-level regex match from Python at all -- silently
+    falling back to an unbounded scan there would let the exact same
+    pathological pattern hang the CLI indefinitely on that platform, so
+    this refuses the term instead (the caller reports it as rejected, not
+    resolved) rather than risking the hang this whole mechanism exists to
+    prevent."""
+    if not hasattr(signal, "SIGALRM"):
+        return _UNSUPPORTED_PLATFORM
     if timeout is None:
         timeout = _REGEX_SEARCH_TIMEOUT_SECONDS
-    if not hasattr(signal, "SIGALRM"):
-        return _scan_term_matches(term, pattern, files_rows, root)
     previous_handler = signal.signal(signal.SIGALRM, _raise_regex_timeout)
     signal.setitimer(signal.ITIMER_REAL, timeout)
     try:
-        return _scan_term_matches(term, pattern, files_rows, root)
+        return _scan_term_matches(term, pattern, files_rows, root, collect_cap)
     except _RegexSearchTimeout:
         return None
     finally:
@@ -409,7 +427,7 @@ def _scan_term_matches_bounded(term: str, pattern, files_rows: list, root: Path,
 _REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS = 30.0
 
 
-def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_rows: list) -> tuple:
+def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_rows: list, max_files: int) -> tuple:
     """Resolve each search term against the scanned repository's current
     source (same matching rule Tier 2 rendering uses). Returns
     (resolutions: list[SelectorResolution], matches_by_term: dict[str,
@@ -423,6 +441,11 @@ def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_r
     resolutions = []
     matches_by_term: dict = {}
     stale_files_skipped = 0
+    # Same collection cap the direct --search path (rc_packet.py) already
+    # uses -- a common term matching most of a large repository would
+    # otherwise accumulate an unbounded number of tuples before max_files
+    # or the packet budget is ever applied during Tier-2 rendering.
+    collect_cap = max(1, max_files) * 5
     # The per-term SIGALRM bound (_scan_term_matches_bounded) stops any one
     # pathological pattern from hanging forever, but the schema places no
     # cap on how many search_terms a request can carry -- hundreds of
@@ -450,8 +473,18 @@ def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_r
                 ))
                 matches_by_term[term] = []
                 continue
-            scanned = _scan_term_matches_bounded(term, pattern, files_rows, root,
+            scanned = _scan_term_matches_bounded(term, pattern, files_rows, root, collect_cap,
                                                   timeout=min(_REGEX_SEARCH_TIMEOUT_SECONDS, remaining))
+            if scanned == _UNSUPPORTED_PLATFORM:
+                resolutions.append(SelectorResolution(
+                    "search_term", term, "invalid",
+                    "search_as_regex rejected: this platform has no way (SIGALRM/POSIX only) to safely "
+                    "bound a pathological pattern's evaluation time, and running it unbounded risks "
+                    "hanging the CLI indefinitely. Disable search_as_regex, or use a literal search_terms "
+                    "value instead.",
+                ))
+                matches_by_term[term] = []
+                continue
             if scanned is None:
                 resolutions.append(SelectorResolution(
                     "search_term", term, "invalid",
@@ -462,7 +495,7 @@ def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_r
                 continue
             term_matches, stale = scanned
         else:
-            term_matches, stale = _scan_term_matches(term, pattern, files_rows, root)
+            term_matches, stale = _scan_term_matches(term, pattern, files_rows, root, collect_cap)
         stale_files_skipped += stale
         matches_by_term[term] = term_matches
         if term_matches:
@@ -501,10 +534,14 @@ def _render_excerpt_block(root: Path, rel_path: str, start: int, end: int, budge
         budget.omissions.append(f"`{rel_path}` excerpt unavailable (file missing or unreadable).")
         return "unavailable"
     body_lines = [f"{ln:>6}| {text}" for ln, text in excerpt]
-    body = "\n".join(body_lines)
+    # Redact *before* the budget check, not after -- redact_secrets()
+    # replaces a matched secret with a placeholder that can be longer
+    # than the original text, so checking budget.allow() against the raw
+    # body and only redacting afterward let the actually-written content
+    # end up bigger than what was verified to fit.
+    body = redact_secrets("\n".join(body_lines))
     if not budget.allow(body, len(body_lines)):
         return "too_large"
-    body = redact_secrets(body)
     out.append("```\n" + body + "\n```\n")
     budget.spend(body, len(body_lines))
     return "rendered"
@@ -691,7 +728,7 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
     symbol_resolutions = resolve_symbols(resolved.symbols, symbols_rows)
     line_resolutions = resolve_lines(resolved.lines, files_by_path)
     search_resolutions, search_matches_by_term, stale_search_files = resolve_search_terms(
-        root, resolved.search_terms, resolved.search_as_regex, files_rows,
+        root, resolved.search_terms, resolved.search_as_regex, files_rows, resolved.max_files,
     )
     all_resolutions = file_resolutions + symbol_resolutions + line_resolutions + search_resolutions
 
@@ -845,9 +882,17 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
                 f"explicit line selector `{res.requested}` does not fit: limits.max_files ({resolved.max_files}) reached"
             )
             continue
+        # Only substitute a smaller enclosing symbol when it contains
+        # *both* endpoints of the requested range -- a symbol containing
+        # just the start line (the old check) could be smaller than the
+        # actual request (e.g. lines 2-7 where line 2's enclosing function
+        # ends at line 2), silently truncating the rendered excerpt to
+        # that symbol's own bounds while the resolution report still
+        # claimed the full range was resolved.
         enclosing = [
             r for r in symbols_by_file.get(rel, [])
-            if int(r["start_line"]) <= info["start"] <= int(r["end_line"]) and r["symbol_type"] != "module"
+            if int(r["start_line"]) <= info["start"] and info["end"] <= int(r["end_line"])
+            and r["symbol_type"] != "module"
         ]
         header = _render_origin_header(f"Line selector: `{res.requested}`", ["explicit_line_selector"])
         if not _spend_header(header):
@@ -856,8 +901,18 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         if enclosing:
             enclosing.sort(key=lambda r: int(r["end_line"]) - int(r["start_line"]))
             row = enclosing[0]
-            out.append(f"Enclosing symbol: `{row['qualified_name']}` ({row['symbol_type']}, "
-                       f"lines {row['start_line']}-{row['end_line']})\n")
+            enclosing_line = (f"Enclosing symbol: `{row['qualified_name']}` ({row['symbol_type']}, "
+                               f"lines {row['start_line']}-{row['end_line']})\n")
+            # Metadata, not the mandatory excerpt itself -- budgeted like
+            # every other optional line, with a non-fatal skip if it
+            # doesn't fit rather than silently rendering it unbudgeted.
+            if budget.allow(enclosing_line, 1):
+                out.append(enclosing_line)
+                budget.spend(enclosing_line, 1)
+            else:
+                budget.omissions.append(
+                    f"Enclosing-symbol note for `{res.requested}` omitted (packet size limit reached)."
+                )
             status = _render_excerpt_block(root, rel, int(row["start_line"]), int(row["end_line"]), budget, out,
                                             files_by_path.get(rel, {}).get("sha256", ""))
         else:
@@ -1024,6 +1079,14 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         f"- Limits: max_estimated_tokens={resolved.max_estimated_tokens}, max_files={resolved.max_files}, "
         f"max_hops={resolved.max_hops}"
     )
+    # This fixed framing (title/root/question/provenance/limits) always
+    # renders in full -- it's essential provenance, not optional content
+    # -- but it must still be *charged* against the budget so "Estimated
+    # tokens used" reflects the packet's true size. A `question` up to
+    # MAX_QUESTION_LENGTH (4000 chars) alone could otherwise make the
+    # actual packet many times larger than limits.max_estimated_tokens
+    # while the sidecar reported a number near zero.
+    budget.spend("\n".join(header_lines) + "\n", len(header_lines))
 
     # The resolution report scales with the *request*, not the source
     # repository (a request naming hundreds of missing/ambiguous
@@ -1051,15 +1114,21 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             budget.spend(note, 1)
     resolution_lines.append("")
 
-    # Computed last so it reflects the resolution report's own budget spend too.
+    # Same fixed-framing reasoning as the header above -- always rendered
+    # in full, but charged first so it's reflected in "Estimated tokens
+    # used" below rather than silently riding along uncounted.
+    footer = ("\n_Static analysis only. Call/import relationships above are candidates, not proof of runtime "
+              "dispatch. See README.md in this output directory for full limitations._\n")
+    budget.spend(footer, 1)
+
+    # Computed last so it reflects the resolution report's and footer's own budget spend too.
     header_lines.append(
         f"- Estimated tokens used: ~{round(budget.chars_used / 4)} "
         f"(chars_used={budget.chars_used}/{budget.max_characters})\n"
     )
     header_lines.extend(resolution_lines)
 
-    out.append("\n_Static analysis only. Call/import relationships above are candidates, not proof of runtime "
-                "dispatch. See README.md in this output directory for full limitations._\n")
+    out.append(footer)
 
     text = "\n".join(header_lines) + "\n".join(out) + "\n"
 

@@ -1,9 +1,9 @@
 # Routing catalog: `dev_tools`
 
-- Generated (UTC): 2026-08-22T06:29:19Z
+- Generated (UTC): 2026-08-22T09:43:57Z
 - Tool version: 0.1.0
 - Files covered: 25
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `1a8118aafe131653aeb6cfb4b3581c274df5d273515d881170a12c2228fc9f32`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `94310d041f90ec48ba6ef544a42a845b19867e612e4ad83f7340fc6a16c10e12`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/rc_chunking.py`
@@ -90,16 +90,16 @@
   - module docstring: Lightweight, deterministic discovery: natural-language question ->
   - filename/path terms: rc discover
 - Important symbols (2 total):
-  - `_terms` (function) — line 28
-  - `run_discover` (function) — line 50
+  - `_terms` (function) — line 29
+  - `run_discover` (function) — line 51
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
-  - `run_discover (dev_tools/repo_context/rc_discover.py:64)`
+  - `run_discover (dev_tools/repo_context/rc_discover.py:65)`
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`c77a1c62e974d2c8…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_discover.py`)
+- Retrieval identity: sha256=`bd8a84e48c5b7790…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_discover.py`)
 
 ### `dev_tools/repo_context/rc_graphify.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
@@ -108,7 +108,7 @@
   - filename/path terms: rc graphify
 - Important symbols (2 total):
   - `load_graphify_communities` (function) — line 20
-  - `format_communities` (function) — line 115
+  - `format_communities` (function) — line 126
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
@@ -116,7 +116,7 @@
   - (none resolved statically; see python_calls.csv)
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`eba03a4bbe27703d…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_graphify.py`)
+- Retrieval identity: sha256=`0220d396b2b75d19…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_graphify.py`)
 
 ### `dev_tools/repo_context/rc_manifest.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
@@ -271,38 +271,38 @@
   - `resolve_symbols` (function) — line 295
   - `resolve_lines` (function) — line 320
   - `_scan_term_matches` (function) — line 346
-  - `_RegexSearchTimeout` (class) — line 365
-  - `_raise_regex_timeout` (function) — line 369
-  - `_scan_term_matches_bounded` (function) — line 373
-  - `resolve_search_terms` (function) — line 412
-  - `_render_origin_header` (function) — line 478
-  - `_render_excerpt_block` (function) — line 482
-  - `_symbol_expansion` (function) — line 513
-  - `generate_packet_from_request` (function) — line 662
-  - `_res_to_dict` (function) — line 1088
+  - `_RegexSearchTimeout` (class) — line 375
+  - `_raise_regex_timeout` (function) — line 379
+  - `_scan_term_matches_bounded` (function) — line 386
+  - `resolve_search_terms` (function) — line 430
+  - `_render_origin_header` (function) — line 511
+  - `_render_excerpt_block` (function) — line 515
+  - `_symbol_expansion` (function) — line 550
+  - `generate_packet_from_request` (function) — line 699
+  - `_res_to_dict` (function) — line 1157
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
-  - `_raise_regex_timeout (dev_tools/repo_context/rc_request.py:370)`
-  - `_scan_term_matches_bounded (dev_tools/repo_context/rc_request.py:397)`
-  - `_scan_term_matches_bounded (dev_tools/repo_context/rc_request.py:401)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:1070)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:677)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:690)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:691)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:692)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:693)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:701)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:778)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:791)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:822)`
+  - `_raise_regex_timeout (dev_tools/repo_context/rc_request.py:380)`
+  - `_scan_term_matches_bounded (dev_tools/repo_context/rc_request.py:419)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:1139)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:714)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:727)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:728)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:729)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:730)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:738)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:815)`
   - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:828)`
-  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:852)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:859)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:865)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:897)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:916)`
   - ... and 27 more (see python_calls.csv)
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`9afae857c0fde058…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_request.py`)
+- Retrieval identity: sha256=`50a7a8ece86c108e…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_request.py`)
 
 ### `dev_tools/repo_context/rc_routing.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
@@ -310,37 +310,37 @@
   - module docstring: Hierarchical routing-catalog generation.
   - filename/path terms: rc routing
 - Important symbols (11 total):
-  - `RoutingOptions` (class) — line 36
-  - `_sort_key` (function) — line 45
-  - `_partition_files` (function) — line 49
-  - `_catalog_filenames` (function) — line 102
-  - `_top_level_symbols` (function) — line 123
-  - `_module_docstring` (function) — line 129
-  - `_filename_terms` (function) — line 136
-  - `_markdown_title` (function) — line 146
-  - `_render_file_entry` (function) — line 170
-  - `generate_routing` (function) — line 228
-  - `_render_index` (function) — line 509
+  - `RoutingOptions` (class) — line 37
+  - `_sort_key` (function) — line 46
+  - `_partition_files` (function) — line 50
+  - `_catalog_filenames` (function) — line 107
+  - `_top_level_symbols` (function) — line 138
+  - `_module_docstring` (function) — line 144
+  - `_filename_terms` (function) — line 151
+  - `_markdown_title` (function) — line 161
+  - `_render_file_entry` (function) — line 196
+  - `generate_routing` (function) — line 259
+  - `_render_index` (function) — line 540
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
-  - `_render_file_entry (dev_tools/repo_context/rc_routing.py:176)`
-  - `_render_file_entry (dev_tools/repo_context/rc_routing.py:177)`
-  - `_render_file_entry (dev_tools/repo_context/rc_routing.py:183)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:301)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:309)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:313)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:316)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:320)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:357)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:359)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:374)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:468)`
-  - `generate_routing (dev_tools/repo_context/rc_routing.py:484)`
+  - `_render_file_entry (dev_tools/repo_context/rc_routing.py:202)`
+  - `_render_file_entry (dev_tools/repo_context/rc_routing.py:203)`
+  - `_render_file_entry (dev_tools/repo_context/rc_routing.py:214)`
+  - `generate_routing (dev_tools/repo_context/rc_routing.py:332)`
+  - `generate_routing (dev_tools/repo_context/rc_routing.py:340)`
+  - `generate_routing (dev_tools/repo_context/rc_routing.py:344)`
+  - `generate_routing (dev_tools/repo_context/rc_routing.py:347)`
+  - `generate_routing (dev_tools/repo_context/rc_routing.py:351)`
+  - `generate_routing (dev_tools/repo_context/rc_routing.py:388)`
+  - `generate_routing (dev_tools/repo_context/rc_routing.py:390)`
+  - `generate_routing (dev_tools/repo_context/rc_routing.py:405)`
+  - `generate_routing (dev_tools/repo_context/rc_routing.py:499)`
+  - `generate_routing (dev_tools/repo_context/rc_routing.py:515)`
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`8a054ebae93c80a6…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_routing.py`)
+- Retrieval identity: sha256=`1ea94b1923cbc2d9…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_routing.py`)
 
 ### `dev_tools/repo_context/rc_scan.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')

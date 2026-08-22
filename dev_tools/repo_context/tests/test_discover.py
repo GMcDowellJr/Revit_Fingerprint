@@ -1,6 +1,7 @@
 import json
 
-from conftest import run_tool, write_files
+from conftest import run_tool, write_files  # noqa: F401 -- conftest import also puts TOOL_DIR on sys.path
+import rc_request as rr
 
 
 def _scan(repo, out):
@@ -110,6 +111,30 @@ def test_discover_stopword_only_question_writes_no_draft(repo, out):
     report_text = report_path.read_text(encoding="utf-8")
     assert "No draft" in report_text
     assert "packet --request" in report_text
+
+
+def test_discover_draft_question_is_truncated_to_max_question_length(repo, out):
+    # Regression: packet --request's own validation rejects a `question`
+    # over MAX_QUESTION_LENGTH (4000 chars), but a successful `discover`
+    # run copied the raw (potentially much longer) question verbatim into
+    # the draft, handing off an immediately-unusable artifact -- a
+    # successful discovery run must not end in a request that's own
+    # documented next step outright rejects.
+    write_files(repo, {"core/widget.py": "def widget():\n    return 1\n"})
+    _scan(repo, out)
+    long_question = "widget " * 700  # ~4900 chars, over MAX_QUESTION_LENGTH
+    result = run_tool([
+        "discover", str(repo), "--output", str(out), "--question", long_question,
+    ])
+    assert result.returncode == 0, result.stderr
+    [request_path] = list((out / "packets").glob("discover_*.packet_request.json"))
+    draft = json.loads(request_path.read_text(encoding="utf-8"))
+    assert len(draft["question"]) <= rr.MAX_QUESTION_LENGTH
+
+    # And the resulting draft must actually pass packet --request's own
+    # validation, not just fit the length check in isolation.
+    result2 = run_tool(["packet", str(repo), "--output", str(out), "--request", str(request_path)])
+    assert result2.returncode == 0, result2.stderr
 
 
 def test_discover_draft_symbol_selectors_include_the_resolved_file(repo, out):

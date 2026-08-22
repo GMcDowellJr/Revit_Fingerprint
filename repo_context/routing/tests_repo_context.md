@@ -1,9 +1,9 @@
 # Routing catalog: `tests/repo_context`
 
-- Generated (UTC): 2026-08-22T06:29:19Z
+- Generated (UTC): 2026-08-22T09:43:57Z
 - Tool version: 0.1.0
 - Files covered: 15
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `a9f3c9f604fed56ac244569b388c0e2bc248d8c392e5052f1587dfbdecda1ab7`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `2e6e79ef08c2ea1b1258bcf51b746f914e381ba16504a03a5b059cc9130d27f5`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/tests/conftest.py`
@@ -76,27 +76,29 @@
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
 - Purpose clues:
   - filename/path terms: test discover
-- Important symbols (7 total):
-  - `_scan` (function) — line 6
-  - `test_discover_groups_matches_by_channel_and_writes_draft_request` (function) — line 11
-  - `test_discover_output_feeds_directly_into_packet_request` (function) — line 47
-  - `test_discover_preserves_case_of_mixed_case_identifiers` (function) — line 66
-  - `test_discover_stopword_only_question_writes_no_draft` (function) — line 95
-  - `test_discover_draft_symbol_selectors_include_the_resolved_file` (function) — line 115
-  - `test_discover_max_per_channel_truncates_with_count` (function) — line 150
+- Important symbols (8 total):
+  - `_scan` (function) — line 7
+  - `test_discover_groups_matches_by_channel_and_writes_draft_request` (function) — line 12
+  - `test_discover_output_feeds_directly_into_packet_request` (function) — line 48
+  - `test_discover_preserves_case_of_mixed_case_identifiers` (function) — line 67
+  - `test_discover_stopword_only_question_writes_no_draft` (function) — line 96
+  - `test_discover_draft_question_is_truncated_to_max_question_length` (function) — line 116
+  - `test_discover_draft_symbol_selectors_include_the_resolved_file` (function) — line 140
+  - `test_discover_max_per_channel_truncates_with_count` (function) — line 175
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
-  - `test_discover_draft_symbol_selectors_include_the_resolved_file (dev_tools/repo_context/tests/test_discover.py:127)`
-  - `test_discover_groups_matches_by_channel_and_writes_draft_request (dev_tools/repo_context/tests/test_discover.py:18)`
-  - `test_discover_max_per_channel_truncates_with_count (dev_tools/repo_context/tests/test_discover.py:153)`
-  - `test_discover_output_feeds_directly_into_packet_request (dev_tools/repo_context/tests/test_discover.py:54)`
-  - `test_discover_preserves_case_of_mixed_case_identifiers (dev_tools/repo_context/tests/test_discover.py:76)`
-  - `test_discover_stopword_only_question_writes_no_draft (dev_tools/repo_context/tests/test_discover.py:103)`
+  - `test_discover_draft_question_is_truncated_to_max_question_length (dev_tools/repo_context/tests/test_discover.py:124)`
+  - `test_discover_draft_symbol_selectors_include_the_resolved_file (dev_tools/repo_context/tests/test_discover.py:152)`
+  - `test_discover_groups_matches_by_channel_and_writes_draft_request (dev_tools/repo_context/tests/test_discover.py:19)`
+  - `test_discover_max_per_channel_truncates_with_count (dev_tools/repo_context/tests/test_discover.py:178)`
+  - `test_discover_output_feeds_directly_into_packet_request (dev_tools/repo_context/tests/test_discover.py:55)`
+  - `test_discover_preserves_case_of_mixed_case_identifiers (dev_tools/repo_context/tests/test_discover.py:77)`
+  - `test_discover_stopword_only_question_writes_no_draft (dev_tools/repo_context/tests/test_discover.py:104)`
 - Related tests:
   - `dev_tools/repo_context/tests/test_discover.py`
-- Retrieval identity: sha256=`7318f5d5e50995ac…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_discover.py`)
+- Retrieval identity: sha256=`f968e0b34543672a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_discover.py`)
 
 ### `dev_tools/repo_context/tests/test_imports_and_calls.py`
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
@@ -195,7 +197,7 @@
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
 - Purpose clues:
   - filename/path terms: test packet from request
-- Important symbols (40 total):
+- Important symbols (46 total):
   - `_scan` (function) — line 8
   - `_request` (function) — line 13
   - `_packet` (function) — line 19
@@ -214,37 +216,37 @@
   - `test_path_traversal_selector_is_rejected` (function) — line 270
   - `test_search_term_matches_and_related_tests_are_included` (function) — line 282
   - `test_line_selector_resolves_enclosing_symbol` (function) — line 300
-  - `test_stale_source_since_scan_withholds_excerpt` (function) — line 314
-  - `test_resolution_sidecar_json_is_written` (function) — line 329
-  - `test_whole_file_symbol_listing_is_charged_against_budget` (function) — line 344
-  - `test_file_inventories_deferred_until_every_explicit_file_renders` (function) — line 373
-  - `test_explicit_file_excerpt_renders_before_optional_symbol_inventory` (function) — line 432
-  - `test_search_terms_share_a_single_global_max_files_cap` (function) — line 490
-  - `test_invalid_regex_notices_are_charged_against_budget` (function) — line 513
-  - ... and 15 more (see python_symbols.csv)
+  - `test_line_range_extending_past_enclosing_symbol_renders_in_full` (function) — line 314
+  - `test_enclosing_symbol_note_is_charged_against_budget` (function) — line 347
+  - `test_search_match_collection_is_capped` (function) — line 366
+  - `test_redacted_excerpt_is_charged_not_the_raw_source` (function) — line 381
+  - `test_regex_search_rejected_when_bounding_is_unsupported` (function) — line 425
+  - `test_packet_header_and_footer_charged_against_budget` (function) — line 442
+  - `test_stale_source_since_scan_withholds_excerpt` (function) — line 470
+  - ... and 21 more (see python_symbols.csv)
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
-  - `test_aggregate_regex_search_time_is_capped_across_all_terms (dev_tools/repo_context/tests/test_packet_from_request.py:576)`
+  - `test_aggregate_regex_search_time_is_capped_across_all_terms (dev_tools/repo_context/tests/test_packet_from_request.py:732)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:48)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:49)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:53)`
-  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:704)`
-  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:705)`
-  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:712)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:777)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:778)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:784)`
+  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:860)`
+  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:861)`
+  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:868)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:933)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:934)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:940)`
   - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:200)`
   - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:201)`
   - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:206)`
-  - `test_expansion_never_preempts_a_later_explicit_selector (dev_tools/repo_context/tests/test_packet_from_request.py:136)`
-  - `test_expansion_never_preempts_a_later_explicit_selector (dev_tools/repo_context/tests/test_packet_from_request.py:139)`
-  - ... and 101 more (see python_calls.csv)
+  - `test_enclosing_symbol_note_is_charged_against_budget (dev_tools/repo_context/tests/test_packet_from_request.py:353)`
+  - `test_enclosing_symbol_note_is_charged_against_budget (dev_tools/repo_context/tests/test_packet_from_request.py:354)`
+  - ... and 117 more (see python_calls.csv)
 - Related tests:
   - `dev_tools/repo_context/tests/test_packet_from_request.py`
-- Retrieval identity: sha256=`aabbe8ebb777987d…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_packet_from_request.py`)
+- Retrieval identity: sha256=`df517eeb144275c2…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_packet_from_request.py`)
 
 ### `dev_tools/repo_context/tests/test_packets.py`
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))

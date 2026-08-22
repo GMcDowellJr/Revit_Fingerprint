@@ -1,6 +1,6 @@
 # Routing catalog: `docs`
 
-- Generated (UTC): 2026-08-22T06:29:19Z
+- Generated (UTC): 2026-08-22T09:43:57Z
 - Tool version: 0.1.0
 - Files covered: 41
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `23143e64227d3a38a1b130c94aa40d7077e977ca975b11549be445757fb3a545`

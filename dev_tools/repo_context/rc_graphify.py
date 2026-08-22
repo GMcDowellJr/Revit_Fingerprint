@@ -104,9 +104,20 @@ def load_graphify_communities(root: Path, current_commit: Optional[str],
             continue
         source_file = node.get("source_file")
         community = node.get("community")
-        if not source_file or community is None:
+        if not isinstance(source_file, str) or not source_file or community is None:
             continue
-        name = node.get("community_name") or ""
+        # community/community_name must be hashable (for the set below)
+        # and mutually comparable (for the sorted() call afterward) -- a
+        # malformed graph.json (e.g. "community": []) would otherwise
+        # crash the whole scan with TypeError: unhashable type, over one
+        # optional artifact. Normalizing to a string is hashable/orderable
+        # for any JSON value and renders identically to a plain int/str in
+        # the f-strings that display it (format_communities).
+        if not isinstance(community, (str, int)):
+            community = str(community)
+        name = node.get("community_name")
+        if not isinstance(name, str):
+            name = str(name) if name is not None else ""
         by_file.setdefault(source_file, set()).add((community, name))
 
     return {k: sorted(v) for k, v in by_file.items()}, []

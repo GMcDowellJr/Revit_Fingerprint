@@ -1,6 +1,6 @@
 # Routing catalog: `tools/compare_templates_stand-alone`
 
-- Generated (UTC): 2026-08-22T06:29:19Z
+- Generated (UTC): 2026-08-22T09:43:57Z
 - Tool version: 0.1.0
 - Files covered: 2
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `8f0edbcd1530934fbe09b667ad93747ea5ae50be36ff5785ffa37546c59df6c8`
