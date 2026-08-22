@@ -20,7 +20,7 @@ from typing import Optional
 
 import rc_classify
 import rc_graphify
-from rc_common import TOOL_VERSION, atomic_write_text, get_git_info, sha256_text
+from rc_common import TOOL_VERSION, atomic_write_text, get_git_info, sha256_text, stable_path_id
 
 DEFAULT_MAX_FILES_PER_CATALOG = 60
 DEFAULT_MAX_CATALOG_CHARS = 24_000
@@ -96,8 +96,25 @@ def _partition_files(files_with_role: list, max_files: int) -> dict:
     return final
 
 
-def _catalog_filename(key: str) -> str:
-    return key.replace("/", "_") + ".md"
+def _catalog_filenames(keys: list) -> dict:
+    """Injective key -> filename mapping. A naive "/" -> "_" substitution
+    can collide (partition key "a/b" and a separate top-level partition
+    "a_b" would both naively become "a_b.md", silently overwriting one),
+    so any keys that collide under that substitution get a short stable
+    hash suffix appended -- deterministic, and only paid for the
+    (uncommon) colliding keys, so the common case stays readable."""
+    naive = {key: key.replace("/", "_") + ".md" for key in keys}
+    by_filename: dict = defaultdict(list)
+    for key, filename in naive.items():
+        by_filename[filename].append(key)
+    result = {}
+    for filename, colliding_keys in by_filename.items():
+        if len(colliding_keys) == 1:
+            result[colliding_keys[0]] = filename
+        else:
+            for key in colliding_keys:
+                result[key] = f"{key.replace('/', '_')}__{stable_path_id(key, length=6)}.md"
+    return result
 
 
 def _top_level_symbols(rel_path: str, symbols_by_file: dict) -> list:
@@ -264,10 +281,12 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
         "\n".join(f"{f.relative_path}:{f.sha256}" for f in sorted(included, key=lambda f: _sort_key(f.relative_path)))
     )
 
+    filenames_by_key = _catalog_filenames(list(partitions.keys()))
+
     catalog_entries = []  # for index.md, in key-sorted order
     for key in sorted(partitions):
         cat_files = sorted(partitions[key], key=lambda f: _sort_key(f.relative_path))
-        filename = _catalog_filename(key)
+        filename = filenames_by_key[key]
         cat_hash = sha256_text(
             "\n".join(f"{f.relative_path}:{f.sha256}" for f in cat_files)
         )

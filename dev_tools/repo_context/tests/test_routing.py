@@ -173,6 +173,40 @@ def test_no_routing_removes_stale_routing_from_earlier_scan(repo, out):
     assert not (out / "routing").exists()
 
 
+def test_catalog_filenames_do_not_collide_across_partition_keys(repo, out):
+    # Regression: a naive "/" -> "_" filename substitution can make a
+    # nested partition key ("a/b") collide with an unrelated top-level
+    # partition ("a_b") -- both naively become "a_b.md", so one
+    # catalog's content silently overwrote the other's file on disk even
+    # though the routing manifest still listed both.
+    write_files(repo, {
+        "a/b/x1.py": "def x1():\n    return 1\n",
+        "a/b/x2.py": "def x2():\n    return 2\n",
+        "a/b/x3.py": "def x3():\n    return 3\n",
+        "a_b/y1.py": "def y1():\n    return 4\n",
+    })
+    _scan(repo, out, ["--routing-max-files-per-catalog", "2"])
+    manifest = _manifest(out)
+
+    keys = [c["key"] for c in manifest["catalogs"]]
+    assert "a/b" in keys
+    assert "a_b" in keys
+
+    paths = [c["path"] for c in manifest["catalogs"]]
+    assert len(paths) == len(set(paths)), f"duplicate catalog filenames: {paths}"
+
+    a_b_nested = next(c for c in manifest["catalogs"] if c["key"] == "a/b")
+    a_b_top = next(c for c in manifest["catalogs"] if c["key"] == "a_b")
+    assert a_b_nested["path"] != a_b_top["path"]
+
+    nested_text = (out / a_b_nested["path"]).read_text(encoding="utf-8")
+    top_text = (out / a_b_top["path"]).read_text(encoding="utf-8")
+    assert "a/b/x1.py" in nested_text
+    assert "a_b/y1.py" in top_text
+    assert "a_b/y1.py" not in nested_text
+    assert "a/b/x1.py" not in top_text
+
+
 def test_purpose_clues_are_traceable_to_deterministic_evidence(repo, out):
     write_files(repo, {"core/thing.py": '"""Widget factory helpers."""\n\ndef make_widget():\n    return 1\n'})
     _scan(repo, out)

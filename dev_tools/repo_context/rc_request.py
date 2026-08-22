@@ -326,6 +326,50 @@ def resolve_lines(lines: list, files_by_path: dict) -> list:
     return out
 
 
+def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_rows: list) -> tuple:
+    """Resolve each search term against the scanned repository's current
+    source (same matching rule Tier 2 rendering uses). Returns
+    (resolutions: list[SelectorResolution], matches_by_term: dict[str,
+    list[(rel_path, line, text)]], stale_files_skipped: int).
+
+    Done up front (before the strict-mode gate) so an invalid regex or a
+    zero-match term is visible to strict mode exactly like a missing file
+    or ambiguous symbol -- search terms were previously invisible to
+    `all_resolutions` entirely, so strict mode could not catch them.
+    """
+    resolutions = []
+    matches_by_term: dict = {}
+    stale_files_skipped = 0
+    for term in terms:
+        try:
+            pattern = re.compile(term) if search_as_regex else None
+        except re.error as exc:
+            resolutions.append(SelectorResolution("search_term", term, "invalid", f"not a valid regex: {exc}"))
+            matches_by_term[term] = []
+            continue
+        term_matches = []
+        for frow in files_rows:
+            if frow.get("included") != "true" or frow.get("text_or_binary") == "binary":
+                continue
+            if not _file_is_fresh(root, frow["relative_path"], frow.get("sha256", "")):
+                stale_files_skipped += 1
+                continue
+            excerpt = _safe_excerpt(root, frow["relative_path"], 1, 10_000_000)
+            if excerpt is None:
+                continue
+            for ln, text in excerpt:
+                hit = pattern.search(text) if pattern else (term in text)
+                if hit:
+                    term_matches.append((frow["relative_path"], ln, text))
+        matches_by_term[term] = term_matches
+        if term_matches:
+            resolutions.append(SelectorResolution("search_term", term, "resolved",
+                                                    f"{len(term_matches)} match(es) found"))
+        else:
+            resolutions.append(SelectorResolution("search_term", term, "missing", "no matches found"))
+    return resolutions, matches_by_term, stale_files_skipped
+
+
 # --- Rendering ------------------------------------------------------------
 
 def _render_origin_header(title: str, origins: list) -> str:
@@ -492,7 +536,10 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
     file_resolutions = resolve_files(resolved.files, files_by_path)
     symbol_resolutions = resolve_symbols(resolved.symbols, symbols_rows)
     line_resolutions = resolve_lines(resolved.lines, files_by_path)
-    all_resolutions = file_resolutions + symbol_resolutions + line_resolutions
+    search_resolutions, search_matches_by_term, stale_search_files = resolve_search_terms(
+        root, resolved.search_terms, resolved.search_as_regex, files_rows,
+    )
+    all_resolutions = file_resolutions + symbol_resolutions + line_resolutions + search_resolutions
 
     unresolved_explicit = [r for r in all_resolutions if r.status != "resolved"]
     if resolved.strict and unresolved_explicit:
@@ -535,7 +582,15 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             continue
         rel = res.requested
         if not note_focus_file(rel):
-            budget.omissions.append(f"`{rel}` omitted: limits.max_files ({resolved.max_files}) reached.")
+            # This is an *explicit* selector -- limits.max_files being too
+            # small to fit every distinct file the request named is the
+            # same category of hard conflict as a token-budget overflow,
+            # not something to quietly omit (which would otherwise leave
+            # the resolution report claiming "resolved" for content that
+            # was never actually rendered).
+            explicit_conflicts.append(
+                f"explicit file selector `{rel}` does not fit: limits.max_files ({resolved.max_files}) reached"
+            )
             continue
         row = res.resolved_rows[0]
         out.append(_render_origin_header(f"File: `{rel}`", ["explicit_file_selector"]))
@@ -581,7 +636,10 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         row = res.resolved_rows[0]
         rel = row["relative_path"]
         if not note_focus_file(rel):
-            budget.omissions.append(f"`{row['qualified_name']}` omitted: limits.max_files ({resolved.max_files}) reached.")
+            explicit_conflicts.append(
+                f"explicit symbol selector `{row['qualified_name']}` in `{rel}` does not fit: "
+                f"limits.max_files ({resolved.max_files}) reached"
+            )
             continue
         out.append(_render_origin_header(f"Symbol: `{row['qualified_name']}` — `{rel}`", ["explicit_symbol_selector"]))
         status = _render_excerpt_block(root, rel, int(row["start_line"]), int(row["end_line"]), budget, out,
@@ -597,7 +655,9 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         info = res.resolved_rows[0]
         rel = info["file"]
         if not note_focus_file(rel):
-            budget.omissions.append(f"`{res.requested}` omitted: limits.max_files ({resolved.max_files}) reached.")
+            explicit_conflicts.append(
+                f"explicit line selector `{res.requested}` does not fit: limits.max_files ({resolved.max_files}) reached"
+            )
             continue
         enclosing = [
             r for r in symbols_by_file.get(rel, [])
@@ -618,36 +678,26 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             explicit_conflicts.append(f"explicit line selector `{res.requested}` does not fit")
 
     if explicit_conflicts:
-        # An explicit selection itself didn't fit -- per contract this is a
-        # hard conflict, not something to truncate silently.
+        # An explicit selection itself didn't fit -- either the token
+        # budget or limits.max_files -- per contract this is a hard
+        # conflict, not something to truncate silently.
         return None, [_res_to_dict(r) for r in all_resolutions], (
             "the requested explicit selector(s) do not fit within limits.max_estimated_tokens "
-            f"({resolved.max_estimated_tokens}); increase the budget or narrow the request. Conflicts:\n"
+            f"({resolved.max_estimated_tokens}) / limits.max_files ({resolved.max_files}); increase the "
+            f"relevant limit or narrow the request. Conflicts:\n"
             + "\n".join(f"  - {o}" for o in explicit_conflicts)
         )
 
     # --- Tier 2: exact search-term matches ---
-    stale_search_files = 0
+    # Matches were already computed by resolve_search_terms() above (before
+    # the strict-mode gate) -- reused here rather than re-scanning the
+    # repository a second time.
     for term in resolved.search_terms:
-        matches = []
-        try:
-            pattern = re.compile(term) if resolved.search_as_regex else None
-        except re.error as exc:
-            out.append(f"\n_Search term `{term}` is not a valid regex: {exc}; skipped._\n")
+        matches = search_matches_by_term.get(term, [])
+        term_status = next((r.status for r in search_resolutions if r.requested == term), None)
+        if term_status == "invalid":
+            out.append(f"\n_Search term `{term}` is not a valid regex; skipped._\n")
             continue
-        for frow in files_rows:
-            if frow.get("included") != "true" or frow.get("text_or_binary") == "binary":
-                continue
-            if not _file_is_fresh(root, frow["relative_path"], frow.get("sha256", "")):
-                stale_search_files += 1
-                continue
-            excerpt = _safe_excerpt(root, frow["relative_path"], 1, 10_000_000)
-            if excerpt is None:
-                continue
-            for ln, text in excerpt:
-                hit = pattern.search(text) if pattern else (term in text)
-                if hit:
-                    matches.append((frow["relative_path"], ln, text))
         header = f"\n### Search: `{term}` ({len(matches)} match(es))\n_Included because: exact_search_match._\n"
         if not budget.allow(header, 1):
             budget.omissions.append(f"Search results for `{term}` omitted entirely (packet size limit reached).")

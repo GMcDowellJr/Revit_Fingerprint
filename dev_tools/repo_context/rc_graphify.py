@@ -40,17 +40,32 @@ def load_graphify_communities(root: Path, current_commit: Optional[str],
         return {}, [f"graphify-out/graph.json could not be read/parsed ({exc}); Graphify routing evidence omitted."]
 
     built_at_commit = data.get("built_at_commit")
-    if current_commit and built_at_commit and built_at_commit != current_commit and not allow_stale:
-        return {}, [
-            f"graphify-out/graph.json was built at commit {built_at_commit[:12]}, which does not match "
-            f"the current scan's HEAD commit {current_commit[:12]}; Graphify-derived routing/expansion "
-            f"evidence omitted by default (revision alignment could not be proven)."
-        ]
     if not built_at_commit:
         return {}, [
             "graphify-out/graph.json has no built_at_commit field; revision alignment cannot be proven, "
             "so Graphify-derived routing/expansion evidence is omitted by default."
         ]
+    if not allow_stale:
+        # Revision alignment can only be *proven* when both the scanned
+        # repository's current commit and the graph's built_at_commit are
+        # known and equal -- if current_commit is unknown (e.g. scanning a
+        # folder that isn't a git repo), that is exactly the "cannot be
+        # proven" case, not a free pass. A prior version treated a missing
+        # current_commit as vacuously compatible, which would accept a
+        # copied/stale graph against a non-git checkout with no way to
+        # verify it.
+        if not current_commit:
+            return {}, [
+                "the scanned repository's current commit could not be determined (not a git repository, "
+                "or git is unavailable); Graphify revision alignment cannot be proven, so Graphify-derived "
+                "routing/expansion evidence is omitted by default."
+            ]
+        if built_at_commit != current_commit:
+            return {}, [
+                f"graphify-out/graph.json was built at commit {built_at_commit[:12]}, which does not match "
+                f"the current scan's HEAD commit {current_commit[:12]}; Graphify-derived routing/expansion "
+                f"evidence omitted by default (revision alignment could not be proven)."
+            ]
 
     by_file: dict = {}
     for node in data.get("nodes", []) or []:
