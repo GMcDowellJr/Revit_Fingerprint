@@ -1,9 +1,9 @@
 # Routing catalog: `dev_tools`
 
-- Generated (UTC): 2026-08-22T09:56:48Z
+- Generated (UTC): 2026-08-22T10:06:55Z
 - Tool version: 0.1.0
 - Files covered: 25
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `fb1e9474469aab2f0bdc502495581181017b8eefa11659a0b47de7c9a3fd602d`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `e0ebad3cfd9bb40dced95f500577c61dbd05edb3889467ce96dc3d6500a4e59d`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/rc_chunking.py`
@@ -99,7 +99,7 @@
   - `run_discover (dev_tools/repo_context/rc_discover.py:65)`
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`bd8a84e48c5b7790…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_discover.py`)
+- Retrieval identity: sha256=`8b8728dd73310e93…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_discover.py`)
 
 ### `dev_tools/repo_context/rc_graphify.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
@@ -108,7 +108,7 @@
   - filename/path terms: rc graphify
 - Important symbols (2 total):
   - `load_graphify_communities` (function) — line 20
-  - `format_communities` (function) — line 126
+  - `format_communities` (function) — line 131
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
@@ -116,7 +116,7 @@
   - (none resolved statically; see python_calls.csv)
 - Related tests:
   - (none found via resolved imports/calls)
-- Retrieval identity: sha256=`0220d396b2b75d19…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_graphify.py`)
+- Retrieval identity: sha256=`c5c308020aa78202…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_graphify.py`)
 
 ### `dev_tools/repo_context/rc_manifest.py`
 - Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')

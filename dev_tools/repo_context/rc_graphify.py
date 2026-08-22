@@ -110,11 +110,16 @@ def load_graphify_communities(root: Path, current_commit: Optional[str],
         # and mutually comparable (for the sorted() call afterward) -- a
         # malformed graph.json (e.g. "community": []) would otherwise
         # crash the whole scan with TypeError: unhashable type, over one
-        # optional artifact. Normalizing to a string is hashable/orderable
-        # for any JSON value and renders identically to a plain int/str in
-        # the f-strings that display it (format_communities).
-        if not isinstance(community, (str, int)):
-            community = str(community)
+        # optional artifact. Always normalizing to a string (not just
+        # when the value isn't already str/int) matters because a single
+        # source_file can appear in multiple nodes -- leaving a legitimate
+        # int community (e.g. 1) and a legitimate str community (e.g.
+        # "2") both as-is would still crash sorted() on that file's tuple
+        # set (int and str aren't mutually comparable) even though neither
+        # node was individually malformed. A string renders identically to
+        # a plain int/str in the f-strings that display it
+        # (format_communities).
+        community = str(community)
         name = node.get("community_name")
         if not isinstance(name, str):
             name = str(name) if name is not None else ""

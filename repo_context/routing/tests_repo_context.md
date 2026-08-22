@@ -1,9 +1,9 @@
 # Routing catalog: `tests/repo_context`
 
-- Generated (UTC): 2026-08-22T09:56:48Z
+- Generated (UTC): 2026-08-22T10:06:55Z
 - Tool version: 0.1.0
 - Files covered: 15
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `d3e40bb3f8df6fe50a09fdfe8a807df45db3902970bb32ad83de3282288764f9`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `22bf2ccf36cd876fc17e44998e43f5ddf9f6ccafd1e659433cf0bfa226640a27`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/tests/conftest.py`
@@ -76,29 +76,31 @@
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
 - Purpose clues:
   - filename/path terms: test discover
-- Important symbols (8 total):
+- Important symbols (9 total):
   - `_scan` (function) — line 7
   - `test_discover_groups_matches_by_channel_and_writes_draft_request` (function) — line 12
   - `test_discover_output_feeds_directly_into_packet_request` (function) — line 48
   - `test_discover_preserves_case_of_mixed_case_identifiers` (function) — line 67
   - `test_discover_stopword_only_question_writes_no_draft` (function) — line 96
   - `test_discover_draft_question_is_truncated_to_max_question_length` (function) — line 116
-  - `test_discover_draft_symbol_selectors_include_the_resolved_file` (function) — line 140
-  - `test_discover_max_per_channel_truncates_with_count` (function) — line 175
+  - `test_discover_question_with_no_actual_matches_writes_no_draft` (function) — line 140
+  - `test_discover_draft_symbol_selectors_include_the_resolved_file` (function) — line 157
+  - `test_discover_max_per_channel_truncates_with_count` (function) — line 192
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
   - `test_discover_draft_question_is_truncated_to_max_question_length (dev_tools/repo_context/tests/test_discover.py:124)`
-  - `test_discover_draft_symbol_selectors_include_the_resolved_file (dev_tools/repo_context/tests/test_discover.py:152)`
+  - `test_discover_draft_symbol_selectors_include_the_resolved_file (dev_tools/repo_context/tests/test_discover.py:169)`
   - `test_discover_groups_matches_by_channel_and_writes_draft_request (dev_tools/repo_context/tests/test_discover.py:19)`
-  - `test_discover_max_per_channel_truncates_with_count (dev_tools/repo_context/tests/test_discover.py:178)`
+  - `test_discover_max_per_channel_truncates_with_count (dev_tools/repo_context/tests/test_discover.py:195)`
   - `test_discover_output_feeds_directly_into_packet_request (dev_tools/repo_context/tests/test_discover.py:55)`
   - `test_discover_preserves_case_of_mixed_case_identifiers (dev_tools/repo_context/tests/test_discover.py:77)`
+  - `test_discover_question_with_no_actual_matches_writes_no_draft (dev_tools/repo_context/tests/test_discover.py:149)`
   - `test_discover_stopword_only_question_writes_no_draft (dev_tools/repo_context/tests/test_discover.py:104)`
 - Related tests:
   - `dev_tools/repo_context/tests/test_discover.py`
-- Retrieval identity: sha256=`f968e0b34543672a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_discover.py`)
+- Retrieval identity: sha256=`3d796379bf8de903…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_discover.py`)
 
 ### `dev_tools/repo_context/tests/test_imports_and_calls.py`
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))

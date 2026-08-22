@@ -171,7 +171,15 @@ def run_discover(root: Path, output_dir: Path, question: str, max_per_channel: i
     # selectors that `packet --request` then reports as ambiguous, even
     # though discovery had already disambiguated them.
     draft_symbols = [{"name": qn, "file": file} for file, qn, _, _ in symbol_matches[:5]]
-    draft_search_terms = terms[:5]
+    # Only terms discovery actually confirmed a literal match for -- not
+    # every extracted term regardless of whether anything matched. A
+    # question with usable-looking but absent terminology (e.g. "Where is
+    # Frobnicator implemented?" when nothing in the repo mentions
+    # "Frobnicator") previously still copied the extracted term straight
+    # into the draft, making has_usable_selectors true and producing a
+    # "successful" discovery whose sole selector was already known to
+    # resolve to nothing.
+    draft_search_terms = list(dict.fromkeys(t for t, _, _ in exact_matches))[:5]
     has_usable_selectors = bool(draft_files or draft_symbols or draft_search_terms)
 
     if has_usable_selectors:

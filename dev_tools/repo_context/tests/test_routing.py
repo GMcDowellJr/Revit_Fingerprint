@@ -425,6 +425,28 @@ def test_scan_survives_a_graphify_node_with_unhashable_community(repo, out):
     assert (out / "routing" / "index.md").exists()
 
 
+def test_scan_survives_mixed_int_and_str_graphify_community_ids(repo, out):
+    # Regression: the malformed-node fix only normalized a `community`
+    # value when it *wasn't already* str/int, so a legitimate int (e.g.
+    # 1) and a legitimate str (e.g. "2") both passed through unchanged.
+    # When the *same* source_file appeared in two nodes with those two
+    # differently-typed-but-individually-valid community IDs, sorted()
+    # on that file's tuple set still crashed with TypeError: '<' not
+    # supported between instances of 'str' and 'int'.
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    (repo / "graphify-out").mkdir(parents=True, exist_ok=True)
+    graph = {
+        "built_at_commit": "",
+        "nodes": [
+            {"source_file": "core/a.py", "community": 1},
+            {"source_file": "core/a.py", "community": "2"},
+        ],
+    }
+    (repo / "graphify-out" / "graph.json").write_text(json.dumps(graph), encoding="utf-8")
+    _scan(repo, out)  # must not crash
+    assert (out / "routing" / "index.md").exists()
+
+
 def test_content_derived_purpose_clues_are_redacted(repo, out):
     # Regression: _markdown_title() and the module-docstring purpose clue
     # both pull real content directly from the scanned file, unlike

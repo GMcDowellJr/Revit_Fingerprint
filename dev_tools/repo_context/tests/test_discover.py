@@ -137,6 +137,23 @@ def test_discover_draft_question_is_truncated_to_max_question_length(repo, out):
     assert result2.returncode == 0, result2.stderr
 
 
+def test_discover_question_with_no_actual_matches_writes_no_draft(repo, out):
+    # Regression: the draft's search_terms included every extracted term
+    # unconditionally, regardless of whether any discovery channel
+    # (path/symbol/exact) actually matched it. A question naming
+    # plausible-looking but entirely absent terminology produced a
+    # "successful" discovery whose sole selector was already known to
+    # resolve to nothing -- has_usable_selectors was true purely because
+    # the term existed, not because anything in the repo matched it.
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    _scan(repo, out)
+    result = run_tool([
+        "discover", str(repo), "--output", str(out), "--question", "Where is Frobnicator implemented?",
+    ])
+    assert result.returncode == 1, result.stdout
+    assert not list((out / "packets").glob("discover_*.packet_request.json"))
+
+
 def test_discover_draft_symbol_selectors_include_the_resolved_file(repo, out):
     # Regression: the draft's symbol selectors dropped the resolved
     # `file`, keeping only `{"name": qn}`. A qualified name that appears

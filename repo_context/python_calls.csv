@@ -1865,16 +1865,18 @@ dev_tools/repo_context/rc_discover.py,run_discover,161,lines.append,append,,,unr
 dev_tools/repo_context/rc_discover.py,run_discover,161,rc_graphify.format_communities,format_communities,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 dev_tools/repo_context/rc_discover.py,run_discover,163,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_discover.py,run_discover,164,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_discover.py,run_discover,175,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_discover.py,run_discover,178,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_discover.py,run_discover,184,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_discover.py,run_discover,193,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_discover.py,run_discover,195,sanitize_stem,sanitize_stem,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_discover.py,run_discover,197,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_discover.py,run_discover,209,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_discover.py,run_discover,211,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_discover.py,run_discover,230,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_discover.py,run_discover,230,json.dumps,dumps,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_discover.py,run_discover,182,dict.fromkeys,fromkeys,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/rc_discover.py,run_discover,182,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_discover.py,run_discover,183,bool,bool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_discover.py,run_discover,186,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_discover.py,run_discover,192,lines.append,append,,,unresolved,'lines' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_discover.py,run_discover,201,'\n'.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_discover.py,run_discover,203,sanitize_stem,sanitize_stem,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_discover.py,run_discover,205,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_discover.py,run_discover,217,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_discover.py,run_discover,219,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_discover.py,run_discover,238,atomic_write_text,atomic_write_text,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_discover.py,run_discover,238,json.dumps,dumps,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 dev_tools/repo_context/rc_graphify.py,load_graphify_communities,42,graph_path.exists,exists,,,unresolved,'graph_path' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_graphify.py,load_graphify_communities,46,graph_path.read_text,read_text,,,unresolved,'graph_path' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_graphify.py,load_graphify_communities,46,json.loads,loads,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
@@ -1885,17 +1887,16 @@ dev_tools/repo_context/rc_graphify.py,load_graphify_communities,103,isinstance,i
 dev_tools/repo_context/rc_graphify.py,load_graphify_communities,105,node.get,get,,,unresolved,'node' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_graphify.py,load_graphify_communities,106,node.get,get,,,unresolved,'node' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_graphify.py,load_graphify_communities,107,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_graphify.py,load_graphify_communities,116,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_graphify.py,load_graphify_communities,117,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_graphify.py,load_graphify_communities,118,node.get,get,,,unresolved,'node' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_graphify.py,load_graphify_communities,119,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_graphify.py,load_graphify_communities,120,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_graphify.py,load_graphify_communities,121,by_file.setdefault,setdefault,,,unresolved,'by_file' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_graphify.py,load_graphify_communities,121,"by_file.setdefault(source_file, set()).add",add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/rc_graphify.py,load_graphify_communities,121,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_graphify.py,load_graphify_communities,123,by_file.items,items,,,unresolved,'by_file' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/rc_graphify.py,load_graphify_communities,123,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/rc_graphify.py,format_communities,133,'; '.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_graphify.py,load_graphify_communities,122,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_graphify.py,load_graphify_communities,123,node.get,get,,,unresolved,'node' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_graphify.py,load_graphify_communities,124,isinstance,isinstance,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_graphify.py,load_graphify_communities,125,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_graphify.py,load_graphify_communities,126,by_file.setdefault,setdefault,,,unresolved,'by_file' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_graphify.py,load_graphify_communities,126,"by_file.setdefault(source_file, set()).add",add,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/rc_graphify.py,load_graphify_communities,126,set,set,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_graphify.py,load_graphify_communities,128,by_file.items,items,,,unresolved,'by_file' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/rc_graphify.py,load_graphify_communities,128,sorted,sorted,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/rc_graphify.py,format_communities,138,'; '.join,join,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 dev_tools/repo_context/rc_manifest.py,load_previous_state,34,chunk_manifest_path.exists,exists,,,unresolved,'chunk_manifest_path' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_manifest.py,load_previous_state,34,inventory_path.exists,exists,,,unresolved,'inventory_path' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/rc_manifest.py,load_previous_state,34,manifest_path.exists,exists,,,unresolved,'manifest_path' is shadowed by a parameter or local variable in the enclosing scope
@@ -3850,36 +3851,43 @@ dev_tools/repo_context/tests/test_discover.py,test_discover_draft_question_is_tr
 dev_tools/repo_context/tests/test_discover.py,test_discover_draft_question_is_truncated_to_max_question_length,136,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_discover.py,test_discover_draft_question_is_truncated_to_max_question_length,136,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_discover.py,test_discover_draft_question_is_truncated_to_max_question_length,136,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,148,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,152,_scan,_scan,dev_tools/repo_context/tests/test_discover.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,153,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,154,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,154,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,157,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,157,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,158,json.loads,loads,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,158,request_path.read_text,read_text,,,unresolved,'request_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,160,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,161,all,all,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,166,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,166,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,166,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,166,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,168,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,168,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,169,json.loads,loads,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,169,sidecar_path.read_text,read_text,,,unresolved,'sidecar_path' is shadowed by a parameter or local variable in the enclosing scope
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,171,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,172,all,all,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,176,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,177,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,178,_scan,_scan,dev_tools/repo_context/tests/test_discover.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,179,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,180,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,180,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,183,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,183,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,184,report_path.read_text,read_text,,,unresolved,'report_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_discover.py,test_discover_question_with_no_actual_matches_writes_no_draft,148,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_question_with_no_actual_matches_writes_no_draft,149,_scan,_scan,dev_tools/repo_context/tests/test_discover.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_discover.py,test_discover_question_with_no_actual_matches_writes_no_draft,150,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_question_with_no_actual_matches_writes_no_draft,151,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_question_with_no_actual_matches_writes_no_draft,151,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_question_with_no_actual_matches_writes_no_draft,154,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_discover.py,test_discover_question_with_no_actual_matches_writes_no_draft,154,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,165,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,169,_scan,_scan,dev_tools/repo_context/tests/test_discover.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,170,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,171,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,171,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,174,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,174,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,175,json.loads,loads,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,175,request_path.read_text,read_text,,,unresolved,'request_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,177,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,178,all,all,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,183,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,183,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,183,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,183,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,185,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,185,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,186,json.loads,loads,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,186,sidecar_path.read_text,read_text,,,unresolved,'sidecar_path' is shadowed by a parameter or local variable in the enclosing scope
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,188,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_draft_symbol_selectors_include_the_resolved_file,189,all,all,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,193,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,194,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,195,_scan,_scan,dev_tools/repo_context/tests/test_discover.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,196,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,197,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,197,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,200,(out / 'packets').glob,glob,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,200,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_discover.py,test_discover_max_per_channel_truncates_with_count,201,report_path.read_text,read_text,,,unresolved,'report_path' is shadowed by a parameter or local variable in the enclosing scope
 dev_tools/repo_context/tests/test_imports_and_calls.py,_read,7,open,open,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_imports_and_calls.py,_read,8,csv.DictReader,DictReader,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 dev_tools/repo_context/tests/test_imports_and_calls.py,_read,8,list,list,,,unresolved,name not defined in this module and not bound via a resolvable import
@@ -4804,19 +4812,25 @@ dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_graphify_node_
 dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_graphify_node_with_unhashable_community,423,json.dumps,dumps,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
 dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_graphify_node_with_unhashable_community,424,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
 dev_tools/repo_context/tests/test_routing.py,test_scan_survives_a_graphify_node_with_unhashable_community,425,(out / 'routing' / 'index.md').exists,exists,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_routing.py,test_content_derived_purpose_clues_are_redacted,434,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_content_derived_purpose_clues_are_redacted,438,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_content_derived_purpose_clues_are_redacted,439,(out / 'routing' / 'docs.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_routing.py,test_content_derived_purpose_clues_are_redacted,440,(out / 'routing' / 'core.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_routing.py,test_markdown_title_redacts_before_truncating,454,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_markdown_title_redacts_before_truncating,455,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_markdown_title_redacts_before_truncating,456,(out / 'routing' / 'docs.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_stay_within_filesystem_limits,470,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_stay_within_filesystem_limits,471,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_stay_within_filesystem_limits,472,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_stay_within_filesystem_limits,473,_manifest,_manifest,dev_tools/repo_context/tests/test_routing.py,_manifest,high,direct call to a function defined in the same module
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_stay_within_filesystem_limits,475,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
-dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_stay_within_filesystem_limits,476,(out / cat['path']).exists,exists,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_scan_survives_mixed_int_and_str_graphify_community_ids,436,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_scan_survives_mixed_int_and_str_graphify_community_ids,437,(repo / 'graphify-out').mkdir,mkdir,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_scan_survives_mixed_int_and_str_graphify_community_ids,445,(repo / 'graphify-out' / 'graph.json').write_text,write_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_scan_survives_mixed_int_and_str_graphify_community_ids,445,json.dumps,dumps,,,unresolved,attribute call target is not a statically known module alias (possible instance method dispatch)
+dev_tools/repo_context/tests/test_routing.py,test_scan_survives_mixed_int_and_str_graphify_community_ids,446,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_scan_survives_mixed_int_and_str_graphify_community_ids,447,(out / 'routing' / 'index.md').exists,exists,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_content_derived_purpose_clues_are_redacted,456,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_content_derived_purpose_clues_are_redacted,460,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_content_derived_purpose_clues_are_redacted,461,(out / 'routing' / 'docs.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_content_derived_purpose_clues_are_redacted,462,(out / 'routing' / 'core.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_markdown_title_redacts_before_truncating,476,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_markdown_title_redacts_before_truncating,477,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_markdown_title_redacts_before_truncating,478,(out / 'routing' / 'docs.md').read_text,read_text,,,unresolved,dynamic or unsupported call expression; not statically resolvable
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_stay_within_filesystem_limits,492,range,range,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_stay_within_filesystem_limits,493,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_stay_within_filesystem_limits,494,_scan,_scan,dev_tools/repo_context/tests/test_routing.py,_scan,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_stay_within_filesystem_limits,495,_manifest,_manifest,dev_tools/repo_context/tests/test_routing.py,_manifest,high,direct call to a function defined in the same module
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_stay_within_filesystem_limits,497,len,len,,,unresolved,name not defined in this module and not bound via a resolvable import
+dev_tools/repo_context/tests/test_routing.py,test_catalog_filenames_stay_within_filesystem_limits,498,(out / cat['path']).exists,exists,,,unresolved,dynamic or unsupported call expression; not statically resolvable
 dev_tools/repo_context/tests/test_safety.py,test_refuses_output_dir_equal_to_root,7,write_files,write_files,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_safety.py,test_refuses_output_dir_equal_to_root,8,run_tool,run_tool,,,unresolved,name not defined in this module and not bound via a resolvable import
 dev_tools/repo_context/tests/test_safety.py,test_refuses_output_dir_equal_to_root,8,str,str,,,unresolved,name not defined in this module and not bound via a resolvable import
