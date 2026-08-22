@@ -368,6 +368,64 @@ def test_whole_file_symbol_listing_is_charged_against_budget(repo, out):
     assert "Omitted" in text or text.count("(function, lines") <= 300
 
 
+def test_explicit_file_excerpt_renders_before_optional_symbol_inventory(repo, out):
+    # Regression: the file explicit-selector loop spent budget on the
+    # "Top-level symbols:" inventory listing *before* rendering the file's
+    # own mandatory excerpt. A tight-but-sufficient budget (enough for the
+    # header + full excerpt, but not also the full inventory) let the
+    # optional inventory crowd out the mandatory excerpt, forcing a hard
+    # explicit_conflicts abort even though the file's actual requested
+    # content would have fit on its own. The excerpt must always render
+    # first; only the inventory may be truncated/omitted.
+    n = 150
+    lines = [f"def f_{i:03d}(): pass" for i in range(n)]
+    write_files(repo, {"core/big.py": "\n".join(lines) + "\n"})
+    _scan(repo, out)
+
+    no_expansion = {"include_callers": False, "include_callees": False, "include_imports": False,
+                    "include_related_tests": False, "include_graphify": False}
+    generous_req = _request(out, "generous.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["core/big.py"], "symbols": [], "search_terms": [], "lines": []},
+        "expansion": no_expansion,
+        "limits": {"max_estimated_tokens": 200000, "max_files": 12},
+    })
+    generous_result = _packet(repo, out, generous_req)
+    assert generous_result.returncode == 0, generous_result.stderr
+    full_text = (out / "packets" / "packet_generous.md").read_text(encoding="utf-8")
+    listing_lines = [l for l in full_text.splitlines() if "(function, lines" in l]
+    assert len(listing_lines) == n  # nothing tight yet -- every symbol is listed
+    listing_chars = sum(len(l) for l in listing_lines) + len("Top-level symbols:")
+    full_tokens = json.loads(
+        (out / "packets" / "packet_generous.resolution.json").read_text(encoding="utf-8")
+    )["estimated_tokens_used"]
+
+    # Cut roughly half the inventory listing's worth of room from the
+    # fully-fitting budget: still comfortably enough for the header + full
+    # excerpt (which the listing bug never touched), but not enough for
+    # the full inventory listing too.
+    constrained_tokens = full_tokens - (listing_chars // 2 // 4)
+
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["core/big.py"], "symbols": [], "search_terms": [], "lines": []},
+        "expansion": no_expansion,
+        "limits": {"max_estimated_tokens": constrained_tokens, "max_files": 12},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    # Mandatory excerpt: every function's source line, including the very
+    # last one, must still be present in full.
+    assert "def f_000(): pass" in text
+    assert "def f_149(): pass" in text
+    # Optional inventory: truncated instead, never the excerpt.
+    listing_lines_constrained = [l for l in text.splitlines() if "(function, lines" in l]
+    assert len(listing_lines_constrained) < n
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+    assert any("top-level symbol" in o.lower() for o in sidecar["omissions"])
+
+
 def test_search_terms_share_a_single_global_max_files_cap(repo, out):
     # Regression: max_files was previously enforced per search term (a
     # fresh `shown_files` set each iteration), so two different terms

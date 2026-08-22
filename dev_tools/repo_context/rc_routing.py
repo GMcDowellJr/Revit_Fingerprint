@@ -312,8 +312,23 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
                 sorted(called_by_file.get(rel, ())), sorted(tests_by_target.get(rel, ())),
                 communities_by_file.get(rel, []), routing_opts.max_symbols_per_file_entry,
             )
-            if body_len + len(block) > routing_opts.max_catalog_chars and blocks:
-                omitted_paths.append(rel)
+            if body_len + len(block) > routing_opts.max_catalog_chars:
+                if blocks:
+                    omitted_paths.append(rel)
+                    continue
+                # The very first entry alone already exceeds the limit --
+                # unconditionally including it (the old behavior) let a
+                # single oversized file entry blow past
+                # --routing-max-catalog-chars on its own. Fall back to a
+                # minimal stub (path + role only) so the catalog still
+                # names at least this file directly instead of jumping
+                # straight to an empty-detail catalog.
+                minimal = f"### `{rel}`\n- Role: `{roles[rel]}` (evidence: {role_evidence[rel]})\n"
+                if body_len + len(minimal) > routing_opts.max_catalog_chars:
+                    omitted_paths.append(rel)
+                    continue
+                blocks.append(minimal)
+                body_len += len(minimal)
                 continue
             blocks.append(block)
             body_len += len(block)

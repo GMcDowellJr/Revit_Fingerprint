@@ -181,6 +181,39 @@ def test_manifest_stores_the_complete_omitted_path_list(repo, out):
     assert all(p.startswith("core/") for p in core_cat["omitted_paths"])
 
 
+def test_first_catalog_entry_is_also_capped_by_max_catalog_chars(repo, out):
+    # Regression: the size check `body_len + len(block) > max_catalog_chars`
+    # was skipped whenever `blocks` was still empty, so the very first file
+    # entry in a catalog was always included in full (all its sections --
+    # purpose clues, important symbols, dependencies, etc.) regardless of
+    # size. Measure the real header + full-first-entry costs from a
+    # generous run, then pick a limit that fits the header plus only a
+    # minimal path+role stub -- the first entry must fall back to that
+    # stub (or be omitted), never render its full detail unconditionally.
+    files = {
+        f"core/{'x' * 80}_module_number_{i:04d}.py": f'"""Docstring {i}."""\n\ndef f_{i}():\n    return {i}\n'
+        for i in range(5)
+    }
+    write_files(repo, files)
+    _scan(repo, out, ["--routing-max-files-per-catalog", "1000"])  # generous default max_catalog_chars
+    full_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
+    header_text, _, rest = full_text.partition("### `")
+    first_block = "### `" + rest.split("### `", 1)[0]
+    role_line = next(l for l in first_block.splitlines() if l.startswith("- Role: "))
+    first_path = first_block.splitlines()[0][len("### `"):-1]
+    minimal_stub = f"### `{first_path}`\n{role_line}\n"
+    assert len(first_block) > len(minimal_stub) + 20  # the full entry is genuinely bigger than the stub
+
+    tight_limit = len(header_text) + len(minimal_stub) + 5
+    _scan(repo, out, ["--routing-max-catalog-chars", str(tight_limit),
+                       "--routing-max-files-per-catalog", "1000", "--force"])
+    cat_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
+    assert cat_text.count("### `") == 1  # only the (stubbed) first entry survives in detail
+    assert "Purpose clues" not in cat_text  # full-detail sections did not sneak in for the first entry
+    assert f"### `{first_path}`" in cat_text
+    assert "Omitted from this catalog" in cat_text
+
+
 def test_changed_source_changes_source_manifest_hash(repo, out):
     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
     _scan(repo, out)

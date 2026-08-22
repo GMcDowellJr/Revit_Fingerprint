@@ -428,17 +428,21 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
             if budget.allow(header, 1):
                 out.append(header); budget.spend(header, 1)
                 for c in callers:
+                    line = (f"- `{c['caller_symbol']}` in `{c['caller_file']}`:{c['line']} "
+                            f"— `{c['call_expression']}` ({c['confidence']}: {c['explanation']}) "
+                            f"[origin: caller_expansion]")
+                    # Budget-check before reserving a focus-file slot -- a
+                    # caller entry that ultimately doesn't fit must not
+                    # consume the slot on behalf of content that was never
+                    # actually rendered.
+                    if not budget.allow(line, 1):
+                        budget.omissions.append(f"More callers of `{qn}` omitted (packet size limit reached); see python_calls.csv.")
+                        break
                     if not note_focus_file(c["caller_file"]):
                         budget.omissions.append(
                             f"Caller of `{qn}` in `{c['caller_file']}` omitted: "
                             f"limits.max_files ({req.max_files}) reached."
                         )
-                        break
-                    line = (f"- `{c['caller_symbol']}` in `{c['caller_file']}`:{c['line']} "
-                            f"— `{c['call_expression']}` ({c['confidence']}: {c['explanation']}) "
-                            f"[origin: caller_expansion]")
-                    if not budget.allow(line, 1):
-                        budget.omissions.append(f"More callers of `{qn}` omitted (packet size limit reached); see python_calls.csv.")
                         break
                     out.append(line); budget.spend(line, 1)
             else:
@@ -451,17 +455,17 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
             if budget.allow(header, 1):
                 out.append(header); budget.spend(header, 1)
                 for c in callees:
-                    if not note_focus_file(c["candidate_file"]):
-                        budget.omissions.append(
-                            f"Callee of `{qn}` in `{c['candidate_file']}` omitted: "
-                            f"limits.max_files ({req.max_files}) reached."
-                        )
-                        break
                     line = (f"- `{c['call_expression']}` at line {c['line']} -> `{c['candidate_symbol']}` "
                             f"in `{c['candidate_file']}` ({c['confidence']}: {c['explanation']}) "
                             f"[origin: callee_expansion]")
                     if not budget.allow(line, 1):
                         budget.omissions.append(f"More callees of `{qn}` omitted (packet size limit reached); see python_calls.csv.")
+                        break
+                    if not note_focus_file(c["candidate_file"]):
+                        budget.omissions.append(
+                            f"Callee of `{qn}` in `{c['candidate_file']}` omitted: "
+                            f"limits.max_files ({req.max_files}) reached."
+                        )
                         break
                     out.append(line); budget.spend(line, 1)
             else:
@@ -474,14 +478,14 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
             if budget.allow(header, 1):
                 out.append(header); budget.spend(header, 1)
                 for i in file_imports[:20]:
+                    line = f"- line {i['line']}: `{i['imported_name'] or i['imported_module']}` -> `{i['resolved_file']}`"
+                    if not budget.allow(line, 1):
+                        break
                     if not note_focus_file(i["resolved_file"]):
                         budget.omissions.append(
                             f"Import of `{rel}` resolving to `{i['resolved_file']}` omitted: "
                             f"limits.max_files ({req.max_files}) reached."
                         )
-                        break
-                    line = f"- line {i['line']}: `{i['imported_name'] or i['imported_module']}` -> `{i['resolved_file']}`"
-                    if not budget.allow(line, 1):
                         break
                     out.append(line); budget.spend(line, 1)
 
@@ -492,6 +496,9 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
             if budget.allow(header, 1):
                 out.append(header); budget.spend(header, 1)
                 for t in tests:
+                    line = f"- `{t}`"
+                    if not budget.allow(line, 1):
+                        break
                     if not note_focus_file(t):
                         # Route through the same global-focus-file gate as
                         # every other tier -- a hard-coded high ceiling here
@@ -500,9 +507,6 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
                         budget.omissions.append(
                             f"Related test `{t}` for `{rel}` omitted: limits.max_files ({req.max_files}) reached."
                         )
-                        break
-                    line = f"- `{t}`"
-                    if not budget.allow(line, 1):
                         break
                     out.append(line); budget.spend(line, 1)
 
@@ -519,6 +523,12 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
                 if budget.allow(header, 1):
                     out.append(header); budget.spend(header, 1)
                     for p in peers:
+                        line = f"- `{p}` [origin: graphify_expansion]"
+                        if not budget.allow(line, 1):
+                            budget.omissions.append(
+                                f"More Graphify community peers of `{rel}` omitted (packet size limit reached)."
+                            )
+                            break
                         if not note_focus_file(p):
                             # Route through the same global focus-file gate
                             # as every other expansion tier -- otherwise a
@@ -528,12 +538,6 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
                             budget.omissions.append(
                                 f"Graphify community peer `{p}` of `{rel}` omitted: "
                                 f"limits.max_files ({req.max_files}) reached."
-                            )
-                            break
-                        line = f"- `{p}` [origin: graphify_expansion]"
-                        if not budget.allow(line, 1):
-                            budget.omissions.append(
-                                f"More Graphify community peers of `{rel}` omitted (packet size limit reached)."
                             )
                             break
                         out.append(line); budget.spend(line, 1)
@@ -663,6 +667,19 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         if not _spend_header(header):
             explicit_conflicts.append(f"explicit file selector `{rel}` does not fit (header alone exceeds budget)")
             continue
+        # Render the mandatory excerpt (the actual content the selector asked
+        # for) before the optional top-level-symbols inventory, so the
+        # inventory can never spend the shared budget ahead of the excerpt
+        # itself and force it into an "explicit_conflicts" abort.
+        try:
+            line_count = int(row.get("line_count") or 0)
+        except ValueError:
+            line_count = 0
+        if line_count:
+            status = _render_excerpt_block(root, rel, 1, line_count, budget, out, row.get("sha256", ""))
+            if status == "too_large":
+                explicit_conflicts.append(f"explicit file selector `{rel}` ({line_count} lines) does not fit")
+                continue
         top_level = sorted(
             [r for r in symbols_by_file.get(rel, []) if r["parent_symbol"] == "<module>" and r["symbol_type"] != "module"],
             key=lambda r: int(r["start_line"]),
@@ -687,14 +704,6 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
                     f"Top-level symbol listing for `{rel}` omitted entirely (packet size limit reached); "
                     f"see python_symbols.csv."
                 )
-        try:
-            line_count = int(row.get("line_count") or 0)
-        except ValueError:
-            line_count = 0
-        if line_count:
-            status = _render_excerpt_block(root, rel, 1, line_count, budget, out, row.get("sha256", ""))
-            if status == "too_large":
-                explicit_conflicts.append(f"explicit file selector `{rel}` ({line_count} lines) does not fit")
         file_expansion_items.append(top_level)
 
     for res in symbol_resolutions:
