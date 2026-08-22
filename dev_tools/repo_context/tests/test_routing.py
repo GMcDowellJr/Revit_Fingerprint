@@ -144,6 +144,24 @@ def test_routing_catalog_respects_max_catalog_chars(repo, out):
     assert "Omitted from this catalog" in cat_text
 
 
+def test_omitted_path_appendix_is_bounded_regardless_of_omitted_count(repo, out):
+    # Regression: the "Omitted from this catalog" appendix listed every
+    # single omitted path with no cap of its own -- a partition with
+    # hundreds of long filenames could make that appendix alone exceed
+    # --routing-max-catalog-chars, defeating the exact limit it exists to
+    # respect.
+    files = {
+        f"core/{'x' * 80}_module_number_{i:04d}.py": f'"""Docstring {i}."""\n\ndef f_{i}():\n    return {i}\n'
+        for i in range(300)
+    }
+    write_files(repo, files)
+    _scan(repo, out, ["--routing-max-catalog-chars", "100", "--routing-max-files-per-catalog", "1000"])
+    cat_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
+    assert "Omitted from this catalog" in cat_text
+    assert "more (not listed here" in cat_text
+    assert len(cat_text) < 6000
+
+
 def test_changed_source_changes_source_manifest_hash(repo, out):
     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
     _scan(repo, out)

@@ -492,6 +492,17 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
                 if budget.allow(header, 1):
                     out.append(header); budget.spend(header, 1)
                     for p in peers:
+                        if not note_focus_file(p):
+                            # Route through the same global focus-file gate
+                            # as every other expansion tier -- otherwise a
+                            # Graphify peer could silently exceed
+                            # limits.max_files while the resolution
+                            # sidecar's focus_files list stayed under it.
+                            budget.omissions.append(
+                                f"Graphify community peer `{p}` of `{rel}` omitted: "
+                                f"limits.max_files ({req.max_files}) reached."
+                            )
+                            break
                         line = f"- `{p}` [origin: graphify_expansion]"
                         if not budget.allow(line, 1):
                             budget.omissions.append(
@@ -696,7 +707,19 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         matches = search_matches_by_term.get(term, [])
         term_status = next((r.status for r in search_resolutions if r.requested == term), None)
         if term_status == "invalid":
-            out.append(f"\n_Search term `{term}` is not a valid regex; skipped._\n")
+            notice = f"\n_Search term `{term}` is not a valid regex; skipped._\n"
+            if not budget.allow(notice, 1):
+                # Unbounded per-term notices (e.g. a request with hundreds
+                # of invalid regex terms) would otherwise bypass
+                # limits.max_estimated_tokens entirely, same failure shape
+                # as the earlier unbudgeted resolution-report finding.
+                budget.omissions.append(
+                    f"Invalid-regex notice for `{term}` omitted (packet size limit reached); "
+                    f"see the resolution report."
+                )
+                continue
+            out.append(notice)
+            budget.spend(notice, 1)
             continue
         header = f"\n### Search: `{term}` ({len(matches)} match(es))\n_Included because: exact_search_match._\n"
         if not budget.allow(header, 1):
@@ -722,9 +745,33 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
                                  f"skipped for search terms; re-run scan.")
 
     if budget.omissions:
-        out.append("\n## Omitted / unresolved\n")
-        for o in budget.omissions:
-            out.append(f"- {o}")
+        # The omissions *list* itself is unbounded in memory (a request
+        # that triggers hundreds of distinct omission reasons -- e.g. many
+        # invalid regex search terms -- can produce hundreds of entries),
+        # so rendering it must be budgeted the same way the resolution
+        # report is: otherwise this section alone could bypass
+        # limits.max_estimated_tokens. The full list is always available,
+        # unbudgeted, in the packet_*.resolution.json sidecar's
+        # "omissions" field.
+        header = "\n## Omitted / unresolved\n"
+        if budget.allow(header, 1):
+            out.append(header)
+            budget.spend(header, 1)
+            omitted_omissions = 0
+            for idx, o in enumerate(budget.omissions):
+                line = f"- {o}"
+                if not budget.allow(line, 1):
+                    omitted_omissions = len(budget.omissions) - idx
+                    break
+                out.append(line)
+                budget.spend(line, 1)
+            if omitted_omissions:
+                note = (f"- ... and {omitted_omissions} more omission(s) not listed here (packet size limit "
+                        f"reached); see the accompanying packet_*.resolution.json's \"omissions\" field for "
+                        f"the complete list.")
+                if budget.allow(note, 1):
+                    out.append(note)
+                    budget.spend(note, 1)
 
     # (Unresolved/ambiguous selectors are reported once, in the "Selector
     # resolution report" section built into the header below -- not

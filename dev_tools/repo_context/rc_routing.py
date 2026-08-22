@@ -319,6 +319,14 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
 
         text = header + "\n".join(blocks)
         if omitted_paths:
+            # Bounded regardless of how many files were omitted -- listing
+            # every single one here (a partition can have hundreds) would
+            # itself defeat --routing-max-catalog-chars, the exact limit
+            # this appendix exists to respect. A capped sample is enough
+            # to show the shape; the full list already lives in
+            # file_inventory.csv (filtered to this directory) and the
+            # per-catalog manifest entry.
+            omitted_sample_cap = 30
             text += (
                 f"\n## Omitted from this catalog (size limit reached)\n\n"
                 f"{len(omitted_paths)} file(s) in this partition are not detailed above because this "
@@ -326,8 +334,13 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
                 f"({routing_opts.max_catalog_chars}). They are still covered by `file_inventory.csv` / "
                 f"`python_symbols.csv`; request them directly by path in a `packet_request.json`:\n\n"
             )
-            for p in omitted_paths:
+            for p in omitted_paths[:omitted_sample_cap]:
                 text += f"- `{p}`\n"
+            if len(omitted_paths) > omitted_sample_cap:
+                text += (
+                    f"- ... and {len(omitted_paths) - omitted_sample_cap} more (not listed here; see "
+                    f"`file_inventory.csv` or `routing/routing_manifest.json`)\n"
+                )
         atomic_write_text(routing_dir / filename, text + "\n")
 
         by_role = Counter(roles[f.relative_path] for f in cat_files)

@@ -305,6 +305,69 @@ def test_search_terms_share_a_single_global_max_files_cap(repo, out):
     assert "Omitted" in text or "omitted beyond limits.max_files" in text
 
 
+def test_invalid_regex_notices_are_charged_against_budget(repo, out):
+    # Regression: each invalid-regex search term appended a notice with no
+    # budget accounting, so a request with many invalid regex terms could
+    # produce a large packet while reporting ~0 estimated tokens used
+    # under a tiny limits.max_estimated_tokens. This also exercises a
+    # second-order version of the same bug: each skipped notice fell back
+    # to an *unbudgeted* budget.omissions entry, and the final "## Omitted
+    # / unresolved" section rendered that whole list without any size
+    # accounting either -- both layers had to be fixed for this to pass.
+    write_files(repo, {"a.py": "def f():\n    return 1\n"})
+    _scan(repo, out)
+    bad_terms = [f"(unclosed_{i}" for i in range(200)]
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [], "search_terms": bad_terms, "lines": []},
+        "expansion": {"search_as_regex": True},
+        "limits": {"max_estimated_tokens": 1, "max_files": 500},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert len(text) < 3000
+    assert text.count("not a valid regex") < 200
+
+
+def test_graphify_peer_listing_respects_max_files(repo, out):
+    # Regression: Graphify community-peer paths were emitted without
+    # going through note_focus_file, so they could exceed limits.max_files
+    # while the resolution sidecar's focus_files list stayed under it.
+    write_files(repo, {
+        "core/a.py": "def f():\n    return 1\n",
+        "core/b.py": "def g():\n    return 2\n",
+    })
+    commit = _git_init_commit(repo)
+    graph = {
+        "built_at_commit": commit,
+        "nodes": [
+            {"source_file": "core/a.py", "community": 5, "community_name": "Widgets"},
+            {"source_file": "core/b.py", "community": 5, "community_name": "Widgets"},
+        ],
+    }
+    (repo / "graphify-out").mkdir(parents=True, exist_ok=True)
+    (repo / "graphify-out" / "graph.json").write_text(json.dumps(graph), encoding="utf-8")
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [{"name": "f", "file": "core/a.py"}], "search_terms": [], "lines": []},
+        "expansion": {"include_graphify": True},
+        "limits": {"max_estimated_tokens": 12000, "max_files": 1},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+    assert sidecar["focus_files"] == ["core/a.py"]
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    # core/b.py is legitimately named in the omission explanation -- it
+    # must never appear as a rendered, [origin: graphify_expansion]-tagged
+    # evidence item.
+    assert "[origin: graphify_expansion]" not in text
+    assert "Graphify community peer `core/b.py`" in text
+    assert "limits.max_files" in text
+
+
 def _git_init_commit(repo) -> str:
     import subprocess
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
