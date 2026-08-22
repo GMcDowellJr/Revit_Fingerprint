@@ -1,0 +1,117 @@
+# Routing catalog: `tools/join_key_discovery`
+
+- Generated (UTC): 2026-08-22T04:24:28Z
+- Tool version: 0.1.0
+- Files covered: 3
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `3f7a7595c7af5316e8d0b792528f0c1e6d35b1d13a241b96982f88d98812a57c`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tools/join_key_discovery/eval.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: eval
+- Important symbols (8 total):
+  - `_norm` (function) — line 7
+  - `build_identity_index` (function) — line 11
+  - `_listish` (function) — line 36
+  - `_lookup_shape_cfg` (function) — line 44
+  - `normalize_policy_block` (function) — line 68
+  - `build_candidate_join_key_with_details` (function) — line 95
+  - `build_candidate_join_key` (function) — line 143
+  - `score_candidate` (function) — line 154
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_full_population_verify (tools/discover_join_policy.py:282)`
+  - `_load_policy_fields (tools/suggest_discovery_params.py:433)`
+  - `_run_target (tools/discover_hash_policy.py:109)`
+  - `_run_target (tools/discover_hash_policy.py:141)`
+  - `_run_target (tools/discover_hash_policy.py:152)`
+  - `_run_target (tools/discover_hash_policy.py:92)`
+  - `build_candidate_join_key (tools/join_key_discovery/eval.py:150)`
+  - `build_candidate_join_key_with_details (tools/join_key_discovery/eval.py:113)`
+  - `build_identity_index (tools/join_key_discovery/eval.py:16)`
+  - `build_identity_index (tools/join_key_discovery/eval.py:17)`
+  - `build_identity_index (tools/join_key_discovery/eval.py:20)`
+  - `build_identity_index (tools/join_key_discovery/eval.py:21)`
+  - `discover_greedy (tools/join_key_discovery/greedy.py:77)`
+  - `discover_greedy (tools/join_key_discovery/greedy.py:82)`
+  - `discover_greedy (tools/join_key_discovery/greedy.py:92)`
+  - ... and 33 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_discover_join_policy_verification.py`
+  - `tests/test_join_key_discovery_shape_matching.py`
+  - `tests/test_v21_join_policy_compat.py`
+- Retrieval identity: sha256=`c6036fb2047885c9…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/join_key_discovery/eval.py`)
+
+### `tools/join_key_discovery/greedy.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: greedy
+- Important symbols (2 total):
+  - `_score` (function) — line 8
+  - `discover_greedy` (function) — line 18
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/join_key_discovery/eval.py`
+- Called by (high/medium-confidence static callers):
+  - `_run_target (tools/discover_hash_policy.py:146)`
+  - `discover_greedy (tools/join_key_discovery/greedy.py:82)`
+  - `main (tools/discover_join_policy.py:628)`
+  - `test_discover_greedy_required_seed_still_scores_challengers (tests/test_discover_join_policy_verification.py:329)`
+  - `test_discover_greedy_seeds_selected_with_required_fields (tests/test_discover_join_policy_verification.py:289)`
+  - `test_discover_greedy_without_required_fields_behaves_as_before (tests/test_discover_join_policy_verification.py:302)`
+- Related tests:
+  - `tests/test_discover_join_policy_verification.py`
+- Retrieval identity: sha256=`32c53bfccc5e9ed2…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/join_key_discovery/greedy.py`)
+
+### `tools/join_key_discovery/materials_joinkey_discover.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: materials_joinkey_discover.py
+  - filename/path terms: materials joinkey discover
+- Important symbols (19 total):
+  - `_read_csv` (function) — line 39
+  - `_write_csv` (function) — line 45
+  - `_md5` (function) — line 53
+  - `_load_materials` (function) — line 61
+  - `_is_system_material` (function) — line 98
+  - `_partition_rows` (function) — line 110
+  - `_extract_name` (function) — line 120
+  - `_extract_sig` (function) — line 125
+  - `_extract_uid` (function) — line 130
+  - `_build_key` (function) — line 135
+  - `_load_class_map` (function) — line 143
+  - `_compute_metrics` (function) — line 178
+  - `_top_patterns` (function) — line 229
+  - `_build_key_files` (function) — line 259
+  - `_print_tiered` (function) — line 272
+  - `_tiered_csv_rows` (function) — line 294
+  - `_print_summary_table` (function) — line 321
+  - `discover` (function) — line 346
+  - `main` (function) — line 454
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/join_key_discovery/materials_joinkey_discover.py:491)`
+  - `_build_key (tools/join_key_discovery/materials_joinkey_discover.py:136)`
+  - `_compute_metrics (tools/join_key_discovery/materials_joinkey_discover.py:192)`
+  - `_compute_metrics (tools/join_key_discovery/materials_joinkey_discover.py:218)`
+  - `_load_materials (tools/join_key_discovery/materials_joinkey_discover.py:69)`
+  - `_partition_rows (tools/join_key_discovery/materials_joinkey_discover.py:111)`
+  - `_partition_rows (tools/join_key_discovery/materials_joinkey_discover.py:112)`
+  - `_print_tiered (tools/join_key_discovery/materials_joinkey_discover.py:274)`
+  - `_tiered_csv_rows (tools/join_key_discovery/materials_joinkey_discover.py:296)`
+  - `discover (tools/join_key_discovery/materials_joinkey_discover.py:354)`
+  - `discover (tools/join_key_discovery/materials_joinkey_discover.py:357)`
+  - `discover (tools/join_key_discovery/materials_joinkey_discover.py:363)`
+  - `discover (tools/join_key_discovery/materials_joinkey_discover.py:393)`
+  - `discover (tools/join_key_discovery/materials_joinkey_discover.py:394)`
+  - `discover (tools/join_key_discovery/materials_joinkey_discover.py:398)`
+  - ... and 16 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`036bea162de864e4…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/join_key_discovery/materials_joinkey_discover.py`)
+

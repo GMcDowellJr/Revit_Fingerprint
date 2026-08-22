@@ -1,0 +1,448 @@
+# Routing catalog: `dev_tools`
+
+- Generated (UTC): 2026-08-22T04:24:28Z
+- Tool version: 0.1.0
+- Files covered: 25
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `52b482d478e6cbd6aab42565e7710ba0787c9b759123b54d37693db3cbe247a2`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `dev_tools/repo_context/E2E_VERIFICATION.md`
+- Role: `unknown` (evidence: file marked 'generated' by generated/vendor heuristics; operational role not inferred for generated/vendor files)
+- Purpose clues:
+  - filename/path terms: E2E VERIFICATION
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`40962572f681e735…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/E2E_VERIFICATION.md`)
+
+### `dev_tools/repo_context/examples/packet_request.invalid_ambiguous_line_range.json`
+- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
+- Purpose clues:
+  - filename/path terms: packet request.invalid ambiguous line range
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`30663de793db3aa6…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/examples/packet_request.invalid_ambiguous_line_range.json`)
+
+### `dev_tools/repo_context/examples/packet_request.invalid_empty_selectors.json`
+- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
+- Purpose clues:
+  - filename/path terms: packet request.invalid empty selectors
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`11a2945f9eb6b6f4…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/examples/packet_request.invalid_empty_selectors.json`)
+
+### `dev_tools/repo_context/examples/packet_request.invalid_path_traversal.json`
+- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
+- Purpose clues:
+  - filename/path terms: packet request.invalid path traversal
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`ca49876b4e757be8…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/examples/packet_request.invalid_path_traversal.json`)
+
+### `dev_tools/repo_context/examples/packet_request.invalid_schema_version.json`
+- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
+- Purpose clues:
+  - filename/path terms: packet request.invalid schema version
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`ab205d087c47d2c1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/examples/packet_request.invalid_schema_version.json`)
+
+### `dev_tools/repo_context/examples/packet_request.invalid_unknown_field.json`
+- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
+- Purpose clues:
+  - filename/path terms: packet request.invalid unknown field
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`abeab4a36b15ccad…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/examples/packet_request.invalid_unknown_field.json`)
+
+### `dev_tools/repo_context/examples/packet_request.valid.json`
+- Role: `unknown` (evidence: operational-role classification only supports Python files (needs __main__-guard/docstring evidence))
+- Purpose clues:
+  - filename/path terms: packet request.valid
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`ce2fedb7b83c5a39…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/examples/packet_request.valid.json`)
+
+### `dev_tools/repo_context/rc_chunking.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
+- Purpose clues:
+  - module docstring: Line-numbered chunk generation for oversized text files.
+  - filename/path terms: rc chunking
+- Important symbols (5 total):
+  - `_build_python_units` (function) — line 20
+  - `_pack_units` (function) — line 40
+  - `_find_logical_boundary` (function) — line 82
+  - `_pack_generic_lines` (function) — line 98
+  - `chunk_file` (function) — line 119
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_pack_generic_lines (dev_tools/repo_context/rc_chunking.py:107)`
+  - `chunk_file (dev_tools/repo_context/rc_chunking.py:129)`
+  - `chunk_file (dev_tools/repo_context/rc_chunking.py:130)`
+  - `chunk_file (dev_tools/repo_context/rc_chunking.py:133)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`77b42edf8213c712…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_chunking.py`)
+
+### `dev_tools/repo_context/rc_classify.py`
+- Role: `unknown` (evidence: file marked 'generated' by generated/vendor heuristics; operational role not inferred for generated/vendor files)
+- Purpose clues:
+  - module docstring: Explainable file-classification heuristics.
+  - filename/path terms: rc classify
+- Important symbols (5 total):
+  - `is_test_path` (function) — line 30
+  - `classify_file` (function) — line 42
+  - `detect_generated_or_vendor` (function) — line 84
+  - `detect_entrypoint_reason` (function) — line 100
+  - `classify_operational_role` (function) — line 130
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `classify_file (dev_tools/repo_context/rc_classify.py:50)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`3dd9c774ba95531f…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_classify.py`)
+
+### `dev_tools/repo_context/rc_common.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
+- Purpose clues:
+  - module docstring: Shared constants, dataclasses, and small utilities for repo_context.
+  - filename/path terms: rc common
+- Important symbols (19 total):
+  - `_looks_secret_shaped` (function) — line 71
+  - `redact_secrets` (function) — line 100
+  - `to_posix_rel` (function) — line 122
+  - `sha256_file` (function) — line 126
+  - `sha256_text` (function) — line 137
+  - `count_lines_streaming` (function) — line 141
+  - `stable_path_id` (function) — line 157
+  - `sanitize_stem` (function) — line 161
+  - `match_any_glob` (function) — line 166
+  - `sniff_binary` (function) — line 173
+  - `FileRecord` (class) — line 184
+  - `SymbolRecord` (class) — line 202
+  - `ImportRecord` (class) — line 221
+  - `CallRecord` (class) — line 235
+  - `ChunkRecord` (class) — line 248
+  - `atomic_write_text` (function) — line 295
+  - `atomic_write_bytes` (function) — line 303
+  - `estimate_tokens` (function) — line 311
+  - `get_git_info` (function) — line 315
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `redact_secrets._sub (dev_tools/repo_context/rc_common.py:108)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`f57f6d90474c2d84…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_common.py`)
+
+### `dev_tools/repo_context/rc_discover.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
+- Purpose clues:
+  - module docstring: Lightweight, deterministic discovery: natural-language question ->
+  - filename/path terms: rc discover
+- Important symbols (2 total):
+  - `_terms` (function) — line 28
+  - `run_discover` (function) — line 39
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `run_discover (dev_tools/repo_context/rc_discover.py:47)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`195b232025f9edc9…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_discover.py`)
+
+### `dev_tools/repo_context/rc_graphify.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
+- Purpose clues:
+  - module docstring: Optional Graphify adapter.
+  - filename/path terms: rc graphify
+- Important symbols (2 total):
+  - `load_graphify_communities` (function) — line 20
+  - `format_communities` (function) — line 69
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`44f44deb6386f088…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_graphify.py`)
+
+### `dev_tools/repo_context/rc_manifest.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
+- Purpose clues:
+  - module docstring: Incremental reuse support + generation_manifest.json.
+  - filename/path terms: rc manifest
+- Important symbols (5 total):
+  - `chunking_signature` (function) — line 18
+  - `load_previous_state` (function) — line 28
+  - `make_chunk_reuse_provider` (function) — line 81
+  - `write_manifest` (function) — line 112
+  - `utc_now_iso` (function) — line 152
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `make_chunk_reuse_provider (dev_tools/repo_context/rc_manifest.py:84)`
+  - `make_chunk_reuse_provider (dev_tools/repo_context/rc_manifest.py:87)`
+  - `write_manifest (dev_tools/repo_context/rc_manifest.py:131)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`a8ec68be54057149…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_manifest.py`)
+
+### `dev_tools/repo_context/rc_overview.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
+- Purpose clues:
+  - module docstring: repository_overview.md and README.md generation.
+  - filename/path terms: rc overview
+- Important symbols (3 total):
+  - `_top_dir` (function) — line 13
+  - `generate_overview_md` (function) — line 18
+  - `generate_readme_md` (function) — line 137
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `generate_overview_md (dev_tools/repo_context/rc_overview.py:36)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`32060399c7e77ec5…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_overview.py`)
+
+### `dev_tools/repo_context/rc_packet.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
+- Purpose clues:
+  - module docstring: Targeted context packet generation.
+  - filename/path terms: rc packet
+- Important symbols (16 total):
+  - `_load_csv` (function) — line 17
+  - `_norm_rel` (function) — line 24
+  - `_file_is_fresh` (function) — line 28
+  - `_safe_excerpt` (function) — line 53
+  - `_symbol_matches` (function) — line 75
+  - `_find_symbol_candidates` (function) — line 80
+  - `PacketOptions` (class) — line 88
+  - `Budget` (class) — line 105
+  - `_callers_of` (function) — line 121
+  - `_callees_of` (function) — line 125
+  - `_bfs_callers` (function) — line 129
+  - `_bfs_callees` (function) — line 148
+  - `_enclosing_class_or_func` (function) — line 168
+  - `_candidate_tests_for_file` (function) — line 178
+  - `_render_symbol_block` (function) — line 193
+  - `generate_packet` (function) — line 230
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_bfs_callees (dev_tools/repo_context/rc_packet.py:155)`
+  - `_bfs_callers (dev_tools/repo_context/rc_packet.py:136)`
+  - `_find_symbol_candidates (dev_tools/repo_context/rc_packet.py:81)`
+  - `_render_symbol_block (dev_tools/repo_context/rc_packet.py:205)`
+  - `_render_symbol_block (dev_tools/repo_context/rc_packet.py:213)`
+  - `generate_packet (dev_tools/repo_context/rc_packet.py:231)`
+  - `generate_packet (dev_tools/repo_context/rc_packet.py:232)`
+  - `generate_packet (dev_tools/repo_context/rc_packet.py:233)`
+  - `generate_packet (dev_tools/repo_context/rc_packet.py:234)`
+  - `generate_packet (dev_tools/repo_context/rc_packet.py:242)`
+  - `generate_packet (dev_tools/repo_context/rc_packet.py:253)`
+  - `generate_packet (dev_tools/repo_context/rc_packet.py:261)`
+  - `generate_packet (dev_tools/repo_context/rc_packet.py:266)`
+  - `generate_packet (dev_tools/repo_context/rc_packet.py:446)`
+  - `generate_packet (dev_tools/repo_context/rc_packet.py:450)`
+  - ... and 13 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`51c343731f80f2f0…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_packet.py`)
+
+### `dev_tools/repo_context/rc_pyanalysis.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
+- Purpose clues:
+  - module docstring: AST-based Python symbol / import / call extraction.
+  - filename/path terms: rc pyanalysis
+- Important symbols (21 total):
+  - `dotted_module_path` (function) — line 22
+  - `_complexity_count` (function) — line 30
+  - `complexity_approx` (function) — line 47
+  - `_is_main_guard` (function) — line 51
+  - `_is_static_false_test` (function) — line 62
+  - `_is_static_true_test` (function) — line 76
+  - `_unparse_safe` (function) — line 82
+  - `format_params` (function) — line 91
+  - `RawCall` (class) — line 126
+  - `ClassInfo` (class) — line 137
+  - `PyFileAnalysis` (class) — line 144
+  - `_lambda_param_names` (function) — line 157
+  - `_collect_local_bound_names` (function) — line 172
+  - `_collect_module_reassigned_names` (function) — line 223
+  - `analyze_python_source` (function) — line 246
+  - `resolve_import_record` (function) — line 519
+  - `build_import_bindings` (function) — line 569
+  - `build_bindings_by_scope` (function) — line 597
+  - `_lookup_in_scope_chain` (function) — line 606
+  - `resolve_calls` (function) — line 657
+  - `name_in_index` (function) — line 813
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_complexity_count (dev_tools/repo_context/rc_pyanalysis.py:43)`
+  - `analyze_python_source (dev_tools/repo_context/rc_pyanalysis.py:258)`
+  - `analyze_python_source (dev_tools/repo_context/rc_pyanalysis.py:276)`
+  - `analyze_python_source (dev_tools/repo_context/rc_pyanalysis.py:510)`
+  - `analyze_python_source (dev_tools/repo_context/rc_pyanalysis.py:515)`
+  - `analyze_python_source.handle_class (dev_tools/repo_context/rc_pyanalysis.py:411)`
+  - `analyze_python_source.handle_class (dev_tools/repo_context/rc_pyanalysis.py:420)`
+  - `analyze_python_source.handle_class (dev_tools/repo_context/rc_pyanalysis.py:427)`
+  - `analyze_python_source.handle_class (dev_tools/repo_context/rc_pyanalysis.py:442)`
+  - `analyze_python_source.handle_func (dev_tools/repo_context/rc_pyanalysis.py:469)`
+  - `analyze_python_source.handle_func (dev_tools/repo_context/rc_pyanalysis.py:470)`
+  - `analyze_python_source.handle_func (dev_tools/repo_context/rc_pyanalysis.py:472)`
+  - `analyze_python_source.handle_func (dev_tools/repo_context/rc_pyanalysis.py:476)`
+  - `analyze_python_source.handle_func (dev_tools/repo_context/rc_pyanalysis.py:485)`
+  - `analyze_python_source.make_call (dev_tools/repo_context/rc_pyanalysis.py:287)`
+  - ... and 17 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`6250793f1eacbfb1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_pyanalysis.py`)
+
+### `dev_tools/repo_context/rc_request.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
+- Purpose clues:
+  - module docstring: packet_request.json: schema validation, deterministic selector
+  - filename/path terms: rc request
+- Important symbols (14 total):
+  - `RequestError` (class) — line 36
+  - `ResolvedRequest` (class) — line 43
+  - `_is_safe_repo_relative_path` (function) — line 62
+  - `validate_request_dict` (function) — line 76
+  - `parse_and_validate_request` (function) — line 202
+  - `SelectorResolution` (class) — line 244
+  - `resolve_files` (function) — line 253
+  - `resolve_symbols` (function) — line 267
+  - `resolve_lines` (function) — line 292
+  - `_render_origin_header` (function) — line 317
+  - `_render_excerpt_block` (function) — line 321
+  - `_symbol_expansion` (function) — line 352
+  - `generate_packet_from_request` (function) — line 443
+  - `_res_to_dict` (function) — line 718
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:458)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:471)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:472)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:473)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:479)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:520)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:550)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:554)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:565)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:566)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:570)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:585)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:591)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:595)`
+  - `generate_packet_from_request (dev_tools/repo_context/rc_request.py:602)`
+  - ... and 16 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`406c3779ba7e34ec…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_request.py`)
+
+### `dev_tools/repo_context/rc_scan.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'dev_tools/')
+- Purpose clues:
+  - module docstring: Filesystem walk + inventory + Python analysis orchestration.
+  - filename/path terms: rc scan
+- Important symbols (9 total):
+  - `ScanOptions` (class) — line 28
+  - `ScanResult` (class) — line 48
+  - `_sort_key` (function) — line 62
+  - `_is_ancestor` (function) — line 66
+  - `_should_exclude_file` (function) — line 74
+  - `_walk` (function) — line 88
+  - `scan_repository` (function) — line 175
+  - `_cleanup_stale_chunks` (function) — line 340
+  - `_resolve_python_relationships` (function) — line 359
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_walk.recurse (dev_tools/repo_context/rc_scan.py:137)`
+  - `_walk.recurse (dev_tools/repo_context/rc_scan.py:138)`
+  - `_walk.recurse (dev_tools/repo_context/rc_scan.py:98)`
+  - `scan_repository (dev_tools/repo_context/rc_scan.py:176)`
+  - `scan_repository (dev_tools/repo_context/rc_scan.py:186)`
+  - `scan_repository (dev_tools/repo_context/rc_scan.py:206)`
+  - `scan_repository (dev_tools/repo_context/rc_scan.py:335)`
+  - `scan_repository (dev_tools/repo_context/rc_scan.py:336)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`6ebef0788146efcb…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/rc_scan.py`)
+
+## Omitted from this catalog (size limit reached)
+
+7 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
+
+- `dev_tools/repo_context/rc_routing.py`
+- `dev_tools/repo_context/rc_tree.py`
+- `dev_tools/repo_context/rc_validate.py`
+- `dev_tools/repo_context/rc_writers.py`
+- `dev_tools/repo_context/README.md`
+- `dev_tools/repo_context/repo_context.py`
+- `dev_tools/repo_context/schema/packet_request.schema.json`
+

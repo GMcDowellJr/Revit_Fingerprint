@@ -1,0 +1,453 @@
+# Routing catalog: `core`
+
+- Generated (UTC): 2026-08-22T04:24:28Z
+- Tool version: 0.1.0
+- Files covered: 25
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `95ded63fe541519763c99967adc6f97648d4e96457f54cb1a76ee6b91f78c293`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `core/__init__.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Core utilities package (pure Python + minimal Revit-aware helpers).
+  - filename/path terms: init
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`f6bda52cd73a263b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/__init__.py`)
+
+### `core/canon.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Core canonicalization and formatting utilities (pure Python, no Revit API).
+  - filename/path terms: canon
+- Important symbols (8 total):
+  - `is_sentinel` (function) — line 33
+  - `canon_str` (function) — line 41
+  - `canon_bool` (function) — line 73
+  - `canon_num` (function) — line 93
+  - `canon_id` (function) — line 108
+  - `fnum` (function) — line 146
+  - `rgb_sig_from_color` (function) — line 151
+  - `rgb_dict_from_color` (function) — line 161
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+- Called by (high/medium-confidence static callers):
+  - `DocViewContext.view_info (core/context.py:107)`
+  - `DocViewContext.view_info (core/context.py:119)`
+  - `DocViewContext.view_info (core/context.py:144)`
+  - `DocViewContext.view_info (core/context.py:167)`
+  - `DocViewContext.view_info (core/context.py:169)`
+  - `_append_filter_stack_signature (domains/view_templates.py:181)`
+  - `_append_filter_stack_signature (domains/view_templates.py:198)`
+  - `_append_filter_stack_signature (domains/view_templates.py:205)`
+  - `_append_filter_stack_signature (domains/view_templates.py:207)`
+  - `_append_phase_filter_value (domains/view_templates.py:142)`
+  - `_append_phase_filter_value (domains/view_templates.py:147)`
+  - `_append_phase_filter_value (domains/view_templates.py:150)`
+  - `_append_phase_filter_value (domains/view_templates.py:158)`
+  - `_append_workset_visibility (domains/view_templates.py:287)`
+  - `_collect_categories (domains/object_styles.py:83)`
+  - ... and 97 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`e4457ee152230f1a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/canon.py`)
+
+### `core/canonical_items.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Canonical flat-item helpers.
+  - filename/path terms: canonical items
+- Important symbols (6 total):
+  - `_normalize_item` (function) — line 26
+  - `build_flat_items` (function) — line 35
+  - `merge_legacy_buckets` (function) — line 58
+  - `compile_role_policy` (function) — line 72
+  - `resolve_item_roles` (function) — line 107
+  - `canonicalize_record` (function) — line 130
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_canonicalize_all_domain_records (runner/run_dynamo.py:1258)`
+  - `build_flat_items (core/canonical_items.py:47)`
+  - `canonicalize_record (core/canonical_items.py:137)`
+  - `extract (domains/text_types.py:537)`
+  - `flat_items_for_record (core/name_key_builder.py:73)`
+  - `merge_legacy_buckets (core/canonical_items.py:69)`
+  - `test_build_flat_items_preserves_counts_for_unique_keys (tests/test_canonical_items_migration.py:25)`
+  - `test_canonicalize_record_merges_all_sources_and_strips_legacy_keys (tests/test_runner_canonicalization.py:24)`
+  - `test_compile_and_resolve_roles_runtime_from_key_only (tests/test_canonical_items_migration.py:44)`
+  - `test_compile_and_resolve_roles_runtime_from_key_only (tests/test_canonical_items_migration.py:52)`
+  - `test_compile_role_policy_accepts_top_level_domains_wrapper (tests/test_canonical_items_migration.py:82)`
+  - `test_compile_role_policy_skips_scalar_string_for_role_keys (tests/test_canonical_items_migration.py:67)`
+  - `test_merge_legacy_buckets_preserves_existing_canonical_items (tests/test_canonical_items_migration.py:33)`
+  - `test_merge_legacy_buckets_to_flat_items_equivalence_and_dedupe (tests/test_canonical_items_migration.py:17)`
+  - `transform_record (tools/migration/reformat_to_flat_items.py:39)`
+- Related tests:
+  - `tests/test_canonical_items_migration.py`
+  - `tests/test_runner_canonicalization.py`
+- Retrieval identity: sha256=`eb3070fcc6e154f1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/canonical_items.py`)
+
+### `core/collect.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: core/collect.py
+  - filename/path terms: collect
+- Important symbols (15 total):
+  - `CollectCtx` (class) — line 34
+  - `_is_invalid_element_id` (function) — line 54
+  - `_safe_unique_id` (function) — line 86
+  - `_make_query_key` (function) — line 97
+  - `_require_revit_api` (function) — line 126
+  - `_collect_id_ints_uncached` (function) — line 131
+  - `collect_id_ints` (function) — line 238
+  - `_get_element` (function) — line 312
+  - `collect_elements` (function) — line 324
+  - `collect_types` (function) — line 362
+  - `collect_instances` (function) — line 386
+  - `build_purgeable_id_set` (function) — line 412
+  - `purge_lookup` (function) — line 465
+  - `build_subcategory_used_id_set` (function) — line 478
+  - `is_type_purgeable` (function) — line 552
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `TestCollectCtx.test_default_fields (tests/test_collect.py:43)`
+  - `TestCollectCtx.test_inc_accumulates (tests/test_collect.py:25)`
+  - `TestCollectCtx.test_inc_coerces_to_int (tests/test_collect.py:37)`
+  - `TestCollectCtx.test_inc_initializes_counter (tests/test_collect.py:20)`
+  - `TestCollectCtx.test_inc_multiple_keys (tests/test_collect.py:31)`
+  - `TestCollectIdIntsNoRevit.test_cache_bypass_for_unkeyed_predicate (tests/test_collect.py:201)`
+  - `TestCollectIdIntsNoRevit.test_cache_bypass_for_unkeyed_predicate (tests/test_collect.py:203)`
+  - `TestCollectIdIntsNoRevit.test_no_revit_raises (tests/test_collect.py:191)`
+  - `TestCollectIdIntsNoRevit.test_none_doc_raises (tests/test_collect.py:197)`
+  - `TestIsInvalidElementId.test_integer_value_none_is_invalid (tests/test_collect.py:90)`
+  - `TestIsInvalidElementId.test_large_positive_is_valid (tests/test_collect.py:85)`
+  - `TestIsInvalidElementId.test_negative_integer_value_is_invalid (tests/test_collect.py:64)`
+  - `TestIsInvalidElementId.test_none_is_invalid (tests/test_collect.py:55)`
+  - `TestIsInvalidElementId.test_object_without_integer_value_is_invalid (tests/test_collect.py:59)`
+  - `TestIsInvalidElementId.test_positive_integer_value_is_valid (tests/test_collect.py:80)`
+  - ... and 87 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_collect.py`
+- Retrieval identity: sha256=`b1452ea1e12dabe2…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/collect.py`)
+
+### `core/context.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - filename/path terms: context
+- Important symbols (2 total):
+  - `ViewInfo` (class) — line 28
+  - `DocViewContext` (class) — line 50
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+- Called by (high/medium-confidence static callers):
+  - `DocViewContext.view_info (core/context.py:176)`
+  - `DocViewContext.view_info (core/context.py:85)`
+  - `run_fingerprint (runner/run_dynamo.py:562)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`108e9b2fb27f7a86…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/context.py`)
+
+### `core/contracts.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - filename/path terms: contracts
+- Important symbols (7 total):
+  - `DiagError` (class) — line 55
+  - `_ensure_list` (function) — line 62
+  - `new_run_diag` (function) — line 66
+  - `add_bounded_error` (function) — line 85
+  - `new_domain_envelope` (function) — line 134
+  - `new_run_envelope` (function) — line 170
+  - `compute_run_status` (function) — line 205
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_env (tests/test_contracts_run_status.py:23)`
+  - `compute_run_status (core/contracts.py:225)`
+  - `compute_run_status (core/contracts.py:258)`
+  - `compute_run_status (core/contracts.py:286)`
+  - `new_domain_envelope (core/contracts.py:158)`
+  - `test_bounded_errors_caps_and_counts_dropped (tests/test_contracts_bounded_errors.py:11)`
+  - `test_bounded_errors_caps_and_counts_dropped (tests/test_contracts_bounded_errors.py:7)`
+  - `test_bounded_errors_defensive_cap_nonpositive (tests/test_contracts_bounded_errors.py:26)`
+  - `test_bounded_errors_defensive_cap_nonpositive (tests/test_contracts_bounded_errors.py:27)`
+  - `test_invalid_domain_status_counts_as_failed_and_records_error (tests/test_contracts_run_status.py:87)`
+  - `test_new_run_envelope_accepts_current_version (tests/test_contracts_run_status.py:108)`
+  - `test_new_run_envelope_accepts_current_version (tests/test_contracts_run_status.py:109)`
+  - `test_new_run_envelope_rejects_mismatched_version (tests/test_contracts_run_status.py:96)`
+  - `test_new_run_envelope_rejects_mismatched_version (tests/test_contracts_run_status.py:98)`
+  - `test_run_status_all_ok (tests/test_contracts_run_status.py:39)`
+  - ... and 4 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_contracts_bounded_errors.py`
+  - `tests/test_contracts_run_status.py`
+  - `tests/test_deps_require_domain.py`
+- Retrieval identity: sha256=`3cc219652631985f…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/contracts.py`)
+
+### `core/deployment_config.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Dependency-neutral validation for deployment-owned extraction configuration.
+  - filename/path terms: deployment config
+- Important symbols (3 total):
+  - `validate_project_info_shared_parameters` (function) — line 22
+  - `_identity_allowed_keys` (function) — line 64
+  - `load_deployment_config` (function) — line 75
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_configured_project_info_fields (domains/identity.py:192)`
+  - `build_extraction_context (runner/extraction_context.py:23)`
+  - `load_deployment_config (core/deployment_config.py:89)`
+  - `load_deployment_config (core/deployment_config.py:90)`
+  - `test_malformed_contract_fails (tests/test_deployment_config.py:119)`
+  - `test_missing_contract_fails (tests/test_deployment_config.py:111)`
+  - `test_no_configuration_is_empty (tests/test_deployment_config.py:26)`
+  - `test_rejects_duplicate_guid_mapped_to_conflicting_keys (tests/test_deployment_config.py:94)`
+  - `test_rejects_invalid_mapping_entries (tests/test_deployment_config.py:81)`
+  - `test_rejects_missing_mapping_field (tests/test_deployment_config.py:106)`
+  - `test_rejects_missing_or_invalid_schema (tests/test_deployment_config.py:60)`
+  - `test_rejects_non_list_mapping (tests/test_deployment_config.py:66)`
+  - `test_rejects_non_object_top_level (tests/test_deployment_config.py:49)`
+  - `test_rejects_unknown_top_level_field (tests/test_deployment_config.py:99)`
+  - `test_valid_guid_is_canonicalized (tests/test_deployment_config.py:38)`
+  - ... and 1 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_deployment_config.py`
+- Retrieval identity: sha256=`98a20ac81bb72653…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/deployment_config.py`)
+
+### `core/deps.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: core/deps.py
+  - filename/path terms: deps
+- Important symbols (2 total):
+  - `Blocked` (class) — line 29
+  - `require_domain` (function) — line 55
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/contracts.py`
+- Called by (high/medium-confidence static callers):
+  - `_extract_object_styles (domains/object_styles.py:227)`
+  - `_require_compound_dependencies (domains/compound_layers.py:417)`
+  - `_require_compound_dependencies (domains/compound_layers.py:418)`
+  - `_require_compound_dependencies (domains/compound_layers.py:419)`
+  - `extract (domains/view_category_overrides_model.py:127)`
+  - `extract_ceiling_plans (domains/view_templates.py:891)`
+  - `extract_ceiling_plans (domains/view_templates.py:892)`
+  - `extract_elevations_sections_detail (domains/view_templates.py:1341)`
+  - `extract_elevations_sections_detail (domains/view_templates.py:1342)`
+  - `extract_floor_structural_area_plans (domains/view_templates.py:466)`
+  - `extract_floor_structural_area_plans (domains/view_templates.py:467)`
+  - `extract_renderings_drafting (domains/view_templates.py:1767)`
+  - `extract_renderings_drafting (domains/view_templates.py:1768)`
+  - `extract_schedules (domains/view_templates.py:2189)`
+  - `require_domain (core/deps.py:108)`
+  - ... and 24 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_deps_require_domain.py`
+- Retrieval identity: sha256=`7b19f119e2382e79…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/deps.py`)
+
+### `core/dimension_type_helpers.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: core/dimension_type_helpers.py
+  - filename/path terms: dimension type helpers
+- Important symbols (14 total):
+  - `_get_dimension_shape` (function) — line 130
+  - `_fmt_in_from_ft` (function) — line 254
+  - `_fmt_float` (function) — line 265
+  - `_format_options_to_kv` (function) — line 279
+  - `get_type_display_name` (function) — line 327
+  - `_build_text_appearance_items` (function) — line 402
+  - `_read_tick_mark_sig_hash` (function) — line 528
+  - `_read_unit_format_info` (function) — line 577
+  - `_read_prefix_suffix` (function) — line 685
+  - `_read_leader_arrowhead` (function) — line 720
+  - `_read_arrowhead_ref_sig_hash` (function) — line 799
+  - `_read_element_ref_name` (function) — line 859
+  - `_read_line_pattern_ref_sig_hash` (function) — line 931
+  - `_build_alternate_units_items` (function) — line 1040
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+  - imports `core/hashing.py`
+  - imports `core/record_v2.py`
+  - imports `core/rows.py`
+- Called by (high/medium-confidence static callers):
+  - `_build_text_appearance_items (core/dimension_type_helpers.py:443)`
+  - `_format_options_to_kv (core/dimension_type_helpers.py:314)`
+  - `_read_element_ref_name (core/dimension_type_helpers.py:911)`
+  - `_read_leader_arrowhead (core/dimension_type_helpers.py:768)`
+  - `_read_unit_format_info (core/dimension_type_helpers.py:664)`
+  - `extract_angular (domains/dimension_types.py:699)`
+  - `extract_angular (domains/dimension_types.py:706)`
+  - `extract_angular (domains/dimension_types.py:739)`
+  - `extract_angular (domains/dimension_types.py:742)`
+  - `extract_angular (domains/dimension_types.py:745)`
+  - `extract_angular (domains/dimension_types.py:764)`
+  - `extract_angular (domains/dimension_types.py:794)`
+  - `extract_angular (domains/dimension_types.py:801)`
+  - `extract_angular (domains/dimension_types.py:808)`
+  - `extract_angular (domains/dimension_types.py:831)`
+  - ... and 65 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_dimension_types_shape_gating.py`
+- Retrieval identity: sha256=`dc024129e8ca371f…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `core/dimension_type_helpers.py`)
+
+### `core/features.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Cohort-analysis feature surface.
+  - filename/path terms: features
+- Important symbols (4 total):
+  - `_as_dict` (function) — line 19
+  - `_as_int` (function) — line 23
+  - `_extract_counts_from_legacy` (function) — line 41
+  - `build_features` (function) — line 55
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_extract_counts_from_legacy (core/features.py:49)`
+  - `_extract_counts_from_legacy (core/features.py:50)`
+  - `_extract_counts_from_legacy (core/features.py:51)`
+  - `build_features (core/features.py:100)`
+  - `build_features (core/features.py:111)`
+  - `build_features (core/features.py:66)`
+  - `build_features (core/features.py:67)`
+  - `build_features (core/features.py:73)`
+  - `build_features (core/features.py:77)`
+  - `build_features (core/features.py:92)`
+  - `build_features (core/features.py:94)`
+  - `build_features (core/features.py:95)`
+  - `run_fingerprint (runner/run_dynamo.py:1136)`
+  - `test_monolithic_features_surface (tests/test_split_export.py:62)`
+- Related tests:
+  - `tests/test_split_export.py`
+- Retrieval identity: sha256=`577662845d652f69…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/features.py`)
+
+### `core/graphic_overrides.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: core/graphic_overrides.py
+  - filename/path terms: graphic overrides
+- Important symbols (19 total):
+  - `_is_category` (function) — line 62
+  - `_is_ogs` (function) — line 67
+  - `_is_invalid_element_id` (function) — line 72
+  - `_rgb_from_color` (function) — line 89
+  - `_read_attr` (function) — line 100
+  - `_read_first_attr` (function) — line 110
+  - `_read_category_line_weight` (function) — line 122
+  - `_read_category_line_pattern_id` (function) — line 133
+  - `_read_category_line_color` (function) — line 143
+  - `_read_category_fill_pattern_id` (function) — line 155
+  - `_read_category_fill_color` (function) — line 170
+  - `_resolve_pattern_sig_hash` (function) — line 179
+  - `_append_pattern_items` (function) — line 204
+  - `_append_color_item` (function) — line 237
+  - `_append_value_item` (function) — line 243
+  - `extract_projection_graphics` (function) — line 260
+  - `extract_cut_graphics` (function) — line 393
+  - `extract_halftone` (function) — line 524
+  - `extract_transparency` (function) — line 545
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `TestExtractUnknownSource.test_custom_key_prefix (tests/test_graphic_overrides.py:202)`
+  - `TestExtractUnknownSource.test_cut_graphics_unknown_source (tests/test_graphic_overrides.py:178)`
+  - `TestExtractUnknownSource.test_halftone_custom_prefix (tests/test_graphic_overrides.py:209)`
+  - `TestExtractUnknownSource.test_halftone_unknown_source (tests/test_graphic_overrides.py:190)`
+  - `TestExtractUnknownSource.test_projection_graphics_unknown_source (tests/test_graphic_overrides.py:166)`
+  - `TestExtractUnknownSource.test_transparency_custom_prefix (tests/test_graphic_overrides.py:213)`
+  - `TestExtractUnknownSource.test_transparency_unknown_source (tests/test_graphic_overrides.py:196)`
+  - `TestIsInvalidElementId.test_negative_is_invalid (tests/test_graphic_overrides.py:45)`
+  - `TestIsInvalidElementId.test_no_integer_value_attr_is_valid (tests/test_graphic_overrides.py:49)`
+  - `TestIsInvalidElementId.test_none_is_invalid (tests/test_graphic_overrides.py:29)`
+  - `TestIsInvalidElementId.test_positive_integer_value_is_valid (tests/test_graphic_overrides.py:34)`
+  - `TestIsInvalidElementId.test_zero_is_invalid (tests/test_graphic_overrides.py:40)`
+  - `TestReadAttr.test_existing_attr (tests/test_graphic_overrides.py:108)`
+  - `TestReadAttr.test_missing_attr (tests/test_graphic_overrides.py:113)`
+  - `TestReadAttr.test_raising_attr (tests/test_graphic_overrides.py:122)`
+  - ... and 76 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_graphic_overrides.py`
+- Retrieval identity: sha256=`ff5b1bc151c0999e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/graphic_overrides.py`)
+
+### `core/hashing.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'core/')
+- Purpose clues:
+  - module docstring: Core hashing utilities (pure Python, no Revit API).
+  - filename/path terms: hashing
+- Important symbols (3 total):
+  - `safe_str` (function) — line 14
+  - `make_hash` (function) — line 29
+  - `_make_hash_impl` (function) — line 62
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `TestCanonicalEvidenceSelectors.test_linear_join_key_uses_required_keys_only (tests/test_dimension_types_shape_gating.py:284)`
+  - `TestHashingTimingIntegration.test_make_hash_determinism_with_timing (tests/test_timing_collector.py:292)`
+  - `TestHashingTimingIntegration.test_make_hash_determinism_with_timing (tests/test_timing_collector.py:297)`
+  - `_append_workset_visibility (domains/view_templates.py:290)`
+  - `_append_workset_visibility (domains/view_templates.py:292)`
+  - `_apply_family_name_override (domains/dimension_types.py:1067)`
+  - `_apply_family_name_override (domains/dimension_types.py:1440)`
+  - `_apply_family_name_override (domains/dimension_types.py:165)`
+  - `_apply_family_name_override (domains/dimension_types.py:1812)`
+  - `_apply_family_name_override (domains/dimension_types.py:2271)`
+  - `_apply_family_name_override (domains/dimension_types.py:2748)`
+  - `_apply_family_name_override (domains/dimension_types.py:640)`
+  - `_block_record_for_unstable_id (core/record_v2.py:404)`
+  - `_build_doc_level_record (domains/worksets.py:380)`
+  - `_build_per_workset_record (domains/worksets.py:218)`
+  - ... and 506 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_arrowheads_shape_gating.py`
+  - `tests/test_dimension_types_shape_gating.py`
+  - `tests/test_fill_patterns_canonical_selectors.py`
+  - `tests/test_hashing_incremental.py`
+  - `tests/test_identity_canonical_selectors.py`
+  - `tests/test_line_patterns_canonical_selectors.py`
+  - `tests/test_line_styles_canonical_selectors.py`
+  - `tests/test_materials.py`
+  - `tests/test_object_styles_canonical_selectors.py`
+  - `tests/test_phase_filters_canonical_selectors.py`
+- Retrieval identity: sha256=`ccdf5160115495da…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/hashing.py`)
+
+## Omitted from this catalog (size limit reached)
+
+13 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
+
+- `core/join_key_builder.py`
+- `core/join_key_policy.py`
+- `core/manifest.py`
+- `core/name_key_builder.py`
+- `core/name_key_coverage.py`
+- `core/naming.py`
+- `core/phase2.py`
+- `core/record_v2.py`
+- `core/rows.py`
+- `core/sig_hash_builder.py`
+- `core/sig_hash_policy.py`
+- `core/timing_collector.py`
+- `core/vg_sig.py`
+

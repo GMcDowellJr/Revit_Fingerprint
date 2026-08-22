@@ -1,0 +1,171 @@
+# Routing catalog: `mapping`
+
+- Generated (UTC): 2026-08-22T04:24:28Z
+- Tool version: 0.1.0
+- Files covered: 5
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `433bc87f020c5adf4ea6791839cd72bbb0245a8d5454fb5ba76e39c5384bc03e`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `mapping/__init__.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'mapping/')
+- Purpose clues:
+  - module docstring: mapping/ -- Revit-side downstream utility that materializes governance mapping
+  - filename/path terms: init
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`17611893c1d397bd…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `mapping/__init__.py`)
+
+### `mapping/_dynamo_bootstrap.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'mapping/')
+- Purpose clues:
+  - module docstring: Shared Dynamo CPython3 bootstrap logic for mapping/ entry points.
+  - filename/path terms: dynamo bootstrap
+- Important symbols (6 total):
+  - `looks_like_repo_root` (function) — line 60
+  - `resolve_repo_root` (function) — line 70
+  - `purge_repo_modules` (function) — line 124
+  - `promote_on_sys_path` (function) — line 141
+  - `add_revit_api_references` (function) — line 152
+  - `bootstrap` (function) — line 168
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `bootstrap (mapping/_dynamo_bootstrap.py:180)`
+  - `bootstrap (mapping/_dynamo_bootstrap.py:181)`
+  - `bootstrap (mapping/_dynamo_bootstrap.py:182)`
+  - `bootstrap (mapping/_dynamo_bootstrap.py:184)`
+  - `resolve_repo_root (mapping/_dynamo_bootstrap.py:105)`
+  - `resolve_repo_root (mapping/_dynamo_bootstrap.py:111)`
+  - `resolve_repo_root (mapping/_dynamo_bootstrap.py:90)`
+- Related tests:
+  - `tests/test_dynamo_bootstrap.py`
+- Retrieval identity: sha256=`072a0d5ded07eb53…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `mapping/_dynamo_bootstrap.py`)
+
+### `mapping/create_line_pattern_mappings.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'mapping/')
+- Purpose clues:
+  - filename/path terms: create line pattern mappings
+- Important symbols (3 total):
+  - `_load_bootstrap_module_from` (function) — line 57
+  - `_load_dynamo_bootstrap` (function) — line 67
+  - `run` (function) — line 155
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `mapping/line_pattern_reconstruction.py`
+  - imports `mapping/line_pattern_revit_apply.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (mapping/create_line_pattern_mappings.py:131)`
+  - `<module> (mapping/create_line_pattern_mappings.py:221)`
+  - `_load_dynamo_bootstrap (mapping/create_line_pattern_mappings.py:100)`
+  - `_load_dynamo_bootstrap (mapping/create_line_pattern_mappings.py:118)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`0132770ac4e2df4c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `mapping/create_line_pattern_mappings.py`)
+
+### `mapping/line_pattern_reconstruction.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'mapping/')
+- Purpose clues:
+  - module docstring: Pure-Python reconstruction/validation/naming logic for the line_patterns
+  - filename/path terms: line pattern reconstruction
+- Important symbols (24 total):
+  - `dominant_status` (function) — line 124
+  - `get_line_patterns_join_key_policy` (function) — line 133
+  - `read_csv_rows` (function) — line 153
+  - `load_bundle_pattern_detail_export` (function) — line 158
+  - `SkippedRequest` (class) — line 183
+  - `group_requested_join_hashes` (function) — line 190
+  - `group_settings_by_join_hash` (function) — line 248
+  - `group_names_by_join_hash` (function) — line 260
+  - `compute_segments_def_hash` (function) — line 276
+  - `compute_segments_norm_hash` (function) — line 290
+  - `compute_join_hash_for_segments` (function) — line 317
+  - `ReconstructedPattern` (class) — line 348
+  - `_blocked` (function) — line 362
+  - `reconstruct_pattern` (function) — line 366
+  - `short_join_hash` (function) — line 511
+  - `sanitize_revit_name` (function) — line 515
+  - `select_observed_name` (function) — line 532
+  - `resolve_observed_name` (function) — line 560
+  - `build_mapping_name_candidates` (function) — line 569
+  - `MappingOutcome` (class) — line 588
+  - `outcome_to_report_row` (function) — line 625
+  - `build_report_rows` (function) — line 643
+  - `write_report_csv` (function) — line 653
+  - `compute_run_status` (function) — line 668
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+  - imports `domains/line_patterns.py`
+- Called by (high/medium-confidence static callers):
+  - `_blocked (mapping/line_pattern_reconstruction.py:363)`
+  - `_requested_join_hash_for (tests/test_line_pattern_mapping_reconstruction.py:63)`
+  - `build_mapping_name_candidates (mapping/line_pattern_reconstruction.py:571)`
+  - `build_mapping_name_candidates (mapping/line_pattern_reconstruction.py:573)`
+  - `build_report_rows (mapping/line_pattern_reconstruction.py:650)`
+  - `compute_join_hash_for_segments (mapping/line_pattern_reconstruction.py:328)`
+  - `compute_join_hash_for_segments (mapping/line_pattern_reconstruction.py:329)`
+  - `compute_run_status (mapping/line_pattern_reconstruction.py:673)`
+  - `group_requested_join_hashes (mapping/line_pattern_reconstruction.py:237)`
+  - `load_bundle_pattern_detail_export (mapping/line_pattern_reconstruction.py:172)`
+  - `load_bundle_pattern_detail_export (mapping/line_pattern_reconstruction.py:173)`
+  - `load_bundle_pattern_detail_export (mapping/line_pattern_reconstruction.py:174)`
+  - `reconstruct_pattern (mapping/line_pattern_reconstruction.py:374)`
+  - `reconstruct_pattern (mapping/line_pattern_reconstruction.py:383)`
+  - `reconstruct_pattern (mapping/line_pattern_reconstruction.py:387)`
+  - ... and 82 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_line_pattern_mapping_reconstruction.py`
+- Retrieval identity: sha256=`a218f35c1bed6a59…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `mapping/line_pattern_reconstruction.py`)
+
+### `mapping/line_pattern_revit_apply.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'mapping/')
+- Purpose clues:
+  - module docstring: Revit-API half of the line_patterns mapping utility. Everything here requires
+  - filename/path terms: line pattern revit apply
+- Important symbols (8 total):
+  - `read_segments_from_element` (function) — line 83
+  - `build_name_index` (function) — line 137
+  - `VerificationResult` (class) — line 166
+  - `verify_element_join_hash` (function) — line 172
+  - `CreationResult` (class) — line 193
+  - `_build_api_segments` (function) — line 201
+  - `create_and_verify_line_pattern` (function) — line 212
+  - `resolve_mapping` (function) — line 291
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/collect.py`
+  - imports `core/hashing.py`
+  - imports `domains/line_patterns.py`
+  - imports `mapping/line_pattern_reconstruction.py`
+- Called by (high/medium-confidence static callers):
+  - `create_and_verify_line_pattern (mapping/line_pattern_revit_apply.py:227)`
+  - `create_and_verify_line_pattern (mapping/line_pattern_revit_apply.py:236)`
+  - `create_and_verify_line_pattern (mapping/line_pattern_revit_apply.py:239)`
+  - `create_and_verify_line_pattern (mapping/line_pattern_revit_apply.py:244)`
+  - `create_and_verify_line_pattern (mapping/line_pattern_revit_apply.py:259)`
+  - `create_and_verify_line_pattern (mapping/line_pattern_revit_apply.py:266)`
+  - `create_and_verify_line_pattern (mapping/line_pattern_revit_apply.py:279)`
+  - `resolve_mapping (mapping/line_pattern_revit_apply.py:340)`
+  - `resolve_mapping (mapping/line_pattern_revit_apply.py:354)`
+  - `resolve_mapping (mapping/line_pattern_revit_apply.py:370)`
+  - `resolve_mapping (mapping/line_pattern_revit_apply.py:388)`
+  - `run (mapping/create_line_pattern_mappings.py:165)`
+  - `run (mapping/create_line_pattern_mappings.py:172)`
+  - `verify_element_join_hash (mapping/line_pattern_revit_apply.py:175)`
+  - `verify_element_join_hash (mapping/line_pattern_revit_apply.py:177)`
+  - ... and 2 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`d5fc7abed3ac0e0b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `mapping/line_pattern_revit_apply.py`)
+

@@ -1,0 +1,409 @@
+# Routing catalog: `tools/label_synthesis`
+
+- Generated (UTC): 2026-08-22T04:24:28Z
+- Tool version: 0.1.0
+- Files covered: 26
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `f5c31f56b033647f17cf57d58ba06b001e89d4267d32522303a0f4daef3a06e6`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tools/label_synthesis/__init__.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: init
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`e6d87c9e837f845c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/__init__.py`)
+
+### `tools/label_synthesis/build_identity_items_lookup.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: tools/label_synthesis/build_identity_items_lookup.py
+  - filename/path terms: build identity items lookup
+- Important symbols (4 total):
+  - `_find_file` (function) — line 55
+  - `_sniff_item_columns` (function) — line 63
+  - `build_lookup` (function) — line 92
+  - `main` (function) — line 316
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/label_synthesis/build_identity_items_lookup.py:345)`
+  - `build_lookup (tools/label_synthesis/build_identity_items_lookup.py:120)`
+  - `build_lookup (tools/label_synthesis/build_identity_items_lookup.py:96)`
+  - `build_lookup._process_item_rows (tools/label_synthesis/build_identity_items_lookup.py:210)`
+  - `main (tools/label_synthesis/build_identity_items_lookup.py:338)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`586fd1603e52d8b0…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/build_identity_items_lookup.py`)
+
+### `tools/label_synthesis/build_label_population.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: tools/label_synthesis/build_label_population.py
+  - filename/path terms: build label population
+- Important symbols (2 total):
+  - `build_label_population` (function) — line 37
+  - `main` (function) — line 143
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/label_synthesis/build_label_population.py:182)`
+  - `main (tools/label_synthesis/build_label_population.py:174)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`a6988388f3d0dbd3…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/build_label_population.py`)
+
+### `tools/label_synthesis/build_semantic_groups.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Build semantic group labels for selected analysis domains.
+  - filename/path terms: build semantic groups
+- Important symbols (35 total):
+  - `build_grouping_prompt` (function) — line 48
+  - `_peer_block` (function) — line 71
+  - `_normalize_text_size` (function) — line 83
+  - `_parse_text_type_label_fields` (function) — line 125
+  - `_prompt_text_types` (function) — line 150
+  - `_prompt_arrowheads` (function) — line 230
+  - `_prompt_line_patterns` (function) — line 289
+  - `_prompt_line_styles` (function) — line 322
+  - `_normalise_fill_angle` (function) — line 384
+  - `_is_fill_angle_close` (function) — line 388
+  - `_infer_fill_geometry_description` (function) — line 396
+  - `_prompt_fill_patterns` (function) — line 432
+  - `_utc_now_iso` (function) — line 557
+  - `_read_csv_rows` (function) — line 561
+  - `_load_analysis_run_id` (function) — line 566
+  - `_load_cache` (function) — line 576
+  - `_save_cache` (function) — line 596
+  - `_write_json` (function) — line 602
+  - `_resolve_export_target` (function) — line 608
+  - `_write_export_batches` (function) — line 613
+  - `_load_export_progress` (function) — line 634
+  - `_save_export_progress` (function) — line 652
+  - `_derive_element_label` (function) — line 661
+  - `_load_pattern_rows` (function) — line 677
+  - `_load_pattern_to_record_pk` (function) — line 716
+  - ... and 10 more (see python_symbols.csv)
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/label_synthesis/build_semantic_groups.py:1196)`
+  - `_extract_behavioral_props (tools/label_synthesis/build_semantic_groups.py:824)`
+  - `_infer_fill_geometry_description (tools/label_synthesis/build_semantic_groups.py:402)`
+  - `_infer_fill_geometry_description (tools/label_synthesis/build_semantic_groups.py:403)`
+  - `_infer_fill_geometry_description (tools/label_synthesis/build_semantic_groups.py:405)`
+  - `_infer_fill_geometry_description (tools/label_synthesis/build_semantic_groups.py:407)`
+  - `_infer_fill_geometry_description (tools/label_synthesis/build_semantic_groups.py:409)`
+  - `_infer_fill_geometry_description (tools/label_synthesis/build_semantic_groups.py:415)`
+  - `_infer_fill_geometry_description (tools/label_synthesis/build_semantic_groups.py:416)`
+  - `_infer_fill_geometry_description (tools/label_synthesis/build_semantic_groups.py:417)`
+  - `_infer_fill_geometry_description (tools/label_synthesis/build_semantic_groups.py:421)`
+  - `_infer_fill_geometry_description (tools/label_synthesis/build_semantic_groups.py:422)`
+  - `_is_fill_angle_close (tools/label_synthesis/build_semantic_groups.py:389)`
+  - `_is_fill_angle_close (tools/label_synthesis/build_semantic_groups.py:390)`
+  - `_load_analysis_run_id (tools/label_synthesis/build_semantic_groups.py:570)`
+  - ... and 43 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`ecbac527e320e64b…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/build_semantic_groups.py`)
+
+### `tools/label_synthesis/domain_prompts/__init__.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: init
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`e6d87c9e837f845c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/domain_prompts/__init__.py`)
+
+### `tools/label_synthesis/domain_prompts/arrowheads.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - module docstring: tools/label_synthesis/domain_prompts/arrowheads.py
+  - filename/path terms: arrowheads
+- Important symbols (4 total):
+  - `build_prompt` (function) — line 206
+  - `_detect_record_class` (function) — line 318
+  - `_fmt_size` (function) — line 334
+  - `_format_identity_items` (function) — line 345
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_format_identity_items (tools/label_synthesis/domain_prompts/arrowheads.py:360)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/arrowheads.py:215)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/arrowheads.py:242)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`ad3ae7e9f2cbbc75…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/domain_prompts/arrowheads.py`)
+
+### `tools/label_synthesis/domain_prompts/dimension_types.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - module docstring: tools/label_synthesis/domain_prompts/dimension_types.py
+  - filename/path terms: dimension types
+- Important symbols (6 total):
+  - `_get_shape` (function) — line 276
+  - `_shape_context_note` (function) — line 283
+  - `build_prompt` (function) — line 325
+  - `_fmt_accuracy` (function) — line 522
+  - `_fmt_witness` (function) — line 533
+  - `_format_identity_items` (function) — line 537
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_format_identity_items (tools/label_synthesis/domain_prompts/dimension_types.py:629)`
+  - `_format_identity_items (tools/label_synthesis/domain_prompts/dimension_types.py:632)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/dimension_types.py:332)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/dimension_types.py:349)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/dimension_types.py:356)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`d10919365ed1bc89…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/domain_prompts/dimension_types.py`)
+
+### `tools/label_synthesis/domain_prompts/fill_patterns.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - module docstring: tools/label_synthesis/domain_prompts/fill_patterns.py
+  - filename/path terms: fill patterns
+- Important symbols (7 total):
+  - `build_prompt` (function) — line 178
+  - `_is_opaque_fallback` (function) — line 286
+  - `_normalise_angle` (function) — line 294
+  - `_is_angle_close` (function) — line 298
+  - `_infer_geometry_description` (function) — line 306
+  - `_extract_grid_geometry` (function) — line 353
+  - `_get_identity_value` (function) — line 378
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_infer_geometry_description (tools/label_synthesis/domain_prompts/fill_patterns.py:310)`
+  - `_infer_geometry_description (tools/label_synthesis/domain_prompts/fill_patterns.py:311)`
+  - `_infer_geometry_description (tools/label_synthesis/domain_prompts/fill_patterns.py:313)`
+  - `_infer_geometry_description (tools/label_synthesis/domain_prompts/fill_patterns.py:315)`
+  - `_infer_geometry_description (tools/label_synthesis/domain_prompts/fill_patterns.py:317)`
+  - `_infer_geometry_description (tools/label_synthesis/domain_prompts/fill_patterns.py:324)`
+  - `_infer_geometry_description (tools/label_synthesis/domain_prompts/fill_patterns.py:325)`
+  - `_infer_geometry_description (tools/label_synthesis/domain_prompts/fill_patterns.py:329)`
+  - `_infer_geometry_description (tools/label_synthesis/domain_prompts/fill_patterns.py:330)`
+  - `_infer_geometry_description (tools/label_synthesis/domain_prompts/fill_patterns.py:336)`
+  - `_infer_geometry_description (tools/label_synthesis/domain_prompts/fill_patterns.py:337)`
+  - `_is_angle_close (tools/label_synthesis/domain_prompts/fill_patterns.py:299)`
+  - `_is_angle_close (tools/label_synthesis/domain_prompts/fill_patterns.py:300)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/fill_patterns.py:186)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/fill_patterns.py:213)`
+  - ... and 3 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`b27249683f06eef0…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/domain_prompts/fill_patterns.py`)
+
+### `tools/label_synthesis/domain_prompts/line_patterns.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - module docstring: tools/label_synthesis/domain_prompts/line_patterns.py
+  - filename/path terms: line patterns
+- Important symbols (4 total):
+  - `_strip_import_prefix` (function) — line 125
+  - `_is_opaque_name` (function) — line 133
+  - `build_prompt` (function) — line 146
+  - `_format_identity_items` (function) — line 269
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_is_opaque_name (tools/label_synthesis/domain_prompts/line_patterns.py:141)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/line_patterns.py:160)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/line_patterns.py:162)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/line_patterns.py:209)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`c8a3037bc91290a2…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/domain_prompts/line_patterns.py`)
+
+### `tools/label_synthesis/domain_prompts/line_styles.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - module docstring: tools/label_synthesis/domain_prompts/line_styles.py
+  - filename/path terms: line styles
+- Important symbols (4 total):
+  - `_strip_lines_prefix` (function) — line 204
+  - `_fmt_color` (function) — line 218
+  - `build_prompt` (function) — line 233
+  - `_format_identity_items` (function) — line 330
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_format_identity_items (tools/label_synthesis/domain_prompts/line_styles.py:357)`
+  - `_format_identity_items (tools/label_synthesis/domain_prompts/line_styles.py:372)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/line_styles.py:257)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`8106216e6f5072c2…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/domain_prompts/line_styles.py`)
+
+### `tools/label_synthesis/domain_prompts/text_types.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - module docstring: tools/label_synthesis/domain_prompts/text_types.py
+  - filename/path terms: text types
+- Important symbols (4 total):
+  - `build_prompt` (function) — line 190
+  - `_fmt_size` (function) — line 307
+  - `_fmt_color` (function) — line 318
+  - `_format_identity_items` (function) — line 322
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_format_identity_items (tools/label_synthesis/domain_prompts/text_types.py:342)`
+  - `_format_identity_items (tools/label_synthesis/domain_prompts/text_types.py:344)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/text_types.py:214)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`d3a94031142ed141…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/domain_prompts/text_types.py`)
+
+### `tools/label_synthesis/domain_prompts/view_filter_definitions.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - module docstring: tools/label_synthesis/domain_prompts/view_filter_definitions.py
+  - filename/path terms: view filter definitions
+- Important symbols (6 total):
+  - `_is_opaque_name` (function) — line 135
+  - `_get_value` (function) — line 149
+  - `_collect_rules` (function) — line 162
+  - `_op_short` (function) — line 182
+  - `_format_rule_summary` (function) — line 189
+  - `build_prompt` (function) — line 211
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_format_rule_summary (tools/label_synthesis/domain_prompts/view_filter_definitions.py:193)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/view_filter_definitions.py:235)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/view_filter_definitions.py:245)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/view_filter_definitions.py:246)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/view_filter_definitions.py:247)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/view_filter_definitions.py:253)`
+  - `build_prompt (tools/label_synthesis/domain_prompts/view_filter_definitions.py:256)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`bc863df6f3b713de…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/domain_prompts/view_filter_definitions.py`)
+
+### `tools/label_synthesis/label_resolver.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - module docstring: tools/label_synthesis/label_resolver.py
+  - filename/path terms: label resolver
+- Important symbols (13 total):
+  - `resolve_pattern_label` (function) — line 60
+  - `find_near_duplicate_merges` (function) — line 135
+  - `_extract_kv_typed` (function) — line 195
+  - `_are_near_duplicates` (function) — line 222
+  - `_within_tolerance` (function) — line 243
+  - `_try_synopsis` (function) — line 254
+  - `_get_synopsis_formatter` (function) — line 264
+  - `_try_modal` (function) — line 279
+  - `is_fragmented` (function) — line 324
+  - `load_llm_cache` (function) — line 357
+  - `save_llm_cache` (function) — line 367
+  - `load_annotations` (function) — line 373
+  - `load_label_population` (function) — line 390
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_are_near_duplicates (tools/label_synthesis/label_resolver.py:238)`
+  - `_try_synopsis (tools/label_synthesis/label_resolver.py:256)`
+  - `find_near_duplicate_merges (tools/label_synthesis/label_resolver.py:167)`
+  - `find_near_duplicate_merges (tools/label_synthesis/label_resolver.py:179)`
+  - `find_near_duplicate_merges (tools/label_synthesis/label_resolver.py:189)`
+  - `resolve_pattern_label (tools/label_synthesis/label_resolver.py:109)`
+  - `resolve_pattern_label (tools/label_synthesis/label_resolver.py:115)`
+  - `synthesize (tools/label_synthesis/synthesize_fragmented_labels.py:604)`
+  - `synthesize (tools/label_synthesis/synthesize_fragmented_labels.py:629)`
+  - `synthesize (tools/label_synthesis/synthesize_fragmented_labels.py:655)`
+  - `synthesize (tools/label_synthesis/synthesize_fragmented_labels.py:661)`
+  - `synthesize (tools/label_synthesis/synthesize_fragmented_labels.py:829)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`352f580189966aa3…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/label_resolver.py`)
+
+### `tools/label_synthesis/patch_all_domain_patterns.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: tools/label_synthesis/patch_all_domain_patterns.py
+  - filename/path terms: patch all domain patterns
+- Important symbols (8 total):
+  - `_read_csv` (function) — line 64
+  - `_write_csv` (function) — line 72
+  - `_load_cache` (function) — line 83
+  - `_load_label_population` (function) — line 91
+  - `_try_modal` (function) — line 119
+  - `_patch_one` (function) — line 147
+  - `_find_targets` (function) — line 259
+  - `main` (function) — line 297
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/label_synthesis/patch_all_domain_patterns.py:388)`
+  - `_patch_one (tools/label_synthesis/patch_all_domain_patterns.py:163)`
+  - `_patch_one (tools/label_synthesis/patch_all_domain_patterns.py:216)`
+  - `_patch_one (tools/label_synthesis/patch_all_domain_patterns.py:218)`
+  - `_patch_one (tools/label_synthesis/patch_all_domain_patterns.py:250)`
+  - `main (tools/label_synthesis/patch_all_domain_patterns.py:350)`
+  - `main (tools/label_synthesis/patch_all_domain_patterns.py:356)`
+  - `main (tools/label_synthesis/patch_all_domain_patterns.py:364)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`92cff53ab984115a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/patch_all_domain_patterns.py`)
+
+### `tools/label_synthesis/synopsis_formatters/__init__.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: init
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`e6d87c9e837f845c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/label_synthesis/synopsis_formatters/__init__.py`)
+
+## Omitted from this catalog (size limit reached)
+
+11 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
+
+- `tools/label_synthesis/patch_domain_patterns_labels.py`
+- `tools/label_synthesis/synopsis_formatters/arrowheads.py`
+- `tools/label_synthesis/synopsis_formatters/dimension_types.py`
+- `tools/label_synthesis/synopsis_formatters/fill_patterns.py`
+- `tools/label_synthesis/synopsis_formatters/line_patterns.py`
+- `tools/label_synthesis/synopsis_formatters/line_styles.py`
+- `tools/label_synthesis/synopsis_formatters/object_styles_annotation.py`
+- `tools/label_synthesis/synopsis_formatters/object_styles_model.py`
+- `tools/label_synthesis/synopsis_formatters/phase_filters.py`
+- `tools/label_synthesis/synopsis_formatters/text_types.py`
+- `tools/label_synthesis/synthesize_fragmented_labels.py`
+
