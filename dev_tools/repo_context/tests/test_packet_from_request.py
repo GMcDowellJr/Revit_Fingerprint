@@ -368,8 +368,90 @@ def test_graphify_peer_listing_respects_max_files(repo, out):
     assert "limits.max_files" in text
 
 
+def test_graphify_withheld_on_dirty_worktree_even_with_matching_commit(repo, out):
+    # Regression: a matching built_at_commit was accepted even when the
+    # scanned worktree had uncommitted changes -- a matching commit hash
+    # alone doesn't prove graph.json's communities still describe what's
+    # actually on disk if a tracked file was modified since that commit.
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    commit = _git_init_commit(repo)
+    graph = {
+        "built_at_commit": commit,
+        "nodes": [{"source_file": "core/a.py", "community": 5, "community_name": "Widgets"}],
+    }
+    (repo / "graphify-out").mkdir(parents=True, exist_ok=True)
+    (repo / "graphify-out" / "graph.json").write_text(json.dumps(graph), encoding="utf-8")
+    # Modify a tracked file after the commit, without committing again --
+    # this is what makes the worktree dirty even though HEAD still equals
+    # the commit graph.json names.
+    write_files(repo, {"core/a.py": "def f():\n    return 999\n"})
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [{"name": "f", "file": "core/a.py"}], "search_terms": [], "lines": []},
+        "expansion": {"include_graphify": True},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert "graphify_expansion" not in text
+    assert "worktree is dirty" in text
+
+
+def test_overlong_question_is_rejected(repo, out):
+    # Regression: `question` is copied verbatim into every packet's
+    # header with no budget accounting and no schema length limit -- an
+    # oversized value could make a packet exceed limits.max_estimated_tokens
+    # through the header alone.
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "x" * 5000,
+        "selectors": {"files": ["core/a.py"], "symbols": [], "search_terms": [], "lines": []},
+        "limits": {"max_estimated_tokens": 1, "max_files": 12},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 1
+    assert "too long" in result.stderr
+    assert not (out / "packets" / "packet_req.md").exists()
+
+
+def test_caller_callee_import_expansion_respects_max_files(repo, out):
+    # Regression: callers/callees/internal-imports listings emitted every
+    # referenced file without going through note_focus_file, so they could
+    # exceed limits.max_files while the resolution sidecar's focus_files
+    # stayed under it (the related-test and Graphify branches already
+    # enforced this; these three didn't).
+    write_files(repo, {
+        "core/a.py": "from core.b import g\nfrom core.c import h\n\n\ndef f():\n    g()\n    return h()\n",
+        "core/b.py": "def g():\n    return 1\n",
+        "core/c.py": "from core.a import f\n\n\ndef h():\n    return f()\n",
+    })
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [{"name": "f", "file": "core/a.py"}], "search_terms": [], "lines": []},
+        "expansion": {"include_callers": True, "include_callees": True, "include_imports": True},
+        "limits": {"max_estimated_tokens": 12000, "max_files": 1},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+    assert sidecar["focus_files"] == ["core/a.py"]
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert "[origin: caller_expansion]" not in text
+    assert "[origin: callee_expansion]" not in text
+    assert "limits.max_files" in text
+
+
 def _git_init_commit(repo) -> str:
     import subprocess
+    # graphify-out/graph.json is written *after* this commit (it needs the
+    # resulting commit hash for built_at_commit) -- gitignore it first so
+    # that later write leaves the worktree clean (git ignores it) rather
+    # than untracked/dirty, which the dirty-worktree Graphify check would
+    # otherwise (correctly) treat as unverifiable.
+    (repo / ".gitignore").write_text("graphify-out/\n", encoding="utf-8")
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
     subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
     subprocess.run(["git", "-c", "user.email=t@t.com", "-c", "user.name=t", "commit", "-qm", "init"],

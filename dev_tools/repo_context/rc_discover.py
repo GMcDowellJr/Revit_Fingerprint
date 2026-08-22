@@ -105,6 +105,7 @@ def run_discover(root: Path, output_dir: Path, question: str, max_per_channel: i
     git_info = get_git_info(root)
     communities_by_file, graphify_warnings = rc_graphify.load_graphify_communities(
         root, git_info.get("commit") if git_info.get("available") else None,
+        current_dirty=git_info.get("dirty") if git_info.get("available") else None,
     )
     matched_files = {pm[0] for pm in path_matches} | {sm[0] for sm in symbol_matches}
     graphify_candidates = [(f, communities_by_file[f]) for f in sorted(matched_files) if f in communities_by_file]

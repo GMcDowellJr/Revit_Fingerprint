@@ -15,6 +15,7 @@
     "question": {
       "type": "string",
       "minLength": 1,
+      "maxLength": 4000,
       "description": "The natural-language question this request is trying to answer. Carried through into packet provenance verbatim; never parsed or matched against."
     },
     "strict": {

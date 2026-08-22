@@ -18,7 +18,8 @@ from typing import Optional
 
 
 def load_graphify_communities(root: Path, current_commit: Optional[str],
-                               allow_stale: bool = False) -> tuple[dict, list]:
+                               allow_stale: bool = False,
+                               current_dirty: Optional[bool] = None) -> tuple[dict, list]:
     """Return (communities_by_source_file, warnings).
 
     communities_by_source_file: {relative_path: [(community_id, community_name), ...]}
@@ -29,6 +30,13 @@ def load_graphify_communities(root: Path, current_commit: Optional[str],
     different git commit than the current scan (and allow_stale is False),
     returns ({}, [warning]) -- callers must treat that as "no Graphify
     evidence available", not an error.
+
+    current_dirty: the scanned worktree's dirty-state (get_git_info()'s
+    "dirty" field) -- True/False if known, None if it couldn't be
+    determined. A matching commit hash alone doesn't prove the graph
+    still describes what's on disk if uncommitted local edits exist (or
+    if dirty-state itself couldn't be checked), so by default (not
+    allow_stale) either case withholds Graphify evidence too.
     """
     graph_path = root / "graphify-out" / "graph.json"
     if not graph_path.exists():
@@ -65,6 +73,18 @@ def load_graphify_communities(root: Path, current_commit: Optional[str],
                 f"graphify-out/graph.json was built at commit {built_at_commit[:12]}, which does not match "
                 f"the current scan's HEAD commit {current_commit[:12]}; Graphify-derived routing/expansion "
                 f"evidence omitted by default (revision alignment could not be proven)."
+            ]
+        if current_dirty or current_dirty is None:
+            # A matching commit hash on a *dirty* worktree (or one whose
+            # dirty-state couldn't even be checked) doesn't prove the
+            # graph's communities still describe the files being scanned
+            # -- an uncommitted local edit to a tracked file is exactly
+            # the "looks aligned but isn't" case this check exists for.
+            return {}, [
+                "the scanned repository's worktree is dirty (or its clean/dirty state could not be "
+                "determined), so a matching commit hash does not prove graphify-out/graph.json still "
+                "describes the files on disk; Graphify-derived routing/expansion evidence is omitted "
+                "by default."
             ]
 
     by_file: dict = {}

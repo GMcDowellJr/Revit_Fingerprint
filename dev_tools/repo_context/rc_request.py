@@ -29,6 +29,7 @@ from rc_packet import (
 )
 
 SUPPORTED_SCHEMA_VERSIONS = {"1.0"}
+MAX_QUESTION_LENGTH = 4000
 
 _PATH_SELECTOR_FIELDS = {"selectors.files[]", "selectors.symbols[].file", "selectors.lines[].file"}
 
@@ -104,6 +105,14 @@ def validate_request_dict(data: dict) -> list:
     question = data.get("question")
     if not isinstance(question, str) or not question.strip():
         errors.append("missing or empty required field: question")
+    elif len(question) > MAX_QUESTION_LENGTH:
+        # `question` is copied verbatim into every packet's header,
+        # unbudgeted (it's small, fixed provenance, not user-supplied
+        # excerpt content) -- without a cap here, an oversized value would
+        # let a packet exceed limits.max_estimated_tokens entirely through
+        # the header alone, the same failure shape as the earlier
+        # unbudgeted-resolution-report/omissions findings.
+        errors.append(f"'question' is too long ({len(question)} chars; max {MAX_QUESTION_LENGTH})")
 
     if "strict" in data and not isinstance(data["strict"], bool):
         errors.append("'strict' must be a boolean")
@@ -419,6 +428,12 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
             if budget.allow(header, 1):
                 out.append(header); budget.spend(header, 1)
                 for c in callers:
+                    if not note_focus_file(c["caller_file"]):
+                        budget.omissions.append(
+                            f"Caller of `{qn}` in `{c['caller_file']}` omitted: "
+                            f"limits.max_files ({req.max_files}) reached."
+                        )
+                        break
                     line = (f"- `{c['caller_symbol']}` in `{c['caller_file']}`:{c['line']} "
                             f"— `{c['call_expression']}` ({c['confidence']}: {c['explanation']}) "
                             f"[origin: caller_expansion]")
@@ -436,6 +451,12 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
             if budget.allow(header, 1):
                 out.append(header); budget.spend(header, 1)
                 for c in callees:
+                    if not note_focus_file(c["candidate_file"]):
+                        budget.omissions.append(
+                            f"Callee of `{qn}` in `{c['candidate_file']}` omitted: "
+                            f"limits.max_files ({req.max_files}) reached."
+                        )
+                        break
                     line = (f"- `{c['call_expression']}` at line {c['line']} -> `{c['candidate_symbol']}` "
                             f"in `{c['candidate_file']}` ({c['confidence']}: {c['explanation']}) "
                             f"[origin: callee_expansion]")
@@ -453,6 +474,12 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
             if budget.allow(header, 1):
                 out.append(header); budget.spend(header, 1)
                 for i in file_imports[:20]:
+                    if not note_focus_file(i["resolved_file"]):
+                        budget.omissions.append(
+                            f"Import of `{rel}` resolving to `{i['resolved_file']}` omitted: "
+                            f"limits.max_files ({req.max_files}) reached."
+                        )
+                        break
                     line = f"- line {i['line']}: `{i['imported_name'] or i['imported_module']}` -> `{i['resolved_file']}`"
                     if not budget.allow(line, 1):
                         break
@@ -568,6 +595,7 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         _git_for_graphify = get_git_info(root)
         communities_by_file, graphify_warnings_for_request = rc_graphify.load_graphify_communities(
             root, _git_for_graphify.get("commit") if _git_for_graphify.get("available") else None,
+            current_dirty=_git_for_graphify.get("dirty") if _git_for_graphify.get("available") else None,
         )
         for w in graphify_warnings_for_request:
             budget.omissions.append(f"expansion.include_graphify was requested but unavailable: {w}")

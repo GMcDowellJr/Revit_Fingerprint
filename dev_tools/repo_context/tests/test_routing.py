@@ -162,6 +162,25 @@ def test_omitted_path_appendix_is_bounded_regardless_of_omitted_count(repo, out)
     assert len(cat_text) < 6000
 
 
+def test_manifest_stores_the_complete_omitted_path_list(repo, out):
+    # Regression: once the per-catalog appendix was bounded to a 30-path
+    # sample, it started directing readers to routing_manifest.json for
+    # "the complete list" -- but the manifest only ever stored
+    # omitted_file_count and a 3-path sample, so a machine consumer had no
+    # way to actually get the rest.
+    files = {
+        f"core/{'x' * 80}_module_number_{i:04d}.py": f'"""Docstring {i}."""\n\ndef f_{i}():\n    return {i}\n'
+        for i in range(300)
+    }
+    write_files(repo, files)
+    _scan(repo, out, ["--routing-max-catalog-chars", "100", "--routing-max-files-per-catalog", "1000"])
+    manifest = _manifest(out)
+    core_cat = next(c for c in manifest["catalogs"] if c["key"] == "core")
+    assert core_cat["omitted_file_count"] > 30
+    assert len(core_cat["omitted_paths"]) == core_cat["omitted_file_count"]
+    assert all(p.startswith("core/") for p in core_cat["omitted_paths"])
+
+
 def test_changed_source_changes_source_manifest_hash(repo, out):
     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
     _scan(repo, out)

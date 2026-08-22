@@ -261,6 +261,7 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
     communities_by_file, graphify_warnings = rc_graphify.load_graphify_communities(
         root, git_info.get("commit") if git_info.get("available") else None,
         allow_stale=routing_opts.allow_stale_graphify,
+        current_dirty=git_info.get("dirty") if git_info.get("available") else None,
     )
 
     roles: dict = {}
@@ -354,6 +355,10 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
             "omitted_file_count": len(omitted_paths),
             "source_hash": cat_hash,
             "sample_paths": [f.relative_path for f in cat_files[:3]],
+            # The catalog's own appendix only samples the first 30 omitted
+            # paths (keeping that file bounded); the manifest is where a
+            # machine consumer can get the complete list.
+            "omitted_paths": omitted_paths,
         })
 
     index_text = _render_index(

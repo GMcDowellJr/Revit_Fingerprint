@@ -55,6 +55,23 @@ def test_missing_question_is_rejected():
     assert any("question" in e for e in errors)
 
 
+def test_overlong_question_is_rejected():
+    # Regression: `question` is copied verbatim into the packet header
+    # with no budget accounting -- an unbounded value could make a packet
+    # exceed limits.max_estimated_tokens through the header alone.
+    data = _valid_base()
+    data["question"] = "x" * (rr.MAX_QUESTION_LENGTH + 1)
+    errors = rr.validate_request_dict(data)
+    assert any("too long" in e for e in errors)
+
+
+def test_question_at_max_length_is_accepted():
+    data = _valid_base()
+    data["question"] = "x" * rr.MAX_QUESTION_LENGTH
+    errors = rr.validate_request_dict(data)
+    assert errors == []
+
+
 def test_unknown_top_level_field_is_rejected():
     data = _valid_base()
     data["mystery"] = 1
