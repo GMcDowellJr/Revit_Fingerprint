@@ -160,6 +160,19 @@ def test_routing_disabled_with_no_routing_flag(repo, out):
     assert not (out / "routing").exists()
 
 
+def test_no_routing_removes_stale_routing_from_earlier_scan(repo, out):
+    # Regression: rerunning `scan --no-routing` against an output
+    # directory that already has routing/ from an earlier (routing-
+    # enabled) run must not leave the stale catalogs in place -- they'd
+    # silently describe an out-of-date source tree.
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    _scan(repo, out)
+    assert (out / "routing" / "index.md").exists()
+
+    _scan(repo, out, ["--no-routing", "--force"])
+    assert not (out / "routing").exists()
+
+
 def test_purpose_clues_are_traceable_to_deterministic_evidence(repo, out):
     write_files(repo, {"core/thing.py": '"""Widget factory helpers."""\n\ndef make_widget():\n    return 1\n'})
     _scan(repo, out)

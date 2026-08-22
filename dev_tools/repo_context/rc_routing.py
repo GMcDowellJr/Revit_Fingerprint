@@ -182,10 +182,18 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
     """Generate routing/index.md, routing/<key>.md catalogs, and
     routing/routing_manifest.json. Returns the manifest dict, or None if
     routing generation is disabled."""
+    routing_dir = output_dir / "routing"
     if not routing_opts.enabled:
+        # A stale routing/ from an earlier (routing-enabled) scan of this
+        # same output directory must not linger once routing is disabled --
+        # its catalogs/hashes would silently describe an out-of-date
+        # source tree instead of reflecting "routing not generated".
+        if routing_dir.exists():
+            import shutil
+            shutil.rmtree(routing_dir)
         return None
 
-    routing_dir = output_dir / "routing"
+
     routing_dir.mkdir(parents=True, exist_ok=True)
     # Remove stale catalog files from a prior run before writing the
     # current set, so a renamed/removed partition doesn't leave orphaned

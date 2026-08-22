@@ -207,6 +207,85 @@ def test_resolution_sidecar_json_is_written(repo, out):
     assert sidecar["resolution_report"][0]["status"] == "resolved"
 
 
+def test_whole_file_symbol_listing_is_charged_against_budget(repo, out):
+    # Regression: the "Top-level symbols:" listing for an explicit whole-
+    # file selector used to be appended without any budget accounting, so
+    # a file with many top-level definitions could blow past
+    # limits.max_estimated_tokens while the packet reported far less
+    # usage than it actually rendered.
+    lines = []
+    for i in range(300):
+        lines += [f"def func_{i}():", f"    return {i}", ""]
+    write_files(repo, {"big.py": "\n".join(lines) + "\n"})
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["big.py"], "symbols": [], "search_terms": [], "lines": []},
+        "limits": {"max_estimated_tokens": 20000, "max_files": 12},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+
+    # The reported estimated-token usage must not understate the packet's
+    # actual rendered size by a wide margin (the symbol-listing bug made
+    # this true even though every "func_i" line is metadata, not excerpt).
+    assert sidecar["estimated_tokens_used"] * 4 >= len(text) * 0.5
+    assert text.count("func_") <= 300 * 2  # listing entries + (bounded) excerpt lines only, no runaway duplication
+    assert "Omitted" in text or text.count("(function, lines") <= 300
+
+
+def test_search_terms_share_a_single_global_max_files_cap(repo, out):
+    # Regression: max_files was previously enforced per search term (a
+    # fresh `shown_files` set each iteration), so two different terms
+    # matching two different files could each individually stay "within"
+    # limits.max_files while the combined focus-file set exceeded it.
+    write_files(repo, {
+        "a.py": "def f():\n    return 'alpha_needle'\n",
+        "b.py": "def g():\n    return 'beta_needle'\n",
+    })
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [], "search_terms": ["alpha_needle", "beta_needle"], "lines": []},
+        "limits": {"max_estimated_tokens": 12000, "max_files": 1},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+    assert len(sidecar["focus_files"]) <= 1
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert "Omitted" in text or "omitted beyond limits.max_files" in text
+
+
+def test_include_graphify_expansion_lists_revision_aligned_community_peers(repo, out):
+    write_files(repo, {
+        "core/a.py": "def f():\n    return 1\n",
+        "core/b.py": "def g():\n    return 2\n",
+    })
+    graph = {
+        "built_at_commit": "deadbeef",
+        "nodes": [
+            {"source_file": "core/a.py", "community": 5, "community_name": "Widgets"},
+            {"source_file": "core/b.py", "community": 5, "community_name": "Widgets"},
+        ],
+    }
+    (repo / "graphify-out").mkdir(parents=True, exist_ok=True)
+    (repo / "graphify-out" / "graph.json").write_text(json.dumps(graph), encoding="utf-8")
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [{"name": "f", "file": "core/a.py"}], "search_terms": [], "lines": []},
+        "expansion": {"include_graphify": True},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert "graphify_expansion" in text
+    assert "core/b.py" in text
+
+
 def test_name_override_controls_output_filename(repo, out):
     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
     _scan(repo, out)

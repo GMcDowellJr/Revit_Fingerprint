@@ -73,25 +73,28 @@ def _looks_secret_shaped(value: str, quoted: bool) -> bool:
 
     A *quoted* value after `token =` / `password:` / etc. is redacted
     unconditionally, as before -- a literal string in that position is
-    almost always meant to be a real secret. An *unquoted* value that is
-    also a plain identifier (letters/underscores only, e.g. `token =
-    user_provided_value_from_config` or `access_token =
-    fetch_token_from_provider`) is far more likely to be a variable or
-    function-call reference than a literal secret, so it is left alone
-    unless it also contains a digit or mixed case -- the shape real
-    tokens/hashes/keys actually have. This does not eliminate every false
-    positive (e.g. an unquoted identifier that happens to include a
-    digit, like `config_v2_token`, is still redacted) -- closing that gap
-    fully would need real entropy scoring or an allowlist, which is a
-    separate, broader redesign rather than a bounded fix.
+    almost always meant to be a real secret. An *unquoted* value is only
+    left alone when it both (a) is a plain identifier (letters/digits/
+    underscores only) AND (b) contains an underscore, AND (c) has no digit
+    and no mixed case -- i.e. it reads as a natural multi-word snake_case
+    reference like `token = user_provided_value_from_config` or
+    `access_token = fetch_token_from_provider`, not a single opaque word.
+    A single-word unquoted value with no underscore (e.g. `token:
+    abcdefghijklmnopqrstuvwxyz`) is exactly the shape a real lowercase
+    credential/token takes and is still redacted, even though it also
+    happens to be a valid identifier. This does not eliminate every false
+    positive (e.g. a *multi-word* unquoted identifier that happens to
+    include a digit, like `config_v2_token`, is still redacted) -- closing
+    that gap fully would need real entropy scoring or an allowlist, which
+    is a separate, broader redesign rather than a bounded fix.
     """
     if quoted:
         return True
-    if _PLAIN_IDENTIFIER.match(value):
+    if _PLAIN_IDENTIFIER.match(value) and "_" in value:
         has_digit = any(c.isdigit() for c in value)
         has_mixed_case = any(c.islower() for c in value) and any(c.isupper() for c in value)
         return has_digit or has_mixed_case
-    return True  # contains '/', '+', '.', or '-' -- not a plain identifier
+    return True  # single-word identifier, or contains '/', '+', '.', '-' -- secret-shaped
 
 
 def redact_secrets(text: str) -> str:

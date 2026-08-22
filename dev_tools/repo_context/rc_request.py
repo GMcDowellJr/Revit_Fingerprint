@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+import rc_graphify
 from rc_common import TOOL_VERSION, atomic_write_text, get_git_info, redact_secrets, sanitize_stem, sha256_text
 # Sibling-module reuse: these are the same read-only, budget-aware
 # rendering primitives the direct --file/--symbol/--search/--line packet
@@ -349,7 +350,8 @@ def _render_excerpt_block(root: Path, rel_path: str, start: int, end: int, budge
 
 
 def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_path: dict,
-                       req: ResolvedRequest, budget: Budget, out: list, focus_files: list) -> None:
+                       req: ResolvedRequest, budget: Budget, out: list, focus_files: list,
+                       communities_by_file: Optional[dict] = None) -> None:
     rel, qn = row["relative_path"], row["qualified_name"]
 
     if req.include_callers:
@@ -412,6 +414,31 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
                     if t not in focus_files and len(focus_files) < 10_000:
                         focus_files.append(t)
 
+    if req.include_graphify and communities_by_file:
+        my_communities = communities_by_file.get(rel, [])
+        if my_communities:
+            comm_ids = {cid for cid, _ in my_communities}
+            peers = sorted(
+                f for f, comms in communities_by_file.items()
+                if f != rel and any(cid in comm_ids for cid, _ in comms)
+            )[:10]
+            if peers:
+                header = f"\nGraphify community peers of `{rel}` ({rc_graphify.format_communities(my_communities)}):\n"
+                if budget.allow(header, 1):
+                    out.append(header); budget.spend(header, 1)
+                    for p in peers:
+                        line = f"- `{p}` [origin: graphify_expansion]"
+                        if not budget.allow(line, 1):
+                            budget.omissions.append(
+                                f"More Graphify community peers of `{rel}` omitted (packet size limit reached)."
+                            )
+                            break
+                        out.append(line); budget.spend(line, 1)
+                else:
+                    budget.omissions.append(
+                        f"Graphify community peers listing for `{rel}` omitted entirely (packet size limit reached)."
+                    )
+
 
 def generate_packet_from_request(root: Path, output_dir: Path, request_path: Path,
                                   name_override: Optional[str] = None) -> tuple:
@@ -457,6 +484,15 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
     out: list = []
     focus_files: list = []
 
+    communities_by_file: dict = {}
+    if resolved.include_graphify:
+        _git_for_graphify = get_git_info(root)
+        communities_by_file, graphify_warnings_for_request = rc_graphify.load_graphify_communities(
+            root, _git_for_graphify.get("commit") if _git_for_graphify.get("available") else None,
+        )
+        for w in graphify_warnings_for_request:
+            budget.omissions.append(f"expansion.include_graphify was requested but unavailable: {w}")
+
     def note_focus_file(rel: str) -> bool:
         if rel in focus_files:
             return True
@@ -487,9 +523,25 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             key=lambda r: int(r["start_line"]),
         )
         if top_level:
-            out.append("Top-level symbols:")
-            for r in top_level:
-                out.append(f"- `{r['qualified_name']}` ({r['symbol_type']}, lines {r['start_line']}-{r['end_line']})")
+            header = "Top-level symbols:"
+            if budget.allow(header, 1):
+                out.append(header)
+                budget.spend(header, 1)
+                for idx, r in enumerate(top_level):
+                    line = f"- `{r['qualified_name']}` ({r['symbol_type']}, lines {r['start_line']}-{r['end_line']})"
+                    if not budget.allow(line, 1):
+                        budget.omissions.append(
+                            f"{len(top_level) - idx} more top-level symbol(s) in `{rel}` omitted from the "
+                            f"listing (packet size limit reached); see python_symbols.csv."
+                        )
+                        break
+                    out.append(line)
+                    budget.spend(line, 1)
+            else:
+                budget.omissions.append(
+                    f"Top-level symbol listing for `{rel}` omitted entirely (packet size limit reached); "
+                    f"see python_symbols.csv."
+                )
         try:
             line_count = int(row.get("line_count") or 0)
         except ValueError:
@@ -499,7 +551,8 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             if status == "too_large":
                 explicit_conflicts.append(f"explicit file selector `{rel}` ({line_count} lines) does not fit")
         for r in top_level:
-            _symbol_expansion(r, calls_rows, imports_rows, files_by_path, resolved, budget, out, focus_files)
+            _symbol_expansion(r, calls_rows, imports_rows, files_by_path, resolved, budget, out, focus_files,
+                              communities_by_file)
 
     for res in symbol_resolutions:
         if res.status != "resolved":
@@ -514,7 +567,8 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
                                         files_by_path.get(rel, {}).get("sha256", ""))
         if status == "too_large":
             explicit_conflicts.append(f"explicit symbol selector `{row['qualified_name']}` in `{rel}` does not fit")
-        _symbol_expansion(row, calls_rows, imports_rows, files_by_path, resolved, budget, out, focus_files)
+        _symbol_expansion(row, calls_rows, imports_rows, files_by_path, resolved, budget, out, focus_files,
+                          communities_by_file)
 
     for res in line_resolutions:
         if res.status != "resolved":
@@ -578,13 +632,14 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             budget.omissions.append(f"Search results for `{term}` omitted entirely (packet size limit reached).")
             continue
         out.append(header); budget.spend(header, 1)
-        shown_files = set()
         for rel, ln, text in matches:
-            if rel not in shown_files and len(shown_files) >= resolved.max_files:
+            if not note_focus_file(rel):
+                # note_focus_file enforces limits.max_files against the
+                # *global* focus-file set shared across every selector/tier
+                # in this packet, not just this one search term -- so the
+                # cap holds even when different terms match different files.
                 budget.omissions.append(f"Additional `{term}` matches omitted beyond limits.max_files ({resolved.max_files}).")
                 break
-            shown_files.add(rel)
-            note_focus_file(rel)
             line_text = redact_secrets(text.strip()[:200])
             line = f"- `{rel}:{ln}` — `{line_text}`"
             if not budget.allow(line, 1):

@@ -110,6 +110,13 @@ def test_redaction_does_not_remove_valid_code_statements_naming_token_or_secret(
         "AWS_KEY = AKIAABCDEFGHIJKLMNOP",
         "api_key: sk-ABCdef123456ghijklmnop",
         "-----BEGIN RSA PRIVATE KEY-----",
+        # A single-word unquoted lowercase value with no underscore is
+        # exactly the shape a real lowercase credential/token takes, even
+        # though it also happens to be a syntactically valid identifier --
+        # this must stay redacted (regression for a review finding: an
+        # earlier, over-broad "plain identifier" exemption let this
+        # through unredacted).
+        "token: abcdefghijklmnopqrstuvwxyz",
     ]
     for line in secret_like:
         redacted = redact_secrets(line)
