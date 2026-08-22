@@ -128,6 +128,22 @@ def test_validate_reports_malformed_chunk_manifest_instead_of_crashing(repo, out
     assert "Traceback" not in v.stdout and "Traceback" not in v.stderr
 
 
+def test_validate_reports_invalid_utf8_instead_of_crashing(repo, out):
+    write_files(repo, {"a.py": "x = 1\n"})
+    r = run_tool(["scan", str(repo), "--output", str(out)])
+    assert r.returncode == 0, r.stderr
+
+    target = out / "python_imports.csv"
+    with open(target, "ab") as fh:
+        fh.write(b"\xff\xfe\x00garbage")
+
+    v = run_tool(["validate", str(out)])
+    assert v.returncode != 0
+    assert "Traceback" not in v.stdout and "Traceback" not in v.stderr
+    assert "python_imports.csv" in v.stdout
+    assert "not readable" in v.stdout
+
+
 def test_validate_fails_on_missing_required_file(repo, out):
     write_files(repo, {"a.py": "x = 1\n"})
     r = run_tool(["scan", str(repo), "--output", str(out)])

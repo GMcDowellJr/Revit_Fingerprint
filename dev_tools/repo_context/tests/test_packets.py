@@ -181,6 +181,27 @@ def test_packet_accepts_windows_style_relative_path(repo, out):
     assert "def f():" in text
 
 
+def test_symbol_packet_callers_respect_size_budget(repo, out):
+    lines = ["from lib import target", ""]
+    for i in range(50):
+        lines += [f"def caller_{i}():", "    return target()", ""]
+    write_files(repo, {
+        "lib.py": "def target():\n    return 1\n",
+        "callers.py": "\n".join(lines) + "\n",
+    })
+    _scan(repo, out)
+
+    result = run_tool([
+        "packet", str(repo), "--output", str(out), "--symbol", "target",
+        "--max-lines", "10", "--max-characters", "1500",
+    ])
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_target.md").read_text(encoding="utf-8")
+    assert text.count("in `callers.py`") < 50
+    assert "Omitted" in text
+    assert len(text) < 4000
+
+
 def test_packet_without_prior_scan_fails_cleanly(repo, out):
     write_files(repo, {"a.py": "x = 1\n"})
     out.mkdir(parents=True, exist_ok=True)

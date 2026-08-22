@@ -240,7 +240,7 @@ dev_tools/repo_context/rc_overview.py,<module>,module,1,245,,,,,,true,repository
 dev_tools/repo_context/rc_overview.py,_top_dir,function,13,15,<module>,,rel_path: str,,str,false,,3,1,
 dev_tools/repo_context/rc_overview.py,generate_overview_md,function,18,134,<module>,,"result, root_name: str, scan_time_iso: str",,str,false,,117,42,
 dev_tools/repo_context/rc_overview.py,generate_readme_md,function,137,245,<module>,,,,str,false,,109,1,
-dev_tools/repo_context/rc_packet.py,<module>,module,1,515,,,,,,true,Targeted context packet generation.,515,1,"_load_csv,_norm_rel,_file_is_fresh,_safe_excerpt,_symbol_matches,_find_symbol_candidates,PacketOptions,Budget,_callers_of,_callees_of,_bfs_callers,_bfs_callees,_enclosing_class_or_func,_candidate_tests_for_file,_render_symbol_block,generate_packet"
+dev_tools/repo_context/rc_packet.py,<module>,module,1,582,,,,,,true,Targeted context packet generation.,582,1,"_load_csv,_norm_rel,_file_is_fresh,_safe_excerpt,_symbol_matches,_find_symbol_candidates,PacketOptions,Budget,_callers_of,_callees_of,_bfs_callers,_bfs_callees,_enclosing_class_or_func,_candidate_tests_for_file,_render_symbol_block,generate_packet"
 dev_tools/repo_context/rc_packet.py,_load_csv,function,17,21,<module>,,path: Path,,list,false,,5,3,
 dev_tools/repo_context/rc_packet.py,_norm_rel,function,24,25,<module>,,path_str: str,,str,false,,2,1,
 dev_tools/repo_context/rc_packet.py,_file_is_fresh,function,28,50,<module>,,"root: Path, rel_path: str, expected_sha256: str",,bool,true,True if rel_path's current on-disk content still matches the,23,7,
@@ -259,38 +259,41 @@ dev_tools/repo_context/rc_packet.py,_bfs_callees,function,148,165,<module>,,"sta
 dev_tools/repo_context/rc_packet.py,_enclosing_class_or_func,function,168,175,<module>,,"row: dict, symbols_by_file: dict",,Optional[dict],false,,8,5,
 dev_tools/repo_context/rc_packet.py,_candidate_tests_for_file,function,178,190,<module>,,"target_file: str, imports: list, calls: list, files_by_path: dict",,list,false,,13,7,
 dev_tools/repo_context/rc_packet.py,_render_symbol_block,function,193,227,<module>,,"root: Path, row: dict, budget: Budget, out: list, note_prefix: str = '', expected_sha256: str = ''",,None,false,,35,6,
-dev_tools/repo_context/rc_packet.py,generate_packet,function,230,515,<module>,,opts: PacketOptions,,Path,false,,286,54,"add_file_section,add_symbol_section"
+dev_tools/repo_context/rc_packet.py,generate_packet,function,230,582,<module>,,opts: PacketOptions,,Path,false,,353,54,"add_file_section,add_symbol_section"
 dev_tools/repo_context/rc_packet.py,generate_packet.add_file_section,nested_function,271,340,generate_packet,,rel_path: str,,None,false,,70,21,
-dev_tools/repo_context/rc_packet.py,generate_packet.add_symbol_section,nested_function,342,375,generate_packet,,row: dict,,None,false,,34,15,
-dev_tools/repo_context/rc_pyanalysis.py,<module>,module,1,770,,,,,,true,AST-based Python symbol / import / call extraction.,770,1,"dotted_module_path,_complexity_count,complexity_approx,_is_main_guard,_unparse_safe,format_params,RawCall,ClassInfo,PyFileAnalysis,_lambda_param_names,_collect_local_bound_names,_collect_module_reassigned_names,analyze_python_source,resolve_import_record,build_import_bindings,build_bindings_by_scope,_lookup_in_scope_chain,resolve_calls,name_in_index"
+dev_tools/repo_context/rc_packet.py,generate_packet.add_symbol_section,nested_function,342,442,generate_packet,,row: dict,,None,false,,101,23,
+dev_tools/repo_context/rc_pyanalysis.py,<module>,module,1,814,,,,,,true,AST-based Python symbol / import / call extraction.,814,1,"dotted_module_path,_complexity_count,complexity_approx,_is_main_guard,_is_static_false_test,_is_static_true_test,_unparse_safe,format_params,RawCall,ClassInfo,PyFileAnalysis,_lambda_param_names,_collect_local_bound_names,_collect_module_reassigned_names,analyze_python_source,resolve_import_record,build_import_bindings,build_bindings_by_scope,_lookup_in_scope_chain,resolve_calls,name_in_index"
 dev_tools/repo_context/rc_pyanalysis.py,dotted_module_path,function,22,27,<module>,,rel_posix: str,,str,false,,6,5,
 dev_tools/repo_context/rc_pyanalysis.py,_complexity_count,function,30,44,<module>,,node: ast.AST,,int,false,,15,7,
 dev_tools/repo_context/rc_pyanalysis.py,complexity_approx,function,47,48,<module>,,node: ast.AST,,int,false,,2,1,
 dev_tools/repo_context/rc_pyanalysis.py,_is_main_guard,function,51,59,<module>,,node: ast.AST,,bool,false,,9,9,
-dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,function,62,68,<module>,,node,,str,false,,7,4,
-dev_tools/repo_context/rc_pyanalysis.py,format_params,function,71,102,<module>,,args: ast.arguments,,str,false,,32,9,fmt
-dev_tools/repo_context/rc_pyanalysis.py,format_params.fmt,nested_function,74,80,format_params,,"a: ast.arg, default = None",,str,false,,7,3,
-dev_tools/repo_context/rc_pyanalysis.py,RawCall,class,106,113,<module>,dataclass,,,,false,,8,1,
-dev_tools/repo_context/rc_pyanalysis.py,ClassInfo,class,117,120,<module>,dataclass,,,,false,,4,1,
-dev_tools/repo_context/rc_pyanalysis.py,PyFileAnalysis,class,124,134,<module>,dataclass,,,,false,,11,1,
-dev_tools/repo_context/rc_pyanalysis.py,_lambda_param_names,function,137,146,<module>,,node: ast.Lambda,,frozenset,false,,10,5,
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,function,149,183,<module>,,node,,set,true,Parameter names plus simple assignment targets bound directly in,35,5,walk_stmts
-dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,nested_function,164,180,_collect_local_bound_names,,stmts,,None,false,,17,7,
-dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names,function,186,206,<module>,,tree: ast.Module,,set,true,Plain assignment targets (not def/class statements themselves),21,1,walk_stmts
-dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names.walk_stmts,nested_function,195,203,_collect_module_reassigned_names,,stmts,,None,false,,9,7,
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,function,209,472,<module>,,"rel_path: str, source: str",,PyFileAnalysis,false,,264,12,"make_call,walk_expr_for_calls,record_import,walk_body,handle_class,handle_func"
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,nested_function,247,258,analyze_python_source,,"node: ast.Call, caller_symbol: str, class_ctx: str",,RawCall,false,,12,4,
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_expr_for_calls,nested_function,260,272,analyze_python_source,,"expr, scope_qualname: str, class_ctx: str, parent_qualname: str",,None,true,"Harvest calls from a definition-time expression (a decorator, a",13,3,
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,nested_function,274,301,analyze_python_source,,"stmt, scope_qualname: str",,None,true,Record an Import/ImportFrom statement found anywhere in the tree,28,9,
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,nested_function,303,338,analyze_python_source,,"node: ast.AST, scope_qualname: str, class_ctx: str, parent_qualname: str, lambda_shadowed: frozenset = frozenset()",,None,false,,36,12,
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,nested_function,340,385,analyze_python_source,,"node: ast.ClassDef, parent_qualname: str, grandparent_qualname: str",,None,false,,46,16,
-dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,nested_function,387,449,analyze_python_source,,"node, parent_qualname: str, class_ctx: str, grandparent_qualname: str",,None,false,,63,17,
-dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,function,475,522,<module>,,"imp: ImportRecord, module_index: dict, all_top_level_index: dict",,"tuple[str, str]",true,Conservative import resolution.,48,14,
-dev_tools/repo_context/rc_pyanalysis.py,build_import_bindings,function,525,550,<module>,,imports: list,,dict,true,"local_name -> [(line, target_file, target_symbol, kind), ...], sorted",26,8,
-dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,function,553,559,<module>,,imports_by_scope: dict,,dict,true,qualified scope name -> import-bindings dict for imports declared,7,2,
-dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,function,562,610,<module>,,"name: str, caller_symbol: str, parent_of: dict, local_names_by_symbol: dict, bindings_by_scope: dict, class_info: dict, call_line: int",,,true,"Walk caller_symbol's lexical scope chain (its own scope, then each",49,11,
-dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,function,613,766,<module>,,"raw_calls: list, caller_file: str, top_level_index: dict, class_info: dict, bindings_by_scope: dict, all_top_level_index: dict, all_class_info: dict, local_names_by_symbol: dict, parent_of: dict, module_reassigned_names: set",,list,false,,154,34,
-dev_tools/repo_context/rc_pyanalysis.py,name_in_index,function,769,770,<module>,,"index: dict, name: str",,bool,false,,2,2,
+dev_tools/repo_context/rc_pyanalysis.py,_is_static_false_test,function,62,73,<module>,,test: ast.AST,,bool,true,True for an `if` test that is statically guaranteed never to,12,7,
+dev_tools/repo_context/rc_pyanalysis.py,_is_static_true_test,function,76,79,<module>,,test: ast.AST,,bool,true,True for an `if` test that is statically guaranteed to always,4,2,
+dev_tools/repo_context/rc_pyanalysis.py,_unparse_safe,function,82,88,<module>,,node,,str,false,,7,4,
+dev_tools/repo_context/rc_pyanalysis.py,format_params,function,91,122,<module>,,args: ast.arguments,,str,false,,32,9,fmt
+dev_tools/repo_context/rc_pyanalysis.py,format_params.fmt,nested_function,94,100,format_params,,"a: ast.arg, default = None",,str,false,,7,3,
+dev_tools/repo_context/rc_pyanalysis.py,RawCall,class,126,133,<module>,dataclass,,,,false,,8,1,
+dev_tools/repo_context/rc_pyanalysis.py,ClassInfo,class,137,140,<module>,dataclass,,,,false,,4,1,
+dev_tools/repo_context/rc_pyanalysis.py,PyFileAnalysis,class,144,154,<module>,dataclass,,,,false,,11,1,
+dev_tools/repo_context/rc_pyanalysis.py,_lambda_param_names,function,157,166,<module>,,node: ast.Lambda,,frozenset,false,,10,5,
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names,function,172,220,<module>,,node,,set,true,Parameter names plus simple assignment targets bound directly in,49,5,walk_stmts
+dev_tools/repo_context/rc_pyanalysis.py,_collect_local_bound_names.walk_stmts,nested_function,187,217,_collect_local_bound_names,,stmts,,None,false,,31,9,
+dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names,function,223,243,<module>,,tree: ast.Module,,set,true,Plain assignment targets (not def/class statements themselves),21,1,walk_stmts
+dev_tools/repo_context/rc_pyanalysis.py,_collect_module_reassigned_names.walk_stmts,nested_function,232,240,_collect_module_reassigned_names,,stmts,,None,false,,9,7,
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source,function,246,516,<module>,,"rel_path: str, source: str",,PyFileAnalysis,false,,271,7,"make_call,walk_expr_for_calls,record_import,walk_body,walk_child,handle_class,handle_func"
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.make_call,nested_function,284,295,analyze_python_source,,"node: ast.Call, caller_symbol: str, class_ctx: str",,RawCall,false,,12,4,
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_expr_for_calls,nested_function,297,309,analyze_python_source,,"expr, scope_qualname: str, class_ctx: str, parent_qualname: str",,None,true,"Harvest calls from a definition-time expression (a decorator, a",13,3,
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.record_import,nested_function,311,348,analyze_python_source,,"stmt, scope_qualname: str, active: bool = True",,None,true,Record an Import/ImportFrom statement found anywhere in the tree,38,10,
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_body,nested_function,350,353,analyze_python_source,,"node: ast.AST, scope_qualname: str, class_ctx: str, parent_qualname: str, lambda_shadowed: frozenset = frozenset(), import_active: bool = True",,None,false,,4,2,
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.walk_child,nested_function,355,407,analyze_python_source,,"child: ast.AST, scope_qualname: str, class_ctx: str, parent_qualname: str, lambda_shadowed: frozenset, import_active: bool",,None,true,Dispatch for a single statement/expression node reached either,53,18,
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_class,nested_function,409,447,analyze_python_source,,"node: ast.ClassDef, parent_qualname: str, grandparent_qualname: str",,None,false,,39,13,
+dev_tools/repo_context/rc_pyanalysis.py,analyze_python_source.handle_func,nested_function,449,504,analyze_python_source,,"node, parent_qualname: str, class_ctx: str, grandparent_qualname: str",,None,false,,56,14,
+dev_tools/repo_context/rc_pyanalysis.py,resolve_import_record,function,519,566,<module>,,"imp: ImportRecord, module_index: dict, all_top_level_index: dict",,"tuple[str, str]",true,Conservative import resolution.,48,14,
+dev_tools/repo_context/rc_pyanalysis.py,build_import_bindings,function,569,594,<module>,,imports: list,,dict,true,"local_name -> [(line, target_file, target_symbol, kind), ...], sorted",26,8,
+dev_tools/repo_context/rc_pyanalysis.py,build_bindings_by_scope,function,597,603,<module>,,imports_by_scope: dict,,dict,true,qualified scope name -> import-bindings dict for imports declared,7,2,
+dev_tools/repo_context/rc_pyanalysis.py,_lookup_in_scope_chain,function,606,654,<module>,,"name: str, caller_symbol: str, parent_of: dict, local_names_by_symbol: dict, bindings_by_scope: dict, class_info: dict, call_line: int",,,true,"Walk caller_symbol's lexical scope chain (its own scope, then each",49,11,
+dev_tools/repo_context/rc_pyanalysis.py,resolve_calls,function,657,810,<module>,,"raw_calls: list, caller_file: str, top_level_index: dict, class_info: dict, bindings_by_scope: dict, all_top_level_index: dict, all_class_info: dict, local_names_by_symbol: dict, parent_of: dict, module_reassigned_names: set",,list,false,,154,34,
+dev_tools/repo_context/rc_pyanalysis.py,name_in_index,function,813,814,<module>,,"index: dict, name: str",,bool,false,,2,2,
 dev_tools/repo_context/rc_scan.py,<module>,module,1,384,,,,,,true,Filesystem walk + inventory + Python analysis orchestration.,384,1,"ScanOptions,ScanResult,_sort_key,_is_ancestor,_should_exclude_file,_walk,scan_repository,_cleanup_stale_chunks,_resolve_python_relationships"
 dev_tools/repo_context/rc_scan.py,ScanOptions,class,28,44,<module>,dataclass,,,,false,,17,1,
 dev_tools/repo_context/rc_scan.py,ScanResult,class,48,59,<module>,dataclass,,,,false,,12,1,
@@ -361,7 +364,7 @@ dev_tools/repo_context/tests/test_determinism_incremental.py,test_deterministic_
 dev_tools/repo_context/tests/test_determinism_incremental.py,test_incremental_regeneration_reuses_unchanged_chunk_output,function,28,58,<module>,,"repo, out",,,false,,31,12,
 dev_tools/repo_context/tests/test_determinism_incremental.py,test_stale_chunks_removed_when_source_deleted,function,61,81,<module>,,"repo, out",,,false,,21,7,
 dev_tools/repo_context/tests/test_determinism_incremental.py,test_force_bypasses_incremental_reuse,function,84,92,<module>,,"repo, out",,,false,,9,4,
-dev_tools/repo_context/tests/test_imports_and_calls.py,<module>,module,1,329,,,,,,false,,329,1,"_read,test_absolute_and_relative_imports,test_same_module_and_imported_function_calls,test_unresolved_call_is_preserved_not_guessed,test_ambiguous_import_resolution,test_imports_in_nested_scopes_are_recorded,test_call_shadowed_by_parameter_is_not_resolved_to_module_function,test_function_local_import_does_not_leak_into_unrelated_function,test_nested_def_name_shadows_module_level_symbol_throughout_function,test_aliased_base_class_import_resolves_inherited_method,test_module_level_rebinding_is_not_confidently_resolved,test_module_qualified_base_class_resolves_inherited_method,test_duplicate_import_resolved_by_call_site_order,test_definition_time_calls_in_decorators_defaults_and_annotations,test_lambda_parameter_shadowing_is_not_confidently_resolved,test_self_method_call_within_known_class"
+dev_tools/repo_context/tests/test_imports_and_calls.py,<module>,module,1,409,,,,,,false,,409,1,"_read,test_absolute_and_relative_imports,test_same_module_and_imported_function_calls,test_unresolved_call_is_preserved_not_guessed,test_ambiguous_import_resolution,test_imports_in_nested_scopes_are_recorded,test_call_shadowed_by_parameter_is_not_resolved_to_module_function,test_function_local_import_does_not_leak_into_unrelated_function,test_nested_def_name_shadows_module_level_symbol_throughout_function,test_aliased_base_class_import_resolves_inherited_method,test_module_level_rebinding_is_not_confidently_resolved,test_module_qualified_base_class_resolves_inherited_method,test_duplicate_import_resolved_by_call_site_order,test_definition_time_calls_in_decorators_defaults_and_annotations,test_lambda_parameter_shadowing_is_not_confidently_resolved,test_import_inside_dead_if_false_branch_does_not_activate_call_resolution,test_import_inside_type_checking_branch_does_not_activate_call_resolution,test_import_in_live_else_of_dead_if_false_branch_still_resolves,test_comprehension_target_does_not_shadow_module_level_symbol,test_self_method_call_within_known_class"
 dev_tools/repo_context/tests/test_imports_and_calls.py,_read,function,6,8,<module>,,"out, name",,,false,,3,2,
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_absolute_and_relative_imports,function,11,44,<module>,,"repo, out",,,false,,34,11,
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_same_module_and_imported_function_calls,function,47,74,<module>,,"repo, out",,,false,,28,9,
@@ -377,7 +380,11 @@ dev_tools/repo_context/tests/test_imports_and_calls.py,test_module_qualified_bas
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_duplicate_import_resolved_by_call_site_order,function,266,278,<module>,,"repo, out",,,false,,13,6,
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_definition_time_calls_in_decorators_defaults_and_annotations,function,281,297,<module>,,"repo, out",,,false,,17,7,
 dev_tools/repo_context/tests/test_imports_and_calls.py,test_lambda_parameter_shadowing_is_not_confidently_resolved,function,300,310,<module>,,"repo, out",,,false,,11,6,
-dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,function,313,329,<module>,,"repo, out",,,false,,17,6,
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_import_inside_dead_if_false_branch_does_not_activate_call_resolution,function,313,333,<module>,,"repo, out",,,false,,21,9,
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_import_inside_type_checking_branch_does_not_activate_call_resolution,function,336,352,<module>,,"repo, out",,,false,,17,6,
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_import_in_live_else_of_dead_if_false_branch_still_resolves,function,355,372,<module>,,"repo, out",,,false,,18,6,
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_comprehension_target_does_not_shadow_module_level_symbol,function,375,390,<module>,,"repo, out",,,false,,16,7,
+dev_tools/repo_context/tests/test_imports_and_calls.py,test_self_method_call_within_known_class,function,393,409,<module>,,"repo, out",,,false,,17,6,
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,<module>,module,1,118,,,,,,false,,118,1,"_read_csv,test_basic_repository_inventory,test_default_exclusions,test_binary_file_detection,test_duplicate_filenames_in_different_directories,test_dyn_files_are_parsed_as_text_not_binary,test_secret_files_excluded_by_default"
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,_read_csv,function,6,8,<module>,,path,,,false,,3,2,
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_basic_repository_inventory,function,11,32,<module>,,"repo, out",,,false,,22,14,
@@ -388,7 +395,7 @@ dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_dyn_files_are
 dev_tools/repo_context/tests/test_inventory_and_exclusions.py,test_secret_files_excluded_by_default,function,98,118,<module>,,"repo, out",,,false,,21,10,
 dev_tools/repo_context/tests/test_large_file_cap.py,<module>,module,1,27,,,,,,true,White-box test for the >MAX_TEXT_READ_BYTES surfacing fix.,27,1,test_oversized_text_file_is_surfaced_not_silently_skipped
 dev_tools/repo_context/tests/test_large_file_cap.py,test_oversized_text_file_is_surfaced_not_silently_skipped,function,12,27,<module>,,"repo, out, monkeypatch",,,false,,16,9,
-dev_tools/repo_context/tests/test_packets.py,<module>,module,1,188,,,,,,false,,188,1,"_scan,test_packet_by_file,test_search_packet_respects_size_budget_on_repetitive_file,test_packet_withholds_excerpt_when_source_changed_since_scan,test_file_packet_respects_tiny_size_budget,test_line_packet_raw_fallback_withholds_stale_excerpt,test_search_packet_skips_files_changed_since_scan,test_file_packet_imports_respect_size_budget,test_packet_by_symbol,test_packet_by_search,test_packet_by_line,test_ambiguous_symbol_requires_qualifier_or_all_matches,test_packet_accepts_windows_style_relative_path,test_packet_without_prior_scan_fails_cleanly"
+dev_tools/repo_context/tests/test_packets.py,<module>,module,1,209,,,,,,false,,209,1,"_scan,test_packet_by_file,test_search_packet_respects_size_budget_on_repetitive_file,test_packet_withholds_excerpt_when_source_changed_since_scan,test_file_packet_respects_tiny_size_budget,test_line_packet_raw_fallback_withholds_stale_excerpt,test_search_packet_skips_files_changed_since_scan,test_file_packet_imports_respect_size_budget,test_packet_by_symbol,test_packet_by_search,test_packet_by_line,test_ambiguous_symbol_requires_qualifier_or_all_matches,test_packet_accepts_windows_style_relative_path,test_symbol_packet_callers_respect_size_budget,test_packet_without_prior_scan_fails_cleanly"
 dev_tools/repo_context/tests/test_packets.py,_scan,function,4,6,<module>,,"repo, out",,,false,,3,2,
 dev_tools/repo_context/tests/test_packets.py,test_packet_by_file,function,9,18,<module>,,"repo, out",,,false,,10,5,
 dev_tools/repo_context/tests/test_packets.py,test_search_packet_respects_size_budget_on_repetitive_file,function,21,34,<module>,,"repo, out",,,false,,14,5,
@@ -402,7 +409,8 @@ dev_tools/repo_context/tests/test_packets.py,test_packet_by_search,function,123,
 dev_tools/repo_context/tests/test_packets.py,test_packet_by_line,function,134,141,<module>,,"repo, out",,,false,,8,3,
 dev_tools/repo_context/tests/test_packets.py,test_ambiguous_symbol_requires_qualifier_or_all_matches,function,144,170,<module>,,"repo, out",,,false,,27,10,
 dev_tools/repo_context/tests/test_packets.py,test_packet_accepts_windows_style_relative_path,function,173,181,<module>,,"repo, out",,,false,,9,4,
-dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,function,184,188,<module>,,"repo, out",,,false,,5,2,
+dev_tools/repo_context/tests/test_packets.py,test_symbol_packet_callers_respect_size_budget,function,184,202,<module>,,"repo, out",,,false,,19,6,
+dev_tools/repo_context/tests/test_packets.py,test_packet_without_prior_scan_fails_cleanly,function,205,209,<module>,,"repo, out",,,false,,5,2,
 dev_tools/repo_context/tests/test_python_symbols.py,<module>,module,1,98,,,,,,false,,98,1,"_symbols,test_functions_classes_methods_nested_async,test_utf8_bom_prefixed_python_file_still_parses,test_syntax_error_handling_does_not_abort_scan"
 dev_tools/repo_context/tests/test_python_symbols.py,_symbols,function,30,32,<module>,,out,,,false,,3,2,
 dev_tools/repo_context/tests/test_python_symbols.py,test_functions_classes_methods_nested_async,function,35,63,<module>,,"repo, out",,,false,,29,18,
@@ -424,7 +432,7 @@ dev_tools/repo_context/tests/test_symlinks.py,test_symlink_cycle_inside_root_doe
 dev_tools/repo_context/tests/test_symlinks.py,test_symlink_pointing_at_output_dir_is_excluded,function,62,81,<module>,,repo,,,false,,20,8,
 dev_tools/repo_context/tests/test_symlinks.py,test_symlink_into_output_subdirectory_is_excluded,function,84,100,<module>,,repo,,,false,,17,6,
 dev_tools/repo_context/tests/test_symlinks.py,test_fifo_directly_under_root_does_not_hang,function,103,115,<module>,,"repo, out",,,false,,13,7,
-dev_tools/repo_context/tests/test_validate.py,<module>,module,1,138,,,,,,false,,138,1,"_big_text,test_validate_passes_on_freshly_generated_output,test_validate_detects_modified_chunk,test_validate_detects_missing_chunk,test_validate_catches_entirely_deleted_chunk_rows,test_scan_does_not_crash_on_malformed_prior_chunk_manifest,test_validate_reports_bad_chunk_manifest_header_instead_of_crashing,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,test_validate_fails_on_missing_required_file"
+dev_tools/repo_context/tests/test_validate.py,<module>,module,1,154,,,,,,false,,154,1,"_big_text,test_validate_passes_on_freshly_generated_output,test_validate_detects_modified_chunk,test_validate_detects_missing_chunk,test_validate_catches_entirely_deleted_chunk_rows,test_scan_does_not_crash_on_malformed_prior_chunk_manifest,test_validate_reports_bad_chunk_manifest_header_instead_of_crashing,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,test_validate_reports_invalid_utf8_instead_of_crashing,test_validate_fails_on_missing_required_file"
 dev_tools/repo_context/tests/test_validate.py,_big_text,function,6,7,<module>,,n = 1500,,,false,,2,2,
 dev_tools/repo_context/tests/test_validate.py,test_validate_passes_on_freshly_generated_output,function,10,19,<module>,,"repo, out",,,false,,10,4,
 dev_tools/repo_context/tests/test_validate.py,test_validate_detects_modified_chunk,function,22,35,<module>,,"repo, out",,,false,,14,6,
@@ -433,7 +441,8 @@ dev_tools/repo_context/tests/test_validate.py,test_validate_catches_entirely_del
 dev_tools/repo_context/tests/test_validate.py,test_scan_does_not_crash_on_malformed_prior_chunk_manifest,function,69,86,<module>,,"repo, out",,,false,,18,7,
 dev_tools/repo_context/tests/test_validate.py,test_validate_reports_bad_chunk_manifest_header_instead_of_crashing,function,89,107,<module>,,"repo, out",,,false,,19,8,
 dev_tools/repo_context/tests/test_validate.py,test_validate_reports_malformed_chunk_manifest_instead_of_crashing,function,110,128,<module>,,"repo, out",,,false,,19,8,
-dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,function,131,138,<module>,,"repo, out",,,false,,8,4,
+dev_tools/repo_context/tests/test_validate.py,test_validate_reports_invalid_utf8_instead_of_crashing,function,131,144,<module>,,"repo, out",,,false,,14,8,
+dev_tools/repo_context/tests/test_validate.py,test_validate_fails_on_missing_required_file,function,147,154,<module>,,"repo, out",,,false,,8,4,
 domains/__init__.py,<module>,module,1,10,,,,,,true,Domain extractors package.,10,1,
 domains/arrowheads.py,<module>,module,1,667,,,,,,true,Arrowheads domain extractor.,667,4,"_fmt_deg_from_rad,_canon_yesno_bool,_as_value_string,_get_arrowhead_style,_build_common_identity_items,_build_arrow_identity_items,_build_tick_identity_items,_is_arrowhead_type,_iter_arrowhead_ids_from_element,extract"
 domains/arrowheads.py,_fmt_deg_from_rad,function,64,70,<module>,,rad,,,false,,7,4,

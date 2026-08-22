@@ -96,7 +96,7 @@ def validate_output_dir(output_dir: Path, allow_absolute_paths: bool = False) ->
         else:
             try:
                 p.read_text(encoding="utf-8")
-            except OSError as exc:
+            except (OSError, UnicodeDecodeError) as exc:
                 res.error(f"Required output file not readable: {name} ({exc})")
 
     for name in REQUIRED_DIRS:
@@ -120,7 +120,7 @@ def validate_output_dir(output_dir: Path, allow_absolute_paths: bool = False) ->
 
     try:
         manifest = json.loads((output_dir / "generation_manifest.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         res.error(f"generation_manifest.json is not valid JSON: {exc}")
         manifest = {}
 
@@ -221,7 +221,7 @@ def validate_output_dir(output_dir: Path, allow_absolute_paths: bool = False) ->
     for packet_file in sorted(packets_dir.glob("*.md")):
         try:
             text = packet_file.read_text(encoding="utf-8")
-        except OSError as exc:
+        except (OSError, UnicodeDecodeError) as exc:
             res.error(f"Packet file not readable: {packet_file.name} ({exc})")
             continue
         if not text.strip():

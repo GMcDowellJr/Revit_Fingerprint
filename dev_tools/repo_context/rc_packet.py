@@ -355,24 +355,91 @@ def generate_packet(opts: PacketOptions) -> Path:
         resolved_callees = [c for c in callees if c["confidence"] != "unresolved"]
 
         if resolved_callers:
-            out.append(f"\nCallers (statically resolved, depth {opts.caller_depth}):\n")
-            for c in resolved_callers:
-                out.append(f"- `{c['caller_symbol']}` in `{c['caller_file']}`:{c['line']} "
+            header = f"\nCallers (statically resolved, depth {opts.caller_depth}):\n"
+            if budget.allow(header, 1):
+                out.append(header)
+                budget.spend(header, 1)
+                listed = 0
+                for c in resolved_callers:
+                    line = (f"- `{c['caller_symbol']}` in `{c['caller_file']}`:{c['line']} "
                             f"— `{c['call_expression']}` ({c['confidence']}: {c['explanation']})")
+                    if not budget.allow(line, 1):
+                        budget.omissions.append(
+                            f"{len(resolved_callers) - listed} more caller(s) of `{row['qualified_name']}` "
+                            f"omitted from the listing (packet size limit reached); see python_calls.csv."
+                        )
+                        break
+                    out.append(line)
+                    budget.spend(line, 1)
+                    listed += 1
+            else:
+                budget.omissions.append(
+                    f"Callers listing for `{row['qualified_name']}` omitted entirely (packet size limit "
+                    f"reached); see python_calls.csv."
+                )
         if resolved_callees:
-            out.append(f"\nCallees (statically resolved, depth {opts.callee_depth}):\n")
-            for c in resolved_callees:
-                out.append(f"- `{c['call_expression']}` at line {c['line']} "
+            header = f"\nCallees (statically resolved, depth {opts.callee_depth}):\n"
+            if budget.allow(header, 1):
+                out.append(header)
+                budget.spend(header, 1)
+                listed = 0
+                for c in resolved_callees:
+                    line = (f"- `{c['call_expression']}` at line {c['line']} "
                             f"-> `{c['candidate_symbol']}` in `{c['candidate_file']}` "
                             f"({c['confidence']}: {c['explanation']})")
+                    if not budget.allow(line, 1):
+                        budget.omissions.append(
+                            f"{len(resolved_callees) - listed} more callee(s) of `{row['qualified_name']}` "
+                            f"omitted from the listing (packet size limit reached); see python_calls.csv."
+                        )
+                        break
+                    out.append(line)
+                    budget.spend(line, 1)
+                    listed += 1
+            else:
+                budget.omissions.append(
+                    f"Callees listing for `{row['qualified_name']}` omitted entirely (packet size limit "
+                    f"reached); see python_calls.csv."
+                )
 
         unresolved = [c for c in (callers + callees) if c["confidence"] == "unresolved"]
         if unresolved:
-            out.append("\nUnresolved relationships (not statically provable):\n")
-            for c in unresolved[:20]:
-                out.append(f"- `{c['call_expression']}` at `{c['caller_file']}`:{c['line']} — {c['explanation']}")
-            if len(unresolved) > 20:
-                out.append(f"- ... and {len(unresolved) - 20} more (see python_calls.csv)")
+            header = "\nUnresolved relationships (not statically provable):\n"
+            if budget.allow(header, 1):
+                out.append(header)
+                budget.spend(header, 1)
+                shown = unresolved[:20]
+                listed = 0
+                truncated_by_budget = False
+                for c in shown:
+                    line = f"- `{c['call_expression']}` at `{c['caller_file']}`:{c['line']} — {c['explanation']}"
+                    if not budget.allow(line, 1):
+                        truncated_by_budget = True
+                        break
+                    out.append(line)
+                    budget.spend(line, 1)
+                    listed += 1
+                if truncated_by_budget:
+                    budget.omissions.append(
+                        f"{len(unresolved) - listed} more unresolved relationship(s) for "
+                        f"`{row['qualified_name']}` omitted from the listing (packet size limit reached); "
+                        f"see python_calls.csv."
+                    )
+                elif len(unresolved) > 20:
+                    trailer = f"- ... and {len(unresolved) - 20} more (see python_calls.csv)"
+                    if budget.allow(trailer, 1):
+                        out.append(trailer)
+                        budget.spend(trailer, 1)
+                    else:
+                        budget.omissions.append(
+                            f"{len(unresolved) - 20} more unresolved relationship(s) for "
+                            f"`{row['qualified_name']}` omitted (packet size limit reached); see python_calls.csv."
+                        )
+            else:
+                budget.omissions.append(
+                    f"Unresolved-relationships listing for `{row['qualified_name']}` omitted entirely "
+                    f"(packet size limit reached); see python_calls.csv."
+                )
 
     # --- dispatch on request type ---
     if opts.file:

@@ -310,6 +310,86 @@ def test_lambda_parameter_shadowing_is_not_confidently_resolved(repo, out):
     assert row["candidate_symbol"] == ""
 
 
+def test_import_inside_dead_if_false_branch_does_not_activate_call_resolution(repo, out):
+    write_files(repo, {
+        "lib.py": "def helper():\n    return 1\n",
+        "a.py": (
+            "if False:\n"
+            "    from lib import helper\n\n"
+            "helper()\n"
+        ),
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    row = next(r for r in calls if r["call_expression"] == "helper")
+    assert row["confidence"] == "unresolved"
+    assert row["candidate_file"] == ""
+
+    # Still reported in the flat import list per contract, even though it
+    # never activates a runtime binding.
+    imports = _read(out, "python_imports.csv")
+    assert any(r["source_file"] == "a.py" and r["imported_name"] == "helper" for r in imports)
+
+
+def test_import_inside_type_checking_branch_does_not_activate_call_resolution(repo, out):
+    write_files(repo, {
+        "lib.py": "def helper():\n    return 1\n",
+        "a.py": (
+            "from typing import TYPE_CHECKING\n\n"
+            "if TYPE_CHECKING:\n"
+            "    from lib import helper\n\n"
+            "helper()\n"
+        ),
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    row = next(r for r in calls if r["call_expression"] == "helper")
+    assert row["confidence"] == "unresolved"
+    assert row["candidate_file"] == ""
+
+
+def test_import_in_live_else_of_dead_if_false_branch_still_resolves(repo, out):
+    write_files(repo, {
+        "lib.py": "def helper():\n    return 1\n",
+        "a.py": (
+            "if False:\n"
+            "    pass\n"
+            "else:\n"
+            "    from lib import helper\n\n"
+            "helper()\n"
+        ),
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    row = next(r for r in calls if r["call_expression"] == "helper")
+    assert row["confidence"] == "medium"
+    assert row["candidate_file"] == "lib.py"
+
+
+def test_comprehension_target_does_not_shadow_module_level_symbol(repo, out):
+    write_files(repo, {
+        "a.py": (
+            "def target():\n    return 1\n\n\n"
+            "def outer(xs):\n"
+            "    [target for target in xs]\n"
+            "    return target()\n"
+        ),
+    })
+    result = run_tool(["scan", str(repo), "--output", str(out)])
+    assert result.returncode == 0, result.stderr
+
+    calls = _read(out, "python_calls.csv")
+    row = next(r for r in calls if r["caller_symbol"] == "outer" and r["call_expression"] == "target")
+    assert row["confidence"] == "high"
+    assert row["candidate_symbol"] == "target"
+
+
 def test_self_method_call_within_known_class(repo, out):
     write_files(repo, {
         "widget.py": (

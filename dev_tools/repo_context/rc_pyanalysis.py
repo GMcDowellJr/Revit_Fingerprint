@@ -59,6 +59,26 @@ def _is_main_guard(node: ast.AST) -> bool:
             and test.comparators[0].value == "__main__")
 
 
+def _is_static_false_test(test: ast.AST) -> bool:
+    """True for an `if` test that is statically guaranteed never to
+    execute its `body` at runtime: a literal `False`, or the
+    `typing.TYPE_CHECKING` convention (which is only True for static type
+    checkers, never at actual runtime)."""
+    if isinstance(test, ast.Constant) and test.value is False:
+        return True
+    if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+        return True
+    if isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING":
+        return True
+    return False
+
+
+def _is_static_true_test(test: ast.AST) -> bool:
+    """True for an `if` test that is statically guaranteed to always
+    execute its `body` (making its `orelse`, if any, statically dead)."""
+    return isinstance(test, ast.Constant) and test.value is True
+
+
 def _unparse_safe(node) -> str:
     if node is None:
         return ""
@@ -146,6 +166,9 @@ def _lambda_param_names(node: ast.Lambda) -> frozenset:
     return frozenset(names)
 
 
+_COMPREHENSION_TYPES = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+
+
 def _collect_local_bound_names(node) -> set:
     """Parameter names plus simple assignment targets bound directly in
     this function's own body (not inside a nested function/class, which
@@ -177,6 +200,20 @@ def _collect_local_bound_names(node) -> set:
                 names.add(stmt.id)  # also catches walrus (:=) targets
             elif isinstance(stmt, ast.ExceptHandler) and stmt.name:
                 names.add(stmt.name)
+            if isinstance(stmt, _COMPREHENSION_TYPES):
+                # A comprehension's own `for x in ...` targets are scoped
+                # to the comprehension itself in Python 3, not to the
+                # enclosing function -- don't treat them as locals here.
+                # (A walrus `:=` used inside the comprehension DOES leak
+                # to the enclosing scope and is still picked up normally,
+                # via the generic Store-name check above, reached through
+                # the recursive walk of elt/key/value/iter/ifs below.)
+                elt_nodes = [stmt.elt] if hasattr(stmt, "elt") else [stmt.key, stmt.value]
+                walk_stmts(elt_nodes)
+                for gen in stmt.generators:
+                    walk_stmts([gen.iter])
+                    walk_stmts(gen.ifs)
+                continue
             walk_stmts(ast.iter_child_nodes(stmt))
 
     walk_stmts(node.body)
@@ -271,7 +308,7 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
             raw_calls.append(make_call(expr, scope_qualname, class_ctx))
         walk_body(expr, scope_qualname, class_ctx, parent_qualname)
 
-    def record_import(stmt, scope_qualname: str) -> None:
+    def record_import(stmt, scope_qualname: str, active: bool = True) -> None:
         """Record an Import/ImportFrom statement found anywhere in the tree
         -- not just at true module top level. Catches lazy imports inside
         functions/methods, imports under `if TYPE_CHECKING:`, etc., so that
@@ -280,7 +317,16 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
         Also indexes the record under the scope it lexically belongs to
         (imports_by_scope), so call resolution can treat a function-local
         import as visible only within that function's own scope chain --
-        not file-wide."""
+        not file-wide.
+
+        `active=False` marks an import lexically inside a branch that is
+        statically guaranteed never to execute at runtime (`if False:` /
+        `if TYPE_CHECKING:`, see `_is_static_false_test`). It's still
+        recorded in the flat `imports` list (and so still reported in
+        python_imports.csv per contract), but deliberately withheld from
+        `imports_by_scope` so call resolution never treats its binding as
+        live -- a name only ever "imported" inside dead code must not be
+        confidently resolved through it."""
         new_records = []
         if isinstance(stmt, ast.Import):
             for alias in stmt.names:
@@ -298,44 +344,67 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
                     level=stmt.level or 0, resolved_file="", resolution_status="",
                 ))
         imports.extend(new_records)
-        imports_by_scope.setdefault(scope_qualname, []).extend(new_records)
+        if active:
+            imports_by_scope.setdefault(scope_qualname, []).extend(new_records)
 
     def walk_body(node: ast.AST, scope_qualname: str, class_ctx: str, parent_qualname: str,
-                  lambda_shadowed: frozenset = frozenset()) -> None:
-        nonlocal has_main_guard
+                  lambda_shadowed: frozenset = frozenset(), import_active: bool = True) -> None:
         for child in ast.iter_child_nodes(node):
-            if isinstance(child, ast.Call):
-                call_rec = make_call(child, scope_qualname, class_ctx)
-                # A lambda can't be given its own tracked scope the way a
-                # def can (it's anonymous, expression-only), so rather
-                # than risk resolving a call to the wrong target when a
-                # lambda parameter shadows an outer name, conservatively
-                # leave it unresolved.
-                shadowed_name = (
-                    call_rec.callee_simple_name if call_rec.kind == "name" else call_rec.base_name
+            walk_child(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed, import_active)
+
+    def walk_child(child: ast.AST, scope_qualname: str, class_ctx: str, parent_qualname: str,
+                   lambda_shadowed: frozenset, import_active: bool) -> None:
+        """Dispatch for a single statement/expression node reached either
+        as a direct child during a generic walk_body recursion, or as a
+        direct body statement from handle_class/handle_func/the top-level
+        loop -- kept as one shared function so both paths agree on what
+        counts as a dead `if` branch, a main guard, etc."""
+        nonlocal has_main_guard
+        if isinstance(child, ast.Call):
+            call_rec = make_call(child, scope_qualname, class_ctx)
+            # A lambda can't be given its own tracked scope the way a
+            # def can (it's anonymous, expression-only), so rather
+            # than risk resolving a call to the wrong target when a
+            # lambda parameter shadows an outer name, conservatively
+            # leave it unresolved.
+            shadowed_name = (
+                call_rec.callee_simple_name if call_rec.kind == "name" else call_rec.base_name
+            )
+            if lambda_shadowed and shadowed_name in lambda_shadowed:
+                call_rec = RawCall(
+                    call_rec.line, call_rec.call_expression, call_rec.callee_simple_name,
+                    "other", "", scope_qualname, class_ctx,
                 )
-                if lambda_shadowed and shadowed_name in lambda_shadowed:
-                    call_rec = RawCall(
-                        call_rec.line, call_rec.call_expression, call_rec.callee_simple_name,
-                        "other", "", scope_qualname, class_ctx,
-                    )
-                raw_calls.append(call_rec)
-                walk_body(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed)
-            elif isinstance(child, ast.Lambda):
-                walk_body(child, scope_qualname, class_ctx, parent_qualname,
-                          lambda_shadowed | _lambda_param_names(child))
-            elif isinstance(child, ast.ClassDef):
-                handle_class(child, scope_qualname, parent_qualname)
-            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                handle_func(child, scope_qualname, class_ctx, parent_qualname)
-            elif isinstance(child, ast.If) and parent_qualname == MODULE_SYMBOL and _is_main_guard(child):
-                has_main_guard = True
-                walk_body(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed)
-            elif isinstance(child, (ast.Import, ast.ImportFrom)):
-                record_import(child, scope_qualname)
-                walk_body(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed)
-            else:
-                walk_body(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed)
+            raw_calls.append(call_rec)
+            walk_body(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed, import_active)
+        elif isinstance(child, ast.Lambda):
+            walk_body(child, scope_qualname, class_ctx, parent_qualname,
+                      lambda_shadowed | _lambda_param_names(child), import_active)
+        elif isinstance(child, ast.ClassDef):
+            handle_class(child, scope_qualname, parent_qualname)
+        elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            handle_func(child, scope_qualname, class_ctx, parent_qualname)
+        elif isinstance(child, ast.If) and parent_qualname == MODULE_SYMBOL and _is_main_guard(child):
+            has_main_guard = True
+            walk_body(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed, import_active)
+        elif isinstance(child, ast.If) and (_is_static_false_test(child.test) or _is_static_true_test(child.test)):
+            # A statically-determinable dead branch: imports lexically
+            # inside the half that never executes at runtime must not be
+            # wired into imports_by_scope (see record_import), even though
+            # the *other* half (or the test expression itself, which
+            # always evaluates) is handled normally.
+            body_active = import_active and not _is_static_false_test(child.test)
+            orelse_active = import_active and not _is_static_true_test(child.test)
+            walk_child(child.test, scope_qualname, class_ctx, parent_qualname, lambda_shadowed, import_active)
+            for stmt in child.body:
+                walk_child(stmt, scope_qualname, class_ctx, parent_qualname, lambda_shadowed, body_active)
+            for stmt in child.orelse:
+                walk_child(stmt, scope_qualname, class_ctx, parent_qualname, lambda_shadowed, orelse_active)
+        elif isinstance(child, (ast.Import, ast.ImportFrom)):
+            record_import(child, scope_qualname, import_active)
+            walk_body(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed, import_active)
+        else:
+            walk_body(child, scope_qualname, class_ctx, parent_qualname, lambda_shadowed, import_active)
 
     def handle_class(node: ast.ClassDef, parent_qualname: str, grandparent_qualname: str) -> None:
         qualname = f"{parent_qualname}.{node.name}" if parent_qualname != MODULE_SYMBOL else node.name
@@ -375,14 +444,7 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 info.methods.add(n.name)
         for stmt in node.body:
-            if isinstance(stmt, ast.ClassDef):
-                handle_class(stmt, qualname, parent_qualname)
-            elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                handle_func(stmt, qualname, qualname, parent_qualname)
-            elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
-                record_import(stmt, qualname)
-            else:
-                walk_body(stmt, qualname, qualname, parent_qualname)
+            walk_child(stmt, qualname, qualname, parent_qualname, frozenset(), True)
 
     def handle_func(node, parent_qualname: str, class_ctx: str, grandparent_qualname: str) -> None:
         qualname = f"{parent_qualname}.{node.name}" if parent_qualname != MODULE_SYMBOL else node.name
@@ -439,28 +501,10 @@ def analyze_python_source(rel_path: str, source: str) -> PyFileAnalysis:
         # class_ctx passed through for self-resolution of nested defs.
         effective_class_ctx = class_ctx if symbol_type in ("method",) else (class_ctx if symbol_type == "nested_function" else "")
         for stmt in node.body:
-            if isinstance(stmt, ast.ClassDef):
-                handle_class(stmt, qualname, parent_qualname)
-            elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                handle_func(stmt, qualname, effective_class_ctx, parent_qualname)
-            elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
-                record_import(stmt, qualname)
-            else:
-                walk_body(stmt, qualname, effective_class_ctx, parent_qualname)
+            walk_child(stmt, qualname, effective_class_ctx, parent_qualname, frozenset(), True)
 
     for stmt in tree.body:
-        if isinstance(stmt, ast.ClassDef):
-            handle_class(stmt, MODULE_SYMBOL, "")
-        elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            handle_func(stmt, MODULE_SYMBOL, "", "")
-        elif isinstance(stmt, ast.If) and _is_main_guard(stmt):
-            has_main_guard = True
-            walk_body(stmt, MODULE_SYMBOL, "", MODULE_SYMBOL)
-        elif isinstance(stmt, (ast.Import, ast.ImportFrom)):
-            record_import(stmt, MODULE_SYMBOL)
-            walk_body(stmt, MODULE_SYMBOL, "", MODULE_SYMBOL)
-        else:
-            walk_body(stmt, MODULE_SYMBOL, "", MODULE_SYMBOL)
+        walk_child(stmt, MODULE_SYMBOL, "", MODULE_SYMBOL, frozenset(), True)
 
     parent_of = {s.qualified_name: s.parent_symbol for s in symbols}
     return PyFileAnalysis(
