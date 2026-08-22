@@ -614,25 +614,55 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
     # Freshness withholding and non-mandatory expansions (callers/callees/
     # imports/tests) are still recorded as ordinary, non-fatal omissions on
     # `budget` and must NOT abort generation.
+    #
+    # Two passes, deliberately in this order:
+    #   1. Render every explicit selector's own header/excerpt first (and
+    #      only once per distinct target -- two selectors naming the same
+    #      file/symbol/line render it a single time). None of this may be
+    #      pre-empted by expansion content.
+    #   2. Only once every explicit item has had its guaranteed shot at the
+    #      budget do optional expansions (callers/callees/imports/tests/
+    #      Graphify) spend whatever budget remains. Interleaving expansion
+    #      spend between explicit items (the previous structure) let one
+    #      selector's expansions manufacture a budget conflict for a later,
+    #      otherwise-fitting explicit selector.
     explicit_conflicts: list = []
+    rendered_files: set = set()
+    rendered_symbols: set = set()
+    rendered_lines: set = set()
+    file_expansion_items: list = []    # [(top_level_rows)]
+    symbol_expansion_items: list = []  # [row]
+
+    def _spend_header(header: str) -> bool:
+        if not budget.allow(header, 2):
+            return False
+        out.append(header)
+        budget.spend(header, 2)
+        return True
 
     for res in file_resolutions:
         if res.status != "resolved":
             continue
         rel = res.requested
+        if rel in rendered_files:
+            # Duplicate selector for a file already attempted -- its first
+            # occurrence's outcome (rendered, or a recorded conflict) is
+            # final; re-attempting an identical selector would just repeat
+            # the same header/budget work (or the same conflict message)
+            # once per repeat, which is itself an unbounded-output shape
+            # for a request naming the same selector many times over.
+            continue
+        rendered_files.add(rel)
         if not note_focus_file(rel):
-            # This is an *explicit* selector -- limits.max_files being too
-            # small to fit every distinct file the request named is the
-            # same category of hard conflict as a token-budget overflow,
-            # not something to quietly omit (which would otherwise leave
-            # the resolution report claiming "resolved" for content that
-            # was never actually rendered).
             explicit_conflicts.append(
                 f"explicit file selector `{rel}` does not fit: limits.max_files ({resolved.max_files}) reached"
             )
             continue
         row = res.resolved_rows[0]
-        out.append(_render_origin_header(f"File: `{rel}`", ["explicit_file_selector"]))
+        header = _render_origin_header(f"File: `{rel}`", ["explicit_file_selector"])
+        if not _spend_header(header):
+            explicit_conflicts.append(f"explicit file selector `{rel}` does not fit (header alone exceeds budget)")
+            continue
         top_level = sorted(
             [r for r in symbols_by_file.get(rel, []) if r["parent_symbol"] == "<module>" and r["symbol_type"] != "module"],
             key=lambda r: int(r["start_line"]),
@@ -665,34 +695,44 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             status = _render_excerpt_block(root, rel, 1, line_count, budget, out, row.get("sha256", ""))
             if status == "too_large":
                 explicit_conflicts.append(f"explicit file selector `{rel}` ({line_count} lines) does not fit")
-        for r in top_level:
-            _symbol_expansion(r, calls_rows, imports_rows, files_by_path, resolved, budget, out, note_focus_file,
-                              communities_by_file)
+        file_expansion_items.append(top_level)
 
     for res in symbol_resolutions:
         if res.status != "resolved":
             continue
         row = res.resolved_rows[0]
         rel = row["relative_path"]
+        symbol_key = (rel, row["qualified_name"])
+        if symbol_key in rendered_symbols:
+            continue  # duplicate selector; first occurrence's outcome is final
+        rendered_symbols.add(symbol_key)
         if not note_focus_file(rel):
             explicit_conflicts.append(
                 f"explicit symbol selector `{row['qualified_name']}` in `{rel}` does not fit: "
                 f"limits.max_files ({resolved.max_files}) reached"
             )
             continue
-        out.append(_render_origin_header(f"Symbol: `{row['qualified_name']}` — `{rel}`", ["explicit_symbol_selector"]))
+        header = _render_origin_header(f"Symbol: `{row['qualified_name']}` — `{rel}`", ["explicit_symbol_selector"])
+        if not _spend_header(header):
+            explicit_conflicts.append(
+                f"explicit symbol selector `{row['qualified_name']}` in `{rel}` does not fit (header alone exceeds budget)"
+            )
+            continue
         status = _render_excerpt_block(root, rel, int(row["start_line"]), int(row["end_line"]), budget, out,
                                         files_by_path.get(rel, {}).get("sha256", ""))
         if status == "too_large":
             explicit_conflicts.append(f"explicit symbol selector `{row['qualified_name']}` in `{rel}` does not fit")
-        _symbol_expansion(row, calls_rows, imports_rows, files_by_path, resolved, budget, out, note_focus_file,
-                          communities_by_file)
+        symbol_expansion_items.append(row)
 
     for res in line_resolutions:
         if res.status != "resolved":
             continue
         info = res.resolved_rows[0]
         rel = info["file"]
+        line_key = (rel, info["start"], info["end"])
+        if line_key in rendered_lines:
+            continue  # duplicate selector; first occurrence's outcome is final
+        rendered_lines.add(line_key)
         if not note_focus_file(rel):
             explicit_conflicts.append(
                 f"explicit line selector `{res.requested}` does not fit: limits.max_files ({resolved.max_files}) reached"
@@ -702,7 +742,10 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             r for r in symbols_by_file.get(rel, [])
             if int(r["start_line"]) <= info["start"] <= int(r["end_line"]) and r["symbol_type"] != "module"
         ]
-        out.append(_render_origin_header(f"Line selector: `{res.requested}`", ["explicit_line_selector"]))
+        header = _render_origin_header(f"Line selector: `{res.requested}`", ["explicit_line_selector"])
+        if not _spend_header(header):
+            explicit_conflicts.append(f"explicit line selector `{res.requested}` does not fit (header alone exceeds budget)")
+            continue
         if enclosing:
             enclosing.sort(key=lambda r: int(r["end_line"]) - int(r["start_line"]))
             row = enclosing[0]
@@ -726,6 +769,19 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             f"relevant limit or narrow the request. Conflicts:\n"
             + "\n".join(f"  - {o}" for o in explicit_conflicts)
         )
+
+    # Every explicit selector fit -- now spend whatever budget remains on
+    # optional expansions (callers/callees/imports/tests/Graphify). Done
+    # only now, not interleaved with tier-1's rendering above, so a
+    # symbol's expansions can never manufacture a budget conflict for a
+    # later explicit selector.
+    for top_level in file_expansion_items:
+        for r in top_level:
+            _symbol_expansion(r, calls_rows, imports_rows, files_by_path, resolved, budget, out, note_focus_file,
+                              communities_by_file)
+    for row in symbol_expansion_items:
+        _symbol_expansion(row, calls_rows, imports_rows, files_by_path, resolved, budget, out, note_focus_file,
+                          communities_by_file)
 
     # --- Tier 2: exact search-term matches ---
     # Matches were already computed by resolve_search_terms() above (before
@@ -755,17 +811,22 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             continue
         out.append(header); budget.spend(header, 1)
         for rel, ln, text in matches:
+            line_text = redact_secrets(text.strip()[:200])
+            line = f"- `{rel}:{ln}` — `{line_text}`"
+            # Check the budget *before* reserving a focus-file slot for
+            # this match -- otherwise a match that ultimately doesn't fit
+            # (and is never rendered) could still consume the one
+            # remaining limits.max_files slot, starving a later, shorter
+            # match from a different file that would have fit.
+            if not budget.allow(line, 1):
+                budget.omissions.append(f"Additional `{term}` matches omitted (packet size limit reached).")
+                break
             if not note_focus_file(rel):
                 # note_focus_file enforces limits.max_files against the
                 # *global* focus-file set shared across every selector/tier
                 # in this packet, not just this one search term -- so the
                 # cap holds even when different terms match different files.
                 budget.omissions.append(f"Additional `{term}` matches omitted beyond limits.max_files ({resolved.max_files}).")
-                break
-            line_text = redact_secrets(text.strip()[:200])
-            line = f"- `{rel}:{ln}` — `{line_text}`"
-            if not budget.allow(line, 1):
-                budget.omissions.append(f"Additional `{term}` matches omitted (packet size limit reached).")
                 break
             out.append(line); budget.spend(line, 1)
     if stale_search_files:

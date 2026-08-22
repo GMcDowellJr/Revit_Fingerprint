@@ -120,6 +120,92 @@ def test_hard_budget_conflict_on_explicit_selector_aborts_without_partial_packet
     assert not (out / "packets" / "packet_req.md").exists()
 
 
+def test_expansion_never_preempts_a_later_explicit_selector(repo, out):
+    # Regression: expansions (callers/callees/imports/tests) for one
+    # explicit symbol were rendered immediately after it and before the
+    # *next* explicit selector got its turn, so a budget that easily fits
+    # every explicit selector's own content could still fail if an early
+    # selector's expansion ate the remaining room first. Explicit content
+    # must all be attempted before any expansion spends a single char.
+    write_files(repo, {
+        "core/a.py": "def h():\n    return 42\n\n\ndef f():\n    return h()\n",
+        "core/b.py": "def g():\n    return 2\n",
+    })
+    _scan(repo, out)
+
+    # Establish the true no-expansion cost for both explicit symbols.
+    baseline_req = _request(out, "baseline.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [{"name": "f", "file": "core/a.py"},
+                                                 {"name": "g", "file": "core/b.py"}], "search_terms": [], "lines": []},
+        "expansion": {"include_callers": False, "include_callees": False, "include_imports": False,
+                      "include_related_tests": False},
+        "limits": {"max_estimated_tokens": 200, "max_files": 12},
+    })
+    baseline_result = _packet(repo, out, baseline_req)
+    assert baseline_result.returncode == 0, baseline_result.stderr
+    baseline_sidecar = json.loads((out / "packets" / "packet_baseline.resolution.json").read_text(encoding="utf-8"))
+    no_expansion_tokens = baseline_sidecar["estimated_tokens_used"]
+
+    # A budget comfortably above the no-expansion cost, but too small to
+    # also fit f's callee-expansion listing -- both explicit symbols must
+    # still render in full; only the expansion may be omitted.
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [{"name": "f", "file": "core/a.py"},
+                                                 {"name": "g", "file": "core/b.py"}], "search_terms": [], "lines": []},
+        "expansion": {"include_callers": False, "include_callees": True, "include_imports": False,
+                      "include_related_tests": False},
+        "limits": {"max_estimated_tokens": no_expansion_tokens + 10, "max_files": 12},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert "### Symbol: `f`" in text
+    assert "### Symbol: `g`" in text
+    assert "return 2" in text  # g's own body, never sacrificed for f's expansion
+
+
+def test_search_match_does_not_reserve_focus_file_slot_unless_rendered(repo, out):
+    # Regression: note_focus_file(rel) was called before checking whether
+    # the match's own rendered line fit the remaining budget, so a match
+    # that ultimately never appears in the packet could still consume the
+    # sole limits.max_files slot -- and the resolution sidecar would then
+    # misleadingly name that file as a "focus file" despite showing zero
+    # evidence for it.
+    write_files(repo, {"a.py": f"needle = {'x' * 500!r}\n"})
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [], "search_terms": ["needle"], "lines": []},
+        "limits": {"max_estimated_tokens": 10, "max_files": 1},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+    assert sidecar["focus_files"] == []
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert "a.py:1" not in text
+
+
+def test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence(repo, out):
+    # Regression: a request naming the same file selector many times over
+    # re-attempted rendering (and, if it failed, re-appended an identical
+    # conflict message) once per occurrence -- an unbounded-output shape
+    # for a request that just repeats one selector, independent of the
+    # token-budget accounting fixes for distinct content.
+    write_files(repo, {"empty.py": ""})
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["empty.py"] * 1000, "symbols": [], "search_terms": [], "lines": []},
+        "limits": {"max_estimated_tokens": 1, "max_files": 12},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 1
+    assert result.stderr.count("empty.py") <= 2  # one conflict line, not one per duplicate
+
+
 def test_explicit_selectors_beyond_max_files_is_a_hard_conflict_not_silent_drop(repo, out):
     # Regression: naming more distinct explicit files than limits.max_files
     # allows used to succeed with a partial packet, leaving the resolution
