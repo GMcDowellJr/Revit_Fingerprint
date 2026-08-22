@@ -1,6 +1,6 @@
 # Repository Overview: Revit_Fingerprint
 
-- Scan time (UTC): 2026-08-22T10:35:17Z
+- Scan time (UTC): 2026-08-22T10:53:20Z
 - Generator: repo_context.py v0.1.0
 - Total files considered: 669
 - Included: 669
@@ -63,10 +63,10 @@
 - `tools/governance_evidence_package.py` — 1621 lines
 - `runner/run_dynamo.py` — 1581 lines
 - `tools/extractor.py` — 1515 lines
+- `dev_tools/repo_context/tests/test_packet_from_request.py` — 1408 lines
 - `legacy/fingerprint_mvp.py` — 1402 lines
 - `tools/archetype/discover_vfd_edges.py` — 1353 lines
-- `dev_tools/repo_context/tests/test_packet_from_request.py` — 1303 lines
-- `dev_tools/repo_context/rc_request.py` — 1241 lines
+- `dev_tools/repo_context/rc_request.py` — 1283 lines
 
 ## Files that required chunking (46)
 

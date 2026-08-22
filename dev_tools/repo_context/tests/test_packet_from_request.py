@@ -2,6 +2,7 @@ import json
 import time
 
 from conftest import run_tool, write_files  # noqa: F401 -- conftest import also puts TOOL_DIR on sys.path
+import rc_packet
 import rc_request as rr
 
 
@@ -1230,7 +1231,19 @@ def test_fixed_framing_is_reserved_before_tier1_content_spends_budget(repo, out)
     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
     _scan(repo, out)
 
-    def _gen(name, max_tokens):
+    # A single fixed request/output name reused for *every* call below --
+    # the packet header renders the request filename verbatim
+    # (`- Request file: \`{name}.json\` ...`), so varying the name's
+    # length between calls (e.g. "probe166" vs. "boundary" vs. "under")
+    # shifts the header's own size and, right at a ~1-token-wide margin,
+    # can flip whether a given max_estimated_tokens value fits -- making
+    # the boundary this test measures depend on which name happened to be
+    # used for which call, not just on max_estimated_tokens. Reusing one
+    # name removes that variable; each call's result depends only on
+    # max_tokens.
+    name = "req"
+
+    def _gen(max_tokens):
         req = _request(out, f"{name}.json", {
             "schema_version": "1.0", "question": "q",
             "selectors": {"files": ["core/a.py"], "symbols": [], "search_terms": [], "lines": []},
@@ -1241,13 +1254,13 @@ def test_fixed_framing_is_reserved_before_tier1_content_spends_budget(repo, out)
         return rr.generate_packet_from_request(repo, out, req, name_override=name)
 
     # Sanity-bound the binary search: a generous budget must succeed.
-    packet_path, _, err = _gen("hi", 2000)
+    packet_path, _, err = _gen(2000)
     assert packet_path is not None, err
 
     lo, hi = 1, 2000
     while lo < hi:
         mid = (lo + hi) // 2
-        packet_path, _, _ = _gen(f"probe{mid}", mid)
+        packet_path, _, _ = _gen(mid)
         if packet_path is not None:
             hi = mid
         else:
@@ -1260,14 +1273,14 @@ def test_fixed_framing_is_reserved_before_tier1_content_spends_budget(repo, out)
     # would report success here with estimated_tokens_used well above
     # min_success_tokens, since Tier-1 content had already spent as if
     # framing were free).
-    packet_path, _, err = _gen("boundary", min_success_tokens)
+    packet_path, _, err = _gen(min_success_tokens)
     assert packet_path is not None, err
-    sidecar = json.loads((out / "packets" / "packet_boundary.resolution.json").read_text(encoding="utf-8"))
+    sidecar = json.loads((out / "packets" / f"packet_{name}.resolution.json").read_text(encoding="utf-8"))
     assert sidecar["estimated_tokens_used"] <= min_success_tokens
 
     # One token below that boundary must hard-abort -- not silently
     # succeed with a packet whose true size exceeds the requested cap.
-    packet_path, _, err = _gen("under", min_success_tokens - 1)
+    packet_path, _, err = _gen(min_success_tokens - 1)
     assert packet_path is None
     assert "do not fit" in (err or "")
 
@@ -1301,3 +1314,95 @@ def test_search_term_match_cannot_exceed_budget_via_late_footer_charge(repo, out
         assert sidecar["estimated_tokens_used"] <= 100
     else:
         assert "too small to fit" in err
+
+
+def _spy_iter_safe_lines(monkeypatch, module):
+    """Wraps module._iter_safe_lines so every line it actually yields is
+    counted, without changing its behavior (including .close()
+    forwarding). Returns the shared counter dict; read counter["count"]
+    after the call under test."""
+    real = module._iter_safe_lines
+    counter = {"count": 0}
+
+    def spy(root, rel_path, start, end):
+        gen = real(root, rel_path, start, end)
+        if gen is None:
+            return None
+
+        def _wrapped():
+            try:
+                for item in gen:
+                    counter["count"] += 1
+                    yield item
+            finally:
+                gen.close()
+
+        return _wrapped()
+
+    monkeypatch.setattr(module, "_iter_safe_lines", spy)
+    return counter
+
+
+def test_explicit_excerpt_streams_and_stops_instead_of_materializing_whole_range(repo, out, monkeypatch):
+    # Regression: an explicit file selector's excerpt was fully
+    # materialized via _safe_excerpt(root, rel, 1, line_count) *before*
+    # any budget check -- for a file the scanner deliberately keeps in
+    # the inventory without reading whole (files over MAX_TEXT_READ_BYTES
+    # still get a real, streamed-counted line_count -- see rc_scan.py),
+    # this could allocate the file's entire content in memory just to
+    # then learn the excerpt doesn't fit. The excerpt must instead be
+    # streamed and stop reading as soon as it's clear the remaining
+    # budget is exceeded.
+    big_lines = [f"line number {i:06d} of a much larger file body" for i in range(5000)]
+    write_files(repo, {"big.py": "\n".join(big_lines) + "\n"})
+    _scan(repo, out)
+    counter = _spy_iter_safe_lines(monkeypatch, rr)
+
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["big.py"], "symbols": [], "search_terms": [], "lines": []},
+        "limits": {"max_estimated_tokens": 200, "max_files": 12},
+    })
+    packet_path, _, err = rr.generate_packet_from_request(repo, out, req, name_override="req")
+    # The explicit selector doesn't fit this tiny budget -- correctly a
+    # hard conflict, per the existing explicit-selector contract -- but
+    # what matters here is that reaching that conclusion did not require
+    # reading anywhere near all 5000 lines of the file first.
+    assert packet_path is None
+    assert counter["count"] < 500, f"read {counter['count']} lines before bailing out -- not streaming"
+
+
+def test_search_term_scan_streams_and_stops_once_collect_cap_is_reached(repo, out, monkeypatch):
+    # Regression: _scan_term_matches() called _safe_excerpt(root, rel, 1,
+    # 10_000_000) per file, materializing up to ten million lines before
+    # any matching happened -- a large included file (the scanner
+    # deliberately keeps files over MAX_TEXT_READ_BYTES in the inventory
+    # without reading them whole -- see rc_scan.py) could exhaust memory
+    # searching for a term that matches many times, or not at all. A
+    # literal search must still scan every line to find every match up to
+    # collect_cap, but it must do so line-by-line as the file streams in
+    # -- not by pre-loading the whole range into memory first -- and it
+    # must stop consuming the file entirely once collect_cap matches have
+    # been found, not keep reading to the end regardless.
+    #
+    # max_files=1 makes collect_cap (max(1, max_files) * 5) a small,
+    # known value (5): put 10 matches up front, comfortably more than
+    # collect_cap, followed by thousands of filler lines the scan must
+    # never need to reach.
+    big_lines = ["needle_marker"] * 10 + [f"filler line {i:06d}" for i in range(5000)]
+    write_files(repo, {"big.py": "\n".join(big_lines) + "\n"})
+    _scan(repo, out)
+    counter = _spy_iter_safe_lines(monkeypatch, rr)
+
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [], "search_terms": ["needle_marker"], "lines": []},
+        "limits": {"max_estimated_tokens": 12000, "max_files": 1},
+    })
+    packet_path, _, err = rr.generate_packet_from_request(repo, out, req, name_override="req")
+    assert packet_path is not None, err
+    text = packet_path.read_text(encoding="utf-8")
+    assert "needle_marker" in text
+    # collect_cap is 5 here -- the scan must stop shortly after finding
+    # the 5th match, not read all ~5010 lines of the file.
+    assert counter["count"] < 500, f"read {counter['count']} lines after collect_cap was reached -- not streaming"

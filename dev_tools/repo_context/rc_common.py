@@ -67,6 +67,21 @@ REDACTION_TEXT = "[REDACTED-POSSIBLE-SECRET]"
 
 _PLAIN_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
+# Substrings that mark an unquoted, underscore-containing identifier as
+# *demonstrably* a reference/provenance description rather than a secret
+# value that merely happens to look like one -- a real lowercase
+# snake_case credential (e.g. a Diceware-style password like
+# `correct_horse_battery_staple`, or a token literal like
+# `real_secret_value`) has the exact same shape (all-lowercase, no digit,
+# underscore-separated words) as a legitimate reference like
+# `user_provided_value_from_config`, so shape alone (the previous check)
+# cannot tell them apart. Requiring one of these markers narrows the
+# exemption to identifiers that name *where a value comes from*
+# (config/env/provider lookups, or an explicit placeholder), which a real
+# secret's spelling essentially never does.
+_REFERENCE_MARKERS = ("config", "provider", "environ", "_env", "env_", "placeholder", "default", "template",
+                      "example")
+
 
 def _looks_secret_shaped(value: str, quoted: bool) -> bool:
     """Bounded false-positive guard for _SECRET_ASSIGNMENT_PATTERN.
@@ -74,26 +89,32 @@ def _looks_secret_shaped(value: str, quoted: bool) -> bool:
     A *quoted* value after `token =` / `password:` / etc. is redacted
     unconditionally, as before -- a literal string in that position is
     almost always meant to be a real secret. An *unquoted* value is only
-    left alone when it both (a) is a plain identifier (letters/digits/
-    underscores only) AND (b) contains an underscore, AND (c) has no digit
-    and no mixed case -- i.e. it reads as a natural multi-word snake_case
-    reference like `token = user_provided_value_from_config` or
-    `access_token = fetch_token_from_provider`, not a single opaque word.
-    A single-word unquoted value with no underscore (e.g. `token:
-    abcdefghijklmnopqrstuvwxyz`) is exactly the shape a real lowercase
-    credential/token takes and is still redacted, even though it also
-    happens to be a valid identifier. This does not eliminate every false
-    positive (e.g. a *multi-word* unquoted identifier that happens to
-    include a digit, like `config_v2_token`, is still redacted) -- closing
-    that gap fully would need real entropy scoring or an allowlist, which
-    is a separate, broader redesign rather than a bounded fix.
+    left alone when it (a) is a plain identifier (letters/digits/
+    underscores only), (b) contains an underscore, (c) has no digit and no
+    mixed case, AND (d) contains one of `_REFERENCE_MARKERS` -- i.e. it
+    reads as a description of *where a value comes from*, like
+    `token = user_provided_value_from_config` or `access_token =
+    fetch_token_from_provider`, not an opaque value. Requirement (d) is
+    what keeps this exemption from also swallowing a real lowercase
+    snake_case credential like `password = correct_horse_battery_staple`
+    or `token = real_secret_value`: those have the identical shape ((a)-
+    (c)) but name no config/env/provider/placeholder origin, so they stay
+    redacted. A single-word unquoted value with no underscore (e.g.
+    `token: abcdefghijklmnopqrstuvwxyz`) is exactly the shape a real
+    lowercase credential/token takes and is still redacted, even though it
+    also happens to be a valid identifier. This does not eliminate every
+    false positive (e.g. a reference identifier that happens to omit any
+    marker word) -- closing that gap fully would need real entropy scoring
+    or an allowlist, which is a separate, broader redesign rather than a
+    bounded fix.
     """
     if quoted:
         return True
     if _PLAIN_IDENTIFIER.match(value) and "_" in value:
         has_digit = any(c.isdigit() for c in value)
         has_mixed_case = any(c.islower() for c in value) and any(c.isupper() for c in value)
-        return has_digit or has_mixed_case
+        looks_like_reference = any(marker in value.lower() for marker in _REFERENCE_MARKERS)
+        return (has_digit or has_mixed_case) or not looks_like_reference
     return True  # single-word identifier, or contains '/', '+', '.', '-' -- secret-shaped
 
 

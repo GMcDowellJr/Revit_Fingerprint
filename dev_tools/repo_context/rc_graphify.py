@@ -64,6 +64,18 @@ def load_graphify_communities(root: Path, current_commit: Optional[str],
             "graphify-out/graph.json has no built_at_commit field; revision alignment cannot be proven, "
             "so Graphify-derived routing/expansion evidence is omitted by default."
         ]
+    if not isinstance(built_at_commit, str):
+        # A truthy but non-string value (e.g. an int, or a nonempty
+        # object/list) would otherwise reach `built_at_commit[:12]` below
+        # and raise TypeError -- since routing loads Graphify during
+        # every normal scan, that would crash the whole scan over one
+        # malformed field in an optional artifact, instead of treating it
+        # as unavailable evidence like any other malformed graph.json.
+        return {}, [
+            "graphify-out/graph.json's built_at_commit field is not a string; revision alignment cannot be "
+            "proven, so Graphify-derived routing/expansion evidence is omitted (the field is malformed, not "
+            "just stale)."
+        ]
     if not allow_stale:
         # Revision alignment can only be *proven* when both the scanned
         # repository's current commit and the graph's built_at_commit are

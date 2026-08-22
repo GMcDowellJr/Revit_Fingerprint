@@ -447,6 +447,24 @@ def test_scan_survives_mixed_int_and_str_graphify_community_ids(repo, out):
     assert (out / "routing" / "index.md").exists()
 
 
+def test_scan_survives_a_non_string_graphify_built_at_commit(repo, out):
+    # Regression: a truthy but non-string built_at_commit (e.g. an int, or
+    # a nonempty object) reached `built_at_commit[:12]` in the revision-
+    # mismatch message unchanged, raising TypeError (int/dict aren't
+    # sliceable) -- since routing loads Graphify during every normal
+    # scan, one malformed field in this optional artifact crashed the
+    # whole scan instead of just being treated as unavailable evidence.
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    (repo / "graphify-out").mkdir(parents=True, exist_ok=True)
+    graph = {
+        "built_at_commit": 123,
+        "nodes": [{"source_file": "core/a.py", "community": 1}],
+    }
+    (repo / "graphify-out" / "graph.json").write_text(json.dumps(graph), encoding="utf-8")
+    _scan(repo, out)  # must not crash
+    assert (out / "routing" / "index.md").exists()
+
+
 def test_content_derived_purpose_clues_are_redacted(repo, out):
     # Regression: _markdown_title() and the module-docstring purpose clue
     # both pull real content directly from the scanned file, unlike

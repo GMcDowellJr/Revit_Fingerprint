@@ -117,6 +117,16 @@ def test_redaction_does_not_remove_valid_code_statements_naming_token_or_secret(
         # earlier, over-broad "plain identifier" exemption let this
         # through unredacted).
         "token: abcdefghijklmnopqrstuvwxyz",
+        # Regression (fresh review finding): a lowercase, underscore-
+        # separated, digit-free unquoted value is the *exact same shape*
+        # as the benign references above (e.g. `user_provided_value_
+        # from_config`) -- a real Diceware-style password or a plain
+        # snake_case token literal has that shape too, and the previous
+        # version of the identifier exemption redacted neither. Requiring
+        # a reference marker (config/provider/env/etc.) closes this gap:
+        # these contain no such marker and must still be redacted.
+        "password: correct_horse_battery_staple",
+        "token = real_secret_value",
     ]
     for line in secret_like:
         redacted = redact_secrets(line)

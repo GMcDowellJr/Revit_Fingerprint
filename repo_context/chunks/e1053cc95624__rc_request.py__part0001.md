@@ -2,10 +2,10 @@
 
 - Source relative path: `dev_tools/repo_context/rc_request.py`
 - Chunk: 1 of 4
-- Original line range: 1-516
+- Original line range: 1-520
 - Overlap lines with previous chunk: 0
-- Symbols fully or partially present: RequestError, ResolvedRequest, _is_safe_repo_relative_path, validate_request_dict, parse_and_validate_request, SelectorResolution, resolve_files, resolve_symbols, resolve_lines, _scan_term_matches, _RegexSearchTimeout, _raise_regex_timeout, _scan_term_matches_bounded, resolve_search_terms, _render_origin_header
-- Source SHA-256: 82e6de1cc1d8a6782ab71ce65e4e91a7f422b049d64883de0a14e381c517b7c3
+- Symbols fully or partially present: RequestError, ResolvedRequest, _is_safe_repo_relative_path, validate_request_dict, parse_and_validate_request, SelectorResolution, resolve_files, resolve_symbols, resolve_lines, _scan_term_matches, _RegexSearchTimeout, _raise_regex_timeout, _scan_term_matches_bounded, resolve_search_terms
+- Source SHA-256: da6b351bdc8071f0313b339e641c5fdb991fa445c5ab75e6b857884c94d04dea
 - Starts inside symbol: no
 - Ends inside symbol: no
 
@@ -41,7 +41,7 @@
     29| # extraction, freshness checks, and BFS caller/callee walks a second time)
     30| # keeps both packet paths consistent.
     31| from rc_packet import (
-    32|     Budget, _load_csv, _norm_rel, _file_is_fresh, _safe_excerpt,
+    32|     Budget, _load_csv, _norm_rel, _file_is_fresh, _iter_safe_lines,
     33|     _find_symbol_candidates, _bfs_callers, _bfs_callees, _candidate_tests_for_file,
     34| )
     35| 
@@ -372,158 +372,162 @@
    360|         if not _file_is_fresh(root, frow["relative_path"], frow.get("sha256", "")):
    361|             stale += 1
    362|             continue
-   363|         excerpt = _safe_excerpt(root, frow["relative_path"], 1, 10_000_000)
-   364|         if excerpt is None:
-   365|             continue
-   366|         for ln, text in excerpt:
-   367|             hit = pattern.search(text) if pattern else (term in text)
-   368|             if hit:
-   369|                 term_matches.append((frow["relative_path"], ln, text))
-   370|                 if len(term_matches) >= collect_cap:
-   371|                     break
-   372|     return term_matches, stale
-   373| 
-   374| 
-   375| class _RegexSearchTimeout(Exception):
-   376|     pass
-   377| 
-   378| 
-   379| def _raise_regex_timeout(signum, frame) -> None:
-   380|     raise _RegexSearchTimeout()
-   381| 
-   382| 
-   383| _UNSUPPORTED_PLATFORM = "unsupported_platform"
-   384| 
+   363|         # Stream lines in rather than materializing up to 10 million of
+   364|         # them via _safe_excerpt() before any matching happens -- the
+   365|         # scanner deliberately keeps files over MAX_TEXT_READ_BYTES in the
+   366|         # inventory without ever reading them into memory whole (see
+   367|         # rc_scan.py), so a large included file could otherwise exhaust
+   368|         # memory searching for a term that appears once (or not at all).
+   369|         # _iter_safe_lines() evaluates and discards one line at a time,
+   370|         # so a hit early in the file (or collect_cap being reached) stops
+   371|         # reading the rest of it immediately.
+   372|         lines = _iter_safe_lines(root, frow["relative_path"], 1, 10_000_000)
+   373|         if lines is None:
+   374|             continue
+   375|         try:
+   376|             for ln, text in lines:
+   377|                 hit = pattern.search(text) if pattern else (term in text)
+   378|                 if hit:
+   379|                     term_matches.append((frow["relative_path"], ln, text))
+   380|                     if len(term_matches) >= collect_cap:
+   381|                         break
+   382|         finally:
+   383|             lines.close()
+   384|     return term_matches, stale
    385| 
-   386| def _scan_term_matches_bounded(term: str, pattern, files_rows: list, root: Path, collect_cap: int,
-   387|                                 timeout: Optional[float] = None):
-   388|     """Runs _scan_term_matches with a wall-clock ceiling, to bound a
-   389|     pathological `search_as_regex` pattern's catastrophic-backtracking
-   390|     blowup (e.g. `(a+)+$` against a long, nearly-matching source line)
-   391|     instead of hanging the CLI indefinitely. Returns None on timeout, or
-   392|     the module-level _UNSUPPORTED_PLATFORM sentinel if this platform has
-   393|     no way to bound the match at all.
+   386| 
+   387| class _RegexSearchTimeout(Exception):
+   388|     pass
+   389| 
+   390| 
+   391| def _raise_regex_timeout(signum, frame) -> None:
+   392|     raise _RegexSearchTimeout()
+   393| 
    394| 
-   395|     Uses SIGALRM (POSIX only) rather than a background thread: CPython's
-   396|     regex engine checks for pending signals periodically even mid-match,
-   397|     so the alarm reliably interrupts a runaway match in the *same* thread.
-   398|     A background-thread timeout was tried first and rejected -- Python's
-   399|     `re` can't be safely killed once started, so an abandoned worker kept
-   400|     running and, worse, kept contending for the GIL, which starved the
-   401|     "recovered" main thread just as badly (confirmed: the whole process
-   402|     still hadn't returned after 60s in that version, despite the join()
-   403|     itself returning at 5s).
-   404| 
-   405|     On platforms without SIGALRM (Windows), there's no safe way to
-   406|     interrupt a C-level regex match from Python at all -- silently
-   407|     falling back to an unbounded scan there would let the exact same
-   408|     pathological pattern hang the CLI indefinitely on that platform, so
-   409|     this refuses the term instead (the caller reports it as rejected, not
-   410|     resolved) rather than risking the hang this whole mechanism exists to
-   411|     prevent."""
-   412|     if not hasattr(signal, "SIGALRM"):
-   413|         return _UNSUPPORTED_PLATFORM
-   414|     if timeout is None:
-   415|         timeout = _REGEX_SEARCH_TIMEOUT_SECONDS
-   416|     previous_handler = signal.signal(signal.SIGALRM, _raise_regex_timeout)
-   417|     signal.setitimer(signal.ITIMER_REAL, timeout)
-   418|     try:
-   419|         return _scan_term_matches(term, pattern, files_rows, root, collect_cap)
-   420|     except _RegexSearchTimeout:
-   421|         return None
-   422|     finally:
-   423|         signal.setitimer(signal.ITIMER_REAL, 0)
-   424|         signal.signal(signal.SIGALRM, previous_handler)
-   425| 
-   426| 
-   427| _REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS = 30.0
-   428| 
-   429| 
-   430| def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_rows: list, max_files: int) -> tuple:
-   431|     """Resolve each search term against the scanned repository's current
-   432|     source (same matching rule Tier 2 rendering uses). Returns
-   433|     (resolutions: list[SelectorResolution], matches_by_term: dict[str,
-   434|     list[(rel_path, line, text)]], stale_files_skipped: int).
-   435| 
-   436|     Done up front (before the strict-mode gate) so an invalid regex or a
-   437|     zero-match term is visible to strict mode exactly like a missing file
-   438|     or ambiguous symbol -- search terms were previously invisible to
-   439|     `all_resolutions` entirely, so strict mode could not catch them.
-   440|     """
-   441|     resolutions = []
-   442|     matches_by_term: dict = {}
-   443|     stale_files_skipped = 0
-   444|     # Same collection cap the direct --search path (rc_packet.py) already
-   445|     # uses -- a common term matching most of a large repository would
-   446|     # otherwise accumulate an unbounded number of tuples before max_files
-   447|     # or the packet budget is ever applied during Tier-2 rendering.
-   448|     collect_cap = max(1, max_files) * 5
-   449|     # The per-term SIGALRM bound (_scan_term_matches_bounded) stops any one
-   450|     # pathological regex pattern from hanging forever, but the schema
-   451|     # places no cap on how many search_terms a request can carry either
-   452|     # way -- a request with hundreds/thousands of absent *literal* terms
-   453|     # re-reads every included text file once per term (collect_cap only
-   454|     # bounds how many *matches* pile up, not how many scans happen when a
-   455|     # term matches nothing at all). Track one wall-clock deadline across
-   456|     # *all* terms in this call, regex or literal, and skip remaining terms
-   457|     # outright once it's passed, instead of granting every term its own
-   458|     # fresh scan unconditionally.
-   459|     search_deadline = time.monotonic() + _REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS
-   460|     for term in terms:
-   461|         try:
-   462|             pattern = re.compile(term) if search_as_regex else None
-   463|         except re.error as exc:
-   464|             resolutions.append(SelectorResolution("search_term", term, "invalid", f"not a valid regex: {exc}"))
-   465|             matches_by_term[term] = []
-   466|             continue
-   467|         remaining = search_deadline - time.monotonic()
-   468|         if remaining <= 0:
-   469|             resolutions.append(SelectorResolution(
-   470|                 "search_term", term, "invalid",
-   471|                 f"skipped: this request's aggregate search evaluation time exceeded "
-   472|                 f"{_REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS:.0f}s across all its search_terms; reduce the "
-   473|                 f"number of search_terms",
-   474|             ))
-   475|             matches_by_term[term] = []
-   476|             continue
-   477|         if search_as_regex:
-   478|             scanned = _scan_term_matches_bounded(term, pattern, files_rows, root, collect_cap,
-   479|                                                   timeout=min(_REGEX_SEARCH_TIMEOUT_SECONDS, remaining))
-   480|             if scanned == _UNSUPPORTED_PLATFORM:
-   481|                 resolutions.append(SelectorResolution(
-   482|                     "search_term", term, "invalid",
-   483|                     "search_as_regex rejected: this platform has no way (SIGALRM/POSIX only) to safely "
-   484|                     "bound a pathological pattern's evaluation time, and running it unbounded risks "
-   485|                     "hanging the CLI indefinitely. Disable search_as_regex, or use a literal search_terms "
-   486|                     "value instead.",
-   487|                 ))
-   488|                 matches_by_term[term] = []
-   489|                 continue
-   490|             if scanned is None:
-   491|                 resolutions.append(SelectorResolution(
-   492|                     "search_term", term, "invalid",
-   493|                     f"regex evaluation exceeded {_REGEX_SEARCH_TIMEOUT_SECONDS:.0f}s (likely catastrophic "
-   494|                     f"backtracking); term skipped -- simplify the pattern or disable search_as_regex",
-   495|                 ))
-   496|                 matches_by_term[term] = []
-   497|                 continue
-   498|             term_matches, stale = scanned
-   499|         else:
-   500|             term_matches, stale = _scan_term_matches(term, pattern, files_rows, root, collect_cap)
-   501|         stale_files_skipped += stale
-   502|         matches_by_term[term] = term_matches
-   503|         if term_matches:
-   504|             resolutions.append(SelectorResolution("search_term", term, "resolved",
-   505|                                                     f"{len(term_matches)} match(es) found"))
-   506|         else:
-   507|             resolutions.append(SelectorResolution("search_term", term, "missing", "no matches found"))
-   508|     return resolutions, matches_by_term, stale_files_skipped
-   509| 
-   510| 
-   511| # --- Rendering ------------------------------------------------------------
-   512| 
-   513| def _render_origin_header(title: str, origins: list) -> str:
-   514|     return f"\n### {title}\n_Included because: {', '.join(origins)}._\n"
-   515| 
-   516| 
+   395| _UNSUPPORTED_PLATFORM = "unsupported_platform"
+   396| 
+   397| 
+   398| def _scan_term_matches_bounded(term: str, pattern, files_rows: list, root: Path, collect_cap: int,
+   399|                                 timeout: Optional[float] = None):
+   400|     """Runs _scan_term_matches with a wall-clock ceiling, to bound a
+   401|     pathological `search_as_regex` pattern's catastrophic-backtracking
+   402|     blowup (e.g. `(a+)+$` against a long, nearly-matching source line)
+   403|     instead of hanging the CLI indefinitely. Returns None on timeout, or
+   404|     the module-level _UNSUPPORTED_PLATFORM sentinel if this platform has
+   405|     no way to bound the match at all.
+   406| 
+   407|     Uses SIGALRM (POSIX only) rather than a background thread: CPython's
+   408|     regex engine checks for pending signals periodically even mid-match,
+   409|     so the alarm reliably interrupts a runaway match in the *same* thread.
+   410|     A background-thread timeout was tried first and rejected -- Python's
+   411|     `re` can't be safely killed once started, so an abandoned worker kept
+   412|     running and, worse, kept contending for the GIL, which starved the
+   413|     "recovered" main thread just as badly (confirmed: the whole process
+   414|     still hadn't returned after 60s in that version, despite the join()
+   415|     itself returning at 5s).
+   416| 
+   417|     On platforms without SIGALRM (Windows), there's no safe way to
+   418|     interrupt a C-level regex match from Python at all -- silently
+   419|     falling back to an unbounded scan there would let the exact same
+   420|     pathological pattern hang the CLI indefinitely on that platform, so
+   421|     this refuses the term instead (the caller reports it as rejected, not
+   422|     resolved) rather than risking the hang this whole mechanism exists to
+   423|     prevent."""
+   424|     if not hasattr(signal, "SIGALRM"):
+   425|         return _UNSUPPORTED_PLATFORM
+   426|     if timeout is None:
+   427|         timeout = _REGEX_SEARCH_TIMEOUT_SECONDS
+   428|     previous_handler = signal.signal(signal.SIGALRM, _raise_regex_timeout)
+   429|     signal.setitimer(signal.ITIMER_REAL, timeout)
+   430|     try:
+   431|         return _scan_term_matches(term, pattern, files_rows, root, collect_cap)
+   432|     except _RegexSearchTimeout:
+   433|         return None
+   434|     finally:
+   435|         signal.setitimer(signal.ITIMER_REAL, 0)
+   436|         signal.signal(signal.SIGALRM, previous_handler)
+   437| 
+   438| 
+   439| _REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS = 30.0
+   440| 
+   441| 
+   442| def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_rows: list, max_files: int) -> tuple:
+   443|     """Resolve each search term against the scanned repository's current
+   444|     source (same matching rule Tier 2 rendering uses). Returns
+   445|     (resolutions: list[SelectorResolution], matches_by_term: dict[str,
+   446|     list[(rel_path, line, text)]], stale_files_skipped: int).
+   447| 
+   448|     Done up front (before the strict-mode gate) so an invalid regex or a
+   449|     zero-match term is visible to strict mode exactly like a missing file
+   450|     or ambiguous symbol -- search terms were previously invisible to
+   451|     `all_resolutions` entirely, so strict mode could not catch them.
+   452|     """
+   453|     resolutions = []
+   454|     matches_by_term: dict = {}
+   455|     stale_files_skipped = 0
+   456|     # Same collection cap the direct --search path (rc_packet.py) already
+   457|     # uses -- a common term matching most of a large repository would
+   458|     # otherwise accumulate an unbounded number of tuples before max_files
+   459|     # or the packet budget is ever applied during Tier-2 rendering.
+   460|     collect_cap = max(1, max_files) * 5
+   461|     # The per-term SIGALRM bound (_scan_term_matches_bounded) stops any one
+   462|     # pathological regex pattern from hanging forever, but the schema
+   463|     # places no cap on how many search_terms a request can carry either
+   464|     # way -- a request with hundreds/thousands of absent *literal* terms
+   465|     # re-reads every included text file once per term (collect_cap only
+   466|     # bounds how many *matches* pile up, not how many scans happen when a
+   467|     # term matches nothing at all). Track one wall-clock deadline across
+   468|     # *all* terms in this call, regex or literal, and skip remaining terms
+   469|     # outright once it's passed, instead of granting every term its own
+   470|     # fresh scan unconditionally.
+   471|     search_deadline = time.monotonic() + _REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS
+   472|     for term in terms:
+   473|         try:
+   474|             pattern = re.compile(term) if search_as_regex else None
+   475|         except re.error as exc:
+   476|             resolutions.append(SelectorResolution("search_term", term, "invalid", f"not a valid regex: {exc}"))
+   477|             matches_by_term[term] = []
+   478|             continue
+   479|         remaining = search_deadline - time.monotonic()
+   480|         if remaining <= 0:
+   481|             resolutions.append(SelectorResolution(
+   482|                 "search_term", term, "invalid",
+   483|                 f"skipped: this request's aggregate search evaluation time exceeded "
+   484|                 f"{_REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS:.0f}s across all its search_terms; reduce the "
+   485|                 f"number of search_terms",
+   486|             ))
+   487|             matches_by_term[term] = []
+   488|             continue
+   489|         if search_as_regex:
+   490|             scanned = _scan_term_matches_bounded(term, pattern, files_rows, root, collect_cap,
+   491|                                                   timeout=min(_REGEX_SEARCH_TIMEOUT_SECONDS, remaining))
+   492|             if scanned == _UNSUPPORTED_PLATFORM:
+   493|                 resolutions.append(SelectorResolution(
+   494|                     "search_term", term, "invalid",
+   495|                     "search_as_regex rejected: this platform has no way (SIGALRM/POSIX only) to safely "
+   496|                     "bound a pathological pattern's evaluation time, and running it unbounded risks "
+   497|                     "hanging the CLI indefinitely. Disable search_as_regex, or use a literal search_terms "
+   498|                     "value instead.",
+   499|                 ))
+   500|                 matches_by_term[term] = []
+   501|                 continue
+   502|             if scanned is None:
+   503|                 resolutions.append(SelectorResolution(
+   504|                     "search_term", term, "invalid",
+   505|                     f"regex evaluation exceeded {_REGEX_SEARCH_TIMEOUT_SECONDS:.0f}s (likely catastrophic "
+   506|                     f"backtracking); term skipped -- simplify the pattern or disable search_as_regex",
+   507|                 ))
+   508|                 matches_by_term[term] = []
+   509|                 continue
+   510|             term_matches, stale = scanned
+   511|         else:
+   512|             term_matches, stale = _scan_term_matches(term, pattern, files_rows, root, collect_cap)
+   513|         stale_files_skipped += stale
+   514|         matches_by_term[term] = term_matches
+   515|         if term_matches:
+   516|             resolutions.append(SelectorResolution("search_term", term, "resolved",
+   517|                                                     f"{len(term_matches)} match(es) found"))
+   518|         else:
+   519|             resolutions.append(SelectorResolution("search_term", term, "missing", "no matches found"))
+   520|     return resolutions, matches_by_term, stale_files_skipped
 ```

@@ -246,7 +246,7 @@ dev_tools/repo_context/rc_common.py,dev_tools.repo_context.rc_common,11,from_imp
 dev_tools/repo_context/rc_common.py,dev_tools.repo_context.rc_common,11,from_import,dataclasses,field,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_common.py,dev_tools.repo_context.rc_common,12,from_import,pathlib,Path,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_common.py,dev_tools.repo_context.rc_common,13,from_import,typing,Optional,,0,,unresolved_external_or_missing
-dev_tools/repo_context/rc_common.py,dev_tools.repo_context.rc_common,328,import,subprocess,,,0,,unresolved_external_or_missing
+dev_tools/repo_context/rc_common.py,dev_tools.repo_context.rc_common,349,import,subprocess,,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_discover.py,dev_tools.repo_context.rc_discover,11,from_import,__future__,annotations,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_discover.py,dev_tools.repo_context.rc_discover,13,import,json,,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_discover.py,dev_tools.repo_context.rc_discover,14,import,re,,,0,,unresolved_external_or_missing
@@ -323,9 +323,9 @@ dev_tools/repo_context/rc_request.py,dev_tools.repo_context.rc_request,31,from_i
 dev_tools/repo_context/rc_request.py,dev_tools.repo_context.rc_request,31,from_import,rc_packet,_candidate_tests_for_file,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_request.py,dev_tools.repo_context.rc_request,31,from_import,rc_packet,_file_is_fresh,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_request.py,dev_tools.repo_context.rc_request,31,from_import,rc_packet,_find_symbol_candidates,,0,,unresolved_external_or_missing
+dev_tools/repo_context/rc_request.py,dev_tools.repo_context.rc_request,31,from_import,rc_packet,_iter_safe_lines,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_request.py,dev_tools.repo_context.rc_request,31,from_import,rc_packet,_load_csv,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_request.py,dev_tools.repo_context.rc_request,31,from_import,rc_packet,_norm_rel,,0,,unresolved_external_or_missing
-dev_tools/repo_context/rc_request.py,dev_tools.repo_context.rc_request,31,from_import,rc_packet,_safe_excerpt,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_routing.py,dev_tools.repo_context.rc_routing,13,from_import,__future__,annotations,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_routing.py,dev_tools.repo_context.rc_routing,15,import,json,,,0,,unresolved_external_or_missing
 dev_tools/repo_context/rc_routing.py,dev_tools.repo_context.rc_routing,16,from_import,collections,Counter,,0,,unresolved_external_or_missing
@@ -427,9 +427,10 @@ dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.
 dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,2,import,time,,,0,,unresolved_external_or_missing
 dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,4,from_import,conftest,run_tool,,0,,unresolved_external_or_missing
 dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,4,from_import,conftest,write_files,,0,,unresolved_external_or_missing
-dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,5,import,rc_request,,rr,0,,unresolved_external_or_missing
-dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,444,import,signal,,,0,,unresolved_external_or_missing
-dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,1022,import,subprocess,,,0,,unresolved_external_or_missing
+dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,5,import,rc_packet,,,0,,unresolved_external_or_missing
+dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,6,import,rc_request,,rr,0,,unresolved_external_or_missing
+dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,445,import,signal,,,0,,unresolved_external_or_missing
+dev_tools/repo_context/tests/test_packet_from_request.py,dev_tools.repo_context.tests.test_packet_from_request,1023,import,subprocess,,,0,,unresolved_external_or_missing
 dev_tools/repo_context/tests/test_packets.py,dev_tools.repo_context.tests.test_packets,1,from_import,conftest,run_tool,,0,,unresolved_external_or_missing
 dev_tools/repo_context/tests/test_packets.py,dev_tools.repo_context.tests.test_packets,1,from_import,conftest,write_files,,0,,unresolved_external_or_missing
 dev_tools/repo_context/tests/test_python_symbols.py,dev_tools.repo_context.tests.test_python_symbols,1,import,csv,,,0,,unresolved_external_or_missing

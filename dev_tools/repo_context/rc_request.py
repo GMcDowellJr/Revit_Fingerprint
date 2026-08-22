@@ -29,7 +29,7 @@ from rc_common import (
 # extraction, freshness checks, and BFS caller/callee walks a second time)
 # keeps both packet paths consistent.
 from rc_packet import (
-    Budget, _load_csv, _norm_rel, _file_is_fresh, _safe_excerpt,
+    Budget, _load_csv, _norm_rel, _file_is_fresh, _iter_safe_lines,
     _find_symbol_candidates, _bfs_callers, _bfs_callees, _candidate_tests_for_file,
 )
 
@@ -360,15 +360,27 @@ def _scan_term_matches(term: str, pattern: Optional["re.Pattern"], files_rows: l
         if not _file_is_fresh(root, frow["relative_path"], frow.get("sha256", "")):
             stale += 1
             continue
-        excerpt = _safe_excerpt(root, frow["relative_path"], 1, 10_000_000)
-        if excerpt is None:
+        # Stream lines in rather than materializing up to 10 million of
+        # them via _safe_excerpt() before any matching happens -- the
+        # scanner deliberately keeps files over MAX_TEXT_READ_BYTES in the
+        # inventory without ever reading them into memory whole (see
+        # rc_scan.py), so a large included file could otherwise exhaust
+        # memory searching for a term that appears once (or not at all).
+        # _iter_safe_lines() evaluates and discards one line at a time,
+        # so a hit early in the file (or collect_cap being reached) stops
+        # reading the rest of it immediately.
+        lines = _iter_safe_lines(root, frow["relative_path"], 1, 10_000_000)
+        if lines is None:
             continue
-        for ln, text in excerpt:
-            hit = pattern.search(text) if pattern else (term in text)
-            if hit:
-                term_matches.append((frow["relative_path"], ln, text))
-                if len(term_matches) >= collect_cap:
-                    break
+        try:
+            for ln, text in lines:
+                hit = pattern.search(text) if pattern else (term in text)
+                if hit:
+                    term_matches.append((frow["relative_path"], ln, text))
+                    if len(term_matches) >= collect_cap:
+                        break
+        finally:
+            lines.close()
     return term_matches, stale
 
 
@@ -530,12 +542,42 @@ def _render_excerpt_block(root: Path, rel_path: str, start: int, end: int, budge
             budget.spend(msg, 1)
         budget.omissions.append(f"`{rel_path}` changed since the last scan; excerpt withheld. Re-run scan.")
         return "stale"
-    excerpt = _safe_excerpt(root, rel_path, start, end)
-    if excerpt is None:
+    lines = _iter_safe_lines(root, rel_path, start, end)
+    if lines is None:
         out.append("_Source excerpt unavailable (file missing or unreadable)._\n")
         budget.omissions.append(f"`{rel_path}` excerpt unavailable (file missing or unreadable).")
         return "unavailable"
-    body_lines = [f"{ln:>6}| {text}" for ln, text in excerpt]
+    # Stream the requested range rather than materializing it whole up
+    # front -- `end` can be an oversized file's real line_count (the
+    # scanner deliberately keeps files over MAX_TEXT_READ_BYTES in the
+    # inventory, with a real streamed-counted line_count, without ever
+    # reading them into memory whole -- see rc_scan.py), so an explicit
+    # file selector naming such a file could otherwise allocate hundreds
+    # of megabytes or more just to learn the excerpt is "too_large".
+    # Track the raw (pre-redaction) size as lines come in and bail out as
+    # soon as it clearly exceeds the remaining budget, without reading
+    # the rest of the file. redact_secrets() can grow a line slightly (a
+    # short matched secret replaced by the fixed-length placeholder), so
+    # this early check is deliberately against the raw size, not a
+    # substitute for the exact post-redaction budget.allow() check below
+    # -- it only ever *skips* reading further, never changes what content
+    # that does get read is judged against.
+    body_lines = []
+    remaining_chars = budget.max_characters - budget.chars_used
+    raw_chars = 0
+    too_large = False
+    try:
+        for ln, text in lines:
+            rendered = f"{ln:>6}| {text}"
+            body_lines.append(rendered)
+            raw_chars += len(rendered) + 1  # +1 for the joining newline
+            if raw_chars > remaining_chars:
+                too_large = True
+                break
+    finally:
+        lines.close()
+    if too_large:
+        return "too_large"
     # Redact *before* the budget check, not after -- redact_secrets()
     # replaces a matched secret with a placeholder that can be longer
     # than the original text, so checking budget.allow() against the raw

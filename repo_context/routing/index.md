@@ -1,11 +1,11 @@
 # Routing index: Revit_Fingerprint
 
-- Generated (UTC): 2026-08-22T10:35:17Z
+- Generated (UTC): 2026-08-22T10:53:20Z
 - Tool version: 0.1.0
-- Repository revision: `8df1119051f8bdf28832d553b7bd9ddb86e94211` (dirty worktree)
-- Source manifest hash (sha256 over every included file's `path:sha256`): `d74e26e490b482e06f16cd3d3894ce965e397b80985520b0fdf8dd4d25ae2694`
+- Repository revision: `3ce812e43803066392d5d19d2457f81179c44a1b` (dirty worktree)
+- Source manifest hash (sha256 over every included file's `path:sha256`): `ed4a5c9f8b1268ab0bf427bdabd84c036e7b7838bc9dd2208b610a4265709bb3`
 - Freshness rule: if this hash no longer matches a fresh `scan`, re-run `scan` before trusting any catalog below or building a `packet_request.json` from it.
-- Graphify: graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 8df1119051f8; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven).
+- Graphify: graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 3ce812e43803; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven).
 
 ## How to use this index
 
@@ -64,7 +64,7 @@
 - Note: 13 file(s) omitted from this catalog by its own size limit
 
 ### `routing/dev_tools.md`
-- Covers: 25 file(s), 153 top-level symbol(s)
+- Covers: 25 file(s), 154 top-level symbol(s)
 - Note: 3 file(s) omitted from this catalog by its own size limit
 
 ### `routing/docs.md`
@@ -109,7 +109,7 @@
 - Covers: 1 file(s), 10 top-level symbol(s)
 
 ### `routing/tests_repo_context.md`
-- Covers: 15 file(s), 204 top-level symbol(s)
+- Covers: 15 file(s), 208 top-level symbol(s)
 - Note: 5 file(s) omitted from this catalog by its own size limit
 
 ### `routing/tests_revit.md`
