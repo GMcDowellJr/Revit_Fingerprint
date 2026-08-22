@@ -55,12 +55,43 @@ BINARY_EXTENSIONS = {
     # entirely for a text format.
 }
 
-SECRET_LINE_PATTERNS = [
-    re.compile(r"(?i)(api[_-]?key|secret|token|access[_-]?key|password|passwd)\s*[:=]\s*['\"]?[A-Za-z0-9/+_\-\.]{12,}['\"]?"),
+_SECRET_ASSIGNMENT_PATTERN = re.compile(
+    r"(?i)(?:api[_-]?key|secret|token|access[_-]?key|password|passwd)\s*[:=]\s*"
+    r"(?P<q>['\"]?)(?P<value>[A-Za-z0-9/+_\-\.]{12,})(?P=q)"
+)
+_STANDALONE_SECRET_PATTERNS = [
     re.compile(r"AKIA[0-9A-Z]{16}"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
 ]
 REDACTION_TEXT = "[REDACTED-POSSIBLE-SECRET]"
+
+_PLAIN_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _looks_secret_shaped(value: str, quoted: bool) -> bool:
+    """Bounded false-positive guard for _SECRET_ASSIGNMENT_PATTERN.
+
+    A *quoted* value after `token =` / `password:` / etc. is redacted
+    unconditionally, as before -- a literal string in that position is
+    almost always meant to be a real secret. An *unquoted* value that is
+    also a plain identifier (letters/underscores only, e.g. `token =
+    user_provided_value_from_config` or `access_token =
+    fetch_token_from_provider`) is far more likely to be a variable or
+    function-call reference than a literal secret, so it is left alone
+    unless it also contains a digit or mixed case -- the shape real
+    tokens/hashes/keys actually have. This does not eliminate every false
+    positive (e.g. an unquoted identifier that happens to include a
+    digit, like `config_v2_token`, is still redacted) -- closing that gap
+    fully would need real entropy scoring or an allowlist, which is a
+    separate, broader redesign rather than a bounded fix.
+    """
+    if quoted:
+        return True
+    if _PLAIN_IDENTIFIER.match(value):
+        has_digit = any(c.isdigit() for c in value)
+        has_mixed_case = any(c.islower() for c in value) and any(c.isupper() for c in value)
+        return has_digit or has_mixed_case
+    return True  # contains '/', '+', '.', or '-' -- not a plain identifier
 
 
 def redact_secrets(text: str) -> str:
@@ -68,7 +99,16 @@ def redact_secrets(text: str) -> str:
     changed = False
     for line in text.split("\n"):
         new_line = line
-        for pat in SECRET_LINE_PATTERNS:
+
+        def _sub(m):
+            nonlocal changed
+            if _looks_secret_shaped(m.group("value"), bool(m.group("q"))):
+                changed = True
+                return REDACTION_TEXT
+            return m.group(0)
+
+        new_line = _SECRET_ASSIGNMENT_PATTERN.sub(_sub, new_line)
+        for pat in _STANDALONE_SECRET_PATTERNS:
             if pat.search(new_line):
                 new_line = pat.sub(REDACTION_TEXT, new_line)
                 changed = True
@@ -267,3 +307,31 @@ def atomic_write_bytes(path: Path, data: bytes) -> None:
 
 def estimate_tokens(char_count: int) -> int:
     return max(1, round(char_count / 4))
+
+
+def get_git_info(root: Path, timeout: float = 5.0) -> dict:
+    """Best-effort, read-only git metadata for the scanned root: current
+    commit hash and dirty-worktree state. Never raises -- any failure
+    (not a git repo, git not installed, timeout) yields
+    {"available": False}. Used only for provenance/freshness reporting,
+    never to gate whether a scan or packet can run."""
+    import subprocess
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=str(root), capture_output=True,
+            text=True, timeout=timeout,
+        )
+        if commit.returncode != 0:
+            return {"available": False}
+        status = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=str(root), capture_output=True,
+            text=True, timeout=timeout,
+        )
+        dirty = bool(status.stdout.strip()) if status.returncode == 0 else None
+        return {
+            "available": True,
+            "commit": commit.stdout.strip(),
+            "dirty": dirty,
+        }
+    except (OSError, subprocess.SubprocessError):
+        return {"available": False}

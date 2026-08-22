@@ -104,3 +104,79 @@ def detect_entrypoint_reason(rel_posix: str, has_main_guard: bool) -> str | None
     if lname in ("manage.py", "app.py", "main.py", "cli.py", "__main__.py"):
         return f"conventional entrypoint filename '{lname}'"
     return None
+
+
+# --- Operational-role classification (routing catalogs) ---------------
+#
+# Conservative and evidence-based: every result comes with the rule that
+# produced it. An uncertain case is never silently reported as "active" --
+# it falls through to "unknown" instead. Only Python files are classified
+# (operational role depends on __main__-guard/docstring evidence that only
+# exists for parsed Python source).
+
+ARCHIVED_PATH_HINTS = ("/_archive/", "/archive/", "/legacy/", "/deprecated/")
+MIGRATION_PATH_HINTS = ("/migration/", "/migrations/")
+OPERATOR_TOP_DIRS = {"runner", "scripts", "bin", "dev_tools"}
+OPERATOR_FILENAMES = {"main.py", "cli.py", "manage.py", "app.py", "__main__.py"}
+OPERATOR_DOCSTRING_HINTS = ("entry point", "entrypoint", "command-line", "command line", "usage:")
+UTILITY_TOP_DIRS = {"tools", "dev_tools"}
+
+OPERATIONAL_ROLES = (
+    "operator_entrypoint", "active_pipeline", "developer_utility",
+    "test_harness", "migration", "archived_or_legacy", "library_module", "unknown",
+)
+
+
+def classify_operational_role(rel_posix: str, filename: str, category: str, ext: str,
+                               has_main_guard: bool, docstring_first_line: str | None,
+                               generated_or_vendor: str) -> tuple[str, str]:
+    """Return (role, evidence). `role` is always one of OPERATIONAL_ROLES."""
+    lower_path = f"/{rel_posix.lower()}"
+    lname = filename.lower()
+
+    if category == "test":
+        return "test_harness", "file classified as 'test' (test-path/filename convention, see classify_file)"
+
+    for hint in ARCHIVED_PATH_HINTS:
+        if hint in lower_path:
+            return "archived_or_legacy", f"path contains archival directory segment '{hint.strip('/')}'"
+
+    for hint in MIGRATION_PATH_HINTS:
+        if hint in lower_path:
+            return "migration", f"path contains migration directory segment '{hint.strip('/')}'"
+    if lname.startswith("migrate_"):
+        return "migration", "filename starts with 'migrate_'"
+
+    if generated_or_vendor != "no":
+        return "unknown", f"file marked '{generated_or_vendor}' by generated/vendor heuristics; operational role not inferred for generated/vendor files"
+
+    if ext != ".py":
+        return "unknown", "operational-role classification only supports Python files (needs __main__-guard/docstring evidence)"
+
+    top_dir = rel_posix.split("/")[0] if "/" in rel_posix else ""
+    docstring_lower = (docstring_first_line or "").lower()
+
+    if has_main_guard or lname in OPERATOR_FILENAMES:
+        evidence_bits = []
+        if has_main_guard:
+            evidence_bits.append("contains `if __name__ == \"__main__\":` guard")
+        if lname in OPERATOR_FILENAMES:
+            evidence_bits.append(f"conventional entrypoint filename '{lname}'")
+        if top_dir in OPERATOR_TOP_DIRS:
+            return "operator_entrypoint", "; ".join(evidence_bits) + f"; located under operator-facing directory '{top_dir}/'"
+        for hint in OPERATOR_DOCSTRING_HINTS:
+            if hint in docstring_lower:
+                return "operator_entrypoint", "; ".join(evidence_bits) + f"; module docstring mentions '{hint}'"
+        return "active_pipeline", ("; ".join(evidence_bits)
+                                    + "; no operator-facing directory or docstring hint matched, "
+                                      "conservatively treated as an active pipeline stage rather than an operator entrypoint")
+
+    if category == "python_source":
+        if top_dir in UTILITY_TOP_DIRS:
+            return "developer_utility", f"no `__main__` guard; located under developer-tooling directory '{top_dir}/'"
+        return "library_module", (
+            f"no `__main__` guard; located under '{top_dir}/'" if top_dir
+            else "no `__main__` guard; module at repository root"
+        )
+
+    return "unknown", "no operational-role rule matched"

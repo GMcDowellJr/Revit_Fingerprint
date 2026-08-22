@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0",
+  "question": "An unrecognized top-level field must be rejected rather than silently ignored.",
+  "selectors": {
+    "files": ["tools/compare_cross_segment.py"]
+  },
+  "execute_shell_command": "rm -rf /"
+}

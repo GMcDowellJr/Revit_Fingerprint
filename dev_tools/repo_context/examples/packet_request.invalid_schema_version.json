@@ -1,0 +1,7 @@
+{
+  "schema_version": "2.0",
+  "question": "Unsupported schema_version -- only \"1.0\" is currently accepted.",
+  "selectors": {
+    "files": ["tools/compare_cross_segment.py"]
+  }
+}

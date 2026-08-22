@@ -1,0 +1,667 @@
+"""packet_request.json: schema validation, deterministic selector
+resolution, and request-driven packet generation.
+
+This is the "LLM produces packet_request.json -> repo_context validates
+selectors -> repo_context generates a bounded, source-backed evidence
+packet" half of the discovery-to-packet workflow described in
+schema/packet_request.schema.json. Nothing here executes repository code;
+selectors are resolved purely against the CSV indexes a prior `scan`
+already produced, plus read-only source excerpts.
+"""
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+from rc_common import TOOL_VERSION, atomic_write_text, get_git_info, redact_secrets, sanitize_stem, sha256_text
+# Sibling-module reuse: these are the same read-only, budget-aware
+# rendering primitives the direct --file/--symbol/--search/--line packet
+# path already uses. Reusing them (rather than re-implementing excerpt
+# extraction, freshness checks, and BFS caller/callee walks a second time)
+# keeps both packet paths consistent.
+from rc_packet import (
+    Budget, _load_csv, _norm_rel, _file_is_fresh, _safe_excerpt,
+    _find_symbol_candidates, _bfs_callers, _bfs_callees, _candidate_tests_for_file,
+)
+
+SUPPORTED_SCHEMA_VERSIONS = {"1.0"}
+
+_PATH_SELECTOR_FIELDS = {"selectors.files[]", "selectors.symbols[].file", "selectors.lines[].file"}
+
+
+class RequestError(Exception):
+    """Raised for a structurally invalid request (schema errors). Distinct
+    from resolution issues (missing/ambiguous selectors), which are
+    reported per-selector instead of raising."""
+
+
+@dataclass
+class ResolvedRequest:
+    schema_version: str
+    question: str
+    strict: bool
+    files: list          # list[str] repo-relative paths, as given
+    symbols: list         # list[dict] {"name":..., "file": optional}
+    search_terms: list
+    lines: list           # list[dict] {"file":..., "line":..., "end_line": optional}
+    include_callers: bool
+    include_callees: bool
+    include_imports: bool
+    include_related_tests: bool
+    include_graphify: bool
+    search_as_regex: bool
+    max_hops: int
+    max_estimated_tokens: int
+    max_files: int
+
+
+def _is_safe_repo_relative_path(p: str) -> bool:
+    if not p or not isinstance(p, str):
+        return False
+    norm = p.replace("\\", "/")
+    if norm.startswith("/") or norm.startswith("~"):
+        return False
+    if re.match(r"^[A-Za-z]:", norm):  # drive letter (Windows absolute path)
+        return False
+    parts = norm.split("/")
+    if any(part == ".." for part in parts):
+        return False
+    return True
+
+
+def validate_request_dict(data: dict) -> list:
+    """Structural validation mirroring schema/packet_request.schema.json.
+    Returns a list of human-readable error strings (empty == valid). Does
+    NOT check selectors against the scanned repository -- that happens
+    during resolution, where a missing file/symbol is reported per-item
+    rather than failing the whole request.
+    """
+    errors = []
+    if not isinstance(data, dict):
+        return ["request must be a JSON object"]
+
+    allowed_top = {"schema_version", "question", "strict", "selectors", "expansion", "limits"}
+    for key in data:
+        if key not in allowed_top:
+            errors.append(f"unknown top-level field: '{key}' (schema does not permit extension fields)")
+
+    version = data.get("schema_version")
+    if version is None:
+        errors.append("missing required field: schema_version")
+    elif version not in SUPPORTED_SCHEMA_VERSIONS:
+        errors.append(f"unsupported schema_version: {version!r} (supported: {sorted(SUPPORTED_SCHEMA_VERSIONS)})")
+
+    question = data.get("question")
+    if not isinstance(question, str) or not question.strip():
+        errors.append("missing or empty required field: question")
+
+    if "strict" in data and not isinstance(data["strict"], bool):
+        errors.append("'strict' must be a boolean")
+
+    selectors = data.get("selectors")
+    if selectors is None:
+        errors.append("missing required field: selectors")
+    elif not isinstance(selectors, dict):
+        errors.append("'selectors' must be an object")
+    else:
+        allowed_sel = {"files", "symbols", "search_terms", "lines"}
+        for key in selectors:
+            if key not in allowed_sel:
+                errors.append(f"unknown field under 'selectors': '{key}'")
+
+        files = selectors.get("files", [])
+        if not isinstance(files, list) or not all(isinstance(x, str) for x in files):
+            errors.append("'selectors.files' must be an array of strings")
+        else:
+            for p in files:
+                if not p:
+                    errors.append("'selectors.files' contains an empty path")
+                elif not _is_safe_repo_relative_path(p):
+                    errors.append(f"'selectors.files' contains a path outside the scanned repository: {p!r}")
+
+        symbols = selectors.get("symbols", [])
+        if not isinstance(symbols, list):
+            errors.append("'selectors.symbols' must be an array")
+        else:
+            for i, s in enumerate(symbols):
+                if not isinstance(s, dict) or "name" not in s or not isinstance(s.get("name"), str) or not s["name"]:
+                    errors.append(f"'selectors.symbols[{i}]' must be an object with a non-empty 'name'")
+                    continue
+                extra = set(s.keys()) - {"name", "file"}
+                if extra:
+                    errors.append(f"'selectors.symbols[{i}]' has unknown field(s): {sorted(extra)}")
+                if "file" in s and (not isinstance(s["file"], str) or not _is_safe_repo_relative_path(s["file"])):
+                    errors.append(f"'selectors.symbols[{i}].file' is not a safe repo-relative path: {s.get('file')!r}")
+
+        terms = selectors.get("search_terms", [])
+        if not isinstance(terms, list) or not all(isinstance(x, str) and x for x in terms):
+            errors.append("'selectors.search_terms' must be an array of non-empty strings")
+
+        lines = selectors.get("lines", [])
+        if not isinstance(lines, list):
+            errors.append("'selectors.lines' must be an array")
+        else:
+            for i, ln in enumerate(lines):
+                if not isinstance(ln, dict) or "file" not in ln or "line" not in ln:
+                    errors.append(f"'selectors.lines[{i}]' must be an object with 'file' and 'line'")
+                    continue
+                extra = set(ln.keys()) - {"file", "line", "end_line"}
+                if extra:
+                    errors.append(f"'selectors.lines[{i}]' has unknown field(s): {sorted(extra)}")
+                if not isinstance(ln["file"], str) or not _is_safe_repo_relative_path(ln["file"]):
+                    errors.append(f"'selectors.lines[{i}].file' is not a safe repo-relative path: {ln.get('file')!r}")
+                if not isinstance(ln.get("line"), int) or ln["line"] < 1:
+                    errors.append(f"'selectors.lines[{i}].line' must be a positive integer")
+                if "end_line" in ln:
+                    if not isinstance(ln["end_line"], int) or ln["end_line"] < 1:
+                        errors.append(f"'selectors.lines[{i}].end_line' must be a positive integer")
+                    elif isinstance(ln.get("line"), int) and ln["end_line"] < ln["line"]:
+                        errors.append(f"'selectors.lines[{i}].end_line' ({ln['end_line']}) is before 'line' ({ln['line']})")
+
+        if isinstance(selectors, dict) and not any(selectors.get(k) for k in allowed_sel):
+            errors.append("'selectors' must contain at least one non-empty selector list "
+                          "(files/symbols/search_terms/lines)")
+
+    expansion = data.get("expansion", {})
+    if not isinstance(expansion, dict):
+        errors.append("'expansion' must be an object")
+    else:
+        allowed_exp = {"include_callers", "include_callees", "include_imports", "include_related_tests",
+                       "include_graphify", "search_as_regex", "max_hops"}
+        for key in expansion:
+            if key not in allowed_exp:
+                errors.append(f"unknown field under 'expansion': '{key}'")
+        if "max_hops" in expansion:
+            mh = expansion["max_hops"]
+            if not isinstance(mh, int) or isinstance(mh, bool) or not (0 <= mh <= 5):
+                errors.append("'expansion.max_hops' must be an integer between 0 and 5 "
+                              "(a deep expansion is bounded, not unlimited)")
+        for key in allowed_exp - {"max_hops"}:
+            if key in expansion and not isinstance(expansion[key], bool):
+                errors.append(f"'expansion.{key}' must be a boolean")
+
+    limits = data.get("limits", {})
+    if not isinstance(limits, dict):
+        errors.append("'limits' must be an object")
+    else:
+        allowed_lim = {"max_estimated_tokens", "max_files"}
+        for key in limits:
+            if key not in allowed_lim:
+                errors.append(f"unknown field under 'limits': '{key}'")
+        for key in allowed_lim:
+            if key in limits and (not isinstance(limits[key], int) or isinstance(limits[key], bool) or limits[key] < 1):
+                errors.append(f"'limits.{key}' must be a positive integer")
+
+    return errors
+
+
+def parse_and_validate_request(text: str) -> tuple:
+    """Returns (ResolvedRequest, errors). If errors is non-empty, the
+    ResolvedRequest half is None."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return None, [f"request is not valid JSON: {exc}"]
+
+    errors = validate_request_dict(data)
+    if errors:
+        return None, errors
+
+    selectors = data.get("selectors", {})
+    expansion = data.get("expansion", {}) or {}
+    limits = data.get("limits", {}) or {}
+
+    resolved = ResolvedRequest(
+        schema_version=data["schema_version"],
+        question=data["question"],
+        strict=bool(data.get("strict", False)),
+        files=[_norm_rel(p) for p in selectors.get("files", [])],
+        symbols=[{"name": s["name"], "file": _norm_rel(s["file"]) if s.get("file") else None}
+                 for s in selectors.get("symbols", [])],
+        search_terms=list(selectors.get("search_terms", [])),
+        lines=[{"file": _norm_rel(ln["file"]), "line": ln["line"], "end_line": ln.get("end_line", ln["line"])}
+               for ln in selectors.get("lines", [])],
+        include_callers=bool(expansion.get("include_callers", True)),
+        include_callees=bool(expansion.get("include_callees", True)),
+        include_imports=bool(expansion.get("include_imports", True)),
+        include_related_tests=bool(expansion.get("include_related_tests", True)),
+        include_graphify=bool(expansion.get("include_graphify", False)),
+        search_as_regex=bool(expansion.get("search_as_regex", False)),
+        max_hops=int(expansion.get("max_hops", 1)),
+        max_estimated_tokens=int(limits.get("max_estimated_tokens", 12000)),
+        max_files=int(limits.get("max_files", 12)),
+    )
+    return resolved, []
+
+
+# --- Selector resolution -------------------------------------------------
+
+@dataclass
+class SelectorResolution:
+    selector_type: str   # "file" | "symbol" | "line" | "search_term"
+    requested: str
+    status: str           # "resolved" | "ambiguous" | "missing" | "invalid"
+    detail: str
+    candidates: list = field(default_factory=list)
+    resolved_rows: list = field(default_factory=list)  # the matched row(s) for "resolved"
+
+
+def resolve_files(files: list, files_by_path: dict) -> list:
+    out = []
+    for p in files:
+        row = files_by_path.get(p)
+        if row is None:
+            out.append(SelectorResolution("file", p, "missing", f"'{p}' not found in file_inventory.csv"))
+        elif row.get("included") != "true":
+            out.append(SelectorResolution("file", p, "missing",
+                                           f"'{p}' was excluded from the scan (reason: {row.get('exclusion_reason')})"))
+        else:
+            out.append(SelectorResolution("file", p, "resolved", f"matched included file '{p}'", resolved_rows=[row]))
+    return out
+
+
+def resolve_symbols(symbols: list, symbols_rows: list) -> list:
+    out = []
+    for sel in symbols:
+        name, file_constraint = sel["name"], sel["file"]
+        candidates = _find_symbol_candidates(name, symbols_rows, file_constraint)
+        if not candidates:
+            out.append(SelectorResolution("symbol", name, "missing",
+                                           f"no symbol matching '{name}'"
+                                           + (f" in '{file_constraint}'" if file_constraint else "")
+                                           + " was found in python_symbols.csv"))
+        elif len(candidates) > 1:
+            alts = [f"{c['qualified_name']} ({c['relative_path']}:{c['start_line']}-{c['end_line']})" for c in candidates]
+            out.append(SelectorResolution(
+                "symbol", name, "ambiguous",
+                f"'{name}' matches {len(candidates)} symbols; qualify with a fully-qualified name or a 'file' field",
+                candidates=alts,
+            ))
+        else:
+            row = candidates[0]
+            out.append(SelectorResolution("symbol", name, "resolved",
+                                           f"resolved to '{row['qualified_name']}' in '{row['relative_path']}'",
+                                           resolved_rows=[row]))
+    return out
+
+
+def resolve_lines(lines: list, files_by_path: dict) -> list:
+    out = []
+    for ln in lines:
+        f, start, end = ln["file"], ln["line"], ln["end_line"]
+        label = f"{f}:{start}" + (f"-{end}" if end != start else "")
+        row = files_by_path.get(f)
+        if row is None:
+            out.append(SelectorResolution("line", label, "missing", f"'{f}' not found in file_inventory.csv"))
+            continue
+        if row.get("included") != "true":
+            out.append(SelectorResolution("line", label, "missing",
+                                           f"'{f}' was excluded from the scan (reason: {row.get('exclusion_reason')})"))
+            continue
+        line_count = row.get("line_count")
+        if line_count and line_count.isdigit() and end > int(line_count):
+            out.append(SelectorResolution("line", label, "invalid",
+                                           f"end line {end} exceeds '{f}' line count ({line_count})"))
+            continue
+        out.append(SelectorResolution("line", label, "resolved", f"resolved to '{f}' lines {start}-{end}",
+                                       resolved_rows=[{"file": f, "start": start, "end": end}]))
+    return out
+
+
+# --- Rendering ------------------------------------------------------------
+
+def _render_origin_header(title: str, origins: list) -> str:
+    return f"\n### {title}\n_Included because: {', '.join(origins)}._\n"
+
+
+def _render_excerpt_block(root: Path, rel_path: str, start: int, end: int, budget: Budget, out: list,
+                           expected_sha256: str) -> str:
+    """Returns "rendered", "stale" (withheld -- source changed since scan),
+    "unavailable" (file missing/unreadable), or "too_large" (would not fit
+    within the remaining budget). Only "too_large" is a hard, must-not-be-
+    silently-dropped conflict for an *explicit* selector -- "stale" and
+    "unavailable" are reported as ordinary (non-fatal) omissions, matching
+    the direct --file/--symbol/--line packet path's existing behavior."""
+    if not _file_is_fresh(root, rel_path, expected_sha256):
+        msg = (f"_Source excerpt withheld: `{rel_path}` has changed on disk since the last `scan` "
+               f"(SHA-256 mismatch); re-run `scan` for an up-to-date packet._\n")
+        if budget.allow(msg, 1):
+            out.append(msg)
+            budget.spend(msg, 1)
+        budget.omissions.append(f"`{rel_path}` changed since the last scan; excerpt withheld. Re-run scan.")
+        return "stale"
+    excerpt = _safe_excerpt(root, rel_path, start, end)
+    if excerpt is None:
+        out.append("_Source excerpt unavailable (file missing or unreadable)._\n")
+        budget.omissions.append(f"`{rel_path}` excerpt unavailable (file missing or unreadable).")
+        return "unavailable"
+    body_lines = [f"{ln:>6}| {text}" for ln, text in excerpt]
+    body = "\n".join(body_lines)
+    if not budget.allow(body, len(body_lines)):
+        return "too_large"
+    body = redact_secrets(body)
+    out.append("```\n" + body + "\n```\n")
+    budget.spend(body, len(body_lines))
+    return "rendered"
+
+
+def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_path: dict,
+                       req: ResolvedRequest, budget: Budget, out: list, focus_files: list) -> None:
+    rel, qn = row["relative_path"], row["qualified_name"]
+
+    if req.include_callers:
+        callers = [c for c in _bfs_callers(rel, qn, calls_rows, req.max_hops) if c["confidence"] != "unresolved"]
+        if callers:
+            header = f"\nCallers of `{qn}` (statically resolved, max_hops={req.max_hops}):\n"
+            if budget.allow(header, 1):
+                out.append(header); budget.spend(header, 1)
+                for c in callers:
+                    line = (f"- `{c['caller_symbol']}` in `{c['caller_file']}`:{c['line']} "
+                            f"— `{c['call_expression']}` ({c['confidence']}: {c['explanation']}) "
+                            f"[origin: caller_expansion]")
+                    if not budget.allow(line, 1):
+                        budget.omissions.append(f"More callers of `{qn}` omitted (packet size limit reached); see python_calls.csv.")
+                        break
+                    out.append(line); budget.spend(line, 1)
+            else:
+                budget.omissions.append(f"Callers listing for `{qn}` omitted entirely (packet size limit reached).")
+
+    if req.include_callees:
+        callees = [c for c in _bfs_callees(rel, qn, calls_rows, req.max_hops) if c["confidence"] != "unresolved"]
+        if callees:
+            header = f"\nCallees of `{qn}` (statically resolved, max_hops={req.max_hops}):\n"
+            if budget.allow(header, 1):
+                out.append(header); budget.spend(header, 1)
+                for c in callees:
+                    line = (f"- `{c['call_expression']}` at line {c['line']} -> `{c['candidate_symbol']}` "
+                            f"in `{c['candidate_file']}` ({c['confidence']}: {c['explanation']}) "
+                            f"[origin: callee_expansion]")
+                    if not budget.allow(line, 1):
+                        budget.omissions.append(f"More callees of `{qn}` omitted (packet size limit reached); see python_calls.csv.")
+                        break
+                    out.append(line); budget.spend(line, 1)
+            else:
+                budget.omissions.append(f"Callees listing for `{qn}` omitted entirely (packet size limit reached).")
+
+    if req.include_imports:
+        file_imports = [i for i in imports_rows if i["source_file"] == rel and i["resolved_file"]]
+        if file_imports:
+            header = f"\nInternal imports of `{rel}` (import_expansion):\n"
+            if budget.allow(header, 1):
+                out.append(header); budget.spend(header, 1)
+                for i in file_imports[:20]:
+                    line = f"- line {i['line']}: `{i['imported_name'] or i['imported_module']}` -> `{i['resolved_file']}`"
+                    if not budget.allow(line, 1):
+                        break
+                    out.append(line); budget.spend(line, 1)
+
+    if req.include_related_tests:
+        tests = _candidate_tests_for_file(rel, imports_rows, calls_rows, files_by_path)
+        if tests:
+            header = f"\nRelated tests for `{rel}` (related_test_expansion):\n"
+            if budget.allow(header, 1):
+                out.append(header); budget.spend(header, 1)
+                for t in tests:
+                    line = f"- `{t}`"
+                    if not budget.allow(line, 1):
+                        break
+                    out.append(line); budget.spend(line, 1)
+                    if t not in focus_files and len(focus_files) < 10_000:
+                        focus_files.append(t)
+
+
+def generate_packet_from_request(root: Path, output_dir: Path, request_path: Path,
+                                  name_override: Optional[str] = None) -> tuple:
+    """Returns (packet_path_or_None, resolution_report, error_message_or_None).
+
+    error_message_or_None is set (and packet_path is None) for a
+    structurally invalid request, or when strict mode / an unresolvable
+    explicit-selector budget conflict blocks generation -- no partial
+    packet is written in either case.
+    """
+    try:
+        request_text = request_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return None, [], f"could not read request file {request_path}: {exc}"
+
+    request_hash = sha256_text(request_text)
+    resolved, errors = parse_and_validate_request(request_text)
+    if errors:
+        return None, [], "invalid packet_request.json:\n" + "\n".join(f"  - {e}" for e in errors)
+
+    files_rows = _load_csv(output_dir / "file_inventory.csv")
+    symbols_rows = _load_csv(output_dir / "python_symbols.csv")
+    imports_rows = _load_csv(output_dir / "python_imports.csv")
+    calls_rows = _load_csv(output_dir / "python_calls.csv")
+    files_by_path = {r["relative_path"]: r for r in files_rows}
+    symbols_by_file: dict = {}
+    for r in symbols_rows:
+        symbols_by_file.setdefault(r["relative_path"], []).append(r)
+
+    file_resolutions = resolve_files(resolved.files, files_by_path)
+    symbol_resolutions = resolve_symbols(resolved.symbols, symbols_rows)
+    line_resolutions = resolve_lines(resolved.lines, files_by_path)
+    all_resolutions = file_resolutions + symbol_resolutions + line_resolutions
+
+    unresolved_explicit = [r for r in all_resolutions if r.status != "resolved"]
+    if resolved.strict and unresolved_explicit:
+        lines = [f"  - {r.selector_type} '{r.requested}': {r.status} — {r.detail}" for r in unresolved_explicit]
+        return None, [_res_to_dict(r) for r in all_resolutions], (
+            "strict mode: aborting because the following selector(s) did not resolve cleanly:\n" + "\n".join(lines)
+        )
+
+    budget = Budget(max_lines=1_000_000, max_characters=resolved.max_estimated_tokens * 4)
+    out: list = []
+    focus_files: list = []
+
+    def note_focus_file(rel: str) -> bool:
+        if rel in focus_files:
+            return True
+        if len(focus_files) >= resolved.max_files:
+            return False
+        focus_files.append(rel)
+        return True
+
+    # --- Tier 1: explicit selectors (never silently dropped) ---
+    # explicit_conflicts collects only "the explicit excerpt itself doesn't
+    # fit the budget" -- a hard, must-be-reported-not-truncated conflict.
+    # Freshness withholding and non-mandatory expansions (callers/callees/
+    # imports/tests) are still recorded as ordinary, non-fatal omissions on
+    # `budget` and must NOT abort generation.
+    explicit_conflicts: list = []
+
+    for res in file_resolutions:
+        if res.status != "resolved":
+            continue
+        rel = res.requested
+        if not note_focus_file(rel):
+            budget.omissions.append(f"`{rel}` omitted: limits.max_files ({resolved.max_files}) reached.")
+            continue
+        row = res.resolved_rows[0]
+        out.append(_render_origin_header(f"File: `{rel}`", ["explicit_file_selector"]))
+        top_level = sorted(
+            [r for r in symbols_by_file.get(rel, []) if r["parent_symbol"] == "<module>" and r["symbol_type"] != "module"],
+            key=lambda r: int(r["start_line"]),
+        )
+        if top_level:
+            out.append("Top-level symbols:")
+            for r in top_level:
+                out.append(f"- `{r['qualified_name']}` ({r['symbol_type']}, lines {r['start_line']}-{r['end_line']})")
+        try:
+            line_count = int(row.get("line_count") or 0)
+        except ValueError:
+            line_count = 0
+        if line_count:
+            status = _render_excerpt_block(root, rel, 1, line_count, budget, out, row.get("sha256", ""))
+            if status == "too_large":
+                explicit_conflicts.append(f"explicit file selector `{rel}` ({line_count} lines) does not fit")
+        for r in top_level:
+            _symbol_expansion(r, calls_rows, imports_rows, files_by_path, resolved, budget, out, focus_files)
+
+    for res in symbol_resolutions:
+        if res.status != "resolved":
+            continue
+        row = res.resolved_rows[0]
+        rel = row["relative_path"]
+        if not note_focus_file(rel):
+            budget.omissions.append(f"`{row['qualified_name']}` omitted: limits.max_files ({resolved.max_files}) reached.")
+            continue
+        out.append(_render_origin_header(f"Symbol: `{row['qualified_name']}` — `{rel}`", ["explicit_symbol_selector"]))
+        status = _render_excerpt_block(root, rel, int(row["start_line"]), int(row["end_line"]), budget, out,
+                                        files_by_path.get(rel, {}).get("sha256", ""))
+        if status == "too_large":
+            explicit_conflicts.append(f"explicit symbol selector `{row['qualified_name']}` in `{rel}` does not fit")
+        _symbol_expansion(row, calls_rows, imports_rows, files_by_path, resolved, budget, out, focus_files)
+
+    for res in line_resolutions:
+        if res.status != "resolved":
+            continue
+        info = res.resolved_rows[0]
+        rel = info["file"]
+        if not note_focus_file(rel):
+            budget.omissions.append(f"`{res.requested}` omitted: limits.max_files ({resolved.max_files}) reached.")
+            continue
+        enclosing = [
+            r for r in symbols_by_file.get(rel, [])
+            if int(r["start_line"]) <= info["start"] <= int(r["end_line"]) and r["symbol_type"] != "module"
+        ]
+        out.append(_render_origin_header(f"Line selector: `{res.requested}`", ["explicit_line_selector"]))
+        if enclosing:
+            enclosing.sort(key=lambda r: int(r["end_line"]) - int(r["start_line"]))
+            row = enclosing[0]
+            out.append(f"Enclosing symbol: `{row['qualified_name']}` ({row['symbol_type']}, "
+                       f"lines {row['start_line']}-{row['end_line']})\n")
+            status = _render_excerpt_block(root, rel, int(row["start_line"]), int(row["end_line"]), budget, out,
+                                            files_by_path.get(rel, {}).get("sha256", ""))
+        else:
+            start, end = max(1, info["start"] - 10), info["end"] + 10
+            status = _render_excerpt_block(root, rel, start, end, budget, out, files_by_path.get(rel, {}).get("sha256", ""))
+        if status == "too_large":
+            explicit_conflicts.append(f"explicit line selector `{res.requested}` does not fit")
+
+    if explicit_conflicts:
+        # An explicit selection itself didn't fit -- per contract this is a
+        # hard conflict, not something to truncate silently.
+        return None, [_res_to_dict(r) for r in all_resolutions], (
+            "the requested explicit selector(s) do not fit within limits.max_estimated_tokens "
+            f"({resolved.max_estimated_tokens}); increase the budget or narrow the request. Conflicts:\n"
+            + "\n".join(f"  - {o}" for o in explicit_conflicts)
+        )
+
+    # --- Tier 2: exact search-term matches ---
+    stale_search_files = 0
+    for term in resolved.search_terms:
+        matches = []
+        try:
+            pattern = re.compile(term) if resolved.search_as_regex else None
+        except re.error as exc:
+            out.append(f"\n_Search term `{term}` is not a valid regex: {exc}; skipped._\n")
+            continue
+        for frow in files_rows:
+            if frow.get("included") != "true" or frow.get("text_or_binary") == "binary":
+                continue
+            if not _file_is_fresh(root, frow["relative_path"], frow.get("sha256", "")):
+                stale_search_files += 1
+                continue
+            excerpt = _safe_excerpt(root, frow["relative_path"], 1, 10_000_000)
+            if excerpt is None:
+                continue
+            for ln, text in excerpt:
+                hit = pattern.search(text) if pattern else (term in text)
+                if hit:
+                    matches.append((frow["relative_path"], ln, text))
+        header = f"\n### Search: `{term}` ({len(matches)} match(es))\n_Included because: exact_search_match._\n"
+        if not budget.allow(header, 1):
+            budget.omissions.append(f"Search results for `{term}` omitted entirely (packet size limit reached).")
+            continue
+        out.append(header); budget.spend(header, 1)
+        shown_files = set()
+        for rel, ln, text in matches:
+            if rel not in shown_files and len(shown_files) >= resolved.max_files:
+                budget.omissions.append(f"Additional `{term}` matches omitted beyond limits.max_files ({resolved.max_files}).")
+                break
+            shown_files.add(rel)
+            note_focus_file(rel)
+            line_text = redact_secrets(text.strip()[:200])
+            line = f"- `{rel}:{ln}` — `{line_text}`"
+            if not budget.allow(line, 1):
+                budget.omissions.append(f"Additional `{term}` matches omitted (packet size limit reached).")
+                break
+            out.append(line); budget.spend(line, 1)
+    if stale_search_files:
+        budget.omissions.append(f"{stale_search_files} file(s) changed on disk since the last scan and were "
+                                 f"skipped for search terms; re-run scan.")
+
+    if budget.omissions:
+        out.append("\n## Omitted / unresolved\n")
+        for o in budget.omissions:
+            out.append(f"- {o}")
+
+    # (Unresolved/ambiguous selectors are reported once, in the "Selector
+    # resolution report" section built into the header below -- not
+    # repeated here.)
+
+    git_info = get_git_info(root)
+    header_lines = [
+        "# Repo Context Packet (from packet_request.json)\n",
+        f"- Root: `{root.resolve().name}`",
+        f"- Question: {resolved.question}",
+        f"- schema_version: {resolved.schema_version}",
+        f"- Tool version: {TOOL_VERSION}",
+        f"- Request file: `{request_path.name}` (sha256: `{request_hash[:16]}…`)",
+    ]
+    if git_info.get("available"):
+        dirty = "dirty" if git_info.get("dirty") else ("clean" if git_info.get("dirty") is False else "unknown")
+        header_lines.append(f"- Repository revision: `{git_info['commit']}` ({dirty} worktree)")
+    else:
+        header_lines.append("- Repository revision: not available (not a git repository, or git is not installed)")
+    header_lines.append(
+        f"- Limits: max_estimated_tokens={resolved.max_estimated_tokens}, max_files={resolved.max_files}, "
+        f"max_hops={resolved.max_hops}"
+    )
+    header_lines.append(
+        f"- Estimated tokens used: ~{round(budget.chars_used / 4)} "
+        f"(chars_used={budget.chars_used}/{budget.max_characters})\n"
+    )
+    header_lines.append("## Selector resolution report\n")
+    for r in all_resolutions:
+        header_lines.append(f"- {r.selector_type} `{r.requested}`: **{r.status}** — {r.detail}")
+        for c in r.candidates:
+            header_lines.append(f"  - candidate: `{c}`")
+    header_lines.append("")
+
+    out.append("\n_Static analysis only. Call/import relationships above are candidates, not proof of runtime "
+                "dispatch. See README.md in this output directory for full limitations._\n")
+
+    text = "\n".join(header_lines) + "\n".join(out) + "\n"
+
+    stem = sanitize_stem(name_override) if name_override else sanitize_stem(request_path.stem)
+    packet_path = output_dir / "packets" / f"packet_{stem}.md"
+    atomic_write_text(packet_path, text)
+
+    resolution_report = [_res_to_dict(r) for r in all_resolutions]
+    sidecar = {
+        "tool_version": TOOL_VERSION,
+        "schema_version": resolved.schema_version,
+        "question": resolved.question,
+        "request_file_sha256": request_hash,
+        "git": git_info,
+        "estimated_tokens_used": round(budget.chars_used / 4),
+        "focus_files": focus_files,
+        "omissions": budget.omissions,
+        "resolution_report": resolution_report,
+    }
+    atomic_write_text(output_dir / "packets" / f"packet_{stem}.resolution.json",
+                       json.dumps(sidecar, indent=2, sort_keys=True) + "\n")
+
+    return packet_path, resolution_report, None
+
+
+def _res_to_dict(r: SelectorResolution) -> dict:
+    return {
+        "selector_type": r.selector_type, "requested": r.requested,
+        "status": r.status, "detail": r.detail, "candidates": r.candidates,
+    }

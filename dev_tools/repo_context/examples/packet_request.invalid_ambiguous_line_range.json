@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "question": "end_line before line is an invalid range, not just an odd one.",
+  "selectors": {
+    "lines": [{"file": "tools/compare_cross_segment.py", "line": 200, "end_line": 100}]
+  }
+}
