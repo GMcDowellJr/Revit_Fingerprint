@@ -2,10 +2,10 @@
 
 - Source relative path: `dev_tools/repo_context/tests/test_packet_from_request.py`
 - Chunk: 1 of 3
-- Original line range: 1-499
+- Original line range: 1-520
 - Overlap lines with previous chunk: 0
-- Symbols fully or partially present: _scan, _request, _packet, test_valid_request_resolves_file_and_symbol_selectors, test_ambiguous_symbol_is_reported_not_silently_resolved, test_qualified_symbol_via_file_field_resolves_unambiguously, test_missing_selector_is_reported_but_other_selectors_still_processed, test_strict_mode_aborts_on_any_unresolved_selector, test_hard_budget_conflict_on_explicit_selector_aborts_without_partial_packet, test_expansion_never_preempts_a_later_explicit_selector, test_search_match_does_not_reserve_focus_file_slot_unless_rendered, test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence, test_explicit_selectors_beyond_max_files_is_a_hard_conflict_not_silent_drop, test_strict_mode_catches_unresolved_search_terms, test_invalid_schema_version_is_rejected_before_resolution, test_path_traversal_selector_is_rejected, test_search_term_matches_and_related_tests_are_included, test_line_selector_resolves_enclosing_symbol, test_line_range_extending_past_enclosing_symbol_renders_in_full, test_enclosing_symbol_note_is_charged_against_budget, test_search_match_collection_is_capped, test_redacted_excerpt_is_charged_not_the_raw_source, test_regex_search_rejected_when_bounding_is_unsupported, test_packet_header_and_footer_charged_against_budget, test_stale_source_since_scan_withholds_excerpt, test_resolution_sidecar_json_is_written
-- Source SHA-256: df517eeb144275c222d2e91539a9089bdf2618474d39d425f1db5b88a6702bfa
+- Symbols fully or partially present: _scan, _request, _packet, test_valid_request_resolves_file_and_symbol_selectors, test_ambiguous_symbol_is_reported_not_silently_resolved, test_qualified_symbol_via_file_field_resolves_unambiguously, test_missing_selector_is_reported_but_other_selectors_still_processed, test_strict_mode_aborts_on_any_unresolved_selector, test_hard_budget_conflict_on_explicit_selector_aborts_without_partial_packet, test_expansion_never_preempts_a_later_explicit_selector, test_search_match_does_not_reserve_focus_file_slot_unless_rendered, test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence, test_explicit_selectors_beyond_max_files_is_a_hard_conflict_not_silent_drop, test_strict_mode_catches_unresolved_search_terms, test_invalid_schema_version_is_rejected_before_resolution, test_path_traversal_selector_is_rejected, test_search_term_matches_and_related_tests_are_included, test_line_selector_resolves_enclosing_symbol, test_line_range_extending_past_enclosing_symbol_renders_in_full, test_enclosing_symbol_note_is_charged_against_budget, test_search_match_collection_is_capped, test_redacted_excerpt_is_charged_not_the_raw_source, test_regex_search_rejected_when_bounding_is_unsupported, test_aggregate_search_deadline_applies_to_literal_terms_too, test_search_match_redacts_before_truncating, test_packet_header_and_footer_charged_against_budget, test_stale_source_since_scan_withholds_excerpt
+- Source SHA-256: 759d9ce2ca0219228b05d56db69e1b045fd96066288de392f13f77203a94949c
 - Starts inside symbol: no
 - Ends inside symbol: no
 
@@ -451,62 +451,83 @@
    439|     assert matches_by_term["(a+)+$"] == []
    440| 
    441| 
-   442| def test_packet_header_and_footer_charged_against_budget(repo, out):
-   443|     # Regression: the fixed header (title/root/question/provenance/
-   444|     # limits) and footer were written with no budget accounting
-   445|     # whatsoever -- an accepted (<=4000-char) question alone could make
-   446|     # the real packet many times bigger than limits.max_estimated_tokens
-   447|     # while the sidecar still reported a number near zero.
-   448|     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
-   449|     _scan(repo, out)
-   450|     long_question = "why? " * 700  # comfortably under MAX_QUESTION_LENGTH (4000), still substantial
-   451|     # A search-term selector, not an explicit file/symbol/line selector --
-   452|     # the latter now correctly hard-aborts the whole packet if it can't
-   453|     # fit alongside the (now-charged) header, which is a separate, correct
-   454|     # invariant this test isn't about. A search term is soft/omittable, so
-   455|     # the packet still succeeds even when the header alone consumes most
-   456|     # of an unreasonably tiny budget.
-   457|     req = _request(out, "req.json", {
-   458|         "schema_version": "1.0", "question": long_question,
-   459|         "selectors": {"files": [], "symbols": [], "search_terms": ["nonexistent_term_xyz"], "lines": []},
-   460|         "limits": {"max_estimated_tokens": 1, "max_files": 12},
-   461|     })
-   462|     result = _packet(repo, out, req)
-   463|     assert result.returncode == 0, result.stderr
-   464|     text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
-   465|     sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
-   466|     assert sidecar["estimated_tokens_used"] > 100  # the question alone is ~700+ chars
-   467|     assert sidecar["estimated_tokens_used"] * 4 >= len(text) * 0.5
-   468| 
-   469| 
-   470| def test_stale_source_since_scan_withholds_excerpt(repo, out):
-   471|     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
-   472|     _scan(repo, out)
-   473|     write_files(repo, {"core/a.py": "def f():\n    return 999\n"})
-   474|     req = _request(out, "req.json", {
-   475|         "schema_version": "1.0", "question": "q",
-   476|         "selectors": {"files": ["core/a.py"], "symbols": [], "search_terms": [], "lines": []},
-   477|     })
-   478|     result = _packet(repo, out, req)
-   479|     assert result.returncode == 0, result.stderr
-   480|     text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
-   481|     assert "withheld" in text
-   482|     assert "return 999" not in text
-   483| 
-   484| 
-   485| def test_resolution_sidecar_json_is_written(repo, out):
+   442| def test_aggregate_search_deadline_applies_to_literal_terms_too(repo, out, monkeypatch):
+   443|     # Regression: the aggregate wall-clock deadline only applied when
+   444|     # search_as_regex was true. A request with hundreds/thousands of
+   445|     # absent *literal* terms re-reads every included text file once per
+   446|     # term with no bound at all, since collect_cap only limits how many
+   447|     # matches pile up, not how many full scans happen for a term that
+   448|     # matches nothing. The deadline must apply regardless of
+   449|     # search_as_regex.
+   450|     monkeypatch.setattr(rr, "_REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS", 0)
+   451|     write_files(repo, {"core/a.py": "needle\n"})
+   452|     _scan(repo, out)
+   453|     files_rows = rr._load_csv(out / "file_inventory.csv")
+   454|     resolutions, matches_by_term, _ = rr.resolve_search_terms(repo, ["needle", "other"], False, files_rows, 12)
+   455|     assert all(r.status == "invalid" for r in resolutions)
+   456|     assert all("aggregate" in r.detail for r in resolutions)
+   457| 
+   458| 
+   459| def test_search_match_redacts_before_truncating(repo, out):
+   460|     # Regression: the rendered search-match line truncated to 200 chars
+   461|     # *before* calling redact_secrets(). A secret-shaped value whose
+   462|     # closing quote fell beyond character 200 had that quote cut off
+   463|     # first, breaking _SECRET_ASSIGNMENT_PATTERN's closing-quote
+   464|     # backreference -- redact_secrets() then never matched at all, and
+   465|     # the (truncated) secret prefix leaked into the packet unredacted.
+   466|     secret_value = "x" * 250
+   467|     write_files(repo, {"core/a.py": f'token = "{secret_value}"  # NEEDLE_MARKER\n'})
+   468|     _scan(repo, out)
+   469|     req = _request(out, "req.json", {
+   470|         "schema_version": "1.0", "question": "q",
+   471|         "selectors": {"files": [], "symbols": [], "search_terms": ["NEEDLE_MARKER"], "lines": []},
+   472|     })
+   473|     result = _packet(repo, out, req)
+   474|     assert result.returncode == 0, result.stderr
+   475|     text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+   476|     assert "xxxxxxxxxx" not in text
+   477|     assert "REDACTED" in text
+   478| 
+   479| 
+   480| def test_packet_header_and_footer_charged_against_budget(repo, out):
+   481|     # Regression: the fixed header (title/root/question/provenance/
+   482|     # limits) and footer were written with no budget accounting
+   483|     # whatsoever -- an accepted (<=4000-char) question alone could make
+   484|     # the real packet many times bigger than limits.max_estimated_tokens
+   485|     # while the sidecar still reported a number near zero.
    486|     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
    487|     _scan(repo, out)
-   488|     req = _request(out, "req.json", {
-   489|         "schema_version": "1.0", "question": "q",
-   490|         "selectors": {"files": ["core/a.py"], "symbols": [], "search_terms": [], "lines": []},
-   491|     })
-   492|     result = _packet(repo, out, req)
-   493|     assert result.returncode == 0, result.stderr
-   494|     sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
-   495|     assert sidecar["schema_version"] == "1.0"
-   496|     assert sidecar["question"] == "q"
-   497|     assert sidecar["resolution_report"][0]["status"] == "resolved"
-   498| 
-   499| 
+   488|     long_question = "why? " * 700  # comfortably under MAX_QUESTION_LENGTH (4000), still substantial
+   489|     # A search-term selector, not an explicit file/symbol/line selector --
+   490|     # the latter now correctly hard-aborts the whole packet if it can't
+   491|     # fit alongside the (now-charged) header, which is a separate, correct
+   492|     # invariant this test isn't about. A search term is soft/omittable, so
+   493|     # the packet still succeeds even when the header alone consumes most
+   494|     # of an unreasonably tiny budget.
+   495|     req = _request(out, "req.json", {
+   496|         "schema_version": "1.0", "question": long_question,
+   497|         "selectors": {"files": [], "symbols": [], "search_terms": ["nonexistent_term_xyz"], "lines": []},
+   498|         "limits": {"max_estimated_tokens": 1, "max_files": 12},
+   499|     })
+   500|     result = _packet(repo, out, req)
+   501|     assert result.returncode == 0, result.stderr
+   502|     text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+   503|     sidecar = json.loads((out / "packets" / "packet_req.resolution.json").read_text(encoding="utf-8"))
+   504|     assert sidecar["estimated_tokens_used"] > 100  # the question alone is ~700+ chars
+   505|     assert sidecar["estimated_tokens_used"] * 4 >= len(text) * 0.5
+   506| 
+   507| 
+   508| def test_stale_source_since_scan_withholds_excerpt(repo, out):
+   509|     write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+   510|     _scan(repo, out)
+   511|     write_files(repo, {"core/a.py": "def f():\n    return 999\n"})
+   512|     req = _request(out, "req.json", {
+   513|         "schema_version": "1.0", "question": "q",
+   514|         "selectors": {"files": ["core/a.py"], "symbols": [], "search_terms": [], "lines": []},
+   515|     })
+   516|     result = _packet(repo, out, req)
+   517|     assert result.returncode == 0, result.stderr
+   518|     text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+   519|     assert "withheld" in text
+   520|     assert "return 999" not in text
 ```

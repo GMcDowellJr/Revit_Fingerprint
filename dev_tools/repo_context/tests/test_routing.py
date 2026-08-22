@@ -442,6 +442,22 @@ def test_content_derived_purpose_clues_are_redacted(repo, out):
     assert "abcdefghijklmnopqrstuvwxyz" not in core_text
 
 
+def test_markdown_title_redacts_before_truncating(repo, out):
+    # Regression: _markdown_title() truncated the candidate title to
+    # _MAX_CONTENT_TITLE_CHARS (120) *before* calling redact_secrets(). A
+    # headingless markdown file starting with a secret-shaped quoted value
+    # whose closing quote falls beyond character 120 had that quote cut
+    # off first, breaking _SECRET_ASSIGNMENT_PATTERN's closing-quote
+    # backreference -- redaction never matched, and the (truncated)
+    # secret prefix leaked into the routing catalog.
+    secret_value = "x" * 200
+    write_files(repo, {"docs/secret.md": f'token = "{secret_value}"\n\nMore text.\n'})
+    _scan(repo, out)
+    docs_text = (out / "routing" / "docs.md").read_text(encoding="utf-8")
+    assert "xxxxxxxxxx" not in docs_text
+    assert "REDACTED" in docs_text
+
+
 def test_catalog_filenames_stay_within_filesystem_limits(repo, out):
     # Regression: an oversized partition split through several long
     # directory segments flattened its entire key ("/" -> "_") into a

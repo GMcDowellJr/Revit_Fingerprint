@@ -1,9 +1,9 @@
 # Routing catalog: `tests/repo_context`
 
-- Generated (UTC): 2026-08-22T09:43:57Z
+- Generated (UTC): 2026-08-22T09:56:48Z
 - Tool version: 0.1.0
 - Files covered: 15
-- Catalog source hash (sha256 of sorted `path:sha256` pairs): `2e6e79ef08c2ea1b1258bcf51b746f914e381ba16504a03a5b059cc9130d27f5`
+- Catalog source hash (sha256 of sorted `path:sha256` pairs): `d3e40bb3f8df6fe50a09fdfe8a807df45db3902970bb32ad83de3282288764f9`
 - If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
 
 ### `dev_tools/repo_context/tests/conftest.py`
@@ -197,7 +197,7 @@
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
 - Purpose clues:
   - filename/path terms: test packet from request
-- Important symbols (46 total):
+- Important symbols (49 total):
   - `_scan` (function) — line 8
   - `_request` (function) — line 13
   - `_packet` (function) — line 19
@@ -221,32 +221,32 @@
   - `test_search_match_collection_is_capped` (function) — line 366
   - `test_redacted_excerpt_is_charged_not_the_raw_source` (function) — line 381
   - `test_regex_search_rejected_when_bounding_is_unsupported` (function) — line 425
-  - `test_packet_header_and_footer_charged_against_budget` (function) — line 442
-  - `test_stale_source_since_scan_withholds_excerpt` (function) — line 470
-  - ... and 21 more (see python_symbols.csv)
+  - `test_aggregate_search_deadline_applies_to_literal_terms_too` (function) — line 442
+  - `test_search_match_redacts_before_truncating` (function) — line 459
+  - ... and 24 more (see python_symbols.csv)
 - Entrypoint evidence: none
 - Internal dependencies (resolved imports within this repository):
   - (none resolved; see python_imports.csv for unresolved/external imports)
 - Called by (high/medium-confidence static callers):
-  - `test_aggregate_regex_search_time_is_capped_across_all_terms (dev_tools/repo_context/tests/test_packet_from_request.py:732)`
+  - `test_aggregate_regex_search_time_is_capped_across_all_terms (dev_tools/repo_context/tests/test_packet_from_request.py:770)`
+  - `test_aggregate_search_deadline_applies_to_literal_terms_too (dev_tools/repo_context/tests/test_packet_from_request.py:452)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:48)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:49)`
   - `test_ambiguous_symbol_is_reported_not_silently_resolved (dev_tools/repo_context/tests/test_packet_from_request.py:53)`
-  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:860)`
-  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:861)`
-  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:868)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:933)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:934)`
-  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:940)`
+  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:898)`
+  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:899)`
+  - `test_callee_expansion_continues_past_a_rejected_file (dev_tools/repo_context/tests/test_packet_from_request.py:906)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:971)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:972)`
+  - `test_caller_callee_import_expansion_respects_max_files (dev_tools/repo_context/tests/test_packet_from_request.py:978)`
   - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:200)`
   - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:201)`
   - `test_duplicate_explicit_selectors_are_evaluated_once_not_per_occurrence (dev_tools/repo_context/tests/test_packet_from_request.py:206)`
   - `test_enclosing_symbol_note_is_charged_against_budget (dev_tools/repo_context/tests/test_packet_from_request.py:353)`
-  - `test_enclosing_symbol_note_is_charged_against_budget (dev_tools/repo_context/tests/test_packet_from_request.py:354)`
-  - ... and 117 more (see python_calls.csv)
+  - ... and 124 more (see python_calls.csv)
 - Related tests:
   - `dev_tools/repo_context/tests/test_packet_from_request.py`
-- Retrieval identity: sha256=`df517eeb144275c2…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_packet_from_request.py`)
+- Retrieval identity: sha256=`759d9ce2ca021922…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `dev_tools/repo_context/tests/test_packet_from_request.py`)
 
 ### `dev_tools/repo_context/tests/test_packets.py`
 - Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))

@@ -184,13 +184,21 @@ def _markdown_title(root: Path, rel_path: str) -> str:
         if not stripped:
             continue
         if stripped.startswith("#"):
-            title = stripped.lstrip("#").strip()[:_MAX_CONTENT_TITLE_CHARS]
+            title = stripped.lstrip("#").strip()
             break
         if not first_line:
             first_line = stripped
     if not title:
-        title = first_line[:_MAX_CONTENT_TITLE_CHARS]
-    return redact_secrets(title) if title else ""
+        title = first_line
+    if not title:
+        return ""
+    # Redact the *full* line before truncating it, not after -- a secret-
+    # shaped value whose closing quote falls beyond the truncation point
+    # would otherwise have that quote cut off first, breaking
+    # _SECRET_ASSIGNMENT_PATTERN's closing-quote backreference so
+    # redact_secrets() never matches at all and the (truncated) secret
+    # prefix leaks into the catalog unredacted.
+    return redact_secrets(title)[:_MAX_CONTENT_TITLE_CHARS]
 
 
 def _render_file_entry(f, symbols_by_file: dict, role: str, role_evidence: str,

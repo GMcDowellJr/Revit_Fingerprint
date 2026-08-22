@@ -447,14 +447,16 @@ def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_r
     # or the packet budget is ever applied during Tier-2 rendering.
     collect_cap = max(1, max_files) * 5
     # The per-term SIGALRM bound (_scan_term_matches_bounded) stops any one
-    # pathological pattern from hanging forever, but the schema places no
-    # cap on how many search_terms a request can carry -- hundreds of
-    # distinct catastrophic-backtracking patterns could still each burn
-    # their own full per-term allowance before packet budgeting even
-    # begins. Track a wall-clock deadline across *all* regex terms in this
-    # call and shrink (or zero out) each remaining term's allowance once
-    # it's been spent, instead of granting every term a fresh timeout.
-    regex_deadline = time.monotonic() + _REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS if search_as_regex else None
+    # pathological regex pattern from hanging forever, but the schema
+    # places no cap on how many search_terms a request can carry either
+    # way -- a request with hundreds/thousands of absent *literal* terms
+    # re-reads every included text file once per term (collect_cap only
+    # bounds how many *matches* pile up, not how many scans happen when a
+    # term matches nothing at all). Track one wall-clock deadline across
+    # *all* terms in this call, regex or literal, and skip remaining terms
+    # outright once it's passed, instead of granting every term its own
+    # fresh scan unconditionally.
+    search_deadline = time.monotonic() + _REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS
     for term in terms:
         try:
             pattern = re.compile(term) if search_as_regex else None
@@ -462,17 +464,17 @@ def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_r
             resolutions.append(SelectorResolution("search_term", term, "invalid", f"not a valid regex: {exc}"))
             matches_by_term[term] = []
             continue
+        remaining = search_deadline - time.monotonic()
+        if remaining <= 0:
+            resolutions.append(SelectorResolution(
+                "search_term", term, "invalid",
+                f"skipped: this request's aggregate search evaluation time exceeded "
+                f"{_REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS:.0f}s across all its search_terms; reduce the "
+                f"number of search_terms",
+            ))
+            matches_by_term[term] = []
+            continue
         if search_as_regex:
-            remaining = regex_deadline - time.monotonic()
-            if remaining <= 0:
-                resolutions.append(SelectorResolution(
-                    "search_term", term, "invalid",
-                    f"skipped: this request's aggregate search_as_regex evaluation time exceeded "
-                    f"{_REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS:.0f}s across all its terms; reduce the number "
-                    f"of regex terms or disable search_as_regex",
-                ))
-                matches_by_term[term] = []
-                continue
             scanned = _scan_term_matches_bounded(term, pattern, files_rows, root, collect_cap,
                                                   timeout=min(_REGEX_SEARCH_TIMEOUT_SECONDS, remaining))
             if scanned == _UNSUPPORTED_PLATFORM:
@@ -547,9 +549,12 @@ def _render_excerpt_block(root: Path, rel_path: str, start: int, end: int, budge
     return "rendered"
 
 
-def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_path: dict,
-                       req: ResolvedRequest, budget: Budget, out: list, note_focus_file,
-                       communities_by_file: Optional[dict] = None) -> None:
+def _symbol_expansion(row: dict, calls_rows: list, req: ResolvedRequest, budget: Budget, out: list,
+                       note_focus_file) -> None:
+    """Callers/callees are inherently per-symbol (each symbol has its own
+    call graph neighborhood), unlike imports/related-tests/Graphify peers
+    below in _file_expansion(), which describe the containing file and
+    must not be repeated once per symbol in it."""
     rel, qn = row["relative_path"], row["qualified_name"]
 
     if req.include_callers:
@@ -612,6 +617,18 @@ def _symbol_expansion(row: dict, calls_rows: list, imports_rows: list, files_by_
             else:
                 budget.omissions.append(f"Callees listing for `{qn}` omitted entirely (packet size limit reached).")
 
+
+def _file_expansion(rel: str, imports_rows: list, calls_rows: list, files_by_path: dict,
+                     req: ResolvedRequest, budget: Budget, out: list, note_focus_file,
+                     communities_by_file: Optional[dict] = None) -> None:
+    """Internal imports, related tests, and Graphify community peers all
+    describe the *file*, not any one symbol in it -- unlike
+    callers/callees above, which are inherently per-symbol. Must be
+    called at most once per file regardless of how many of that file's
+    symbols are being expanded (see the caller: it used to call this
+    content once per top-level symbol, rendering identical "Internal
+    imports of X"/"Related tests for X"/"Graphify community peers of X"
+    sections over and over for a multi-symbol file)."""
     if req.include_imports:
         file_imports = [i for i in imports_rows if i["source_file"] == rel and i["resolved_file"]]
         if file_imports:
@@ -960,13 +977,30 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
                     f"Top-level symbol listing for `{rel}` omitted entirely (packet size limit reached); "
                     f"see python_symbols.csv."
                 )
+    file_level_expansion_done: set = set()
+
+    def _maybe_file_expansion(rel: str) -> None:
+        # Once per file regardless of how many symbols in it get
+        # expanded, and regardless of whether that file is reached via a
+        # file selector's own top-level symbols or a distinct explicit
+        # symbol selector in the same file.
+        if rel in file_level_expansion_done:
+            return
+        file_level_expansion_done.add(rel)
+        _file_expansion(rel, imports_rows, calls_rows, files_by_path, resolved, budget, out, note_focus_file,
+                         communities_by_file)
+
     for rel, top_level in file_expansion_items:
+        if not top_level:
+            # Matches the prior trigger condition -- a file with no
+            # top-level symbols never had its expansions rendered either.
+            continue
         for r in top_level:
-            _symbol_expansion(r, calls_rows, imports_rows, files_by_path, resolved, budget, out, note_focus_file,
-                              communities_by_file)
+            _symbol_expansion(r, calls_rows, resolved, budget, out, note_focus_file)
+        _maybe_file_expansion(rel)
     for row in symbol_expansion_items:
-        _symbol_expansion(row, calls_rows, imports_rows, files_by_path, resolved, budget, out, note_focus_file,
-                          communities_by_file)
+        _symbol_expansion(row, calls_rows, resolved, budget, out, note_focus_file)
+        _maybe_file_expansion(row["relative_path"])
 
     # --- Tier 2: exact search-term matches ---
     # Matches were already computed by resolve_search_terms() above (before
@@ -997,7 +1031,13 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         out.append(header); budget.spend(header, 1)
         max_files_note_emitted = False
         for rel, ln, text in matches:
-            line_text = redact_secrets(text.strip()[:200])
+            # Redact the full line before truncating it, not after -- a
+            # secret-shaped value whose closing quote falls beyond
+            # character 200 would otherwise have that quote cut off
+            # first, breaking _SECRET_ASSIGNMENT_PATTERN's closing-quote
+            # backreference so redact_secrets() never matches and the
+            # (truncated) secret prefix leaks into the packet.
+            line_text = redact_secrets(text.strip())[:200]
             line = f"- `{rel}:{ln}` — `{line_text}`"
             # Check the budget *before* reserving a focus-file slot for
             # this match -- otherwise a match that ultimately doesn't fit

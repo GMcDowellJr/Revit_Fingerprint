@@ -224,8 +224,8 @@
         "dev_tools/repo_context/examples/packet_request.invalid_ambiguous_line_range.json",
         "dev_tools/repo_context/examples/packet_request.invalid_empty_selectors.json"
       ],
-      "source_hash": "94310d041f90ec48ba6ef544a42a845b19867e612e4ad83f7340fc6a16c10e12",
-      "symbol_count": 150
+      "source_hash": "fb1e9474469aab2f0bdc502495581181017b8eefa11659a0b47de7c9a3fd602d",
+      "symbol_count": 151
     },
     {
       "file_count": 41,
@@ -577,8 +577,8 @@
         "dev_tools/repo_context/tests/test_chunking.py",
         "dev_tools/repo_context/tests/test_determinism_incremental.py"
       ],
-      "source_hash": "2e6e79ef08c2ea1b1258bcf51b746f914e381ba16504a03a5b059cc9130d27f5",
-      "symbol_count": 194
+      "source_hash": "d3e40bb3f8df6fe50a09fdfe8a807df45db3902970bb32ad83de3282288764f9",
+      "symbol_count": 198
     },
     {
       "file_count": 4,
@@ -884,14 +884,14 @@
       "symbol_count": 8
     }
   ],
-  "generated_at_utc": "2026-08-22T09:43:57Z",
+  "generated_at_utc": "2026-08-22T09:56:48Z",
   "git": {
     "available": true,
-    "commit": "399d1ada86a25f900487c2690a222f22300d3c1e",
+    "commit": "c21564ff88a0f723a02b86b81dadd4108b37b6e7",
     "dirty": true
   },
   "graphify_warnings": [
-    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 399d1ada86a2; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
+    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit c21564ff88a0; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
   ],
   "options": {
     "allow_stale_graphify": false,
@@ -900,6 +900,6 @@
     "max_index_chars": 10000,
     "max_symbols_per_file_entry": 25
   },
-  "source_manifest_hash": "dca9f14fecce8660a503b0bcf19b9b5db5ee2b372f6c63cedb149bd4e6ecddb8",
+  "source_manifest_hash": "0d4e6de5a998286e1ade876db093eba7e247adb6ce2d52de2a9ea3a9eeec007a",
   "tool_version": "0.1.0"
 }

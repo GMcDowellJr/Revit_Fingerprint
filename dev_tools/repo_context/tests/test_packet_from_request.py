@@ -439,6 +439,44 @@ def test_regex_search_rejected_when_bounding_is_unsupported(repo, out, monkeypat
     assert matches_by_term["(a+)+$"] == []
 
 
+def test_aggregate_search_deadline_applies_to_literal_terms_too(repo, out, monkeypatch):
+    # Regression: the aggregate wall-clock deadline only applied when
+    # search_as_regex was true. A request with hundreds/thousands of
+    # absent *literal* terms re-reads every included text file once per
+    # term with no bound at all, since collect_cap only limits how many
+    # matches pile up, not how many full scans happen for a term that
+    # matches nothing. The deadline must apply regardless of
+    # search_as_regex.
+    monkeypatch.setattr(rr, "_REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS", 0)
+    write_files(repo, {"core/a.py": "needle\n"})
+    _scan(repo, out)
+    files_rows = rr._load_csv(out / "file_inventory.csv")
+    resolutions, matches_by_term, _ = rr.resolve_search_terms(repo, ["needle", "other"], False, files_rows, 12)
+    assert all(r.status == "invalid" for r in resolutions)
+    assert all("aggregate" in r.detail for r in resolutions)
+
+
+def test_search_match_redacts_before_truncating(repo, out):
+    # Regression: the rendered search-match line truncated to 200 chars
+    # *before* calling redact_secrets(). A secret-shaped value whose
+    # closing quote fell beyond character 200 had that quote cut off
+    # first, breaking _SECRET_ASSIGNMENT_PATTERN's closing-quote
+    # backreference -- redact_secrets() then never matched at all, and
+    # the (truncated) secret prefix leaked into the packet unredacted.
+    secret_value = "x" * 250
+    write_files(repo, {"core/a.py": f'token = "{secret_value}"  # NEEDLE_MARKER\n'})
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": [], "symbols": [], "search_terms": ["NEEDLE_MARKER"], "lines": []},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    assert "xxxxxxxxxx" not in text
+    assert "REDACTED" in text
+
+
 def test_packet_header_and_footer_charged_against_budget(repo, out):
     # Regression: the fixed header (title/root/question/provenance/
     # limits) and footer were written with no budget accounting
@@ -1044,6 +1082,40 @@ def test_selector_resolution_report_is_charged_against_budget(repo, out):
     assert len(text) < 2000
     assert text.count("missing_") < 200
     assert sidecar["estimated_tokens_used"] * 4 >= len(text) * 0.5
+
+
+def test_file_level_expansions_render_once_per_file_not_per_symbol(repo, out):
+    # Regression: _symbol_expansion() rendered imports/related-tests/
+    # Graphify-peer sections (all keyed by the containing *file*, not the
+    # symbol) on every call -- but an explicit file selector called it
+    # once per top-level symbol in that file, so a multi-function file
+    # got its "Internal imports of X" / "Related tests for X" sections
+    # duplicated once per function instead of appearing once.
+    write_files(repo, {
+        "core/a.py": (
+            "from core.dep import helper\n\n\n"
+            "def f():\n    return helper()\n\n\n"
+            "def g():\n    return helper()\n\n\n"
+            "def h():\n    return helper()\n"
+        ),
+        "core/dep.py": "def helper():\n    return 1\n",
+        "tests/test_a.py": "from core.a import f\n\n\ndef test_f():\n    assert f() == 1\n",
+    })
+    _scan(repo, out)
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["core/a.py"], "symbols": [], "search_terms": [], "lines": []},
+        "expansion": {"include_callers": False, "include_callees": False, "include_imports": True,
+                      "include_related_tests": True, "include_graphify": False},
+        "limits": {"max_estimated_tokens": 12000, "max_files": 12},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    # Three top-level functions in core/a.py, but these file-level
+    # sections must appear exactly once, not three times.
+    assert text.count("Internal imports of `core/a.py`") == 1
+    assert text.count("Related tests for `core/a.py`") == 1
 
 
 def test_related_test_expansion_respects_global_max_files(repo, out):

@@ -7,7 +7,7 @@
     "redact_secrets": true
   },
   "counts": {
-    "calls": 52181,
+    "calls": 52208,
     "chunked_files": 46,
     "chunks": 1432,
     "entrypoint_candidates": 103,
@@ -17,7 +17,7 @@
     "imports": 4695,
     "parse_failures": 0,
     "python_files": 386,
-    "symbols": 5180
+    "symbols": 5186
   },
   "exclude_dir_names_default_count": null,
   "excluded_directories_sample": [
@@ -50,7 +50,7 @@
       "reason": "excluded_directory_name"
     }
   ],
-  "generated_at_utc": "2026-08-22T09:43:57Z",
+  "generated_at_utc": "2026-08-22T09:56:48Z",
   "incremental": {
     "chunks_regenerated_for_files": 46,
     "chunks_reused_for_files": 0,
