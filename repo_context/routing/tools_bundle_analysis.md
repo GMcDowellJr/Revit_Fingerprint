@@ -1,6 +1,6 @@
 # Routing catalog: `tools/bundle_analysis`
 
-- Generated (UTC): 2026-08-22T06:08:45Z
+- Generated (UTC): 2026-08-22T06:21:11Z
 - Tool version: 0.1.0
 - Files covered: 19
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `f736b277d9e1f6fd82b4fe97f9be754014de1e4e507b028c1e996c87ecd81442`
@@ -339,16 +339,4 @@
 - Related tests:
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`83b12c25156fdbf4…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/bundle_analysis/step_compare.py`)
-
-## Omitted from this catalog (size limit reached)
-
-7 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
-
-- `tools/bundle_analysis/step2b_bundle_share_profile.py`
-- `tools/bundle_analysis/step3_build_dag.py`
-- `tools/bundle_analysis/step4_difference_sets.py`
-- `tools/bundle_analysis/step5_classify_patterns.py`
-- `tools/bundle_analysis/step6_classify_files.py`
-- `tools/bundle_analysis/step7_overlap_report.py`
-- `tools/bundle_analysis/utils.py`
 

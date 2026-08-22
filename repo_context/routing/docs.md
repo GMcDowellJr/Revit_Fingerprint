@@ -1,6 +1,6 @@
 # Routing catalog: `docs`
 
-- Generated (UTC): 2026-08-22T06:08:45Z
+- Generated (UTC): 2026-08-22T06:21:11Z
 - Tool version: 0.1.0
 - Files covered: 41
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `23143e64227d3a38a1b130c94aa40d7077e977ca975b11549be445757fb3a545`
@@ -455,20 +455,4 @@
 - Related tests:
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`91680641627fcb00…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `docs/research/candidate_dependency_edges.csv`)
-
-## Omitted from this catalog (size limit reached)
-
-11 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
-
-- `docs/research/fingerprint_api_concept_map.csv`
-- `docs/research/fingerprint_api_semantic_mapping.md`
-- `docs/research/semantic_label_review.csv`
-- `docs/research/unsupported_api_concepts.csv`
-- `docs/SPLIT_EXPORT.md`
-- `docs/tools_DEPRECATED.md`
-- `docs/tools_PHASE0_1_2_MAP.md`
-- `docs/tracked-reference-hygiene.md`
-- `docs/V21_ANALYSIS_SCHEMA.md`
-- `docs/V21_DETERMINISM_AND_IDENTITY.md`
-- `docs/V21_PHASE0_EXPORT_SCHEMA.md`
 

@@ -1,6 +1,6 @@
 # Routing catalog: `tools`
 
-- Generated (UTC): 2026-08-22T06:08:45Z
+- Generated (UTC): 2026-08-22T06:21:11Z
 - Tool version: 0.1.0
 - Files covered: 49
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `186bd8fb5e648d3853b278c2db4aa9f2801dc7c2a2d2be25436967cc0d21bae6`
@@ -411,7 +411,7 @@
 
 ## Omitted from this catalog (size limit reached)
 
-36 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
+36 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
 
 - `tools/dimension_types.join_key.md`
 - `tools/discover_hash_policy.py`
@@ -421,27 +421,4 @@
 - `tools/enterprise_policy.py`
 - `tools/export_bundle_pattern_detail.py`
 - `tools/export_to_flat_tables.py`
-- `tools/extract_segment_subtree.py`
-- `tools/extractor.py`
-- `tools/generate_governance_narrative.py`
-- `tools/generate_name_key_patterns.py`
-- `tools/generate_sig_hash_policy.py`
-- `tools/governance_evidence_package.py`
-- `tools/governance_manifest.py`
-- `tools/governance_policy.py`
-- `tools/governance_relationships.py`
-- `tools/inspect_lft_similarity.py`
-- `tools/jenks_utils.py`
-- `tools/join_key_derivation.py`
-- `tools/label_refresh_runbook.ps1`
-- `tools/na_token.py`
-- `tools/pairwise_analysis.py`
-- `tools/pareto_joinkey_search.py`
-- `tools/pattern_id_utils.py`
-- `tools/population_framing.py`
-- `tools/probe_config.json`
-- `tools/refreshed_revit_governance_dod.md`
-- `tools/reset_wall_types_for_reapply.py`
-- `tools/run_config.json`
-- ... and 6 more (not listed here; see `file_inventory.csv` or `routing/routing_manifest.json`)
 

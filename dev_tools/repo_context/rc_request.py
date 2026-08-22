@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import re
 import signal
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -405,6 +406,9 @@ def _scan_term_matches_bounded(term: str, pattern, files_rows: list, root: Path,
         signal.signal(signal.SIGALRM, previous_handler)
 
 
+_REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS = 30.0
+
+
 def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_rows: list) -> tuple:
     """Resolve each search term against the scanned repository's current
     source (same matching rule Tier 2 rendering uses). Returns
@@ -419,6 +423,15 @@ def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_r
     resolutions = []
     matches_by_term: dict = {}
     stale_files_skipped = 0
+    # The per-term SIGALRM bound (_scan_term_matches_bounded) stops any one
+    # pathological pattern from hanging forever, but the schema places no
+    # cap on how many search_terms a request can carry -- hundreds of
+    # distinct catastrophic-backtracking patterns could still each burn
+    # their own full per-term allowance before packet budgeting even
+    # begins. Track a wall-clock deadline across *all* regex terms in this
+    # call and shrink (or zero out) each remaining term's allowance once
+    # it's been spent, instead of granting every term a fresh timeout.
+    regex_deadline = time.monotonic() + _REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS if search_as_regex else None
     for term in terms:
         try:
             pattern = re.compile(term) if search_as_regex else None
@@ -427,7 +440,18 @@ def resolve_search_terms(root: Path, terms: list, search_as_regex: bool, files_r
             matches_by_term[term] = []
             continue
         if search_as_regex:
-            scanned = _scan_term_matches_bounded(term, pattern, files_rows, root)
+            remaining = regex_deadline - time.monotonic()
+            if remaining <= 0:
+                resolutions.append(SelectorResolution(
+                    "search_term", term, "invalid",
+                    f"skipped: this request's aggregate search_as_regex evaluation time exceeded "
+                    f"{_REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS:.0f}s across all its terms; reduce the number "
+                    f"of regex terms or disable search_as_regex",
+                ))
+                matches_by_term[term] = []
+                continue
+            scanned = _scan_term_matches_bounded(term, pattern, files_rows, root,
+                                                  timeout=min(_REGEX_SEARCH_TIMEOUT_SECONDS, remaining))
             if scanned is None:
                 resolutions.append(SelectorResolution(
                     "search_term", term, "invalid",
@@ -722,7 +746,7 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
     rendered_files: set = set()
     rendered_symbols: set = set()
     rendered_lines: set = set()
-    file_expansion_items: list = []    # [(top_level_rows)]
+    file_expansion_items: list = []    # [(rel, top_level_rows)]
     symbol_expansion_items: list = []  # [row]
 
     def _spend_header(header: str) -> bool:
@@ -772,27 +796,13 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
             [r for r in symbols_by_file.get(rel, []) if r["parent_symbol"] == "<module>" and r["symbol_type"] != "module"],
             key=lambda r: int(r["start_line"]),
         )
-        if top_level:
-            header = "Top-level symbols:"
-            if budget.allow(header, 1):
-                out.append(header)
-                budget.spend(header, 1)
-                for idx, r in enumerate(top_level):
-                    line = f"- `{r['qualified_name']}` ({r['symbol_type']}, lines {r['start_line']}-{r['end_line']})"
-                    if not budget.allow(line, 1):
-                        budget.omissions.append(
-                            f"{len(top_level) - idx} more top-level symbol(s) in `{rel}` omitted from the "
-                            f"listing (packet size limit reached); see python_symbols.csv."
-                        )
-                        break
-                    out.append(line)
-                    budget.spend(line, 1)
-            else:
-                budget.omissions.append(
-                    f"Top-level symbol listing for `{rel}` omitted entirely (packet size limit reached); "
-                    f"see python_symbols.csv."
-                )
-        file_expansion_items.append(top_level)
+        # The "Top-level symbols:" inventory itself is optional metadata,
+        # same as this symbol's caller/callee/etc. expansions -- deferred
+        # to the pass below (after every explicit file/symbol/line
+        # selector has had its guaranteed shot at the budget), so file A's
+        # inventory can never spend budget that file B's own explicit
+        # excerpt needed.
+        file_expansion_items.append((rel, top_level))
 
     for res in symbol_resolutions:
         if res.status != "resolved":
@@ -868,11 +878,34 @@ def generate_packet_from_request(root: Path, output_dir: Path, request_path: Pat
         )
 
     # Every explicit selector fit -- now spend whatever budget remains on
-    # optional expansions (callers/callees/imports/tests/Graphify). Done
-    # only now, not interleaved with tier-1's rendering above, so a
-    # symbol's expansions can never manufacture a budget conflict for a
-    # later explicit selector.
-    for top_level in file_expansion_items:
+    # optional metadata/expansions (callers/callees/imports/tests/
+    # Graphify, plus each explicit file selector's own "Top-level
+    # symbols:" inventory). Done only now, not interleaved with tier-1's
+    # rendering above, so a symbol's expansions -- or one file's inventory
+    # -- can never manufacture a budget conflict for a later explicit
+    # selector.
+    for rel, top_level in file_expansion_items:
+        if top_level:
+            header = "Top-level symbols:"
+            if budget.allow(header, 1):
+                out.append(header)
+                budget.spend(header, 1)
+                for idx, r in enumerate(top_level):
+                    line = f"- `{r['qualified_name']}` ({r['symbol_type']}, lines {r['start_line']}-{r['end_line']})"
+                    if not budget.allow(line, 1):
+                        budget.omissions.append(
+                            f"{len(top_level) - idx} more top-level symbol(s) in `{rel}` omitted from the "
+                            f"listing (packet size limit reached); see python_symbols.csv."
+                        )
+                        break
+                    out.append(line)
+                    budget.spend(line, 1)
+            else:
+                budget.omissions.append(
+                    f"Top-level symbol listing for `{rel}` omitted entirely (packet size limit reached); "
+                    f"see python_symbols.csv."
+                )
+    for rel, top_level in file_expansion_items:
         for r in top_level:
             _symbol_expansion(r, calls_rows, imports_rows, files_by_path, resolved, budget, out, note_focus_file,
                               communities_by_file)

@@ -152,22 +152,49 @@ def test_routing_catalog_respects_max_catalog_chars(repo, out):
     assert "Omitted from this catalog" in cat_text
 
 
+def test_catalog_appendix_respects_the_cap_when_header_alone_is_close_to_it(repo, out):
+    # Regression: the header and the "Omitted from this catalog" appendix
+    # were both appended unconditionally with no size accounting against
+    # --routing-max-catalog-chars at all. Scanning a single file with a
+    # tiny cap (100) previously still produced ~700+ characters of output
+    # once the fixed-framing header and the appendix's own fixed-framing
+    # text were added on top of it. The header is unavoidable fixed
+    # framing (revision/hash provenance) that always renders in full, but
+    # the appendix is optional annotation and must now respect whatever
+    # budget is actually left after the header -- which, for a 100-char
+    # cap, is none at all, so no appendix should be appended.
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    _scan(repo, out, ["--routing-max-catalog-chars", "100"])
+    cat_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
+    assert "Omitted from this catalog" not in cat_text
+    assert len(cat_text) < 600  # just the fixed header, not header + an unbounded appendix on top
+
+
 def test_omitted_path_appendix_is_bounded_regardless_of_omitted_count(repo, out):
     # Regression: the "Omitted from this catalog" appendix listed every
     # single omitted path with no cap of its own -- a partition with
     # hundreds of long filenames could make that appendix alone exceed
     # --routing-max-catalog-chars, defeating the exact limit it exists to
     # respect.
+    #
+    # 1000 (not an absurdly tiny 100) is deliberately still much smaller
+    # than what 300 full detailed entries would need -- everything still
+    # gets omitted -- but it's big enough to leave room for the (now
+    # budget-respecting) short notice plus a sample, which is the actual
+    # behavior this test verifies. A cap smaller than the catalog's own
+    # fixed header framing can no longer show any appendix at all -- see
+    # test_first_catalog_entry_is_also_capped_by_max_catalog_chars for
+    # that boundary case.
     files = {
         f"core/{'x' * 80}_module_number_{i:04d}.py": f'"""Docstring {i}."""\n\ndef f_{i}():\n    return {i}\n'
         for i in range(300)
     }
     write_files(repo, files)
-    _scan(repo, out, ["--routing-max-catalog-chars", "100", "--routing-max-files-per-catalog", "1000"])
+    _scan(repo, out, ["--routing-max-catalog-chars", "1000", "--routing-max-files-per-catalog", "1000"])
     cat_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
     assert "Omitted from this catalog" in cat_text
     assert "more (not listed here" in cat_text
-    assert len(cat_text) < 6000
+    assert len(cat_text) < 1000 + 500  # small slack for the last sample line/trailer that pushed it over
 
 
 def test_manifest_stores_the_complete_omitted_path_list(repo, out):
@@ -219,7 +246,15 @@ def test_first_catalog_entry_is_also_capped_by_max_catalog_chars(repo, out):
     assert cat_text.count("### `") == 1  # only the (stubbed) first entry survives in detail
     assert "Purpose clues" not in cat_text  # full-detail sections did not sneak in for the first entry
     assert f"### `{first_path}`" in cat_text
-    assert "Omitted from this catalog" in cat_text
+    # By construction there are only 5 spare characters left after the
+    # header + stub -- nowhere near enough room for even the appendix's
+    # short notice, so none is shown here (rather than being forced in
+    # over budget); the 4 omitted files are still fully tracked in the
+    # manifest (see test_manifest_stores_the_complete_omitted_path_list).
+    assert "Omitted from this catalog" not in cat_text
+    manifest = _manifest(out)
+    core_cat = next(c for c in manifest["catalogs"] if c["key"] == "core")
+    assert core_cat["omitted_file_count"] == 4
 
 
 def test_changed_source_changes_source_manifest_hash(repo, out):
@@ -291,3 +326,18 @@ def test_purpose_clues_are_traceable_to_deterministic_evidence(repo, out):
     cat_text = (out / "routing" / "core.md").read_text(encoding="utf-8")
     assert "module docstring: Widget factory helpers." in cat_text
     assert "filename/path terms: thing" in cat_text
+
+
+def test_scan_survives_a_malformed_graphify_top_level_structure(repo, out):
+    # Regression: graphify-out/graph.json containing valid JSON but a
+    # non-object top level (e.g. a bare list) crashed `data.get(...)` with
+    # AttributeError inside load_graphify_communities(). Since routing
+    # loads Graphify during every normal `scan`, that crashed the whole
+    # scan (after partially writing its output) over one optional,
+    # malformed artifact -- instead of treating it as unavailable
+    # evidence, the same as any other unreadable/stale graph.json.
+    write_files(repo, {"core/a.py": "def f():\n    return 1\n"})
+    (repo / "graphify-out").mkdir(parents=True, exist_ok=True)
+    (repo / "graphify-out" / "graph.json").write_text("[]", encoding="utf-8")
+    _scan(repo, out)  # must not crash -- _scan() itself asserts returncode == 0
+    assert (out / "routing" / "index.md").exists()

@@ -1,6 +1,6 @@
 # Routing catalog: `tools/label_synthesis`
 
-- Generated (UTC): 2026-08-22T06:08:45Z
+- Generated (UTC): 2026-08-22T06:21:11Z
 - Tool version: 0.1.0
 - Files covered: 26
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `f5c31f56b033647f17cf57d58ba06b001e89d4267d32522303a0f4daef3a06e6`
@@ -393,17 +393,11 @@
 
 ## Omitted from this catalog (size limit reached)
 
-11 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
+11 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
 
 - `tools/label_synthesis/patch_domain_patterns_labels.py`
 - `tools/label_synthesis/synopsis_formatters/arrowheads.py`
 - `tools/label_synthesis/synopsis_formatters/dimension_types.py`
 - `tools/label_synthesis/synopsis_formatters/fill_patterns.py`
-- `tools/label_synthesis/synopsis_formatters/line_patterns.py`
-- `tools/label_synthesis/synopsis_formatters/line_styles.py`
-- `tools/label_synthesis/synopsis_formatters/object_styles_annotation.py`
-- `tools/label_synthesis/synopsis_formatters/object_styles_model.py`
-- `tools/label_synthesis/synopsis_formatters/phase_filters.py`
-- `tools/label_synthesis/synopsis_formatters/text_types.py`
-- `tools/label_synthesis/synthesize_fragmented_labels.py`
+- ... and 7 more (not listed here)
 

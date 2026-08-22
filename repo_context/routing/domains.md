@@ -1,6 +1,6 @@
 # Routing catalog: `domains`
 
-- Generated (UTC): 2026-08-22T06:08:45Z
+- Generated (UTC): 2026-08-22T06:21:11Z
 - Tool version: 0.1.0
 - Files covered: 31
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `77af39c4f48ed1872bc8aee884b47866cc5896647bdbd27c8e5678467294a3cb`
@@ -485,7 +485,7 @@
 
 ## Omitted from this catalog (size limit reached)
 
-15 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
+15 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
 
 - `domains/materials.py`
 - `domains/object_styles.py`
@@ -496,10 +496,4 @@
 - `domains/units.py`
 - `domains/view_category_overrides.py`
 - `domains/view_category_overrides_annotation.py`
-- `domains/view_category_overrides_model.py`
-- `domains/view_filter_applications_view_templates.py`
-- `domains/view_filter_definitions.py`
-- `domains/view_templates.py`
-- `domains/wall_types.py`
-- `domains/worksets.py`
 

@@ -1,6 +1,6 @@
 # Routing catalog: `tools/join_key_discovery`
 
-- Generated (UTC): 2026-08-22T06:08:45Z
+- Generated (UTC): 2026-08-22T06:21:11Z
 - Tool version: 0.1.0
 - Files covered: 3
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `3f7a7595c7af5316e8d0b792528f0c1e6d35b1d13a241b96982f88d98812a57c`

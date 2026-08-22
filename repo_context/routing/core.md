@@ -1,6 +1,6 @@
 # Routing catalog: `core`
 
-- Generated (UTC): 2026-08-22T06:08:45Z
+- Generated (UTC): 2026-08-22T06:21:11Z
 - Tool version: 0.1.0
 - Files covered: 25
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `95ded63fe541519763c99967adc6f97648d4e96457f54cb1a76ee6b91f78c293`
@@ -432,22 +432,4 @@
   - `tests/test_object_styles_canonical_selectors.py`
   - `tests/test_phase_filters_canonical_selectors.py`
 - Retrieval identity: sha256=`ccdf5160115495da…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `core/hashing.py`)
-
-## Omitted from this catalog (size limit reached)
-
-13 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
-
-- `core/join_key_builder.py`
-- `core/join_key_policy.py`
-- `core/manifest.py`
-- `core/name_key_builder.py`
-- `core/name_key_coverage.py`
-- `core/naming.py`
-- `core/phase2.py`
-- `core/record_v2.py`
-- `core/rows.py`
-- `core/sig_hash_builder.py`
-- `core/sig_hash_policy.py`
-- `core/timing_collector.py`
-- `core/vg_sig.py`
 

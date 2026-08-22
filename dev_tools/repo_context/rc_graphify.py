@@ -47,6 +47,17 @@ def load_graphify_communities(root: Path, current_commit: Optional[str],
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         return {}, [f"graphify-out/graph.json could not be read/parsed ({exc}); Graphify routing evidence omitted."]
 
+    if not isinstance(data, dict):
+        # Valid JSON but the wrong shape (e.g. a bare list or scalar) --
+        # since routing loads Graphify during a normal `scan`, letting
+        # `.get()` raise AttributeError here would crash the whole scan
+        # over one optional, malformed artifact instead of just treating
+        # it as unavailable evidence like any other bad graph.json.
+        return {}, [
+            "graphify-out/graph.json is not a JSON object at its top level; Graphify routing/expansion "
+            "evidence is omitted (the file is malformed, not just stale)."
+        ]
+
     built_at_commit = data.get("built_at_commit")
     if not built_at_commit:
         return {}, [

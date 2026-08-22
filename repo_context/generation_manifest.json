@@ -7,22 +7,26 @@
     "redact_secrets": true
   },
   "counts": {
-    "calls": 51993,
+    "calls": 52044,
     "chunked_files": 45,
     "chunks": 1429,
     "entrypoint_candidates": 103,
-    "excluded_directories": 5,
+    "excluded_directories": 7,
     "files_excluded": 0,
     "files_included": 670,
-    "imports": 4688,
+    "imports": 4690,
     "parse_failures": 0,
     "python_files": 386,
-    "symbols": 5162
+    "symbols": 5166
   },
   "exclude_dir_names_default_count": null,
   "excluded_directories_sample": [
     {
       "path": ".git",
+      "reason": "excluded_directory_name"
+    },
+    {
+      "path": ".pytest_cache",
       "reason": "excluded_directory_name"
     },
     {
@@ -40,9 +44,13 @@
     {
       "path": "repo_context",
       "reason": "output_directory"
+    },
+    {
+      "path": "tests/__pycache__",
+      "reason": "excluded_directory_name"
     }
   ],
-  "generated_at_utc": "2026-08-22T06:08:45Z",
+  "generated_at_utc": "2026-08-22T06:21:11Z",
   "incremental": {
     "chunks_regenerated_for_files": 45,
     "chunks_reused_for_files": 0,

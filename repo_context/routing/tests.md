@@ -1,6 +1,6 @@
 # Routing catalog: `tests`
 
-- Generated (UTC): 2026-08-22T06:08:45Z
+- Generated (UTC): 2026-08-22T06:21:11Z
 - Tool version: 0.1.0
 - Files covered: 107
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
@@ -363,7 +363,7 @@
 
 ## Omitted from this catalog (size limit reached)
 
-96 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
+96 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
 
 - `tests/test_compare_cross_segment_comparison_registry.py`
 - `tests/test_compare_cross_segment_cross_client.py`
@@ -375,25 +375,4 @@
 - `tests/test_compound_types_wall.py`
 - `tests/test_contracts_bounded_errors.py`
 - `tests/test_contracts_run_status.py`
-- `tests/test_deployment_config.py`
-- `tests/test_deps_require_domain.py`
-- `tests/test_dimension_types_placeholder_fields.py`
-- `tests/test_dimension_types_shape_gating.py`
-- `tests/test_discover_hash_policy.py`
-- `tests/test_discover_join_policy_verification.py`
-- `tests/test_discover_vfd_edges.py`
-- `tests/test_dynamo_bootstrap.py`
-- `tests/test_enterprise_policy.py`
-- `tests/test_export_bundle_pattern_detail_quality_resolution.py`
-- `tests/test_export_layer_stacks.py`
-- `tests/test_extractor_unit_system.py`
-- `tests/test_fill_patterns_canonical_selectors.py`
-- `tests/test_fill_patterns_is_import_coercion.py`
-- `tests/test_fingerprint_export_discovery.py`
-- `tests/test_generate_governance_narrative_bc_client_sections.py`
-- `tests/test_generate_governance_narrative_brief.py`
-- `tests/test_generate_governance_narrative_classification.py`
-- `tests/test_generate_governance_narrative_comparison_registry.py`
-- `tests/test_generate_governance_narrative_evidence_package.py`
-- ... and 66 more (not listed here; see `file_inventory.csv` or `routing/routing_manifest.json`)
 

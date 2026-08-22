@@ -1,6 +1,6 @@
 # Routing catalog: `tools/probes`
 
-- Generated (UTC): 2026-08-22T06:08:45Z
+- Generated (UTC): 2026-08-22T06:21:11Z
 - Tool version: 0.1.0
 - Files covered: 33
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `764135461a8a642b2f798a2b03eb1cb4bd5bd2629b37925ce66714173e6ad324`
@@ -441,7 +441,7 @@
 
 ## Omitted from this catalog (size limit reached)
 
-21 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
+21 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
 
 - `tools/probes/probe_floor_types.py`
 - `tools/probes/probe_identity.py`
@@ -463,5 +463,4 @@
 - `tools/probes/probe_views.py`
 - `tools/probes/probe_wall_types.py`
 - `tools/probes/probe_worksets.py`
-- `tools/probes/sweep_line_pattern_normhash_precision.py`
 

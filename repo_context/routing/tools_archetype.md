@@ -1,6 +1,6 @@
 # Routing catalog: `tools/archetype`
 
-- Generated (UTC): 2026-08-22T06:08:45Z
+- Generated (UTC): 2026-08-22T06:21:11Z
 - Tool version: 0.1.0
 - Files covered: 19
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `c5dfc15c8ac63c3bd8e5c140c081e69d97eb5fb91d4f2ed43f57ac619d6f3163`
@@ -404,13 +404,4 @@
 - Related tests:
   - (none found via resolved imports/calls)
 - Retrieval identity: sha256=`b76d87a0285ec563…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/shared_param_names.json`)
-
-## Omitted from this catalog (size limit reached)
-
-4 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
-
-- `tools/archetype/review/select_archetype_review_files.py`
-- `tools/archetype/validate_archetype_signals.py`
-- `tools/archetype/vfd_bip_target_domain_hints.json`
-- `tools/archetype/vfd_category_domain_map.json`
 

@@ -1,6 +1,6 @@
 # Routing catalog: `archived`
 
-- Generated (UTC): 2026-08-22T06:08:45Z
+- Generated (UTC): 2026-08-22T06:21:11Z
 - Tool version: 0.1.0
 - Files covered: 35
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `a10201250a29a18d2265a41f13d9edd500558df3e37d62b9f0c989d241809fc3`
@@ -394,28 +394,11 @@
 
 ## Omitted from this catalog (size limit reached)
 
-22 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
+22 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
 
 - `tools/patterns_analysis/_archive/intradomain_summary.py`
 - `tools/patterns_analysis/_archive/io.py`
 - `tools/patterns_analysis/_archive/pareto_join_keys_by_ids.py`
 - `tools/patterns_analysis/_archive/pareto_with_splits.py`
 - `tools/patterns_analysis/_archive/report.py`
-- `tools/patterns_analysis/_archive/run_attribute_stress.py`
-- `tools/patterns_analysis/_archive/run_attribute_stress_all_joinable.py`
-- `tools/patterns_analysis/_archive/run_candidate_joinkey_simulation.py`
-- `tools/patterns_analysis/_archive/run_change_type.py`
-- `tools/patterns_analysis/_archive/run_collision_differencing.py`
-- `tools/patterns_analysis/_archive/run_dimension_types_by_family.py`
-- `tools/patterns_analysis/_archive/run_identity_collision_diagnostics.py`
-- `tools/patterns_analysis/_archive/run_joinhash_label_population.py`
-- `tools/patterns_analysis/_archive/run_joinhash_parameter_population.py`
-- `tools/patterns_analysis/_archive/run_population_stability.py`
-- `tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py`
-- `tools/patterns_analysis/_archive/run_view_category_overrides_joinkey_analysis.py`
-- `tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py`
-- `tools/patterns_analysis/_archive/split_detection.py`
-- `tools/patterns_analysis/_archive/split_detection_element_level.py`
-- `tools/patterns_analysis/_archive/split_detection_file_level.py`
-- `tools/patterns_analysis/_archive/stability.py`
 

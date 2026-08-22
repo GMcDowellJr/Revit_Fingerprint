@@ -229,7 +229,7 @@
         "dev_tools/repo_context/examples/packet_request.invalid_ambiguous_line_range.json",
         "dev_tools/repo_context/examples/packet_request.invalid_empty_selectors.json"
       ],
-      "source_hash": "4a39c0287ad42fe757441f015dc1ac7124891febcdbaa3b1ad5db5e06ee1033d",
+      "source_hash": "ea34227389b7707664f24b24db5f603e4175df4fa4acc2b3f9ebb3a6da891407",
       "symbol_count": 149
     },
     {
@@ -685,8 +685,8 @@
         "dev_tools/repo_context/tests/test_chunking.py",
         "dev_tools/repo_context/tests/test_determinism_incremental.py"
       ],
-      "source_hash": "cf69da7bbef0dd0564348f6321b8b55465d841f61f827b26b2d9afb8b2c3c9e2",
-      "symbol_count": 177
+      "source_hash": "6958e5c0ef14b6bc97d44c7c815cadba6023503e8c20226fb0a5d8de84b68b27",
+      "symbol_count": 181
     },
     {
       "file_count": 4,
@@ -1002,14 +1002,14 @@
       "symbol_count": 8
     }
   ],
-  "generated_at_utc": "2026-08-22T06:08:45Z",
+  "generated_at_utc": "2026-08-22T06:21:11Z",
   "git": {
     "available": true,
-    "commit": "0e2e08aa53087bfef76417a862dc040c7a837a3d",
+    "commit": "f15e9a3fef1b86b73f3c0fb3097ece7fbcbd5bf2",
     "dirty": true
   },
   "graphify_warnings": [
-    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit 0e2e08aa5308; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
+    "graphify-out/graph.json was built at commit 28ef09a287a6, which does not match the current scan's HEAD commit f15e9a3fef1b; Graphify-derived routing/expansion evidence omitted by default (revision alignment could not be proven)."
   ],
   "options": {
     "allow_stale_graphify": false,
@@ -1018,6 +1018,6 @@
     "max_index_chars": 10000,
     "max_symbols_per_file_entry": 25
   },
-  "source_manifest_hash": "6bab822e4cbbe07990d4d8e629b88439b35fd4711b746154f4fa55582278c597",
+  "source_manifest_hash": "bfc5ab2d1c6c188ea0b8d4a3c69ebbed4a1c3ab9bbed7dd32d486e452b90e2a9",
   "tool_version": "0.1.0"
 }

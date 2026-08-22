@@ -1,6 +1,6 @@
 # Routing catalog: `reference/revit_lookup/Descriptors`
 
-- Generated (UTC): 2026-08-22T06:08:45Z
+- Generated (UTC): 2026-08-22T06:21:11Z
 - Tool version: 0.1.0
 - Files covered: 117
 - Catalog source hash (sha256 of sorted `path:sha256` pairs): `73286f15c7446874bf38a37db55ee3a6e59bccd80d6ea13838d8e8094c2403b9`
@@ -428,7 +428,7 @@
 
 ## Omitted from this catalog (size limit reached)
 
-89 file(s) in this partition are not detailed above because this catalog reached its configured `--routing-max-catalog-chars` limit (24000). They are still covered by `file_inventory.csv` / `python_symbols.csv`; request them directly by path in a `packet_request.json`:
+89 file(s) omitted; see `file_inventory.csv` / `routing/routing_manifest.json` for the complete list.
 
 - `reference/revit_lookup/Descriptors/DependencyObjectDescriptor.cs`
 - `reference/revit_lookup/Descriptors/DisposableDescriptor.cs`
@@ -437,28 +437,4 @@
 - `reference/revit_lookup/Descriptors/DuctDescriptor.cs`
 - `reference/revit_lookup/Descriptors/EdgeDescriptor.cs`
 - `reference/revit_lookup/Descriptors/EdgeEndPointDescriptor.cs`
-- `reference/revit_lookup/Descriptors/ElementDescriptor.cs`
-- `reference/revit_lookup/Descriptors/ElementIdDescriptor.cs`
-- `reference/revit_lookup/Descriptors/ElementTypeDescriptor.cs`
-- `reference/revit_lookup/Descriptors/ElevationMarkerDescriptor.cs`
-- `reference/revit_lookup/Descriptors/EntityDescriptor.cs`
-- `reference/revit_lookup/Descriptors/EnumerableDescriptor.cs`
-- `reference/revit_lookup/Descriptors/EnumeratorDescriptor.cs`
-- `reference/revit_lookup/Descriptors/EvaluatedParameterDescriptor.cs`
-- `reference/revit_lookup/Descriptors/ExternalDefinitionDescriptor.cs`
-- `reference/revit_lookup/Descriptors/ExternalResourceReferenceDescriptor.cs`
-- `reference/revit_lookup/Descriptors/ExternalResourceTypeDescriptor.cs`
-- `reference/revit_lookup/Descriptors/ExternalServiceDescriptor.cs`
-- `reference/revit_lookup/Descriptors/FaceDescriptor.cs`
-- `reference/revit_lookup/Descriptors/FailureDefinitionAccessorDescriptor.cs`
-- `reference/revit_lookup/Descriptors/FailureMessageDescriptor.cs`
-- `reference/revit_lookup/Descriptors/FamilyDescriptor.cs`
-- `reference/revit_lookup/Descriptors/FamilyInstanceDescriptor.cs`
-- `reference/revit_lookup/Descriptors/FamilyManagerDescriptor.cs`
-- `reference/revit_lookup/Descriptors/FamilyParameterDescriptor.cs`
-- `reference/revit_lookup/Descriptors/FamilySizeTableColumnDescriptor.cs`
-- `reference/revit_lookup/Descriptors/FamilySizeTableDescriptor.cs`
-- `reference/revit_lookup/Descriptors/FamilySizeTableManagerDescriptor.cs`
-- `reference/revit_lookup/Descriptors/FamilySymbolDescriptor.cs`
-- ... and 59 more (not listed here; see `file_inventory.csv` or `routing/routing_manifest.json`)
 

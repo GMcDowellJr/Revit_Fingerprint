@@ -1,4 +1,5 @@
 import json
+import time
 
 from conftest import run_tool, write_files  # noqa: F401 -- conftest import also puts TOOL_DIR on sys.path
 import rc_request as rr
@@ -369,6 +370,65 @@ def test_whole_file_symbol_listing_is_charged_against_budget(repo, out):
     assert "Omitted" in text or text.count("(function, lines") <= 300
 
 
+def test_file_inventories_deferred_until_every_explicit_file_renders(repo, out):
+    # Regression: one explicit file selector's "Top-level symbols:"
+    # inventory was still rendered before the *next* explicit file
+    # selector got its guaranteed shot at the budget. With a 30-function
+    # `a.py` selected before a tiny `b.py`, a.py's inventory could consume
+    # enough of a tight-but-otherwise-sufficient budget that b.py's own
+    # excerpt no longer fit -- reversing the selector order changed the
+    # outcome under the same limit, which is exactly the ordering-
+    # dependence this fix removes (every file's excerpt must render before
+    # *any* file's inventory spends a char).
+    n = 60
+    lines = [f"def f_{i:03d}(): pass" for i in range(n)]
+    write_files(repo, {
+        "a.py": "\n".join(lines) + "\n",
+        "b.py": "def tiny():\n    return 1\n",
+    })
+    _scan(repo, out)
+
+    no_expansion = {"include_callers": False, "include_callees": False, "include_imports": False,
+                    "include_related_tests": False, "include_graphify": False}
+    generous_req = _request(out, "generous.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["a.py", "b.py"], "symbols": [], "search_terms": [], "lines": []},
+        "expansion": no_expansion,
+        "limits": {"max_estimated_tokens": 200000, "max_files": 12},
+    })
+    generous_result = _packet(repo, out, generous_req)
+    assert generous_result.returncode == 0, generous_result.stderr
+    full_text = (out / "packets" / "packet_generous.md").read_text(encoding="utf-8")
+    listing_lines = [l for l in full_text.splitlines() if "(function, lines" in l]
+    assert len(listing_lines) == n + 1  # a.py's n functions plus b.py's own single "tiny" entry
+    listing_chars = sum(len(l) for l in listing_lines) + len("Top-level symbols:")
+    full_tokens = json.loads(
+        (out / "packets" / "packet_generous.resolution.json").read_text(encoding="utf-8")
+    )["estimated_tokens_used"]
+
+    # Cut roughly half of a.py's inventory worth of room from the fully-
+    # fitting total -- still comfortably enough for both files' headers +
+    # excerpts (which this bug never touched), but not enough for a.py's
+    # full inventory too.
+    constrained_tokens = full_tokens - (listing_chars // 2 // 4)
+
+    req = _request(out, "req.json", {
+        "schema_version": "1.0", "question": "q",
+        "selectors": {"files": ["a.py", "b.py"], "symbols": [], "search_terms": [], "lines": []},
+        "expansion": no_expansion,
+        "limits": {"max_estimated_tokens": constrained_tokens, "max_files": 12},
+    })
+    result = _packet(repo, out, req)
+    assert result.returncode == 0, result.stderr
+    text = (out / "packets" / "packet_req.md").read_text(encoding="utf-8")
+    # b.py's mandatory excerpt (a *later* explicit selector) must render
+    # regardless of a.py's inventory being tight.
+    assert "def tiny():" in text
+    assert "def f_000(): pass" in text  # a.py's own excerpt still renders in full too
+    listing_lines_constrained = [l for l in text.splitlines() if "(function, lines" in l]
+    assert len(listing_lines_constrained) < n  # a.py's inventory got truncated instead
+
+
 def test_explicit_file_excerpt_renders_before_optional_symbol_inventory(repo, out):
     # Regression: the file explicit-selector loop spent budget on the
     # "Top-level symbols:" inventory listing *before* rendering the file's
@@ -498,6 +558,36 @@ def test_pathological_regex_search_term_times_out_instead_of_hanging(repo, out, 
     resolutions2, matches_by_term2, _ = rr.resolve_search_terms(repo, ["a{3}"], True, files_rows)
     assert resolutions2[0].status == "resolved"
     assert matches_by_term2["a{3}"]
+
+
+def test_aggregate_regex_search_time_is_capped_across_all_terms(repo, out, monkeypatch):
+    # Regression: the per-term SIGALRM bound stops any *one* pathological
+    # pattern from hanging forever, but the schema places no cap on how
+    # many search_terms a request can carry -- a request with several
+    # distinct catastrophic-backtracking patterns could still burn a full
+    # per-term allowance for *each one* before packet budgeting even
+    # began. Three terms each requesting up to 1.0s, under a 1.5s
+    # aggregate cap, must finish in well under 3.0s total, with the terms
+    # beyond the aggregate deadline reported as skipped rather than each
+    # getting their own fresh timeout.
+    monkeypatch.setattr(rr, "_REGEX_SEARCH_TIMEOUT_SECONDS", 1.0)
+    monkeypatch.setattr(rr, "_REGEX_SEARCH_TOTAL_TIMEOUT_SECONDS", 1.5)
+    write_files(repo, {"core/a.py": "x = '" + "a" * 35 + "!'\n"})
+    _scan(repo, out)
+    files_rows = rr._load_csv(out / "file_inventory.csv")
+    start = time.monotonic()
+    # Three distinct-looking patterns, all pathological against the same
+    # run of `a` characters (a term repeated verbatim would risk being
+    # deduplicated by a caller upstream of this function; these aren't).
+    resolutions, matches_by_term, _ = rr.resolve_search_terms(
+        repo, ["(a+)+$", "(a+)*$", "(a|aa)+$"], True, files_rows,
+    )
+    elapsed = time.monotonic() - start
+    assert elapsed < 2.5  # comfortably bounded, not the ~3.0s+ three full per-term timeouts would take
+    assert all(r.status == "invalid" for r in resolutions)
+    # At least the last term must be skipped outright by the aggregate
+    # deadline rather than getting its own fresh per-term timeout.
+    assert any("aggregate" in r.detail for r in resolutions)
 
 
 def test_graphify_peer_listing_respects_max_files(repo, out):

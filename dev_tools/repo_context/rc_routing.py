@@ -314,7 +314,15 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
                 sorted(called_by_file.get(rel, ())), sorted(tests_by_target.get(rel, ())),
                 communities_by_file.get(rel, []), routing_opts.max_symbols_per_file_entry,
             )
-            if body_len + len(block) > routing_opts.max_catalog_chars:
+            # Blocks are joined with "\n".join() below, which inserts one
+            # extra separator character before every block after the
+            # first -- account for that here too, or body_len silently
+            # undercounts the real assembled length by (len(blocks) - 1)
+            # characters, letting the packed text end up a few characters
+            # over max_catalog_chars even when every individual decision
+            # above looked like it fit.
+            join_cost = 1 if blocks else 0
+            if body_len + join_cost + len(block) > routing_opts.max_catalog_chars:
                 if blocks:
                     omitted_paths.append(rel)
                     continue
@@ -333,32 +341,62 @@ def generate_routing(root: Path, output_dir: Path, result, routing_opts: Routing
                 body_len += len(minimal)
                 continue
             blocks.append(block)
-            body_len += len(block)
+            body_len += join_cost + len(block)
 
         text = header + "\n".join(blocks)
+        # The header above is fixed, mandatory framing (revision/hash
+        # provenance) that always renders in full regardless of the
+        # configured cap -- but the appendix below is optional annotation,
+        # same as everything else optional in this tool, and must respect
+        # whatever budget is actually left. Previously it was appended
+        # unconditionally with no size accounting at all, so a very small
+        # --routing-max-catalog-chars (e.g. 100) still produced output far
+        # larger than the cap once the header and appendix's own fixed
+        # framing text were added on top of it.
+        #
+        # Split into a short, near-mandatory notice (just the count and
+        # where to look) and an optional, further-bounded detailed sample
+        # list -- a full explanatory paragraph for *every* catalog that
+        # omits anything would itself often not fit within a realistic
+        # (not absurdly tiny) cap, silently losing even the fact that
+        # omission happened.
         if omitted_paths:
-            # Bounded regardless of how many files were omitted -- listing
-            # every single one here (a partition can have hundreds) would
-            # itself defeat --routing-max-catalog-chars, the exact limit
-            # this appendix exists to respect. A capped sample is enough
-            # to show the shape; the full list already lives in
-            # file_inventory.csv (filtered to this directory) and the
-            # per-catalog manifest entry.
-            omitted_sample_cap = 30
-            text += (
+            remaining = routing_opts.max_catalog_chars - len(text)
+            short_notice = (
                 f"\n## Omitted from this catalog (size limit reached)\n\n"
-                f"{len(omitted_paths)} file(s) in this partition are not detailed above because this "
-                f"catalog reached its configured `--routing-max-catalog-chars` limit "
-                f"({routing_opts.max_catalog_chars}). They are still covered by `file_inventory.csv` / "
-                f"`python_symbols.csv`; request them directly by path in a `packet_request.json`:\n\n"
+                f"{len(omitted_paths)} file(s) omitted; see `file_inventory.csv` / "
+                f"`routing/routing_manifest.json` for the complete list.\n"
             )
-            for p in omitted_paths[:omitted_sample_cap]:
-                text += f"- `{p}`\n"
-            if len(omitted_paths) > omitted_sample_cap:
-                text += (
-                    f"- ... and {len(omitted_paths) - omitted_sample_cap} more (not listed here; see "
-                    f"`file_inventory.csv` or `routing/routing_manifest.json`)\n"
-                )
+            if len(short_notice) <= remaining:
+                text += short_notice
+                remaining -= len(short_notice)
+                # Bounded regardless of how many files were omitted --
+                # listing every single one here (a partition can have
+                # hundreds) would itself defeat --routing-max-catalog-chars.
+                # A capped sample is enough to show the shape; the full
+                # list already lives in file_inventory.csv (filtered to
+                # this directory) and the per-catalog manifest entry.
+                omitted_sample_cap = 30
+                sample = ""
+                shown = 0
+                for p in omitted_paths[:omitted_sample_cap]:
+                    line = f"- `{p}`\n"
+                    if len(line) > remaining:
+                        break
+                    sample += line
+                    remaining -= len(line)
+                    shown += 1
+                not_shown = len(omitted_paths) - shown
+                if not_shown > 0 and shown > 0:
+                    trailer = f"- ... and {not_shown} more (not listed here)\n"
+                    if len(trailer) <= remaining:
+                        sample += trailer
+                if sample:
+                    text += f"\n{sample}"
+            # else: not even the short notice fits -- omit the appendix
+            # entirely rather than force it in over budget. The complete
+            # omitted-path list is still in routing_manifest.json's
+            # per-catalog omitted_paths.
         atomic_write_text(routing_dir / filename, text + "\n")
 
         by_role = Counter(roles[f.relative_path] for f in cat_files)
