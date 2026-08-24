@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Dict, List, Sequence
 
 try:
-    from tools.join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate
+    from tools.join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate, summarize_shape_gate_usage
     from tools.join_key_discovery.greedy import discover_greedy
 except ModuleNotFoundError:
-    from join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate
+    from join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate, summarize_shape_gate_usage
     from join_key_discovery.greedy import discover_greedy
 
 
@@ -505,6 +505,11 @@ def main() -> None:
         opt = normalized["optional_items"]
         excluded = set(normalized["explicitly_excluded_items"])
         gates = normalized["gates"]
+        gate_cfg = {"required_fields": req, **gates}
+        shape_gate_summary_sample = summarize_shape_gate_usage(dom_records, identity_index, req, gate_cfg)
+        shape_gate_summary_full = summarize_shape_gate_usage(dom_records_all, identity_index, req, gate_cfg)
+        shape_gate_summary_json = json.dumps(shape_gate_summary_sample, sort_keys=True, separators=(",", ":"))
+        shape_gate_summary_full_json = json.dumps(shape_gate_summary_full, sort_keys=True, separators=(",", ":"))
         scoped_candidates = _without_excluded(candidate_fields, excluded)
 
         # Required fields that never appear anywhere in this domain's populated
@@ -580,6 +585,12 @@ def main() -> None:
                     "excluded_count": str(len(excluded)),
                     "excluded_items": "|".join(sorted(excluded)),
                     "stratify_by": stratify_key,
+                    "policy_shape_gate_enabled": "true" if shape_gate_summary_sample.get("enabled") else "false",
+                    "policy_shape_gate_discriminator_key": str(shape_gate_summary_sample.get("discriminator_key", "")),
+                    "policy_shape_gate_summary_json": shape_gate_summary_json,
+                    "policy_shape_gate_summary_full_json": shape_gate_summary_full_json,
+                    "policy_shape_gate_missing_required_sample": str(shape_gate_summary_sample.get("records_missing_required", 0)),
+                    "policy_shape_gate_missing_required_full": str(shape_gate_summary_full.get("records_missing_required", 0)),
                     "coverage_full": "0",
                     "collision_rate_full": "1",
                     "fragmentation_rate_full": "1",
@@ -719,6 +730,12 @@ def main() -> None:
                     "excluded_count": str(len(excluded)),
                     "excluded_items": "|".join(sorted(excluded)),
                     "stratify_by": stratify_key,
+                    "policy_shape_gate_enabled": "true" if shape_gate_summary_sample.get("enabled") else "false",
+                    "policy_shape_gate_discriminator_key": str(shape_gate_summary_sample.get("discriminator_key", "")),
+                    "policy_shape_gate_summary_json": shape_gate_summary_json,
+                    "policy_shape_gate_summary_full_json": shape_gate_summary_full_json,
+                    "policy_shape_gate_missing_required_sample": str(shape_gate_summary_sample.get("records_missing_required", 0)),
+                    "policy_shape_gate_missing_required_full": str(shape_gate_summary_full.get("records_missing_required", 0)),
                     "coverage_full": f"{float(metrics_full.get('coverage', 0.0)):.6f}",
                     "collision_rate_full": f"{float(metrics_full.get('collision_rate', 1.0)):.6f}",
                     "fragmentation_rate_full": f"{float(metrics_full.get('fragmentation_rate', 1.0)):.6f}",
@@ -807,6 +824,9 @@ def main() -> None:
         "records_total", "records_covered", "collision_records", "fragmented_sig_count", "join_group_count", "hhi", "effective_cluster_count", "failures_json", "frontier_size", "fallback_used",
         "required_count", "required_fields", "optional_count", "optional_items", "excluded_count", "excluded_items",
         "stratify_by",
+        "policy_shape_gate_enabled", "policy_shape_gate_discriminator_key",
+        "policy_shape_gate_summary_json", "policy_shape_gate_summary_full_json",
+        "policy_shape_gate_missing_required_sample", "policy_shape_gate_missing_required_full",
         "coverage_full", "collision_rate_full", "fragmentation_rate_full", "records_total_full", "records_covered_full",
         "collision_records_full", "fragmented_sig_count_full", "join_group_count_full", "hhi_full", "effective_cluster_count_full",
         "full_verify_status", "sample_vs_full_diverges",
