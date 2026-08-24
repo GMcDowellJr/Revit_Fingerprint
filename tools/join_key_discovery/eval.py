@@ -107,6 +107,7 @@ def build_candidate_join_key_with_details(
     shape_value = ""
     shape_matched = False
     additional_required: List[str] = []
+    additional_optional: List[str] = []
     if disc_key and row_items.get(disc_key):
         shape_value = row_items[disc_key][1]
         shape_requirements = gates.get("shape_requirements") if isinstance(gates.get("shape_requirements"), dict) else {}
@@ -114,6 +115,13 @@ def build_candidate_join_key_with_details(
         if isinstance(shape_cfg, dict):
             shape_matched = True
             additional_required = [str(f).strip() for f in (shape_cfg.get("additional_required") or []) if str(f).strip()]
+            # Informational only: additional_optional does not participate in required/
+            # selected/hash composition here (discovery's candidate-key model, unlike
+            # core/join_key_builder.py's production build_join_key_from_policy(), only
+            # ever searches/scores over required fields). Surfaced in `details` purely
+            # so summarize_shape_gate_usage() can report it -- previously invisible to
+            # any audit even though core/join_key_builder.py already honors it.
+            additional_optional = [str(f).strip() for f in (shape_cfg.get("additional_optional") or []) if str(f).strip()]
 
     required = sorted(set(base_required + additional_required), key=lambda s: s.lower())
     selected: List[Dict[str, str]] = []
@@ -129,6 +137,7 @@ def build_candidate_join_key_with_details(
     details = {
         "effective_required_fields": required,
         "missing_required_fields": sorted(missing, key=str.lower),
+        "effective_optional_fields": sorted(set(additional_optional), key=str.lower),
         "discriminator_key": disc_key,
         "discriminator_value": shape_value,
         "shape_matched": shape_matched,
@@ -150,6 +159,76 @@ def build_candidate_join_key(
     status, selected, reason, _details = build_candidate_join_key_with_details(identity_items_by_record, record_pk, selected_fields, gates)
     return status, selected, reason
 
+
+
+def summarize_shape_gate_usage(
+    records: Sequence[Dict[str, str]],
+    identity_items_by_record: Dict[str, Dict[str, Tuple[str, str]]],
+    selected_fields: Sequence[str],
+    gates: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Audit effective join-key fields for every observed shape-gate value."""
+    gates = gates or {}
+    discriminator_key = _norm(gates.get("discriminator_key"))
+    shape_requirements = gates.get("shape_requirements") if isinstance(gates.get("shape_requirements"), dict) else {}
+    out: Dict[str, Any] = {
+        "enabled": bool(discriminator_key),
+        "discriminator_key": discriminator_key,
+        "default_shape_behavior": _norm(gates.get("default_shape_behavior")) or "common_only",
+        "configured_shape_values": sorted((str(k) for k in shape_requirements), key=str.lower),
+        "records_total": len(records),
+        "records_missing_discriminator": 0,
+        "records_missing_required": 0,
+        "matched_records": 0,
+        "unmatched_records": 0,
+        "shapes": [],
+    }
+    if not discriminator_key:
+        return out
+    by_shape: Dict[str, Dict[str, Any]] = {}
+    for row in sorted(records, key=lambda r: (_norm(r.get("record_pk")), _norm(r.get("file_id")))):
+        record_pk = _norm(row.get("record_pk"))
+        row_items = identity_items_by_record.get(record_pk, {})
+        discriminator = row_items.get(discriminator_key)
+        shape_value = discriminator[1] if discriminator else ""
+        if not shape_value:
+            out["records_missing_discriminator"] += 1
+            shape_value = "**missing_discriminator**"
+        status, _items, _reason, details = build_candidate_join_key_with_details(
+            identity_items_by_record, record_pk, selected_fields, gates
+        )
+        matched = bool(details.get("shape_matched"))
+        out["matched_records" if matched else "unmatched_records"] += 1
+        if status == "missing_required":
+            out["records_missing_required"] += 1
+        bucket = by_shape.setdefault(shape_value, {
+            "shape_value": shape_value,
+            "shape_matched": matched,
+            "records": 0,
+            "records_missing_required": 0,
+            "effective_required_fields": set(),
+            "missing_required_fields": set(),
+            "effective_optional_fields": set(),
+        })
+        bucket["records"] += 1
+        bucket["shape_matched"] = bucket["shape_matched"] or matched
+        if status == "missing_required":
+            bucket["records_missing_required"] += 1
+        bucket["effective_required_fields"].update(str(v) for v in details.get("effective_required_fields", []) if str(v))
+        bucket["missing_required_fields"].update(str(v) for v in details.get("missing_required_fields", []) if str(v))
+        bucket["effective_optional_fields"].update(str(v) for v in details.get("effective_optional_fields", []) if str(v))
+    for shape_value in sorted(by_shape, key=str.lower):
+        bucket = by_shape[shape_value]
+        out["shapes"].append({
+            "shape_value": bucket["shape_value"],
+            "shape_matched": bool(bucket["shape_matched"]),
+            "records": int(bucket["records"]),
+            "records_missing_required": int(bucket["records_missing_required"]),
+            "effective_required_fields": sorted(bucket["effective_required_fields"], key=str.lower),
+            "missing_required_fields": sorted(bucket["missing_required_fields"], key=str.lower),
+            "effective_optional_fields": sorted(bucket["effective_optional_fields"], key=str.lower),
+        })
+    return out
 
 def score_candidate(
     records: Sequence[Dict[str, str]],
