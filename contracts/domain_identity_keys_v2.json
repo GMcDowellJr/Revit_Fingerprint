@@ -70,6 +70,12 @@
         "ct.type_name",
         "ct.coarse_fill_color_rgb"
       ],
+      "sig_hash_schema": "ceiling_types.sig_hash.v1",
+      "sig_hash_keys": [
+        "ct.layer_count",
+        "ct.total_thickness_in",
+        "ct.stack_hash_loose"
+      ],
       "minima": {
         "block_if_any_required_not_ok": true
       }
@@ -653,6 +659,12 @@
         "ft.type_name",
         "ft.coarse_fill_color_rgb"
       ],
+      "sig_hash_schema": "floor_types.sig_hash.v1",
+      "sig_hash_keys": [
+        "ft.layer_count",
+        "ft.total_thickness_in",
+        "ft.stack_hash_loose"
+      ],
       "minima": {
         "block_if_any_required_not_ok": true
       }
@@ -1000,6 +1012,12 @@
         "rt.type_name",
         "rt.coarse_fill_color_rgb"
       ],
+      "sig_hash_schema": "roof_types.sig_hash.v1",
+      "sig_hash_keys": [
+        "rt.layer_count",
+        "rt.total_thickness_in",
+        "rt.stack_hash_loose"
+      ],
       "minima": {
         "block_if_any_required_not_ok": true
       }
@@ -1339,6 +1357,15 @@
         "wt.has_embedded_sweeps",
         "wt.type_name",
         "wt.coarse_fill_color_rgb"
+      ],
+      "sig_hash_schema": "wall_types.sig_hash.v1",
+      "sig_hash_keys": [
+        "wt.function",
+        "wt.layer_count",
+        "wt.total_thickness_in",
+        "wt.stack_hash_loose",
+        "wt.wraps_at_inserts",
+        "wt.wraps_at_ends"
       ],
       "minima": {
         "block_if_any_required_not_ok": true

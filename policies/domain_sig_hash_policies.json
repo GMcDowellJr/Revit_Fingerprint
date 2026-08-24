@@ -65,13 +65,7 @@
       "allowed_items": [
         "ct.layer_count",
         "ct.total_thickness_in",
-        "ct.stack_hash_loose",
-        "ct.total_layer_rows",
-        "ct.stack_hash_strict",
-        "ct.stack_hash_function_only",
-        "ct.coarse_fill_pattern_sig_hash",
-        "ct.type_name",
-        "ct.coarse_fill_color_rgb"
+        "ct.stack_hash_loose"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -79,7 +73,15 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "allowed_items narrowed to contracts/domain_identity_keys_v2.json's sig_hash_keys override",
+        "(D-039): the compound_types extractor (domains/ceiling_types.py) already hashes only this",
+        "3-key 'semantic' bucket inline (ct.type_name/ct.coarse_fill_color_rgb are cosmetic,",
+        "ct.total_layer_rows/ct.stack_hash_strict/ct.stack_hash_function_only/",
+        "ct.coarse_fill_pattern_sig_hash are coordination) -- prior allowed_items mechanically",
+        "mirrored the full identity_basis.items set (no sig_hash_keys override existed yet),",
+        "which meant a post-stage sig_hash recompute would have hashed the type's own display",
+        "name into sig_hash, unlike the extractor's own inline value. See CHANGELOG.md."
       ],
       "required_items": [
         "ct.layer_count",
@@ -522,17 +524,9 @@
     "floor_types": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "ft.function",
         "ft.layer_count",
         "ft.total_thickness_in",
-        "ft.stack_hash_loose",
-        "ft.total_layer_rows",
-        "ft.stack_hash_strict",
-        "ft.stack_hash_function_only",
-        "ft.coarse_fill_pattern_sig_hash",
-        "ft.has_embedded_sweeps",
-        "ft.type_name",
-        "ft.coarse_fill_color_rgb"
+        "ft.stack_hash_loose"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -540,7 +534,15 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "allowed_items narrowed to contracts/domain_identity_keys_v2.json's sig_hash_keys override",
+        "(D-039): the compound_types extractor (domains/floor_types.py) already hashes only this",
+        "3-key 'semantic' bucket inline (ft.type_name/ft.coarse_fill_color_rgb are cosmetic;",
+        "ft.function/ft.total_layer_rows/ft.stack_hash_strict/ft.stack_hash_function_only/",
+        "ft.coarse_fill_pattern_sig_hash/ft.has_embedded_sweeps are coordination) -- prior",
+        "allowed_items mechanically mirrored the full identity_basis.items set (no sig_hash_keys",
+        "override existed yet), which meant a post-stage sig_hash recompute would have hashed the",
+        "type's own display name into sig_hash, unlike the extractor's own inline value. See CHANGELOG.md."
       ],
       "required_items": [
         "ft.layer_count",
@@ -855,13 +857,7 @@
       "allowed_items": [
         "rt.layer_count",
         "rt.total_thickness_in",
-        "rt.stack_hash_loose",
-        "rt.total_layer_rows",
-        "rt.stack_hash_strict",
-        "rt.stack_hash_function_only",
-        "rt.coarse_fill_pattern_sig_hash",
-        "rt.type_name",
-        "rt.coarse_fill_color_rgb"
+        "rt.stack_hash_loose"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -869,7 +865,15 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "allowed_items narrowed to contracts/domain_identity_keys_v2.json's sig_hash_keys override",
+        "(D-039): the compound_types extractor (domains/roof_types.py) already hashes only this",
+        "3-key 'semantic' bucket inline (rt.type_name/rt.coarse_fill_color_rgb are cosmetic,",
+        "rt.total_layer_rows/rt.stack_hash_strict/rt.stack_hash_function_only/",
+        "rt.coarse_fill_pattern_sig_hash are coordination) -- prior allowed_items mechanically",
+        "mirrored the full identity_basis.items set (no sig_hash_keys override existed yet),",
+        "which meant a post-stage sig_hash recompute would have hashed the type's own display",
+        "name into sig_hash, unlike the extractor's own inline value. See CHANGELOG.md."
       ],
       "required_items": [
         "rt.layer_count",
@@ -1188,15 +1192,7 @@
         "wt.total_thickness_in",
         "wt.stack_hash_loose",
         "wt.wraps_at_inserts",
-        "wt.wraps_at_ends",
-        "wt.kind",
-        "wt.total_layer_rows",
-        "wt.stack_hash_strict",
-        "wt.stack_hash_function_only",
-        "wt.coarse_fill_pattern_sig_hash",
-        "wt.has_embedded_sweeps",
-        "wt.type_name",
-        "wt.coarse_fill_color_rgb"
+        "wt.wraps_at_ends"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -1204,7 +1200,15 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "allowed_items narrowed to contracts/domain_identity_keys_v2.json's sig_hash_keys override",
+        "(D-039): the compound_types extractor (domains/wall_types.py) already hashes only this",
+        "6-key 'semantic' bucket inline (wt.type_name/wt.coarse_fill_color_rgb are cosmetic;",
+        "wt.kind/wt.total_layer_rows/wt.stack_hash_strict/wt.stack_hash_function_only/",
+        "wt.coarse_fill_pattern_sig_hash/wt.has_embedded_sweeps are coordination) -- prior",
+        "allowed_items mechanically mirrored the full identity_basis.items set (no sig_hash_keys",
+        "override existed yet), which meant a post-stage sig_hash recompute would have hashed the",
+        "type's own display name into sig_hash, unlike the extractor's own inline value. See CHANGELOG.md."
       ],
       "required_items": [
         "wt.layer_count",

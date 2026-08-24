@@ -1672,3 +1672,122 @@ degraded rather than blocked when it has to).
   domain-specific reconstruction/naming/verification; no shared
   "materialize-a-domain-into-Revit" abstraction was introduced here to avoid
   generalizing prematurely from a single domain.
+
+## D-039 — `wall_types`/`floor_types`/`roof_types`/`ceiling_types` sig_hash policy: close the `sig_hash_keys` registry gap
+
+### Status
+Accepted (2026-08-24)
+
+### Context
+`tools/generate_sig_hash_policy.py` compiles each domain's
+`policies/domain_sig_hash_policies.json` entry from
+`contracts/domain_identity_keys_v2.json`. A domain block's `sig_hash_keys`
+field, when present, overrides `allowed_keys` as the actual sig_hash preimage
+set; when absent, the generator falls back to the full `allowed_keys` list
+(`tools/generate_sig_hash_policy.py:24-30`). Several domains rely on this
+override because their extractor hashes a narrower "semantic" subset of what
+it exports to `identity_basis.items` — `object_styles_model/_annotation/
+_analytical/_imported`, `worksets`, `worksets_doc`, `browser_organization`,
+`line_patterns`, `materials`, and `text_types` all carry an explicit
+`sig_hash_keys` override, several with a hand-written note explaining exactly
+why (e.g. object_styles': "pinned ... so the Area 9 additions register as
+identity_basis.items without widening the sig_hash preimage").
+
+`wall_types`, `floor_types`, `roof_types`, and `ceiling_types` are the same
+shape — each extractor (`domains/{wall,floor,roof,ceiling}_types.py`)
+classifies captured fields into `semantic`/`coordination`/`cosmetic` Python
+lists, exports `identity_items = sorted(semantic + coordination + cosmetic)`
+to `identity_basis.items`, but computes its own inline `sig_hash` from
+`semantic` only (3-6 keys per domain, excluding the type's own display name
+and coarse fill color). These four domains had **no** `sig_hash_keys`
+override in the registry and no note explaining a deliberate choice either
+way — the compiled policy's `allowed_items` mechanically mirrored the full
+`allowed_keys` list, meaning `core/sig_hash_builder.py`'s post-stage
+recompute (`run_extract_all.py`'s `sig_hash` stage, which unconditionally
+overwrites `records.csv`'s `sig_hash` column for any domain with a policy
+entry) would hash `wt.type_name`/`ft.type_name`/`rt.type_name`/
+`ct.type_name` and `*.coarse_fill_color_rgb` into `sig_hash` — reintroducing
+exactly the "names are metadata only, never in behavior hashes" violation
+this project's hashing rules exist to prevent (see D-002 and the top-level
+Critical Rules). Absent any documented rationale, and given every sibling
+domain with a genuine narrowing need already has one, this reads as an
+un-reviewed gap from a mechanical registry regen, not a considered decision.
+
+The gap was latent rather than actively corrupting governance output: the
+actual clustering/pattern machinery (`tools/extractor.py`'s
+`_stable_pattern_id()`) keys exclusively off `join_hash`, and the
+*join-key* policies for these same four domains
+(`policies/domain_join_key_policies.json`) already correctly carry
+`explicitly_excluded_items: ["wt.type_name", "wt.coarse_fill_color_rgb"]`
+(and the floor/roof/ceiling equivalents). The gap becomes live-and-wrong the
+moment identity-mode fallback applies to one of these domains
+(`join_key_schema == "sig_hash_as_join_key.v1"` — CLAUDE.md's own
+documented degraded mode), since `_apply_sig_hash_to_phase0` sets
+`join_hash = sig_hash` in that case: "sig_hash isn't the clustering key" is
+one config state away from being false for these domains, not a stable
+invariant to rely on.
+
+`units`/`units_doc` were investigated under the same hypothesis and found
+**not** to have this gap: `domains/units.py`'s actual sig_hash-driving
+constant, `UNITS_SEMANTIC_KEYS` (11 items), already includes
+`units.symbol_type_id`/`units.accuracy` and matches the compiled policy's
+`allowed_items` exactly. A second, unused local variable also named
+`semantic_keys`/`cosmetic_keys` inside `units.py`'s per-record loop excludes
+those same two fields, but only feeds the informational
+`phase2.cosmetic_items` dict (marked "Deprecated duplication path" in the
+module's own comment) — it never affects `sig_hash`. That is a separate,
+milder internal-consistency question about `units.py`'s own two competing
+notions of "semantic" and is explicitly out of scope for this decision.
+
+### Decision
+Add an explicit `sig_hash_keys` override to each of the four
+`contracts/domain_identity_keys_v2.json` blocks, matching exactly the
+key set each extractor already hashes inline:
+- `wall_types`: `wt.function`, `wt.layer_count`, `wt.total_thickness_in`,
+  `wt.stack_hash_loose`, `wt.wraps_at_inserts`, `wt.wraps_at_ends`
+- `floor_types`: `ft.layer_count`, `ft.total_thickness_in`,
+  `ft.stack_hash_loose`
+- `roof_types`: `rt.layer_count`, `rt.total_thickness_in`,
+  `rt.stack_hash_loose`
+- `ceiling_types`: `ct.layer_count`, `ct.total_thickness_in`,
+  `ct.stack_hash_loose`
+
+`policies/domain_sig_hash_policies.json`'s four corresponding entries were
+hand-patched to the same narrower `allowed_items` (not regenerated via
+`tools/generate_sig_hash_policy.py`, to avoid clobbering unrelated
+hand-tuned notes already present on other domains in that file — the same
+convention `object_styles_*`/`worksets`/`browser_organization` already
+follow). `required_items`/`minima` are unchanged; `wt.kind`,
+`wt.total_layer_rows`, `wt.stack_hash_strict`,
+`wt.stack_hash_function_only`, `wt.coarse_fill_pattern_sig_hash`,
+`wt.has_embedded_sweeps`, `*.type_name`, and `*.coarse_fill_color_rgb`
+remain fully present in `identity_basis.items` (and therefore still visible
+to `discover_hash_policy.py`/`discover_join_policy.py`'s pareto search and
+to the correctly-narrow join-key policy) — only the sig_hash preimage
+narrows.
+
+This is a **hash-breaking correction** for these four domains: any two
+records that previously produced different `sig_hash` values solely because
+of a differing type name or fill color will now produce the same
+`sig_hash`. `join_hash` (the value actually used for cross-file governance
+comparison) is unaffected — the join-key policies were already correct.
+
+### Consequences
+- `records.csv`'s `sig_hash` column for `wall_types`/`floor_types`/
+  `roof_types`/`ceiling_types` changes on any re-run of the `sig_hash`
+  stage; a full corpus re-run of that stage (not full re-extraction — the
+  underlying `identity_basis.items` evidence is unchanged) is required to
+  pick this up.
+- Closes the identity-mode-fallback exposure described above: if
+  `join_key_schema` ever falls back to `sig_hash_as_join_key.v1` for one of
+  these four domains, `join_hash` now inherits a name-free `sig_hash`
+  instead of silently absorbing type names/colors into governance
+  clustering.
+- Does not address `units.py`'s own internal `semantic_keys`/
+  `cosmetic_keys` inconsistency (see Context) — left as a separate, later
+  question.
+- Does not change the bucketing-vs-flat-emission architecture of these four
+  extractors; they remain in the `semantic`/`coordination`/`cosmetic`
+  pattern rather than moving to the `arrowheads.py`/`identity.py` flat
+  `identity_items` pattern. That migration, if pursued, is a separate,
+  larger initiative.

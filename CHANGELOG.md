@@ -42,6 +42,28 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   population membership.
 
 ### Fixed
+- **`wall_types`/`floor_types`/`roof_types`/`ceiling_types`: post-stage `sig_hash`
+  policy no longer hashes in the type's own display name/fill color (D-039).**
+  `policies/domain_sig_hash_policies.json`'s `allowed_items` for these four
+  domains previously mirrored the full `identity_basis.items` set (mechanically
+  inherited from `contracts/domain_identity_keys_v2.json`'s `allowed_keys`,
+  with no `sig_hash_keys` override present to narrow it) rather than the
+  narrower "semantic" subset each extractor (`domains/{wall,floor,roof,
+  ceiling}_types.py`) already hashes inline. A post-stage `sig_hash` stage
+  recompute (`core/sig_hash_builder.py`, invoked by `run_extract_all.py`'s
+  `sig_hash` stage and unconditionally overwriting `records.csv`) would
+  therefore have hashed `wt.type_name`/`ft.type_name`/`rt.type_name`/
+  `ct.type_name` and `*.coarse_fill_color_rgb` into `sig_hash`, contradicting
+  this project's own "names are metadata only, never in behavior hashes" rule
+  and diverging from the extractor's own inline `sig_hash` value for the same
+  record. Added an explicit `sig_hash_keys` override to each of the four
+  registry blocks and hand-narrowed the compiled policy to match (same
+  hand-patch convention already used for `object_styles_*`/`worksets`/
+  `browser_organization`). **Hash-breaking** for these four domains' `sig_hash`
+  values specifically: two records differing only by type name or fill color
+  now produce the same `sig_hash`. `join_hash` is unaffected -- the join-key
+  policies for these domains already excluded these fields correctly via
+  `explicitly_excluded_items`. See DECISIONS.md D-039.
 - **`mapping/create_line_pattern_mappings.py`: an explicit but invalid `IN[2]`
   repo root now fails loudly instead of silently falling back to the
   environment or `__file__`.** A caller-supplied `IN[2]` is an explicit
