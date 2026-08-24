@@ -18,14 +18,47 @@
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "shape_gating added pending discovery evidence (see conversation log / prospective D-0xx):",
+        "not yet consumed by core/sig_hash_builder.py -- currently informational/discovery-only.",
+        "Extractor (domains/arrowheads.py) already routes width_angle_deg/fill_tick/arrow_closed and",
+        "tick_mark_centered/heavy_end_pen_weight into identity_items per-style via STYLE_BUCKET_* --",
+        "these fields already participate in the actual computed sig_hash today regardless of this",
+        "policy's required_items/shape_gating declaration; what shape_gating would add here is",
+        "governed BLOCKING semantics (minima.block_if_any_required_not_ok) per shape, not new hash",
+        "coverage. Confirm with sig-target discovery before treating additional_required as final."
       ],
       "required_items": [
         "arrowhead.style",
         "arrowhead.tick_size_in"
       ],
-      "sig_hash_schema": "arrowheads.sig_hash.v1"
+      "shape_gating": {
+        "discriminator_key": "arrowhead.style",
+        "shape_requirements": {
+          "Arrow": {
+            "additional_required": [
+              "arrowhead.width_angle_deg",
+              "arrowhead.fill_tick",
+              "arrowhead.arrow_closed"
+            ],
+            "additional_optional": [],
+            "notes": [
+              "Arrow record class: arrow-specific geometry and closure/fill flags are required for sig_hash identity."
+            ]
+          },
+          "Heavy end tick mark": {
+            "additional_required": [
+              "arrowhead.tick_mark_centered",
+              "arrowhead.heavy_end_pen_weight"
+            ],
+            "additional_optional": [],
+            "notes": [
+              "Heavy end tick mark record class: centered tick and pen weight are required for sig_hash identity."
+            ]
+          }
+        },
+        "default_shape_behavior": "common_only"
+      },
+      "sig_hash_schema": "arrowheads.sig_hash.v2"
     },
     "ceiling_types": {
       "allowed_item_prefixes": [],
@@ -546,12 +579,29 @@
         "sig_hash is computed post-extraction from canonical identity_basis.items.",
         "project_info.* added by D-025 (identity domain expansion); hand-patched here rather than",
         "via a full tools/generate_sig_hash_policy.py regen, which would also clobber unrelated",
-        "hand-tuned notes on other domains that have drifted from a strict mechanical regen."
+        "hand-tuned notes on other domains that have already drifted from a strict mechanical regen.",
+        "shape_gating added pending discovery evidence (see conversation log / prospective D-0xx):",
+        "not yet consumed by core/sig_hash_builder.py -- currently informational/discovery-only."
       ],
       "required_items": [
         "identity.is_workshared"
       ],
-      "sig_hash_schema": "identity.sig_hash.v2"
+      "shape_gating": {
+        "discriminator_key": "identity.is_workshared",
+        "shape_requirements": {
+          "true": {
+            "additional_required": [
+              "identity.revit_version_number"
+            ],
+            "additional_optional": [],
+            "notes": [
+              "Workshared models require version number in sig_hash identity."
+            ]
+          }
+        },
+        "default_shape_behavior": "common_only"
+      },
+      "sig_hash_schema": "identity.sig_hash.v3"
     },
     "line_patterns": {
       "allowed_item_prefixes": [],
