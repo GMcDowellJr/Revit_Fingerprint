@@ -48,6 +48,12 @@ For shape-gated domains, every gate must have an accepted validation result;
 one passing gate cannot suppress harsh evidence required by another gate.
 Full-population verification is always enabled by the runbook.
 
+Per-discriminator discovery rows are auxiliary evidence with
+`result_scope=partition_diagnostic`. They remain in the archived stage CSV, but
+the orchestrator excludes them from acceptance, cache, Pareto escalation, and
+domain-wide summary selection; only global/runtime-policy rows drive those sweep
+decisions.
+
 `validate` retains its existing meaning: it searches within the governed
 `required_fields + optional_items` candidate universe. It does not score only
 one frozen selected field set. Discovery classifications are review evidence,

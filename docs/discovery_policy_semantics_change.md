@@ -40,7 +40,11 @@ those partition searches. Discriminator values are partitioned from the full
 domain population before sampling, and the configured sample cap is then applied
 independently to each partition. Diagnostics expose both full and sampled record
 counts per partition, so rare shapes cannot disappear merely because they were
-absent from the global sample.
+absent from the global sample. Partition discovery also remains reachable when
+the global sample contains no identity items. These rows are explicitly marked
+`result_scope=partition_diagnostic`; the sweep preserves them in archived CSV
+evidence but excludes them from cache eligibility, escalation, and domain-level
+summary selection.
 
 ## Diagnostic example
 

@@ -148,6 +148,14 @@ def read_csv(path: Path) -> list[dict[str, str]]:
     return list(iter_csv(path))
 
 
+def sweep_evidence_rows(rows: Iterable[dict[str, str]]) -> list[dict[str, str]]:
+    """Exclude auxiliary diagnostics from cache, escalation, and summaries.
+
+    Empty scope is retained for artifacts written before result_scope existed.
+    """
+    return [row for row in rows if row.get("result_scope", "") != "partition_diagnostic"]
+
+
 def _policy_block(path: Path, domain: str) -> tuple[object, str]:
     data = json.loads(path.read_text(encoding="utf-8"))
     return data.get("domains", {}).get(domain, {}), hashlib.sha256(path.read_bytes()).hexdigest()
@@ -366,7 +374,7 @@ class Orchestrator:
         manifest["input_fingerprints"][ck] = greedy_fp
         hit = cache["entries"].get(ck)
         if hit and hit.get("input_fingerprint") == greedy_fp and hit.get("result_status") == "ok" and not self.cfg.force:
-            rows = [r for r in read_csv(Path(hit["result_path"])) if r.get("policy_mode") == mode and r.get("search_mode") == "greedy"]
+            rows = [r for r in sweep_evidence_rows(read_csv(Path(hit["result_path"]))) if r.get("policy_mode") == mode and r.get("search_mode") == "greedy"]
             # Defend against manifests written by older orchestration versions:
             # status=ok alone never makes incomplete/colliding/divergent evidence reusable.
             if stage_cache_eligible(rows):
@@ -378,7 +386,7 @@ class Orchestrator:
         log = run_dir / "logs" / f"{target}_{mode}_greedy.log"; log.parent.mkdir(parents=True, exist_ok=True)
         self._invoke(cmd, log)
         src = self._artifact(target, domain, mode, "greedy")
-        rows = [r for r in read_csv(src) if r.get("policy_mode") == mode and r.get("search_mode") == "greedy"]
+        rows = [r for r in sweep_evidence_rows(read_csv(src)) if r.get("policy_mode") == mode and r.get("search_mode") == "greedy"]
         if not rows: raise RuntimeError(f"no {target}/{mode}/greedy rows produced")
         archived=self._archive_artifacts(target,domain,mode,"greedy",run_dir)
         dest = next((p for p in archived if p.name.startswith(src.stem)), run_dir / target / src.name)
@@ -401,7 +409,7 @@ class Orchestrator:
             phit=cache["entries"].get(pck)
             prows=[]
             if phit and phit.get("input_fingerprint")==pareto_fp and phit.get("result_status")=="ok" and not self.cfg.force:
-                prows=[r for r in read_csv(Path(phit["result_path"])) if r.get("policy_mode")==mode and r.get("search_mode")=="pareto"]
+                prows=[r for r in sweep_evidence_rows(read_csv(Path(phit["result_path"]))) if r.get("policy_mode")==mode and r.get("search_mode")=="pareto"]
                 if stage_cache_eligible(prows):
                     manifest["stages_skipped"].append({"stage":f"{mode}/pareto","reason":"cache_hit","source_run_id":phit["result_run_id"]})
                     sources.append({"policy_mode":mode,"search_mode":"pareto","provenance":"cached",
@@ -412,7 +420,7 @@ class Orchestrator:
                 cmd = self._command(target, domain, mode, "pareto", pareto_params)
                 log = run_dir / "logs" / f"{target}_{mode}_pareto.log"; self._invoke(cmd, log)
                 src = self._artifact(target, domain, mode, "pareto")
-                prows = [r for r in read_csv(src) if r.get("policy_mode") == mode and r.get("search_mode") == "pareto"]
+                prows = [r for r in sweep_evidence_rows(read_csv(src)) if r.get("policy_mode") == mode and r.get("search_mode") == "pareto"]
                 archived=self._archive_artifacts(target,domain,mode,"pareto",run_dir)
                 pdest=next((p for p in archived if p.name.startswith(src.stem)),run_dir/target/src.name)
                 manifest["commands_executed"].append(cmd); manifest["result_files"] += [str(p) for p in archived]; manifest["logs"].append(str(log))

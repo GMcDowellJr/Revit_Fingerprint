@@ -177,3 +177,43 @@ def test_join_discover_cli_emits_independent_shape_partitions(tmp_path: Path):
     assert all(row["discriminator_source"] == "existing_policy" for row in partitions.values())
     assert all(row["records_total_partition"] == "2" for row in partitions.values())
     assert all(row["records_sampled_partition"] == "1" for row in partitions.values())
+
+
+def test_partition_discovery_runs_when_global_sample_has_no_items(tmp_path: Path):
+    phase0 = tmp_path / "results" / "records"
+    phase0.mkdir(parents=True)
+    with (phase0 / "records.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["domain", "record_pk", "sig_hash"])
+        writer.writeheader()
+        # Seed 17 ranks record 9 before record 1, so the one-record global
+        # sample contains only the itemless record.
+        writer.writerows([
+            {"domain": "demo", "record_pk": "9", "sig_hash": "empty"},
+            {"domain": "demo", "record_pk": "1", "sig_hash": "alpha"},
+        ])
+    with (phase0 / "identity_items.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["domain", "record_pk", "item_key", "item_value_type", "item_value"])
+        writer.writeheader()
+        writer.writerows([
+            {"domain": "demo", **_item("1", "shape", "Alpha")},
+            {"domain": "demo", **_item("1", "alpha_x", "usable")},
+        ])
+    policy = tmp_path / "policy.json"
+    policy.write_text(json.dumps({"domains": {"demo": {
+        "shape_gating": {"discriminator_key": "shape", "shape_requirements": {}},
+    }}}), encoding="utf-8")
+
+    subprocess.run(
+        [sys.executable, "tools/discover_join_policy.py", "--phase0-dir", str(phase0),
+         "--domains", "demo", "--policy-json", str(policy), "--policy-modes", "discover",
+         "--search-modes", "greedy", "--sample-size", "1"],
+        cwd=Path(__file__).resolve().parents[1], check=True,
+    )
+    output = phase0.parent / "diagnostics" / "join_key_discovery_exploration__demo__discover.csv"
+    with output.open(newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+
+    alpha = next(row for row in rows if row["discriminator_value"] == "Alpha")
+    assert alpha["result_scope"] == "partition_diagnostic"
+    assert "alpha_x" in alpha["candidate_fields_available"]
+    assert alpha["records_total_partition"] == "1"

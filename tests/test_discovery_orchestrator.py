@@ -9,7 +9,7 @@ import pytest
 from tools.discovery_orchestrator import (
     DISCOVERY_ENGINE_VERSION, SUMMARY_FIELDS, Orchestrator, Config, acceptance_reasons,
     accepted, cache_key, canonical_json, input_fingerprint, stage_cache_eligible,
-    all_shape_gates_accepted, timestamp_now,
+    all_shape_gates_accepted, sweep_evidence_rows, timestamp_now,
 )
 
 
@@ -86,6 +86,12 @@ def test_summary_schema_contains_provenance_and_review_fields():
     required={"summary_timestamp","domain_result_timestamp","source_run_id","shape_gate",
               "decision_status","governance_status","input_fingerprint","refresh_status"}
     assert required <= set(SUMMARY_FIELDS)
+
+
+def test_partition_diagnostics_are_not_sweep_evidence():
+    global_row = {"result_scope": "", "selected_fields": "global"}
+    partition_row = {"result_scope": "partition_diagnostic", "selected_fields": "shape_only"}
+    assert sweep_evidence_rows([global_row, partition_row]) == [global_row]
 
 
 def test_canonical_json_ignores_mapping_order():

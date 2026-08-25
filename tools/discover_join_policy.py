@@ -489,9 +489,7 @@ def main() -> None:
         sampled_pks = {r.get("record_pk", "").strip() for r in dom_records if r.get("record_pk", "").strip()}
         dom_items_sampled = [it for it in dom_items_all if not sampled_pks or it.get("record_pk", "").strip() in sampled_pks]
         candidate_fields = _pick_candidate_fields(dom_items_sampled, int(args.max_candidate_fields))
-        if not candidate_fields:
-            failures.append(domain)
-            continue
+        domain_has_candidates = bool(candidate_fields)
 
         # Built from the FULL (unsampled) item set, not just the sampled subset: a
         # record_pk absent from the sample is simply never looked up when scoring
@@ -799,6 +797,7 @@ def main() -> None:
                 partition_candidates = _without_excluded(
                     _pick_candidate_fields(partition_items, int(args.max_candidate_fields)), excluded
                 )
+                domain_has_candidates = domain_has_candidates or bool(partition_candidates)
                 for search_mode in search_modes:
                     cfg = {"max_k": int(args.max_k), "gates": {"discriminator_key": discriminator_key}, "evaluation_mode": "candidate"}
                     if search_mode == "pareto":
@@ -825,6 +824,7 @@ def main() -> None:
                         partition_verify_status = "skipped_no_selection"
                     report_rows.append({
                         "domain": domain, "policy_mode": "discover", "mode": "discover", "search_mode": search_mode,
+                        "result_scope": "partition_diagnostic",
                         "status": "ok" if selected else "blocked", "reason": "" if selected else "no_frontier",
                         "records_total_domain": str(records_total_domain), "records_sampled_domain": str(records_sampled_domain),
                         "sample_rate": f"{sample_rate:.6f}",
@@ -872,6 +872,9 @@ def main() -> None:
                         "full_verify_status": partition_verify_status,
                         "sample_vs_full_diverges": "true" if partition_diverges else "false",
                     })
+
+        if not domain_has_candidates:
+            failures.append(domain)
 
         # optional compatibility policy JSON generation. Requires a non-diverging
         # full-population verification (sample_vs_full_diverges != "true") -- a
@@ -944,7 +947,7 @@ def main() -> None:
         "records_total_domain", "records_sampled_domain", "sample_rate", "records_total_partition", "records_sampled_partition", "partition_sample_rate", "sample_size_arg", "sample_seed_arg", "max_candidate_fields_arg", "max_k_effective",
         "candidate_fields_raw", "candidate_fields_raw_count", "scoped_candidates", "scoped_candidates_count", "work_candidates", "work_candidates_count",
         "candidate_fields_available", "candidate_fields_evaluated", "effective_fields_actually_scored",
-        "policy_required_fields", "policy_optional_fields", "policy_excluded_fields", "discriminator_key", "discriminator_source", "discriminator_value", "mode",
+        "policy_required_fields", "policy_optional_fields", "policy_excluded_fields", "discriminator_key", "discriminator_source", "discriminator_value", "mode", "result_scope",
         "selected_fields", "coverage", "collision_rate", "fragmentation_rate",
         "records_total", "records_covered", "collision_records", "fragmented_sig_count", "join_group_count", "hhi", "effective_cluster_count", "failures_json", "frontier_size", "fallback_used",
         "required_count", "required_fields", "optional_count", "optional_items", "excluded_count", "excluded_items",
