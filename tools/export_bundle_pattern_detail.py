@@ -8,7 +8,8 @@ Emits three flat CSVs for BI consumption:
   pattern_supplemental_values.csv — deduped variant values with weighted support
   pattern_reconstruction_summary.csv — one row per pattern with reconstruction status
   pattern_names.csv             — one row per (join_hash × observed name)
-  reconstruction_source_files.csv — greedy file cover for the emitted pattern population
+  reconstruction_source_files.csv — compact greedy source-file cover metrics
+  reconstruction_source_file_patterns.json — file/domain/pattern names for inspection
 
 Usage:
     python export_bundle_pattern_detail.py \\
@@ -67,6 +68,22 @@ def _atomic_write_csv(
         writer.writeheader()
         for row in rows:
             writer.writerow({name: row.get(name, "") for name in fieldnames})
+    tmp_path.replace(path)
+
+
+def _atomic_write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        newline="",
+        delete=False,
+        dir=str(path.parent),
+        suffix=".tmp",
+    ) as tmp:
+        tmp_path = Path(tmp.name)
+        json.dump(payload, tmp, ensure_ascii=False, indent=2, sort_keys=False)
+        tmp.write("\n")
     tmp_path.replace(path)
 
 
@@ -612,16 +629,17 @@ def _build_reconstruction_source_files(
     in_scope_patterns: Set[str],
     pattern_record_map: Dict[str, Set[RecordKey]],
     record_meta: Dict[RecordKey, Dict[str, str]],
-) -> List[Dict[str, str]]:
-    """Return a deterministic greedy file cover for the emitted patterns.
+    pattern_map: Dict[str, Dict[str, str]],
+) -> Tuple[List[Dict[str, str]], List[Dict[str, Any]]]:
+    """Build a deterministic greedy source-file cover for emitted patterns.
 
-    Each selected export_run_id is credited only with patterns and sig_hashes
-    not credited to an earlier file. The target population is the exact
-    in_scope_patterns set established after top-bundle/Jenks filtering.
+    The CSV rows remain compact and contain only counts and coverage metrics.
+    The JSON entries carry the human-readable file/domain/pattern relationship.
+    A pattern is credited only to the first selected file that covers it.
 
     This is a greedy set-cover approximation, not proof of a globally minimum
-    file count. Selection is deterministic: most new patterns, then most new
-    sig_hashes, then most total in-scope patterns, then lexical export_run_id.
+    file count. Ties resolve by most new patterns, most new sig_hashes, most
+    total in-scope patterns, then lexical export_run_id.
     """
     patterns_by_file: DefaultDict[str, Set[str]] = defaultdict(set)
     sig_hashes_by_file: DefaultDict[str, Set[str]] = defaultdict(set)
@@ -642,7 +660,8 @@ def _build_reconstruction_source_files(
         uncovered_sig_hashes.update(values)
 
     candidates = set(patterns_by_file)
-    selected_rows: List[Dict[str, str]] = []
+    csv_rows: List[Dict[str, str]] = []
+    json_entries: List[Dict[str, Any]] = []
     cumulative_pattern_count = 0
     cumulative_sig_hash_count = 0
     total_pattern_count = len(in_scope_patterns)
@@ -673,16 +692,14 @@ def _build_reconstruction_source_files(
         cumulative_pattern_count += new_pattern_count
         cumulative_sig_hash_count += new_sig_hash_count
 
-        selected_rows.append({
+        csv_rows.append({
             "segment_id": segment_id,
             "domain": domain,
             "purge_view": purge_view,
             "cover_rank": str(cover_rank),
-            "export_run_id": export_run_id,
+            "file_name": export_run_id,
             "new_pattern_count": str(new_pattern_count),
-            "new_pattern_ids": "|".join(sorted(new_patterns)),
             "new_sig_hash_count": str(new_sig_hash_count),
-            "new_sig_hashes": "|".join(sorted(new_sig_hashes)),
             "file_in_scope_pattern_count": str(file_pattern_count),
             "cumulative_pattern_count": str(cumulative_pattern_count),
             "total_pattern_count": str(total_pattern_count),
@@ -696,9 +713,35 @@ def _build_reconstruction_source_files(
             "remaining_sig_hash_count": str(len(uncovered_sig_hashes)),
             "cover_complete": "1" if not uncovered_patterns else "0",
         })
+
+        pattern_entries: List[Dict[str, str]] = []
+        for pattern_id in sorted(new_patterns):
+            metadata = pattern_map.get(pattern_id, {})
+            pattern_name = (
+                metadata.get("pattern_label_human", "").strip()
+                or metadata.get("pattern_label", "").strip()
+                or pattern_id
+            )
+            pattern_entries.append({
+                "domain": domain,
+                "pattern_name": pattern_name,
+                "pattern_id": pattern_id,
+            })
+        json_entries.append({
+            "file_name": export_run_id,
+            "domain": domain,
+            "cover_rank": cover_rank,
+            "new_pattern_count": new_pattern_count,
+            "cumulative_coverage_pct": round(
+                (100.0 * cumulative_pattern_count / total_pattern_count)
+                if total_pattern_count else 0.0,
+                6,
+            ),
+            "patterns": pattern_entries,
+        })
         cover_rank += 1
 
-    return selected_rows
+    return csv_rows, json_entries
 
 
 def _process_domain(
@@ -714,13 +757,13 @@ def _process_domain(
     join_policy: Dict[str, Any],
     top_bundles: Optional[int],
     top_bundles_auto: bool,
-) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]], int, int, int, int, Optional[Dict[str, Any]]]:
+) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, Any]], int, int, int, int, Optional[Dict[str, Any]]]:
     domain_out_dir = ba_root / domain
     bundles_path = domain_out_dir / "bundles.csv"
     bundle_membership_path = domain_out_dir / "bundle_membership.csv"
     if not bundles_path.exists() or not bundle_membership_path.exists():
         print(f"[WARN] bundle inputs missing for domain '{domain}', skipping", file=sys.stderr)
-        return [], [], [], [], [], 0, 0, 0, 0, None
+        return [], [], [], [], [], [], 0, 0, 0, 0, None
 
     bundles = _read_csv(bundles_path)
     threshold_diag: Optional[Dict[str, Any]] = None
@@ -749,13 +792,14 @@ def _process_domain(
         key for pid in in_scope_patterns for key in pattern_record_map.get(pid, set())
     }
     record_meta = _load_record_metadata(records_csv, domain, all_member_keys)
-    reconstruction_source_files = _build_reconstruction_source_files(
+    reconstruction_source_files, reconstruction_source_file_patterns = _build_reconstruction_source_files(
         segment_id=segment_id,
         domain=domain,
         purge_view=purge_view,
         in_scope_patterns=in_scope_patterns,
         pattern_record_map=pattern_record_map,
         record_meta=record_meta,
+        pattern_map=pattern_map,
     )
     signature_map = _build_pattern_signature_map(pattern_record_map, record_meta)
     representative_keys = {
@@ -836,6 +880,7 @@ def _process_domain(
         sorted(supplemental, key=lambda r: (r["domain"], r["pattern_id"], r["k"], r["v"], r["q"])),
         sorted(names, key=lambda r: (r["domain"], r["join_hash"], r["label_v"])),
         reconstruction_source_files,
+        reconstruction_source_file_patterns,
         len(bundles), len(inventory), len(seen_patterns), len(seen_names), threshold_diag,
     )
 
@@ -881,12 +926,11 @@ _THRESHOLDS_FIELDS: Tuple[str, ...] = (
     "source_value_min", "source_value_max",
 )
 _RECONSTRUCTION_SOURCE_FIELDS: Tuple[str, ...] = (
-    "segment_id", "domain", "purge_view", "cover_rank", "export_run_id",
-    "new_pattern_count", "new_pattern_ids", "new_sig_hash_count", "new_sig_hashes",
-    "file_in_scope_pattern_count", "cumulative_pattern_count", "total_pattern_count",
-    "cumulative_coverage_pct", "remaining_pattern_count",
-    "cumulative_sig_hash_count", "total_sig_hash_count", "remaining_sig_hash_count",
-    "cover_complete",
+    "segment_id", "domain", "purge_view", "cover_rank", "file_name",
+    "new_pattern_count", "new_sig_hash_count", "file_in_scope_pattern_count",
+    "cumulative_pattern_count", "total_pattern_count", "cumulative_coverage_pct",
+    "remaining_pattern_count", "cumulative_sig_hash_count", "total_sig_hash_count",
+    "remaining_sig_hash_count", "cover_complete",
 )
 
 
@@ -971,6 +1015,7 @@ def main() -> None:
     all_supplemental: List[Dict[str, str]] = []
     all_names: List[Dict[str, str]] = []
     all_reconstruction_source_files: List[Dict[str, str]] = []
+    all_reconstruction_source_file_patterns: List[Dict[str, Any]] = []
     all_thresholds: List[Dict[str, str]] = []
 
     total_domains = 0
@@ -982,7 +1027,7 @@ def main() -> None:
     policies = _load_join_policies(Path(args.join_policy).resolve() if args.join_policy else None)
 
     for domain in domains:
-        inv, sett, supplemental, names, reconstruction_source_files, nb, np_, jhi, jhn, threshold_diag = _process_domain(
+        inv, sett, supplemental, names, reconstruction_source_files, reconstruction_source_file_patterns, nb, np_, jhi, jhn, threshold_diag = _process_domain(
             segment_id=segment_id,
             domain=domain,
             purge_view=args.purge_view,
@@ -1004,6 +1049,7 @@ def main() -> None:
         all_supplemental.extend(supplemental)
         all_names.extend(names)
         all_reconstruction_source_files.extend(reconstruction_source_files)
+        all_reconstruction_source_file_patterns.extend(reconstruction_source_file_patterns)
         total_domains += 1
         total_bundles += nb
         total_patterns += np_
@@ -1049,6 +1095,10 @@ def main() -> None:
         _RECONSTRUCTION_SOURCE_FIELDS,
         all_reconstruction_source_files,
     )
+    _atomic_write_json(
+        out_dir / "reconstruction_source_file_patterns.json",
+        all_reconstruction_source_file_patterns,
+    )
     if args.top_bundles_auto:
         _atomic_write_csv(out_dir / "bundle_selection_thresholds.csv", _THRESHOLDS_FIELDS, all_thresholds)
 
@@ -1059,7 +1109,8 @@ def main() -> None:
         f"join_hashes_with_names={total_jh_names} "
         f"invariant_rows={len(all_settings)} supplemental_rows={len(all_supplemental)} "
         f"summary_rows={len(all_summaries)} "
-        f"reconstruction_source_file_rows={len(all_reconstruction_source_files)}"
+        f"reconstruction_source_file_rows={len(all_reconstruction_source_files)} "
+        f"reconstruction_source_pattern_groups={len(all_reconstruction_source_file_patterns)}"
     )
 
 
