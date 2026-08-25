@@ -157,6 +157,7 @@ def main() -> None:
                 selected_fields,
                 {
                     "required_fields": required_fields,
+                    "optional_fields": normalized["optional_items"],
                     "discriminator_key": normalized["gates"].get("discriminator_key"),
                     "shape_requirements": normalized["gates"].get("shape_requirements"),
                     "default_shape_behavior": normalized["gates"].get("default_shape_behavior"),
