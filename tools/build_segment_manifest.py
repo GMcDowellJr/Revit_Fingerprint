@@ -41,6 +41,21 @@ DIMENSION_CONFIG = [
 ]
 
 def _read_csv(path: Path) -> tuple:
+    """Read a CSV file, returning both its header order and its rows as
+    string-normalized dicts.
+
+    --- trace ---
+    reads: `path` -- a Path to file_metadata.csv (main()'s --metadata-file), or, later
+        in main(), to an existing run_registry.csv/segment_membership.csv under
+        --out-dir (for incremental-build carry-over).
+    calls: none (stdlib csv.DictReader only).
+    thresholds: none.
+    returns: (fieldnames: list[str], rows: list[dict[str,str]]) -- fieldnames preserves
+        the file's header order (used by main() for REQUIRED_COLUMNS presence
+        checking); rows has every value normalized to str with None replaced by "".
+        Consumed by main() (for file_metadata.csv, and for existing_registry_rows/
+        existing_membership_rows when those files already exist).
+    """
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         rows = [{str(k): ("" if v is None else str(v)) for k, v in row.items()} for row in reader]
@@ -48,6 +63,19 @@ def _read_csv(path: Path) -> tuple:
     return fieldnames, rows
 
 def _atomic_write_csv(path: Path, fieldnames: Sequence[str], rows: Iterable[Dict[str, str]]) -> None:
+    """Write CSV rows atomically using a temp file in the destination directory.
+
+    --- trace ---
+    reads: `path`, `fieldnames`, `rows` -- caller-supplied; main() calls this three
+        times with (manifest_path, MANIFEST_FIELDNAMES, manifest_rows),
+        (registry_path, REGISTRY_FIELDNAMES, registry_rows), and
+        (membership_path, MEMBERSHIP_FIELDNAMES, membership_rows).
+    calls: none (stdlib csv.DictWriter, tempfile.NamedTemporaryFile).
+    thresholds: none.
+    returns: None; writes `path` atomically (temp file in the same directory, then
+        Path.replace()) so segment_manifest.csv/run_registry.csv/
+        segment_membership.csv are never observed half-written.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile("w", encoding="utf-8", newline="", delete=False, dir=str(path.parent), suffix=".tmp") as tmp:
         tmp_path = Path(tmp.name)
@@ -56,6 +84,21 @@ def _atomic_write_csv(path: Path, fieldnames: Sequence[str], rows: Iterable[Dict
     tmp_path.replace(path)
 
 def _population_hash(export_run_ids: List[str]) -> str:
+    """Compute a stable content hash of a segment's file population.
+
+    --- trace ---
+    reads: `export_run_ids` -- list[str], from _build_segments()'s per-key `eids` (the
+        deduplicated, sorted export_run_id membership of one candidate segment).
+    calls: hashlib.sha1() (stdlib).
+    thresholds: none.
+    returns: 40-char hex sha1 of the "|"-joined, sorted export_run_ids; written into
+        segment_manifest.csv's population_hash column and consumed downstream by
+        tools/run_segment_orchestrator.py's incremental-skip logic (a changed
+        population_hash for a segment_id triggers re-processing) and by
+        _build_segments()'s own "redundant_single_child" detection (a parent whose
+        population_hash matches a direct child's is collapsed to
+        run_type="registration").
+    """
     token="|".join(sorted(export_run_ids));return hashlib.sha1(token.encode()).hexdigest()
 
 _UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>=\s]')
@@ -66,6 +109,24 @@ _UNSAFE_FOLDER_CHARS = re.compile(r'[|/\\:*?"<>=\s]')
 # real business-center value may still be present on the same segment.
 _BLANK_SELECTED_FOLDER_TOKEN = "no_external_client"
 def _sanitize_folder(segment_id:str)->str:
+    """Turn a segment_id into a filesystem-safe, lowercase output-folder name,
+    preserving the distinction between an unselected dimension and one explicitly
+    selected-blank.
+
+    --- trace ---
+    reads: `segment_id` -- a "|"-joined dimension-value string, from
+        _build_registry()'s per-row `sid` (new-segment folder assignment) or from
+        main()'s existing-registry fallback for a segment whose registry row has no
+        stored output_folder.
+    calls: none (re.sub() only).
+    thresholds: _UNSAFE_FOLDER_CHARS (module-level compiled regex, l.61: characters
+        replaced with "_"); _BLANK_SELECTED_FOLDER_TOKEN = "no_external_client" (module
+        constant, l.67: the literal substituted for an empty-but-selected segment_id
+        part, to keep it distinguishable from a not-selected dimension -- see the
+        comment block above for the full rationale).
+    returns: str; consumed by _build_registry() as a new segment's output_folder (with
+        a "_2", "_3", ... suffix appended on a folder-name collision).
+    """
     # No "+" quantifier on _UNSAFE_FOLDER_CHARS and no .strip("_") at the end:
     # both are deliberate. An empty part between/after separator pipes is
     # distinct from that same dimension not being selected at all (e.g.
@@ -94,6 +155,20 @@ def _build_membership_rows(manifest_rows: List[Dict[str, str]]) -> List[Dict[str
     Covers every segment in manifest_rows, not just run_registry-eligible
     (bundle/reference) ones, so segment_membership.csv joins cleanly against
     the full segment_manifest.csv the same way file_count does today.
+
+    --- trace ---
+    reads: `manifest_rows` -- _build_segments()'s return value, passed in by main();
+        reads each row's segment_id plus its internal (not written to
+        segment_manifest.csv) export_run_ids/seed_export_run_ids pipe-delimited fields.
+    calls: none.
+    thresholds: none.
+    returns: list[dict] with keys segment_id/export_run_id/is_seed ("true"/"false"
+        strings), sorted by (segment_id, export_run_id); this is
+        segment_membership.csv's row shape (MEMBERSHIP_FIELDNAMES). Consumed by main()
+        (written to segment_membership.csv) and, downstream, by
+        tools/run_segment_orchestrator.py's load_membership() and
+        tools/extract_segment_subtree.py -- both read this file grouped by
+        segment_id -> sorted export_run_ids.
     """
     rows: List[Dict[str, str]] = []
     for r in manifest_rows:
@@ -108,7 +183,19 @@ def _build_membership_rows(manifest_rows: List[Dict[str, str]]) -> List[Dict[str
 def _membership_by_segment(membership_rows: List[Dict[str, str]]) -> Dict[str, List[str]]:
     """Group membership CSV rows into segment_id -> sorted export_run_ids, for
     reconstructing a prior run's per-segment population (used by _build_registry's
-    population_changed diffing in place of the old registry-embedded export_run_ids)."""
+    population_changed diffing in place of the old registry-embedded export_run_ids).
+
+    --- trace ---
+    reads: `membership_rows` -- previously-written segment_membership.csv rows
+        (segment_id/export_run_id/is_seed), read by main() via _read_csv() when
+        membership_path already exists on disk.
+    calls: none.
+    thresholds: none.
+    returns: Dict[segment_id, sorted list[export_run_id]]; consumed by main() as
+        `existing_membership`, passed to _build_registry() so population_changed
+        diffing (new_files/removed_files notes) can compare against the prior run's
+        actual file set instead of only its population_hash.
+    """
     grouped: Dict[str, List[str]] = defaultdict(list)
     for row in membership_rows:
         sid = (row.get("segment_id") or "").strip()
@@ -118,6 +205,19 @@ def _membership_by_segment(membership_rows: List[Dict[str, str]]) -> Dict[str, L
     return {sid: sorted(eids) for sid, eids in grouped.items()}
 
 def _append_note(row,k,v=""):
+    """Append a "|"-delimited note token to row["notes"], creating the field if absent.
+
+    --- trace ---
+    reads: `row` -- a manifest or registry row dict, mutated in place; `k`, `v` --
+        caller-supplied note key and optional value, from _build_segments() (e.g.
+        "redundant_single_child") and _build_registry() (e.g. "population_changed",
+        "new_files", "run_type_changed").
+    calls: none.
+    thresholds: none.
+    returns: None; mutates `row["notes"]` in place, appending "k" or "k:v" after a "|"
+        separator if notes already has content. Consumed wherever the caller later
+        writes that row to segment_manifest.csv/run_registry.csv (the `notes` column).
+    """
     note=f"{k}:{v}" if v else k
     if row.get("notes"): row["notes"] += f"|{note}"
     else: row["notes"]=note
@@ -133,7 +233,18 @@ def _invalid_required_value_reason(value: str) -> "str | None":
     explicit N/A-style spelling means "reviewed, does not apply" — both are
     invalid for a required segment dimension under the current metadata
     contract (only project_label, which this file does not use, is allowed
-    to carry a not-applicable sentinel)."""
+    to carry a not-applicable sentinel).
+
+    --- trace ---
+    reads: `value` -- one raw file_metadata.csv cell value, from
+        _validate_required_metadata()'s per-row/per-field loop.
+    calls: is_na_token() (tools/na_token.py, imported at module top).
+    thresholds: none named beyond the blank-string and is_na_token() checks themselves
+        (there is no separate constant table of "invalid" values here).
+    returns: "missing_value" | "not_applicable_sentinel" | None; consumed by
+        _validate_required_metadata() to decide whether to emit a diagnostic for that
+        row/field.
+    """
     stripped = (value or "").strip()
     if not stripped:
         return "missing_value"
@@ -160,7 +271,19 @@ def _invalid_dimension_value_reason(value: str) -> "str | None":
     ";" would silently reintroduce the exact delimiter-collision class of
     bug ";" was chosen to fix in the first place -- reject it at the source
     instead of trying to detect/repair a corrupted ancestor_segment_ids
-    field downstream."""
+    field downstream.
+
+    --- trace ---
+    reads: `value` -- one raw file_metadata.csv cell value, from
+        _validate_required_metadata()'s per-row/per-field loop, only for fields in
+        _DIMENSION_FIELD_NAMES.
+    calls: none.
+    thresholds: the literal `";"` character (D-028, per this function's own docstring
+        above) -- hardcoded, not a named constant.
+    returns: "semicolon_not_allowed" | None; consumed by _validate_required_metadata()
+        as an additional check layered on top of _invalid_required_value_reason() for
+        DIMENSION_CONFIG fields only.
+    """
     if ";" in (value or ""):
         return "semicolon_not_allowed"
     return None
@@ -189,6 +312,18 @@ def _validate_required_metadata(rows: List[Dict[str, str]]) -> List[Dict[str, st
     any export_run_id repeated across rows is a data-integrity conflict this
     tool cannot silently resolve (which row is authoritative?), so it blocks
     the build rather than picking one arbitrarily.
+
+    --- trace ---
+    reads: `rows` -- file_metadata.csv rows as read by main() via _read_csv(); reads
+        each row's REQUIRED_ROW_FIELDS values (export_run_id, unit_system,
+        governance_role, client_label, discipline_label, business_center_label).
+    calls: _invalid_required_value_reason(); _invalid_dimension_value_reason() (only
+        for _DIMENSION_FIELD_NAMES fields).
+    thresholds: REQUIRED_ROW_FIELDS (module constant, l.24); _DIMENSION_FIELD_NAMES
+        (module constant, l.151, derived from DIMENSION_CONFIG).
+    returns: list[dict] diagnostics (row_number/export_run_id/field/raw_value/reason),
+        empty if every row is valid; never raises. Consumed by main(), which blocks the
+        entire build (returns 1, writes nothing) if this list is non-empty.
     """
     diagnostics: List[Dict[str, str]] = []
     first_seen_row_by_eid: Dict[str, int] = {}
@@ -274,6 +409,22 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
     Returns (normalized_rows, changes) where changes is a list of
     (field, raw_value, normalized_value) tuples, one per row-field whose value
     was altered by normalization (duplicates included — callers aggregate).
+
+    --- trace ---
+    reads: `rows` -- file_metadata.csv rows, from main() (post-validation) and from
+        _build_segments() (which re-normalizes internally even when called directly,
+        e.g. from tests, since normalization is idempotent).
+    calls: none (is_na_token() is NOT called here -- DIMENSION_CONFIG fields are exempt
+        from sentinel folding, per the "Sentinel handling" paragraph above).
+    thresholds: DIMENSION_CONFIG (module constant, l.35-41: which fields get normalized
+        and how -- root/governance/cut types); _GOVERNANCE_ROLE_CANONICAL (module
+        constant, l.125-127: case-insensitive role-name canonicalization map); the
+        business_center_label zero-pad threshold `len(raw) < 4` (hardcoded literal, per
+        the Excel-truncation rationale above).
+    returns: (normalized_rows: list[dict], changes: list[tuple(field, raw_value,
+        normalized_value)]); normalized_rows is consumed by _build_segments() to
+        construct segment keys; `changes` is consumed by main() to emit aggregated
+        "[WARN] Normalized ..." diagnostics.
     """
     fields = [d["field"] for d in DIMENSION_CONFIG]
     first_seen: Dict[str, Dict[str, str]] = {f: {} for f in fields}
@@ -305,6 +456,57 @@ def _normalize_rows(rows: List[Dict[str, str]]) -> "tuple[List[Dict[str, str]], 
     return normalized_rows, changes
 
 def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_template_bundles:bool=False,enable_parent_bundle_runs:bool=False)->List[Dict[str,str]]:
+    """Build every candidate segment (one row per subset of non-root dimension values,
+    scoped under the single root dimension) from file_metadata.csv rows, then classify
+    each into a run_type, segment_purpose, and segment_label.
+
+    This is the core of the segmentation-lattice build: for every distinct root_value
+    (unit_system), it enumerates the full powerset of the present non-root dimension
+    values (governance_role/client_label/discipline_label/business_center_label) per
+    file, unions file populations across the powerset via `populations[key]`, then
+    converts each distinct key into one segment_manifest.csv row with its parent/
+    ancestor relationships, run_type classification, and human-readable purpose/label.
+
+    --- trace ---
+    reads: `rows` -- file_metadata.csv rows (post _validate_required_metadata(), pre-
+        or post-normalization -- this function re-normalizes internally via
+        _normalize_rows()); `min_files` -- int, from main()'s --min-files (default 3);
+        `enable_cross_org_template_bundles`/`enable_parent_bundle_runs` -- bool, from
+        main()'s --enable-cross-org-template-bundles/--enable-parent-bundle-runs flags.
+    calls: _normalize_rows(); _population_hash() (per segment key); _append_note() (for
+        below_min_files/seed_only/redundant_single_child notes); itertools.combinations()
+        (stdlib, to enumerate the non-root-field powerset); nested _subset_to_id() (many
+        times, to render a frozenset key as a "|"-joined segment_id string) and nested
+        child_span() (once per row with children, to classify "multi_client" vs
+        "single_client" for segment_purpose assignment).
+    thresholds: DIMENSION_CONFIG (module constant, l.35-41: exactly one root + one
+        governance dimension enforced by a raised ValueError, plus the cut dimensions);
+        SEED_ROLES = {"Template","Container"} (module constant, l.15: which
+        governance_role values count a file as a "seed" for has_seed_file/
+        seed_export_run_ids); `min_files` (run_type "bundle" threshold, passed in, not
+        hardcoded); the run_type/segment_purpose assignment itself is a long sequential
+        if/elif chain over (segment_level, is_*_cut booleans, role, run_type)
+        combinations -- see notes below.
+    returns: list[dict] with MANIFEST_FIELDNAMES-shaped keys plus two internal-only
+        columns export_run_ids/seed_export_run_ids (pipe-delimited, consumed by
+        _build_membership_rows() and _build_registry() but never written to
+        segment_manifest.csv itself, since MANIFEST_FIELDNAMES excludes them), sorted
+        by (segment_level, segment_id). Consumed by main() as `manifest_rows`, then
+        passed to _build_membership_rows() and _build_registry().
+    notes: (mechanical-extraction risk) `rows_out` entries are mutated in place across
+        3 sequential passes within this one function (run_type assignment,
+        segment_purpose/segment_label assignment, then the redundant-population-hash
+        collapse pass) -- a naive single-pass static parser could misread this as
+        dead/overwritten state rather than sequential refinement, since a row's
+        run_type/segment_purpose/segment_label set by an earlier pass can be
+        overwritten by a later one (the redundant-hash pass in particular). The
+        segment_purpose/segment_label if/elif chain (roughly l.502-537 as originally
+        read) is sequential-control-flow-as-policy: the ~35-member governance-purpose
+        taxonomy (population_denominator/client_population/cross_template_agreement/...)
+        exists only as branch order in this chain, not as a lookup table, so
+        determining "what purpose does segment X get" requires reading the chain
+        top-to-bottom rather than consulting one data structure.
+    """
     root_dims = [d for d in DIMENSION_CONFIG if d["type"] == "root"]
     gov_dims = [d for d in DIMENSION_CONFIG if d["type"] == "governance"]
     cut_dims = [d for d in DIMENSION_CONFIG if d["type"] == "cut"]
@@ -320,6 +522,22 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
     project_presence_by_l2: Dict[str, bool] = defaultdict(bool)
 
     def _subset_to_id(key: frozenset) -> str:
+        """Render a frozenset of (field, value) pairs as this segment's canonical
+        "|"-joined segment_id string, in DIMENSION_CONFIG field order.
+
+        --- trace ---
+        reads: `key` -- a frozenset of (field, value) tuples; closes over `cfg_fields`
+            (the enclosing _build_segments()'s DIMENSION_CONFIG field-name list, root
+            dimension first).
+        calls: none.
+        thresholds: none (field order comes from the closed-over `cfg_fields` list, not
+            re-derived here).
+        returns: str, e.g. "imperial|Template|Acme"; called repeatedly throughout
+            _build_segments() (populations grouping, project_presence_by_l2 keys,
+            segment_id/parent_id/ancestor_segment_ids construction) -- this is the
+            single place segment_id strings are actually assembled from a
+            dimension-value key.
+        """
         kv = dict(key)
         return "|".join(kv[f] for f in cfg_fields if f in kv)
 
@@ -472,6 +690,24 @@ def _build_segments(rows:List[Dict[str,str]],min_files:int,enable_cross_org_temp
         else: r["run_type"]="registration"
     # purpose/label
     def child_span(r):
+        """Classify a segment's direct level-3 children as "multi_client" or
+        "single_client", used to distinguish a genuine cross-org template pool from a
+        redundant single-child pass-through.
+
+        --- trace ---
+        reads: `r` -- one row from `rows_out`, passed by the purpose/label assignment
+            loop; closes over `row_to_key`, `key_to_children`, `key_to_row` (all built
+            earlier in the enclosing _build_segments() call).
+        calls: none (set comprehension only).
+        thresholds: none named -- "distinct scope" is `client_label or
+            business_center_label` on a level-3 child, treated as mutually exclusive
+            per the comment above this function.
+        returns: "multi_client" if more than one distinct client_label/
+            business_center_label value appears among direct level-3 children, else
+            "single_client"; consumed only by the segment_purpose if/elif chain
+            (distinguishes "cross_org_template_pool" from "redundant_single_child" for
+            a level-2/3 role_alone Template segment).
+        """
         row_key = row_to_key[id(r)]
         # A distinct scope is a real client_label or business_center_label on
         # a level-3 child (mutually exclusive per row today, so a plain set
@@ -600,6 +836,31 @@ def _build_registry(
     conformance_reference_mode is carried over verbatim (defaulting to "latest"
     for new segments and for older registries written before this field
     existed); no other mode is implemented yet.
+
+    --- trace ---
+    reads: `manifest_rows` -- _build_segments()'s return value, from main(); reads
+        segment_id/parent_segment_id/run_type/population_hash/segment_purpose/
+        segment_label/export_run_ids per row. `existing_registry` -- prior
+        run_registry.csv rows (Optional, from main() via _read_csv() when
+        registry_path already exists); reads segment_id/output_folder/status/
+        last_run_utc/notes/conformance_reference_mode/population_hash/run_type per
+        row. `existing_membership` -- Dict[segment_id, sorted export_run_ids] from
+        _membership_by_segment() on a prior segment_membership.csv (Optional).
+    calls: _sanitize_folder() (new segments only); _append_note()
+        (population_changed/new_files/removed_files/run_type_changed notes).
+    thresholds: `{"bundle", "reference"}` (hardcoded literal set, used twice:
+        eligible_rows filter and the run_type-changed detection) -- the only two
+        run_types that get a run_registry.csv row at all; "latest" (hardcoded literal:
+        the only implemented conformance_reference_mode).
+    returns: list[dict], REGISTRY_FIELDNAMES-shaped (segment_id/parent_segment_id/
+        run_type/population_hash/conformance_reference_mode/output_folder/status/
+        last_run_utc/notes/segment_purpose/segment_label); consumed by main() as
+        `registry_rows`, written to run_registry.csv, and subsequently read and
+        mutated in place by tools/run_segment_orchestrator.py's load_registry()/
+        write_registry_atomic() after each segment run. Writes a `[WARN]` line to
+        stderr (not the return value) for any segment_id present in
+        `existing_registry` but absent from the new manifest (dropped_ids), naming
+        folders under segments/ the caller should manually review.
     """
     existing_membership = existing_membership or {}
     existing_by_id: Dict[str, Dict[str, str]] = {}
@@ -714,6 +975,20 @@ def _print_summary(
     manifest_rows: List[Dict[str, str]],
     min_files: int,
 ) -> None:
+    """Print the human-readable run-plan summary (bundle/reference/skipped/
+    registration segments) to stdout after a successful build.
+
+    --- trace ---
+    reads: `manifest_path`, `registry_path` -- Paths, used only for the "written:"
+        lines; `manifest_rows` -- _build_segments()'s return value, from main();
+        `min_files` -- int, from main()'s --min-files, for the "Skipped (below
+        min_files=N)" label.
+    calls: none (print() only).
+    thresholds: none beyond `min_files` itself (caller-supplied, used only in the
+        printed label text).
+    returns: None; side effect is stdout output only. Called once by main(), as the
+        final step of a successful (non-blocked) build.
+    """
     bundles = [r for r in manifest_rows if r["run_type"] == "bundle"]
     refs = [r for r in manifest_rows if r["run_type"] == "reference"]
     skips = [r for r in manifest_rows if r["run_type"] == "skip"]
@@ -744,6 +1019,34 @@ def _print_summary(
 
 
 def main(argv: List[str] | None = None) -> int:
+    """CLI entry point: read file_metadata.csv, validate required metadata, build the
+    segment lattice, and write segment_manifest.csv / run_registry.csv /
+    segment_membership.csv.
+
+    --- trace ---
+    reads: CLI args --metadata-file (required), --out-dir (required), --min-files
+        (default 3), --enable-cross-org-template-bundles, --enable-parent-bundle-runs.
+        Reads file_metadata.csv at --metadata-file; reads any pre-existing
+        run_registry.csv/segment_membership.csv under --out-dir for incremental
+        carry-over.
+    calls: _read_csv() (metadata file, plus existing registry/membership if present);
+        _validate_required_metadata(); _normalize_rows(); _build_segments();
+        _membership_by_segment(); _build_registry(); _build_membership_rows();
+        _atomic_write_csv() (x3: segment_manifest.csv, run_registry.csv,
+        segment_membership.csv); _print_summary().
+    thresholds: REQUIRED_COLUMNS (module constant, l.17: header-presence check);
+        REQUIRED_ROW_FIELDS (module constant, l.24, via _validate_required_metadata());
+        KNOWN_ROLES = {"Project","Template","Container","Generic",""} (l.819 as
+        originally read: unrecognized governance_role values get a [WARN], not a
+        block).
+    returns: int exit code (1 on missing/invalid --metadata-file, missing required
+        columns, or any _validate_required_metadata() diagnostic -- in every blocking
+        case, no output file is written; 0 on success). Invoked as **Run C1** (l.186 of
+        tools/corpus_update_runbook.ps1); its three outputs (segment_manifest.csv,
+        run_registry.csv, segment_membership.csv) are consumed by **Run C2**
+        (tools/run_segment_orchestrator.py) and **Run C2.5**
+        (tools/build_results_registry.py).
+    """
     parser = argparse.ArgumentParser(
         description="Build segment_manifest.csv and run_registry.csv from file_metadata.csv.",
     )
