@@ -50,9 +50,20 @@ Because full-population verification now uses the same effective (stripped) gate
 - `--discovery-target`: `join`, `sig`, or `both`.
 - `--search-modes`: comma-separated `greedy`, `pareto`.
 - `--policy-modes`:
-  - `discover`: discovered candidates only (minus exclusions).
+  - `discover`: canonical emitted candidates only (minus explicit discovery exclusions); loaded required/optional/shape-required policy fields are context, not scoring inputs.
   - `validate`: required+optional only.
-  - `harsh`: required+optional+discovered.
+  - `harsh`: required+optional+discovered (the established broad, policy-seeded challenger search; not stricter validation).
+
+Discovery and validation now use structurally explicit evaluator modes. Diagnostics
+expose both `selected_fields` and `effective_fields_actually_scored`, together with
+candidate/policy/discriminator provenance. For a policy discriminator, join
+discovery emits a global result plus independently scored per-value results; the
+policy's `shape_requirements.additional_required` values apply to validation, not
+to those discovery candidates. Per-value partitioning happens before sampling;
+each partition receives its own deterministic sample cap and reports
+`records_total_partition`, `records_sampled_partition`, and
+`partition_sample_rate`. See
+`docs/discovery_policy_semantics_change.md` for the verification note and example.
 - `--sample-size`: per-domain sample cap (`0` => uncapped).
 - `--sample-seed`: deterministic sampling seed.
 - `--max-candidate-fields`: cap candidate-field pool size.

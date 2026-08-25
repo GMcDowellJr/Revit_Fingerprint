@@ -1,6 +1,10 @@
 # Discovery sweep runbook
 
-The sweep has equivalent repository-root entry points:
+The supported sweep entry points remain the repository-root wrappers below.
+They are the normal way to run discovery across domains; the individual
+`tools/discover_join_policy.py` and `tools/discover_hash_policy.py` commands are
+stage implementations invoked by the sweep, not replacements for its entry
+point.
 
 ```powershell
 .\run_discovery_sweep.ps1 -Run
@@ -23,7 +27,12 @@ Before subprocesses start, fingerprint preparation reports its scope. Large
 monolithic CSVs are scanned at most once per sweep and retained only as compact
 order-independent per-domain hashes; they are not rescanned for every mode.
 
-Both delegate to `tools/discovery_orchestrator.py`; `--force`/`-Force` bypasses
+Both root wrappers delegate to `tools/discovery_orchestrator.py`; the older
+`tools/run_discovery_sweep.py` wrapper remains available for backward
+compatibility and delegates to the same orchestrator. The orchestrator invokes
+`tools/discover_join_policy.py` for join stages and
+`tools/discover_hash_policy.py --discovery-target sig` for sig stages.
+`--force`/`-Force` bypasses
 matching cache entries. `ExportsRoot`, `RepoRoot`, `SuggestionsCsv`, `Domains`,
 `SkipJoin`, `SkipSig`, `WhatIf`, and `Run` are available in the spelling native
 to each shell. Skipping both targets is rejected as an invalid no-op sweep.
@@ -38,6 +47,12 @@ and validate run normally; harsh runs only when validate fails that same gate.
 For shape-gated domains, every gate must have an accepted validation result;
 one passing gate cannot suppress harsh evidence required by another gate.
 Full-population verification is always enabled by the runbook.
+
+Per-discriminator discovery rows are auxiliary evidence with
+`result_scope=partition_diagnostic`. They remain in the archived stage CSV, but
+the orchestrator excludes them from acceptance, cache, Pareto escalation, and
+domain-wide summary selection; only global/runtime-policy rows drive those sweep
+decisions.
 
 `validate` retains its existing meaning: it searches within the governed
 `required_fields + optional_items` candidate universe. It does not score only
@@ -96,6 +111,10 @@ the relevant entry; `--force` bypasses it.
 Bump it whenever discovery inputs, evaluation behavior, acceptance logic, or
 other result-affecting orchestration semantics change. Do not bump it for a
 documentation-only change.
+
+The candidate/runtime scoring separation changed result-affecting evaluation
+semantics, so its sweep cache contract is `discovery-sweep-v3`. Evidence cached
+under v2 cannot be reused for the corrected discovery results.
 
 WhatIf computes the plan without publishing summaries or cache changes. It
 reports requested domains, likely fingerprint-verified cache hits, initial

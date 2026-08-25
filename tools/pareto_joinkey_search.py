@@ -62,7 +62,7 @@ def pareto_search(
     # required baseline is set (discover mode: required_fields is empty, so this
     # degrades to the original combinations-over-the-whole-pool behavior exactly).
     required_fields = sorted(
-        {str(f).strip() for f in (gates.get("required_fields") or []) if str(f).strip()},
+        {str(f).strip() for f in (cfg.get("runtime_required_fields") or gates.get("required_fields") or []) if str(f).strip()},
         key=lambda s: s.lower(),
     )
     required_set = set(required_fields)
@@ -75,8 +75,9 @@ def pareto_search(
     remaining = [f for f in fields if f not in required_set]
     max_extra_k = max(0, max_k - len(required_present))
 
-    scoring_gates = {k: v for k, v in gates.items() if k != "required_fields"}
-    scoring_cfg = {**cfg, "gates": scoring_gates}
+    scoring_cfg = dict(cfg)
+    if "evaluation_mode" not in scoring_cfg:
+        scoring_cfg["gates"] = {k: v for k, v in gates.items() if k != "required_fields"}
 
     rows: List[dict] = []
     for extra_k in range(0, max_extra_k + 1):

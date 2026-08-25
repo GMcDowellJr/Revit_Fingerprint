@@ -269,10 +269,28 @@ def score_candidate(
     by_sig: Dict[str, set[str]] = defaultdict(set)
     covered = 0
     failures: Dict[str, int] = defaultdict(int)
+    effective_fields: set[str] = set()
+
+    evaluation_mode = str(cfg.get("evaluation_mode") or "legacy")
+    gates = dict(cfg.get("gates") or {})
+    if evaluation_mode == "candidate":
+        # Discovery may retain discriminator metadata for partitioning/reporting,
+        # but neither the ratified base requirements nor per-shape requirements
+        # are part of the candidate key being tested.
+        gates.pop("required_fields", None)
+        gates.pop("shape_requirements", None)
+    elif evaluation_mode == "runtime":
+        # Search engines structurally seed selected_fields with the runtime
+        # baseline. Use the complete contender here so harsh/validate challenger
+        # metrics do not silently collapse back to the baseline alone.
+        gates["required_fields"] = list(selected_fields)
 
     for row in sorted(records, key=lambda r: (_norm(r.get("record_pk")), _norm(r.get("file_id")))):
         record_pk = _norm(row.get("record_pk"))
-        status, selected, reason = build_candidate_join_key(identity_items_by_record, record_pk, selected_fields, cfg.get("gates"))
+        status, selected, reason, details = build_candidate_join_key_with_details(
+            identity_items_by_record, record_pk, selected_fields, gates
+        )
+        effective_fields.update(str(v) for v in details.get("effective_required_fields", []) if str(v))
         if status != "ok":
             failures[status if not reason else f"{status}:{reason}"] += 1
             continue
@@ -299,6 +317,8 @@ def score_candidate(
 
     return {
         "selected_fields": list(selected_fields),
+        "effective_fields_actually_scored": sorted(effective_fields, key=str.lower),
+        "evaluation_mode": evaluation_mode,
         "records_total": total,
         "records_covered": covered,
         "coverage": (covered / total) if total else 0.0,
