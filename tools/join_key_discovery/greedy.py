@@ -38,7 +38,7 @@ def discover_greedy(
     # result. Seed `selected` with the required fields up front so the reported
     # selected_fields matches what was actually evaluated.
     required_fields = sorted(
-        {str(f).strip() for f in ((cfg.get("gates") or {}).get("required_fields") or []) if str(f).strip()},
+        {str(f).strip() for f in (cfg.get("runtime_required_fields") or (cfg.get("gates") or {}).get("required_fields") or []) if str(f).strip()},
         key=lambda s: s.lower(),
     )
     selected: List[str] = list(required_fields)
@@ -67,8 +67,9 @@ def discover_greedy(
     # required-inclusive) -- the real candidate under test -- while
     # shape-gating (discriminator_key/shape_requirements) stays active via the
     # rest of `gates`, unaffected.
-    scoring_gates = {k: v for k, v in (cfg.get("gates") or {}).items() if k != "required_fields"}
-    scoring_cfg = {**cfg, "gates": scoring_gates}
+    scoring_cfg = dict(cfg)
+    if "evaluation_mode" not in scoring_cfg:
+        scoring_cfg["gates"] = {k: v for k, v in (cfg.get("gates") or {}).items() if k != "required_fields"}
 
     while remaining:
         contenders = []
