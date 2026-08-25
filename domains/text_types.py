@@ -345,10 +345,19 @@ def extract(doc, ctx=None):
             if p_arrow:
                 arrow_id = p_arrow.AsElementId()
                 if arrow_id and arrow_id.IntegerValue > 0:
-                    arrow = doc.GetElement(arrow_id)
+                    # A positive reference ID is itself evidence a leader arrowhead
+                    # is assigned -- mark this BEFORE attempting element resolution,
+                    # so a stale/unresolvable reference (GetElement returns None or
+                    # raises) is reported as unreadable/missing, not silently
+                    # collapsed into "no leader arrowhead" (D-043 follow-up).
+                    leader_arrow_ref_present = True
+                    try:
+                        arrow = doc.GetElement(arrow_id)
+                    except Exception:
+                        arrow = None
+                        leader_arrow_lookup_unreadable = True
                     if arrow:
                         leader_arrow_uid = getattr(arrow, "UniqueId", None)
-                        leader_arrow_ref_present = True
 
                         try:
                             ah_map = (ctx or {}).get("arrowheads_by_type_id", {}) if ctx is not None else {}

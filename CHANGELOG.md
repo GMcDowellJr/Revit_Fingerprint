@@ -212,6 +212,19 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   explicit `sig_hash_schema` to the registry for the first time (previously
   implicit via `generate_sig_hash_policy.py`'s `.v1` fallback). See
   DECISIONS.md D-045.
+- **`text_types`: a stale/unresolvable leader-arrowhead element reference no
+  longer collapses into "no leader arrowhead" (D-046).** Direct follow-up to
+  D-044, found by automated PR review: `leader_arrow_ref_present` was set
+  only after `doc.GetElement(arrow_id)` successfully returned an element,
+  so a positive `AsElementId()` reference that then failed to resolve (a
+  stale/deleted element, or `GetElement()` raising) still fell back to
+  `v=None, q=ok` -- the same state-collapse D-044 fixed for the sig_hash
+  lookup, one step earlier. Now `leader_arrow_ref_present` is set as soon as
+  a positive reference ID is observed, and a failed/empty element
+  resolution reports `q=missing` (not found) or `q=unreadable` (lookup
+  raised). Not hash-breaking, same reasoning as D-044. Added two tests to
+  `tests/test_text_types_leader_arrowhead_quality.py` covering the
+  stale-reference and lookup-exception cases directly.
 - **`mapping/create_line_pattern_mappings.py`: an explicit but invalid `IN[2]`
   repo root now fails loudly instead of silently falling back to the
   environment or `__file__`.** A caller-supplied `IN[2]` is an explicit

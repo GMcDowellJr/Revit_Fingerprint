@@ -37,6 +37,11 @@ class _Doc:
         return self._elem_by_int_id.get(getattr(elem_id, "IntegerValue", None))
 
 
+class _RaisingDoc:
+    def GetElement(self, elem_id):
+        raise RuntimeError("element lookup failed")
+
+
 def _first_param_with_leader_arrowhead(t, bip_names=None, ui_names=None):
     if bip_names and "LEADER_ARROWHEAD" in bip_names:
         return _LeaderArrowParam()
@@ -106,3 +111,24 @@ def test_leader_arrowhead_reference_present_without_dependency_map_is_missing(mo
     item = _leader_item(rec)
     assert item["v"] is None
     assert item["q"] == "missing"
+
+
+def test_stale_leader_arrowhead_element_reference_is_missing_not_ok(monkeypatch):
+    # P2 review follow-up on D-044: a positive AsElementId() is itself evidence
+    # a leader arrowhead is assigned, even if doc.GetElement() then can't
+    # resolve it (a stale/deleted reference). This must not be reported as
+    # "no leader arrowhead" just because element resolution came back empty.
+    doc = _Doc({})  # GetElement(555) -> None: stale reference
+    rec = _extract_record(monkeypatch, doc=doc, ctx={}, first_param_fn=_first_param_with_leader_arrowhead)
+    item = _leader_item(rec)
+    assert item["v"] is None
+    assert item["q"] == "missing"
+
+
+def test_leader_arrowhead_element_lookup_exception_is_unreadable(monkeypatch):
+    # Same positive-reference case, but doc.GetElement() itself raises --
+    # distinct from "not found," reported as unreadable rather than missing.
+    rec = _extract_record(monkeypatch, doc=_RaisingDoc(), ctx={}, first_param_fn=_first_param_with_leader_arrowhead)
+    item = _leader_item(rec)
+    assert item["v"] is None
+    assert item["q"] == "unreadable"

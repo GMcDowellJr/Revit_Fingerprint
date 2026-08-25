@@ -2327,3 +2327,49 @@ these domains.
   this repository parses or branches on the schema string's version suffix
   today (confirmed via full-suite pass with no assertions on the literal
   value), so this is safe to bump without an accompanying migration.
+
+## D-046 — `text_types`: mark leader-arrowhead reference present before element resolution, not after
+
+### Status
+Accepted (2026-08-25)
+
+### Context
+Found by automated PR review (Codex bot) on the D-045 PR -- a direct
+follow-up to D-044's own fix. D-044 fixed the case where a leader arrowhead
+reference resolves to a real element but its `sig_hash` lookup then fails.
+It missed an earlier point in the same code path: `leader_arrow_ref_present`
+was set to `True` only *inside* `if arrow:` (i.e. only after
+`doc.GetElement(arrow_id)` successfully returned a non-`None` element). A
+positive `AsElementId()` result (`arrow_id.IntegerValue > 0`) is itself
+already proof that a leader arrowhead is assigned -- but if that reference
+is stale (the referenced element was since deleted, or the ID is otherwise
+unresolvable) and `doc.GetElement()` returns `None`, or if `GetElement()`
+itself raises, `leader_arrow_ref_present` stayed `False`, and the record
+fell back into the exact "no leader arrowhead" (`v=None, q=ok`) state D-044
+had just fixed for the sig_hash-lookup case -- the same collapse, one step
+earlier in the same function.
+
+### Decision
+Move `leader_arrow_ref_present = True` to immediately after confirming
+`arrow_id and arrow_id.IntegerValue > 0`, before calling
+`doc.GetElement(arrow_id)`. Wrap that call in its own `try/except`,
+reusing the existing `leader_arrow_lookup_unreadable` flag on exception (an
+unresolvable reference due to an exception is `q=unreadable`; a resolvable-
+but-empty `GetElement()` return, or an unresolved `arrowheads_by_type_id`
+lookup, is `q=missing`). Added
+`test_stale_leader_arrowhead_element_reference_is_missing_not_ok` and
+`test_leader_arrowhead_element_lookup_exception_is_unreadable` to
+`tests/test_text_types_leader_arrowhead_quality.py`, covering both new
+branches directly.
+
+### Consequences
+- **Not hash-breaking**, for the same reason as D-044:
+  `text_type.leader_arrowhead_sig_hash` isn't in `required_keys` or the
+  domain's sig_hash key set.
+- A text type with a stale or otherwise unresolvable leader-arrowhead
+  reference now reports `q=missing`/`q=unreadable` instead of silently
+  looking identical to a text type with no leader arrowhead at all --
+  closing the last gap in this state-collapse across the whole
+  leader-arrowhead read (parameter absent → none; reference present but
+  unresolvable element → missing/unreadable; element resolved but sig_hash
+  lookup unresolved → missing/unreadable; fully resolved → ok).
