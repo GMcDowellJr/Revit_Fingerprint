@@ -209,7 +209,7 @@ def extract_ceiling_types(doc, ctx=None):
         _attach_placeholder_metadata(rec, ct, _instance_count_map, _instance_count_map_q, _total_type_count)
         rec["sig_basis"] = {
             "schema": "ceiling_types.sig_basis.v1",
-            "keys_used": ["ct.layer_count", "ct.total_thickness_in", "ct.stack_hash_loose"],
+            "keys_used": sorted(safe_str(it.get("k", "")) for it in sig_hash_items),
         }
         rec["layer_rows"] = cs_data["layer_rows"]
         records.append(rec)

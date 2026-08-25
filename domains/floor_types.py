@@ -236,7 +236,7 @@ def extract_floor_types(doc, ctx=None):
         _attach_placeholder_metadata(rec, ft, _instance_count_map, _instance_count_map_q, _total_type_count)
         rec["sig_basis"] = {
             "schema": "floor_types.sig_basis.v1",
-            "keys_used": ["ft.layer_count", "ft.total_thickness_in", "ft.stack_hash_loose"],
+            "keys_used": sorted(safe_str(it.get("k", "")) for it in sig_hash_items),
         }
         rec["layer_rows"] = cs_data["layer_rows"]
         records.append(rec)

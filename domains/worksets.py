@@ -268,6 +268,7 @@ def _build_per_workset_record(ws, active_workset_id, active_workset_lookup_ok, k
     )
 
     sig_hash = None
+    semantic_items = []
     if not blocked:
         sig_hash_keys = set(resolve_sig_hash_keys(
             (ctx or {}).get("sig_hash_policies"),
@@ -326,7 +327,7 @@ def _build_per_workset_record(ws, active_workset_id, active_workset_lookup_ok, k
     }
     rec["sig_basis"] = {
         "schema": "worksets.sig_basis.v1",
-        "keys_used": list(WORKSETS_SEMANTIC_KEYS),
+        "keys_used": sorted(it.get("k") for it in semantic_items),
     }
 
     return rec
@@ -433,7 +434,7 @@ def _build_doc_level_record(doc, is_workshared, active_workset_name, kind_counts
     }
     rec["sig_basis"] = {
         "schema": "worksets_doc.sig_basis.v1",
-        "keys_used": list(WORKSETS_DOC_SEMANTIC_KEYS),
+        "keys_used": sorted(it.get("k") for it in semantic_items),
     }
 
     return rec

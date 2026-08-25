@@ -2102,3 +2102,109 @@ this resolver.
 - `join_hash`/`identity_basis.items` are unaffected — `row_key` remains
   required canonical identity evidence and part of the join-key policy,
   which was already correct and independent of this bug.
+
+## D-043 — Register the five D-040 identity-visibility promotions in the domain key registry; report only used keys in `sig_basis`
+
+### Status
+Accepted (2026-08-25)
+
+### Context
+Found by automated PR review (Codex bot) on the D-042 PR, immediately after
+that PR pushed. D-040 promoted five fields from phase2-only buckets into
+`identity_basis.items` (`arrowhead.record_class`, `lp.is_import`,
+`line_style.pattern_ref.synopsis`, `text_type.leader_arrowhead_sig_hash`,
+`vt.assigned_view_count`) so they'd be visible to
+`discover_hash_policy.py`'s/`discover_join_policy.py`'s pareto search. That
+PR's own description called this "purely additive," and it is for
+`sig_hash`/`join_key` — but `contracts/domain_identity_keys_v2.json`'s
+per-domain `allowed_keys` is a **closed** registry: `validators/record_v2.py`'s
+`validate_record_v2()` rejects any `identity_basis.items` key not in a
+domain's `allowed_keys` (or matching an `allowed_key_prefixes` entry) with
+`identity.key.not_allowed:<key>`. Three of the five promotions
+(`arrowhead.record_class`, `lp.is_import`, `vt.assigned_view_count`) were
+never added to their domains' registry entries, so every real extraction
+producing these records would fail strict contract validation the moment
+anything actually calls `validate_record_v2()` against them — which nothing
+in the test suite did, for any of arrowheads/line_patterns/view_templates,
+which is exactly why this shipped unnoticed across two PRs. (The other two
+promotions, `line_style.pattern_ref.synopsis` on `line_styles` and
+`text_type.leader_arrowhead_sig_hash` on `text_types`, were already present
+in those domains' registries beforehand — no gap there.)
+
+A second, independent finding from the same review pass: `sig_basis.keys_used`
+(introduced alongside each domain's inline `sig_hash` as audit metadata
+describing which keys fed the hash preimage) was, in several domains,
+populated from the domain's full resolved/fallback key set rather than the
+keys actually present on that specific record. For `arrowheads.py` this was
+observably wrong: `resolve_sig_hash_keys()`'s `allowed_items` is the union
+across all record classes (Arrow ∪ Tick ∪ common), but a `SizeOnly` or
+`Unknown` record's `identity_basis.items` never contains the Arrow- or
+Tick-specific keys at all (`class_items = []` for those classes) — so its
+`sig_basis.keys_used` claimed keys were hashed that were never present on
+the record, making the audit trail unable to reproduce or explain the hash.
+The same hardcoded-metadata pattern (reporting a fixed key list/constant
+rather than the keys actually used) was present, though not currently
+observably wrong given today's data, in every other domain converted to
+`resolve_sig_hash_keys()` in D-040/D-042: `wall_types`, `floor_types`,
+`roof_types`, `ceiling_types`, `units`/`units_doc`, `worksets`/`worksets_doc`,
+`browser_organization`, and `object_styles` (all 4 partitions).
+
+### Decision
+1. Add the three missing keys to their domains' `allowed_keys` in
+   `contracts/domain_identity_keys_v2.json`: `arrowhead.record_class`
+   (`arrowheads`), `lp.is_import` (`line_patterns`), and
+   `vt.assigned_view_count` (all 5 `view_templates_*` partitions).
+2. For `arrowheads` and the 5 `view_templates_*` partitions, which had no
+   prior `sig_hash_keys` override (so `tools/generate_sig_hash_policy.py`
+   would otherwise fall back to the full, now-widened `allowed_keys` on any
+   future regeneration — the exact D-039 mechanism), add an explicit
+   `sig_hash_keys` override reproducing today's actual preimage set (the
+   pre-existing 9 arrowhead keys; `view_template.def_hash` alone per
+   partition) so the newly-visible key cannot silently widen sig_hash on a
+   future policy regeneration. `line_patterns` already had a correct
+   `sig_hash_keys` override excluding `lp.is_import`, so no change was
+   needed there. `policies/domain_sig_hash_policies.json` required no edits
+   — the new overrides reproduce values already compiled there.
+3. Fix `sig_basis.keys_used` in every domain listed above to report the
+   keys actually present in the filtered item list that fed the hash
+   preimage (e.g. `sorted(it["k"] for it in sig_hash_items)`), not a
+   hardcoded literal, a module-level constant, or the raw resolved
+   `allowed_items` union. `arrowheads.py`'s `sig_hash_items` (previously
+   scoped only inside its non-blocked branch) is now initialized
+   unconditionally so `keys_used` is always well-defined; likewise
+   `worksets.py`'s and `browser_organization.py`'s `semantic_items`.
+4. Added regression coverage that was structurally absent before this:
+   `test_arrowhead_record_class_passes_contract_validation`,
+   `test_lp_is_import_passes_contract_validation`, and
+   `test_vt_assigned_view_count_passes_contract_validation_for_every_partition`
+   each build a record.v2 including the promoted key and assert
+   `validate_record_v2()` returns no violations against the real registry —
+   none of these three domains had any test exercising that validator
+   before. `test_sig_basis_keys_used_reflects_only_keys_present_for_record_class`
+   proves a `SizeOnly` arrowhead's `sig_basis.keys_used` excludes
+   Arrow/Tick-specific keys it never had as items.
+
+### Consequences
+- **Not hash-breaking anywhere.** `sig_hash`/`join_key`/`join_hash` values
+  are unchanged for every domain touched — this decision only fixes contract
+  validation (a real record that was silently invalid becomes valid) and
+  audit-metadata accuracy (`sig_basis.keys_used` now describes what was
+  actually hashed).
+  `sig_basis.keys_used` values change for every domain listed in Decision
+  item 3, but only in cases where they previously diverged from the actual
+  keys used, which is scoped to records where a resolved/fallback key isn't
+  present on that specific record (currently only demonstrated for
+  `arrowheads`' non-Arrow record classes; a no-op everywhere the sets already
+  coincided).
+- Real exports of `arrowheads`/`line_patterns`/`view_templates_*` records
+  produced since D-040/D-041 landed (this PR's own commits, not yet released)
+  were never actually run through `validate_record_v2()` in production, so no
+  externally-visible breakage occurred — this closes the gap before it could.
+- Going forward, any new key promoted into `identity_basis.items` for
+  visibility only (not affecting `sig_hash`/`join_key`) must be added to the
+  domain's registry `allowed_keys` in the same change, and, if the domain has
+  no `sig_hash_keys` override, an explicit override must be added at the same
+  time to freeze the current preimage set — this is the same discipline
+  D-039/D-042 established for the opposite direction (an
+  already-registered key silently entering `sig_hash`); this decision closes
+  the other direction (a newly-visible key never being registered at all).

@@ -325,14 +325,7 @@ def extract_wall_types(doc, ctx=None):
         _attach_placeholder_metadata(rec, wt, _instance_count_map, _instance_count_map_q, _total_type_count)
         rec["sig_basis"] = {
             "schema": "wall_types.sig_basis.v1",
-            "keys_used": [
-                "wt.function",
-                "wt.wraps_at_inserts",
-                "wt.wraps_at_ends",
-                "wt.layer_count",
-                "wt.total_thickness_in",
-                "wt.stack_hash_loose",
-            ],
+            "keys_used": sorted(safe_str(it.get("k", "")) for it in sig_hash_items),
         }
         rec["layer_rows"] = cs_data["layer_rows"]
         records.append(rec)

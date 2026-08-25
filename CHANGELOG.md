@@ -143,6 +143,47 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `candidate_keys`. `object_styles.py`'s call moved inside its per-category
   loop (it previously ran once before the loop, with no per-record keys
   available for prefix resolution). See DECISIONS.md D-042.
+- **Registered three D-040 identity-visibility promotions that were never
+  added to the domain key registry, closing a contract-validation gap
+  (D-043).** `arrowhead.record_class`, `lp.is_import`, and
+  `vt.assigned_view_count` were promoted into `identity_basis.items` by
+  D-040 but never added to `contracts/domain_identity_keys_v2.json`'s
+  `allowed_keys` for `arrowheads`/`line_patterns`/`view_templates_*`, so
+  `validators/record_v2.py`'s `validate_record_v2()` would reject every
+  real-export record from these domains with
+  `identity.key.not_allowed:<key>`. Found by automated PR review; no test
+  in the suite called `validate_record_v2()` against any of these three
+  domains, which is why this shipped across two PRs unnoticed. Added the
+  missing `allowed_keys` entries; for `arrowheads` and the 5
+  `view_templates_*` partitions (which had no prior `sig_hash_keys`
+  override), also added an explicit override reproducing today's actual
+  sig_hash preimage so the newly-visible key can't silently widen sig_hash
+  on a future policy regeneration (the D-039 mechanism, this time closed
+  proactively). Not hash-breaking anywhere. Added regression tests
+  (`test_arrowhead_record_class_passes_contract_validation`,
+  `test_lp_is_import_passes_contract_validation`,
+  `test_vt_assigned_view_count_passes_contract_validation_for_every_partition`)
+  that build a record.v2 and assert clean `validate_record_v2()` results,
+  closing the coverage gap directly. See DECISIONS.md D-043.
+- **`sig_basis.keys_used` now reports the keys actually present in the hash
+  preimage instead of a hardcoded/fallback key set, across every domain
+  converted to `resolve_sig_hash_keys()` in D-040/D-042 (D-043).** Found by
+  automated PR review: `arrowheads.py`'s `sig_basis.keys_used` reported the
+  full cross-record-class union of sig_hash policy keys regardless of
+  record class, so a `SizeOnly`/`Unknown` arrowhead (whose
+  `identity_basis.items` never contains Arrow- or Tick-specific keys at
+  all) claimed those keys were hashed when they were never present on the
+  record -- unreproducible audit metadata. The same pattern (reporting a
+  fixed constant instead of the record's actual filtered key set) existed,
+  though not yet observably wrong given today's data, in `wall_types`,
+  `floor_types`, `roof_types`, `ceiling_types`, `units`/`units_doc`,
+  `worksets`/`worksets_doc`, `browser_organization`, and `object_styles`
+  (all 4 partitions) -- all fixed the same way. Not hash-breaking anywhere
+  (only the `sig_basis.keys_used` metadata field changes, and only where it
+  previously diverged from reality). Added
+  `test_sig_basis_keys_used_reflects_only_keys_present_for_record_class` to
+  prove a `SizeOnly` arrowhead's `keys_used` excludes keys it never had. See
+  DECISIONS.md D-043.
 - **`mapping/create_line_pattern_mappings.py`: an explicit but invalid `IN[2]`
   repo root now fails loudly instead of silently falling back to the
   environment or `__file__`.** A caller-supplied `IN[2]` is an explicit

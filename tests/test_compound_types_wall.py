@@ -494,14 +494,14 @@ def test_identity_items_sorted_and_sig_basis_declared(monkeypatch):
     keys = [it["k"] for it in rec["identity_basis"]["items"]]
     assert keys == sorted(keys)
     assert rec["sig_basis"]["schema"] == "wall_types.sig_basis.v1"
-    assert rec["sig_basis"]["keys_used"] == [
+    assert rec["sig_basis"]["keys_used"] == sorted([
         "wt.function",
         "wt.wraps_at_inserts",
         "wt.wraps_at_ends",
         "wt.layer_count",
         "wt.total_thickness_in",
         "wt.stack_hash_loose",
-    ]
+    ])
 
 
 def test_label_has_quality_provenance_and_components(monkeypatch):

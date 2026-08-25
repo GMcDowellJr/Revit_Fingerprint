@@ -131,3 +131,68 @@ def test_sig_hash_reads_allowed_items_from_ctx_sig_hash_policies_when_present(mo
 
     default_out = _basic_out(m, monkeypatch, ctx=None)
     assert rec["sig_hash"] != default_out["records"][0]["sig_hash"]
+
+
+def _domain_identity_registry_v2():
+    import json
+    with open("contracts/domain_identity_keys_v2.json", "r") as f:
+        return json.load(f)
+
+
+def test_arrowhead_record_class_passes_contract_validation(monkeypatch):
+    # P1 Codex review finding on the D-042 PR: arrowhead.record_class was
+    # promoted into identity_basis.items (D-040) but never registered in
+    # contracts/domain_identity_keys_v2.json's allowed_keys, so
+    # validate_record_v2() rejected every real-export arrowhead record with
+    # identity.key.not_allowed:arrowhead.record_class. No test caught this
+    # because no arrowheads test called validate_record_v2() against the
+    # real registry -- this closes that coverage gap.
+    from validators.record_v2 import validate_record_v2
+
+    registry = _domain_identity_registry_v2()
+    m = _setup_module(monkeypatch)
+    out = _basic_out(m, monkeypatch)
+    rec = out["records"][0]
+    # Provenance the extractor emits ("revit.ElementType.Name_or_params") isn't
+    # in validate_record_v2()'s label.provenance allowlist -- a pre-existing,
+    # separate gap unrelated to this P1 finding. Normalize it here so this
+    # test isolates the registry fix under test.
+    rec["label"]["provenance"] = "computed.path"
+    assert validate_record_v2(rec, registry) == []
+
+
+def test_sig_basis_keys_used_reflects_only_keys_present_for_record_class(monkeypatch):
+    # P2 Codex review finding: sig_basis.keys_used must describe exactly what
+    # was hashed for THIS record, not the full cross-shape allowed_items
+    # union -- a SizeOnly record has no arrow-geometry/tick items in
+    # identity_basis.items at all (class_items=[] for SizeOnly), so claiming
+    # arrowhead.width_angle_deg/fill_tick/arrow_closed/tick_mark_centered/
+    # heavy_end_pen_weight were "used" would be unreproducible audit metadata.
+    m = _setup_module(monkeypatch)
+    size_only_type = _ArrowType(
+        name="Dot Arrowhead",
+        params={
+            "Arrow Style": _Param(value_string="Dot"),
+            "Tick Size": _Param(double_val=0.0208333),
+        },
+        elem_id=3,
+    )
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [size_only_type])
+    monkeypatch.setattr(m, "_is_arrowhead_type", lambda doc, tt: True)
+    out = m.extract(doc=None, ctx=None)
+    rec = out["records"][0]
+
+    record_class_item = [it for it in rec["identity_basis"]["items"] if it["k"] == "arrowhead.record_class"][0]
+    assert record_class_item["v"] == "SizeOnly"
+
+    identity_keys = {it["k"] for it in rec["identity_basis"]["items"]}
+    keys_used = set(rec["sig_basis"]["keys_used"])
+    assert keys_used.issubset(identity_keys)
+    assert "arrowhead.width_angle_deg" not in keys_used
+    assert "arrowhead.fill_tick" not in keys_used
+    assert "arrowhead.arrow_closed" not in keys_used
+    assert "arrowhead.tick_mark_centered" not in keys_used
+    assert "arrowhead.heavy_end_pen_weight" not in keys_used
+
+    sig_hash_items = [it for it in rec["identity_basis"]["items"] if it["k"] in keys_used]
+    assert rec["sig_hash"] == make_hash(serialize_identity_items(sig_hash_items))

@@ -18,6 +18,11 @@ time can go stale relative to what `monkeypatch.setattr(m, ...)` patches on
 the live module object.
 """
 import importlib
+import json
+
+from core.hashing import make_hash
+from core.record_v2 import ITEM_Q_OK, build_record_v2, make_identity_item, serialize_identity_items
+from validators.record_v2 import validate_record_v2
 
 
 class _Id(object):
@@ -91,3 +96,43 @@ def test_assigned_view_count_identity_items_stay_sorted(monkeypatch):
     m._append_assigned_view_count_cosmetic_item(rec, doc=None, v=_Template(elem_id=1), ctx={})
     keys = [it["k"] for it in rec["identity_basis"]["items"]]
     assert keys == sorted(keys)
+
+
+def test_vt_assigned_view_count_passes_contract_validation_for_every_partition():
+    # P1 Codex review finding on the D-042 PR: vt.assigned_view_count was
+    # promoted into identity_basis.items (D-040) but never registered in
+    # contracts/domain_identity_keys_v2.json's allowed_keys for any of the 5
+    # view_templates_* partitions, so validate_record_v2() rejected every
+    # real-export view-template record with
+    # identity.key.not_allowed:vt.assigned_view_count. No test caught this
+    # because no view_templates test called validate_record_v2() against the
+    # real registry -- this closes that coverage gap.
+    with open("contracts/domain_identity_keys_v2.json", "r") as f:
+        registry = json.load(f)
+
+    partitions = [
+        "view_templates_floor_structural_area_plans",
+        "view_templates_ceiling_plans",
+        "view_templates_elevations_sections_detail",
+        "view_templates_renderings_drafting",
+        "view_templates_schedules",
+    ]
+    for domain in partitions:
+        identity_items = sorted(
+            [
+                make_identity_item("view_template.def_hash", "a" * 32, ITEM_Q_OK),
+                make_identity_item("vt.assigned_view_count", "3", ITEM_Q_OK),
+            ],
+            key=lambda it: it["k"],
+        )
+        rec = build_record_v2(
+            domain=domain,
+            record_id="test-view-template",
+            status="ok",
+            status_reasons=[],
+            sig_hash=make_hash(serialize_identity_items(identity_items)),
+            identity_items=identity_items,
+            required_qs=[ITEM_Q_OK],
+            label={"display": "Test Template", "quality": "human", "provenance": "computed.path", "components": {}},
+        )
+        assert validate_record_v2(rec, registry) == [], domain

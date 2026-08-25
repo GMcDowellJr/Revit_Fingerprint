@@ -470,7 +470,7 @@ def extract(doc, ctx=None):
         }
         rec["sig_basis"] = {
             "schema": "units.sig_basis.v1",
-            "keys_used": list(UNITS_SEMANTIC_KEYS),
+            "keys_used": sorted(it.get("k") for it in semantic_items),
         }
 
         v2_records.append(rec)
@@ -620,7 +620,7 @@ def extract_units_doc(doc, ctx=None):
     }
     rec["sig_basis"] = {
         "schema": "units_doc.sig_basis.v1",
-        "keys_used": list(UNITS_DOC_SEMANTIC_KEYS),
+        "keys_used": sorted(it.get("k") for it in semantic_items),
     }
 
     info["records"] = [rec]

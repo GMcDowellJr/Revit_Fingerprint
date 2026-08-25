@@ -518,7 +518,6 @@ def extract(doc, ctx=None):
             [it.get("k") for it in identity_items],
             _ARROWHEADS_SIG_HASH_KEYS_FALLBACK,
         )
-        semantic_keys = sorted(set(sig_hash_keys))
 
         # Required qs: style + tick_size must be OK (classifier depends on their presence)
         required_qs = [style_label_q, tick_in_q]
@@ -542,6 +541,7 @@ def extract(doc, ctx=None):
 
         status = STATUS_OK if not any_incomplete else STATUS_DEGRADED
         sig_hash = None
+        sig_hash_items = []
 
         if v2_blocked:
             status = STATUS_BLOCKED
@@ -551,6 +551,11 @@ def extract(doc, ctx=None):
             preimage = serialize_identity_items(sig_hash_items)
             sig_hash = make_hash(preimage)
             v2_sig_hashes.append(sig_hash)
+
+        # D-043 (P2 review finding): report only the keys actually present in the
+        # hash preimage, not the full cross-shape allowed_items union -- a SizeOnly
+        # record must not claim Arrow-geometry keys were used when they weren't.
+        semantic_keys = sorted(safe_str(it.get("k", "")) for it in sig_hash_items)
 
         # Label is not identity; keep human if possible.
         label_display = nm if nm else "Arrowhead"

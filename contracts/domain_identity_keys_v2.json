@@ -28,11 +28,23 @@
         "arrowhead.fill_tick",
         "arrowhead.arrow_closed",
         "arrowhead.tick_mark_centered",
-        "arrowhead.heavy_end_pen_weight"
+        "arrowhead.heavy_end_pen_weight",
+        "arrowhead.record_class"
       ],
       "required_keys": [
         "arrowhead.style",
         "arrowhead.tick_size_in"
+      ],
+      "sig_hash_keys": [
+        "arrowhead.style",
+        "arrowhead.arrow_style_raw_int",
+        "arrowhead.arrow_style_display",
+        "arrowhead.tick_size_in",
+        "arrowhead.width_angle_deg",
+        "arrowhead.fill_tick",
+        "arrowhead.arrow_closed",
+        "arrowhead.tick_mark_centered",
+        "arrowhead.heavy_end_pen_weight"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -711,7 +723,8 @@
       "display_label": "Line Patterns",
       "allowed_keys": [
         "line_pattern.segment_count",
-        "line_pattern.segments_def_hash"
+        "line_pattern.segments_def_hash",
+        "lp.is_import"
       ],
       "allowed_key_prefixes": [
         "line_pattern.seg["
@@ -1238,12 +1251,16 @@
       "domain_family": "view_templates",
       "display_label": "View Templates — Ceiling Plans",
       "allowed_keys": [
-        "view_template.def_hash"
+        "view_template.def_hash",
+        "vt.assigned_view_count"
       ],
       "allowed_key_prefixes": [
         "view_template.sig."
       ],
       "required_keys": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_keys": [
         "view_template.def_hash"
       ],
       "minima": {
@@ -1254,12 +1271,16 @@
       "domain_family": "view_templates",
       "display_label": "View Templates — Elevations/Sections",
       "allowed_keys": [
-        "view_template.def_hash"
+        "view_template.def_hash",
+        "vt.assigned_view_count"
       ],
       "allowed_key_prefixes": [
         "view_template.sig."
       ],
       "required_keys": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_keys": [
         "view_template.def_hash"
       ],
       "minima": {
@@ -1270,12 +1291,16 @@
       "domain_family": "view_templates",
       "display_label": "View Templates — Floor/Structural Plans",
       "allowed_keys": [
-        "view_template.def_hash"
+        "view_template.def_hash",
+        "vt.assigned_view_count"
       ],
       "allowed_key_prefixes": [
         "view_template.sig."
       ],
       "required_keys": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_keys": [
         "view_template.def_hash"
       ],
       "minima": {
@@ -1286,12 +1311,16 @@
       "domain_family": "view_templates",
       "display_label": "View Templates — Renderings/Drafting",
       "allowed_keys": [
-        "view_template.def_hash"
+        "view_template.def_hash",
+        "vt.assigned_view_count"
       ],
       "allowed_key_prefixes": [
         "view_template.sig."
       ],
       "required_keys": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_keys": [
         "view_template.def_hash"
       ],
       "minima": {
@@ -1302,12 +1331,16 @@
       "domain_family": "view_templates",
       "display_label": "View Templates — Schedules",
       "allowed_keys": [
-        "view_template.def_hash"
+        "view_template.def_hash",
+        "vt.assigned_view_count"
       ],
       "allowed_key_prefixes": [
         "view_template.sig."
       ],
       "required_keys": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_keys": [
         "view_template.def_hash"
       ],
       "minima": {

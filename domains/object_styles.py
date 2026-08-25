@@ -504,7 +504,10 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
                 "coordination_items": phase2_sorted_items(coordination_items),
                 "unknown_items": phase2_sorted_items(unknown_items),
             }
-            rec_v2["sig_basis"] = {"schema": "{}.sig_basis.v1".format(domain_name), "keys_used": semantic_keys}
+            rec_v2["sig_basis"] = {
+                "schema": "{}.sig_basis.v1".format(domain_name),
+                "keys_used": sorted(safe_str(it.get("k", "")) for it in semantic_items),
+            }
 
             v2_records.append(rec_v2)
             if sig_hash_v2:

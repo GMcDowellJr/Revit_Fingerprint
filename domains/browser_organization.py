@@ -409,6 +409,7 @@ def _build_record(category, org, doc, is_workshared, bip_lookup, workset_name_to
     record_id = "browser_organization:{}".format(category_v) if category_v else "browser_organization:unknown"
 
     sig_hash = None
+    semantic_items = []
     if not blocked:
         sig_hash_keys = set(resolve_sig_hash_keys(
             (ctx or {}).get("sig_hash_policies"),
@@ -469,7 +470,7 @@ def _build_record(category, org, doc, is_workshared, bip_lookup, workset_name_to
     }
     rec["sig_basis"] = {
         "schema": "browser_organization.sig_basis.v1",
-        "keys_used": list(BROWSER_ORGANIZATION_SEMANTIC_KEYS),
+        "keys_used": sorted(it.get("k") for it in semantic_items),
     }
 
     return rec
