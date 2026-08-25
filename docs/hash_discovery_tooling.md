@@ -59,7 +59,10 @@ expose both `selected_fields` and `effective_fields_actually_scored`, together w
 candidate/policy/discriminator provenance. For a policy discriminator, join
 discovery emits a global result plus independently scored per-value results; the
 policy's `shape_requirements.additional_required` values apply to validation, not
-to those discovery candidates. See
+to those discovery candidates. Per-value partitioning happens before sampling;
+each partition receives its own deterministic sample cap and reports
+`records_total_partition`, `records_sampled_partition`, and
+`partition_sample_rate`. See
 `docs/discovery_policy_semantics_change.md` for the verification note and example.
 - `--sample-size`: per-domain sample cap (`0` => uncapped).
 - `--sample-seed`: deterministic sampling seed.

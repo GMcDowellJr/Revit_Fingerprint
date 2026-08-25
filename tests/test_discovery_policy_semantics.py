@@ -163,7 +163,7 @@ def test_join_discover_cli_emits_independent_shape_partitions(tmp_path: Path):
     subprocess.run(
         [sys.executable, "tools/discover_join_policy.py", "--phase0-dir", str(phase0),
          "--domains", "demo", "--policy-json", str(policy), "--policy-modes", "discover",
-         "--search-modes", "greedy", "--max-k", "2"],
+         "--search-modes", "greedy", "--max-k", "2", "--sample-size", "1"],
         cwd=Path(__file__).resolve().parents[1], check=True,
     )
     output = phase0.parent / "diagnostics" / "join_key_discovery_exploration__demo__discover.csv"
@@ -175,3 +175,5 @@ def test_join_discover_cli_emits_independent_shape_partitions(tmp_path: Path):
     assert "beta_x" in partitions["Beta"]["effective_fields_actually_scored"]
     assert "ratified_alpha" not in partitions["Alpha"]["effective_fields_actually_scored"]
     assert all(row["discriminator_source"] == "existing_policy" for row in partitions.values())
+    assert all(row["records_total_partition"] == "2" for row in partitions.values())
+    assert all(row["records_sampled_partition"] == "1" for row in partitions.values())

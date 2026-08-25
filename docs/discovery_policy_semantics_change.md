@@ -36,7 +36,11 @@ the Alpha field in `effective_fields_actually_scored`.
 For policies with a discriminator, join discovery now emits the common/global row
 and independent per-discriminator-value rows. The discriminator provenance is
 `existing_policy`; its configured `additional_required` fields are not used in
-those partition searches.
+those partition searches. Discriminator values are partitioned from the full
+domain population before sampling, and the configured sample cap is then applied
+independently to each partition. Diagnostics expose both full and sampled record
+counts per partition, so rare shapes cannot disappear merely because they were
+absent from the global sample.
 
 ## Diagnostic example
 

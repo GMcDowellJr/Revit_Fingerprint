@@ -773,15 +773,29 @@ def main() -> None:
         discriminator_key = str(gates.get("discriminator_key") or "").strip()
         if "discover" in policy_modes and discriminator_key:
             by_value: Dict[str, List[Dict[str, str]]] = {}
-            for record in dom_records:
+            # Partition the full population before applying the sample cap. If the
+            # global sample were partitioned instead, an imbalanced domain could
+            # silently lose a rare discriminator value altogether.
+            for record in dom_records_all:
                 pk = record.get("record_pk", "").strip()
                 qv = identity_index.get(pk, {}).get(discriminator_key)
                 value = qv[1].strip() if qv else "__missing_discriminator__"
                 by_value.setdefault(value or "__missing_discriminator__", []).append(record)
             for discriminator_value in sorted(by_value, key=str.lower):
-                partition_records = by_value[discriminator_value]
+                partition_records_all = by_value[discriminator_value]
+                partition_pks_all = {r.get("record_pk", "").strip() for r in partition_records_all}
+                partition_items_all = [it for it in dom_items_all if it.get("record_pk", "").strip() in partition_pks_all]
+                if stratify_key:
+                    partition_records = _stratified_sample(
+                        partition_records_all, partition_items_all, stratify_key,
+                        int(args.sample_size), int(args.sample_seed),
+                    )
+                else:
+                    partition_records = _sample_domain_records(
+                        partition_records_all, int(args.sample_size), int(args.sample_seed)
+                    )
                 partition_pks = {r.get("record_pk", "").strip() for r in partition_records}
-                partition_items = [it for it in dom_items_sampled if it.get("record_pk", "").strip() in partition_pks]
+                partition_items = [it for it in partition_items_all if it.get("record_pk", "").strip() in partition_pks]
                 partition_candidates = _without_excluded(
                     _pick_candidate_fields(partition_items, int(args.max_candidate_fields)), excluded
                 )
@@ -798,11 +812,25 @@ def main() -> None:
                         selected = [str(x) for x in result.get("selected_fields", []) if str(x).strip()]
                         metrics = result.get("metrics", {}) if isinstance(result.get("metrics"), dict) else {}
                         frontier = []
+                    metrics_full: Dict[str, object] = {}
+                    partition_diverges = False
+                    partition_verify_status = "skipped_no_full_verify_flag"
+                    if selected and full_verify:
+                        metrics_full, partition_diverges = _full_population_verify(
+                            partition_records_all, identity_index, selected, cfg, metrics,
+                            divergence_delta, coverage_drop_threshold=coverage_drop_threshold,
+                        )
+                        partition_verify_status = "ok"
+                    elif not selected:
+                        partition_verify_status = "skipped_no_selection"
                     report_rows.append({
                         "domain": domain, "policy_mode": "discover", "mode": "discover", "search_mode": search_mode,
                         "status": "ok" if selected else "blocked", "reason": "" if selected else "no_frontier",
-                        "records_total_domain": str(records_total_domain), "records_sampled_domain": str(len(partition_records)),
-                        "sample_rate": f"{(len(partition_records) / records_total_domain) if records_total_domain else 0.0:.6f}",
+                        "records_total_domain": str(records_total_domain), "records_sampled_domain": str(records_sampled_domain),
+                        "sample_rate": f"{sample_rate:.6f}",
+                        "records_total_partition": str(len(partition_records_all)),
+                        "records_sampled_partition": str(len(partition_records)),
+                        "partition_sample_rate": f"{(len(partition_records) / len(partition_records_all)) if partition_records_all else 0.0:.6f}",
                         "sample_size_arg": str(args.sample_size), "sample_seed_arg": str(args.sample_seed),
                         "max_candidate_fields_arg": str(args.max_candidate_fields), "max_k_effective": str(args.max_k),
                         "candidate_fields_raw": "|".join(partition_candidates), "candidate_fields_raw_count": str(len(partition_candidates)),
@@ -831,7 +859,18 @@ def main() -> None:
                         "excluded_count": str(len(excluded)), "excluded_items": "|".join(sorted(excluded)),
                         "stratify_by": stratify_key, "policy_shape_gate_enabled": "true",
                         "policy_shape_gate_discriminator_key": discriminator_key,
-                        "full_verify_status": "skipped_partition_diagnostic", "sample_vs_full_diverges": "false",
+                        "coverage_full": f"{float(metrics_full.get('coverage', 0.0)):.6f}" if metrics_full else "",
+                        "collision_rate_full": f"{float(metrics_full.get('collision_rate', 1.0)):.6f}" if metrics_full else "",
+                        "fragmentation_rate_full": f"{float(metrics_full.get('fragmentation_rate', 1.0)):.6f}" if metrics_full else "",
+                        "records_total_full": str(int(metrics_full.get("records_total", 0) or 0)) if metrics_full else "",
+                        "records_covered_full": str(int(metrics_full.get("records_covered", 0) or 0)) if metrics_full else "",
+                        "collision_records_full": str(int(metrics_full.get("collision_records", 0) or 0)) if metrics_full else "",
+                        "fragmented_sig_count_full": str(int(metrics_full.get("fragmented_sig_count", 0) or 0)) if metrics_full else "",
+                        "join_group_count_full": str(int(metrics_full.get("join_group_count", 0) or 0)) if metrics_full else "",
+                        "hhi_full": f"{float(metrics_full.get('hhi', 0.0)):.6f}" if metrics_full else "",
+                        "effective_cluster_count_full": f"{float(metrics_full.get('effective_cluster_count', 0.0)):.6f}" if metrics_full else "",
+                        "full_verify_status": partition_verify_status,
+                        "sample_vs_full_diverges": "true" if partition_diverges else "false",
                     })
 
         # optional compatibility policy JSON generation. Requires a non-diverging
@@ -902,7 +941,7 @@ def main() -> None:
     diagnostics_dir = phase0_dir.parent / "diagnostics"
     fields = [
         "domain", "policy_mode", "search_mode", "status", "reason",
-        "records_total_domain", "records_sampled_domain", "sample_rate", "sample_size_arg", "sample_seed_arg", "max_candidate_fields_arg", "max_k_effective",
+        "records_total_domain", "records_sampled_domain", "sample_rate", "records_total_partition", "records_sampled_partition", "partition_sample_rate", "sample_size_arg", "sample_seed_arg", "max_candidate_fields_arg", "max_k_effective",
         "candidate_fields_raw", "candidate_fields_raw_count", "scoped_candidates", "scoped_candidates_count", "work_candidates", "work_candidates_count",
         "candidate_fields_available", "candidate_fields_evaluated", "effective_fields_actually_scored",
         "policy_required_fields", "policy_optional_fields", "policy_excluded_fields", "discriminator_key", "discriminator_source", "discriminator_value", "mode",
