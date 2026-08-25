@@ -30,7 +30,35 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `export_bundle_pattern_detail.py` semantics change -- this is purely
   additive. See `docs/line_pattern_mapping.md` and D-038.
 
+### Added
+- **Five fields promoted from phase2-only buckets into `identity_basis.items`, visible
+  to policy/pareto discovery for the first time (D-040).** `arrowhead.record_class`
+  (arrowheads.py), `lp.is_import` (line_patterns.py), `line_style.pattern_ref.synopsis`
+  (line_styles.py), `text_type.leader_arrowhead_sig_hash` (text_types.py -- already
+  present in `contracts/domain_identity_keys_v2.json`'s `allowed_keys` but never wired
+  into the extractor), and `vt.assigned_view_count` (view_templates.py) were previously
+  captured but routed only to `phase2.cosmetic_items`/`coordination_items`/`unknown_items`,
+  which `tools/extractor.py`'s flatten stage never reads -- structurally invisible to
+  `discover_hash_policy.py`'s/`discover_join_policy.py`'s pareto search. Purely additive:
+  no domain's `sig_hash`/`join_key` policy includes any of these five keys, so no hash
+  value changes. See DECISIONS.md D-040.
+
 ### Changed
+- **Policy-driven inline `sig_hash` resolution (D-040).** `wall_types`, `floor_types`,
+  `roof_types`, `ceiling_types`, `units`, `units_doc`, `worksets`, `worksets_doc`,
+  `browser_organization`, `object_styles` (all 4 partitions), and `arrowheads` now
+  resolve their inline sig_hash preimage key set via `core/sig_hash_policy.py`'s new
+  `resolve_sig_hash_keys()`, reading `ctx["sig_hash_policies"]` (populated by
+  `runner/extraction_context.py` from `policies/domain_sig_hash_policies.json`, the
+  same file `core/sig_hash_builder.py`'s post-stage recompute already reads) instead of
+  a hardcoded Python list/set. The hardcoded lists remain as fallbacks for when
+  `ctx["sig_hash_policies"]` is absent (e.g. a unit test), so this is a no-op against
+  today's values everywhere it's wired in -- not hash-breaking. Closes the structural
+  gap that let D-039 happen unnoticed: going forward there is one source of truth for
+  "which fields drive sig_hash" per domain, consumed by both the inline extractor and
+  the post-stage recompute, rather than two independently hand-maintained copies that
+  can silently drift apart. Each domain's own required/degraded/blocked status logic is
+  unchanged. See DECISIONS.md D-040.
 - **Repository-neutral runtime and sample defaults.** Dynamo runner discovery no
   longer searches an organization-specific user-profile path, both checked-in
   Dynamo graphs have blank workstation inputs/hints, and the default
@@ -64,6 +92,18 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   now produce the same `sig_hash`. `join_hash` is unaffected -- the join-key
   policies for these domains already excluded these fields correctly via
   `explicitly_excluded_items`. See DECISIONS.md D-039.
+- **`text_types`: `text_type.name` removed from the domain-level `hash_v2` rollup's
+  hashed key set (D-041).** `TEXT_TYPE_SEMANTIC_KEYS` (now
+  `TEXT_TYPE_SEMANTIC_KEYS_FALLBACK`) included the type's own display name, diverging
+  from `policies/domain_sig_hash_policies.json`'s already-correct 12-key
+  `text_types` policy (which excludes it) with no D-0xx decision ever authorizing the
+  inclusion -- discovered incidentally while wiring `text_types.py` into D-040's
+  `resolve_sig_hash_keys()` mechanism. Impact is scoped: `domains/text_types.py`
+  already omits `sig_hash`/`join_key` from its own exported record entirely ("canonical
+  mode"), so this only changes the domain-level `hash_v2` aggregate computed inside the
+  extractor, not any per-record `sig_hash` field (which this domain never emits at
+  extraction time). Fixed a test (`tests/test_text_types_canonical_selectors.py`) that
+  had encoded the divergence as expected behavior. See DECISIONS.md D-041.
 - **`mapping/create_line_pattern_mappings.py`: an explicit but invalid `IN[2]`
   repo root now fails loudly instead of silently falling back to the
   environment or `__file__`.** A caller-supplied `IN[2]` is an explicit

@@ -40,6 +40,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.sig_hash_policy import resolve_sig_hash_keys
 from core.canon import (
     canon_str,
     canon_num,
@@ -377,7 +378,11 @@ def extract(doc, ctx=None):
         }
 
         # Semantic basis selector for sig_hash; evidence remains canonical in identity_basis.items.
-        semantic_items = [it for it in items_sorted if it.get("k") in set(UNITS_SEMANTIC_KEYS)]
+        # Resolved from ctx["sig_hash_policies"] (policies/domain_sig_hash_policies.json) when
+        # available, with UNITS_SEMANTIC_KEYS as the fallback -- see core/sig_hash_policy.py's
+        # resolve_sig_hash_keys() and DECISIONS.md D-039/D-040.
+        sig_hash_keys = set(resolve_sig_hash_keys((ctx or {}).get("sig_hash_policies"), "units", UNITS_SEMANTIC_KEYS))
+        semantic_items = [it for it in items_sorted if it.get("k") in sig_hash_keys]
 
         if blocked:
             rec = build_record_v2(
@@ -563,7 +568,8 @@ def extract_units_doc(doc, ctx=None):
             status_reasons.append("identity.incomplete:{}:{}".format(it.get("q"), it.get("k")))
 
     status = STATUS_DEGRADED if any_incomplete else STATUS_OK
-    semantic_items = [it for it in doc_items_sorted if it.get("k") in set(UNITS_DOC_SEMANTIC_KEYS)]
+    doc_sig_hash_keys = set(resolve_sig_hash_keys((ctx or {}).get("sig_hash_policies"), "units_doc", UNITS_DOC_SEMANTIC_KEYS))
+    semantic_items = [it for it in doc_items_sorted if it.get("k") in doc_sig_hash_keys]
     sig_hash = make_hash(serialize_identity_items(semantic_items))
 
     rec = build_record_v2(

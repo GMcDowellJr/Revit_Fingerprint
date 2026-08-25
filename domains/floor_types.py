@@ -16,6 +16,7 @@ if repo_root not in sys.path:
 from core.hashing import make_hash, safe_str
 from core.collect import collect_types, purge_lookup
 from core.canon import S_UNREADABLE
+from core.sig_hash_policy import resolve_sig_hash_keys
 from core.record_v2 import (
     STATUS_OK,
     STATUS_BLOCKED,
@@ -59,6 +60,16 @@ except (ImportError, AttributeError):
 
 _DOMAIN_FLOOR = "floor_types"
 _FLOOR_FUNCTION_NAMES = {0: "Interior", 1: "Exterior"}
+
+# Fallback sig_hash preimage key set, used only when ctx["sig_hash_policies"]
+# is unavailable. Must stay in sync with policies/domain_sig_hash_policies.json's
+# floor_types.allowed_items -- see core/sig_hash_policy.py's resolve_sig_hash_keys()
+# and DECISIONS.md D-039/D-040.
+_FLOOR_TYPES_SIG_HASH_KEYS_FALLBACK = [
+    "ft.layer_count",
+    "ft.total_thickness_in",
+    "ft.stack_hash_loose",
+]
 
 
 def extract_floor_types(doc, ctx=None):
@@ -199,7 +210,11 @@ def extract_floor_types(doc, ctx=None):
         required_not_ok = any(q != ITEM_Q_OK for q in required_qs)
         status = STATUS_BLOCKED if required_not_ok else STATUS_OK
         status_reasons = ["required_identity_not_ok"] if required_not_ok else []
-        sig_hash = None if required_not_ok else make_hash(serialize_identity_items(semantic))
+        sig_hash_keys = set(resolve_sig_hash_keys(
+            (ctx or {}).get("sig_hash_policies"), _DOMAIN_FLOOR, _FLOOR_TYPES_SIG_HASH_KEYS_FALLBACK
+        ))
+        sig_hash_items = [it for it in identity_items if safe_str(it.get("k", "")) in sig_hash_keys]
+        sig_hash = None if required_not_ok else make_hash(serialize_identity_items(sig_hash_items))
 
         rec = build_record_v2(
             domain=_DOMAIN_FLOOR,

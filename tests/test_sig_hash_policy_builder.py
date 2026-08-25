@@ -3,7 +3,7 @@ import os
 from core.record_v2 import ITEM_Q_MISSING, ITEM_Q_OK, make_identity_item, serialize_identity_items
 from core.hashing import make_hash
 from core.sig_hash_builder import build_sig_hash_from_policy, apply_sig_hash_policy_to_record
-from core.sig_hash_policy import load_sig_hash_policies, get_domain_sig_hash_policy
+from core.sig_hash_policy import load_sig_hash_policies, get_domain_sig_hash_policy, resolve_sig_hash_keys
 
 
 def test_generated_sig_hash_policy_loads():
@@ -191,3 +191,74 @@ def test_object_styles_model_sig_hash_excludes_area9_additions():
     behavioral_items = [it for it in items if it["k"] in allowed]
     expected = make_hash(serialize_identity_items(behavioral_items))
     assert sig_hash == expected
+
+
+def test_resolve_sig_hash_keys_falls_back_when_no_policies_present():
+    result = resolve_sig_hash_keys(None, "wall_types", ["a", "b"])
+    assert result == ["a", "b"]
+
+    result = resolve_sig_hash_keys({}, "wall_types", ["a", "b"])
+    assert result == ["a", "b"]
+
+
+def test_resolve_sig_hash_keys_falls_back_when_domain_not_in_policies():
+    policies = {"domains": {"units": {"allowed_items": ["units.spec"]}}}
+    result = resolve_sig_hash_keys(policies, "wall_types", ["a", "b"])
+    assert result == ["a", "b"]
+
+
+def test_resolve_sig_hash_keys_falls_back_when_allowed_items_empty_or_malformed():
+    assert resolve_sig_hash_keys({"domains": {"wall_types": {"allowed_items": []}}}, "wall_types", ["a"]) == ["a"]
+    assert resolve_sig_hash_keys({"domains": {"wall_types": {"allowed_items": None}}}, "wall_types", ["a"]) == ["a"]
+    assert resolve_sig_hash_keys({"domains": {"wall_types": {"allowed_items": ["a", 1]}}}, "wall_types", ["b"]) == ["b"]
+
+
+def test_resolve_sig_hash_keys_uses_ctx_policy_when_present():
+    policies = {"domains": {"wall_types": {"allowed_items": ["wt.layer_count"]}}}
+    result = resolve_sig_hash_keys(policies, "wall_types", ["wt.function", "wt.layer_count"])
+    assert result == ["wt.layer_count"]
+
+
+def test_resolve_sig_hash_keys_real_policy_file_matches_hardcoded_fallbacks():
+    """D-039/D-040 drift guard: for every domain that resolve_sig_hash_keys()
+    is actually wired into (wall/floor/roof/ceiling_types, units, worksets,
+    worksets_doc, browser_organization, arrowheads, text_types), the real
+    compiled policy's allowed_items must equal what each domain module
+    declares as its own hardcoded fallback -- if these two ever diverge, the
+    module falls back to a stale value in any ctx lacking sig_hash_policies
+    (e.g. a unit test, or a caller that hasn't adopted runner/extraction_context.py
+    yet), silently reproducing the exact class of bug D-039 fixed.
+    """
+    import domains.wall_types as wall_types
+    import domains.floor_types as floor_types
+    import domains.roof_types as roof_types
+    import domains.ceiling_types as ceiling_types
+    import domains.units as units
+    import domains.worksets as worksets
+    import domains.browser_organization as browser_organization
+    import domains.arrowheads as arrowheads
+    import domains.text_types as text_types
+
+    policies = load_sig_hash_policies(os.path.join("policies", "domain_sig_hash_policies.json"))
+
+    checks = [
+        ("wall_types", wall_types._WALL_TYPES_SIG_HASH_KEYS_FALLBACK),
+        ("floor_types", floor_types._FLOOR_TYPES_SIG_HASH_KEYS_FALLBACK),
+        ("roof_types", roof_types._ROOF_TYPES_SIG_HASH_KEYS_FALLBACK),
+        ("ceiling_types", ceiling_types._CEILING_TYPES_SIG_HASH_KEYS_FALLBACK),
+        ("units", units.UNITS_SEMANTIC_KEYS),
+        ("units_doc", units.UNITS_DOC_SEMANTIC_KEYS),
+        ("worksets", worksets.WORKSETS_SEMANTIC_KEYS),
+        ("worksets_doc", worksets.WORKSETS_DOC_SEMANTIC_KEYS),
+        ("browser_organization", browser_organization.BROWSER_ORGANIZATION_SEMANTIC_KEYS),
+        ("arrowheads", arrowheads._ARROWHEADS_SIG_HASH_KEYS_FALLBACK),
+        ("text_types", text_types.TEXT_TYPE_SEMANTIC_KEYS_FALLBACK),
+    ]
+    mismatches = {}
+    for domain, fallback in checks:
+        pol = get_domain_sig_hash_policy(policies, domain)
+        allowed = set(pol["allowed_items"])
+        if allowed != set(fallback):
+            mismatches[domain] = {"policy": sorted(allowed), "fallback": sorted(set(fallback))}
+
+    assert not mismatches, "fallback key set diverged from compiled policy: {}".format(mismatches)

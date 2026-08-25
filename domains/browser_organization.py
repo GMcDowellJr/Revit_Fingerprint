@@ -103,6 +103,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.sig_hash_policy import resolve_sig_hash_keys
 from core.record_v2 import (
     STATUS_OK,
     STATUS_DEGRADED,
@@ -409,7 +410,10 @@ def _build_record(category, org, doc, is_workshared, bip_lookup, workset_name_to
 
     sig_hash = None
     if not blocked:
-        semantic_items = [it for it in identity_items_sorted if it.get("k") in BROWSER_ORGANIZATION_SEMANTIC_KEYS]
+        sig_hash_keys = set(resolve_sig_hash_keys(
+            (ctx or {}).get("sig_hash_policies"), "browser_organization", BROWSER_ORGANIZATION_SEMANTIC_KEYS
+        ))
+        semantic_items = [it for it in identity_items_sorted if it.get("k") in sig_hash_keys]
         sig_hash = make_hash(serialize_identity_items(semantic_items))
 
     label_quality = "placeholder_unreadable" if blocked else "system"

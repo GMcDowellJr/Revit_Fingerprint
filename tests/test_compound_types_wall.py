@@ -438,6 +438,44 @@ def test_type_name_not_in_sig_hash(monkeypatch):
     assert out["records"][0]["sig_hash"] == out["records"][1]["sig_hash"]
 
 
+def test_sig_hash_reads_allowed_items_from_ctx_sig_hash_policies_when_present(monkeypatch):
+    """D-040: the inline sig_hash preimage set is resolved from
+    ctx["sig_hash_policies"] when the runner supplies it, not just from the
+    module's hardcoded fallback -- prove the wiring actually takes effect by
+    pointing the ctx-supplied policy at a deliberately different (narrower)
+    key set than the fallback and confirming the resulting hash changes
+    accordingly (matching a hand-hashed value using only that narrower set).
+    """
+    m = _setup_module(monkeypatch)
+    monkeypatch.setattr(m, "collect_types", lambda *a, **k: [_basic_wall("Name A")])
+
+    ctx = _default_ctx(m)
+    ctx["sig_hash_policies"] = {
+        "domains": {
+            "wall_types": {
+                "sig_hash_schema": "wall_types.sig_hash.v1",
+                "hash_alg": "md5_utf8_join_pipe",
+                "allowed_items": ["wt.layer_count"],
+                "allowed_item_prefixes": [],
+                "required_items": [],
+                "minima": {"block_if_any_required_not_ok": True},
+            }
+        }
+    }
+    out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), ctx)
+    rec = out["records"][0]
+
+    from core.hashing import make_hash
+    from core.record_v2 import serialize_identity_items
+
+    layer_count_item = [it for it in rec["identity_basis"]["items"] if it["k"] == "wt.layer_count"]
+    expected = make_hash(serialize_identity_items(layer_count_item))
+    assert rec["sig_hash"] == expected
+
+    default_out = m.extract_wall_types(_Doc({101: "m1", 102: "m2", 103: "m3"}), _default_ctx(m))
+    assert rec["sig_hash"] != default_out["records"][0]["sig_hash"]
+
+
 def test_layer_rows_attached_to_record(monkeypatch):
     m = _setup_module(monkeypatch)
     monkeypatch.setattr(m, "collect_types", lambda *a, **k: [_basic_wall()])

@@ -10,6 +10,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.sig_hash_policy import resolve_sig_hash_keys
 from core.canon import canon_str
 from core.graphic_overrides import extract_projection_graphics, extract_cut_graphics
 from core.record_v2 import (
@@ -264,7 +265,8 @@ def _extract_object_styles(doc, ctx, *, domain_name, kind, include_cut_weight, z
         if "Lines" in set(excluded_names):
             print("[object_styles_model] excluded_top_level_category name='Lines' reason='covered_by_line_styles'")
 
-    semantic_keys = _MODEL_SEMANTIC_KEYS if include_cut_weight else _NON_MODEL_SEMANTIC_KEYS
+    semantic_keys_fallback = _MODEL_SEMANTIC_KEYS if include_cut_weight else _NON_MODEL_SEMANTIC_KEYS
+    semantic_keys = resolve_sig_hash_keys((ctx or {}).get("sig_hash_policies"), domain_name, semantic_keys_fallback)
     v2_records = []
     v2_sig_hashes = []
     v2_any_blocked = False

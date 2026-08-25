@@ -22,6 +22,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.sig_hash_policy import resolve_sig_hash_keys
 from core.canon import canon_str, fnum, S_MISSING, S_UNREADABLE
 from core.rows import (
     first_param,
@@ -207,6 +208,27 @@ STYLE_BUCKET_TICK = frozenset({"Heavy end tick mark"})
 STYLE_BUCKET_SIZE_ONLY = frozenset({
     "Dot", "Diagonal", "Box", "Loop", "Elevation Target", "Datum triangle"
 })
+
+# Fallback sig_hash preimage key set, used only when ctx["sig_hash_policies"]
+# is unavailable. Must stay in sync with policies/domain_sig_hash_policies.json's
+# arrowheads.allowed_items -- see core/sig_hash_policy.py's resolve_sig_hash_keys()
+# and DECISIONS.md D-039/D-040. This is the full union of common + per-style-bucket
+# identity keys; a given record only ever populates the subset applicable to its
+# own style bucket, so filtering identity_items by this set is a no-op against
+# today's inline hash (arrowhead.record_class is deliberately NOT in this set --
+# it's a coordination/BI-slicer field, not behavior, added to identity_items for
+# discovery visibility per D-040 without widening the hash).
+_ARROWHEADS_SIG_HASH_KEYS_FALLBACK = [
+    "arrowhead.style",
+    "arrowhead.arrow_style_raw_int",
+    "arrowhead.arrow_style_display",
+    "arrowhead.tick_size_in",
+    "arrowhead.width_angle_deg",
+    "arrowhead.fill_tick",
+    "arrowhead.arrow_closed",
+    "arrowhead.tick_mark_centered",
+    "arrowhead.heavy_end_pen_weight",
+]
 
 
 def _is_arrowhead_type(doc, t):
@@ -482,7 +504,18 @@ def extract(doc, ctx=None):
             make_identity_item("arrowhead.arrow_style_display", style_disp_v, style_disp_q),
         ] + common_items + class_items
 
-        semantic_keys = sorted({it.get("k") for it in identity_items if isinstance(it.get("k"), str)})
+        # D-040: record_class (Arrow/Tick/SizeOnly/Unknown) is added to
+        # identity_basis.items so it's visible to discover_hash_policy.py's/
+        # discover_join_policy.py's pareto search -- it is deliberately excluded
+        # from _ARROWHEADS_SIG_HASH_KEYS_FALLBACK / the arrowheads sig_hash
+        # policy's allowed_items, so this does not change sig_hash.
+        identity_items.append(make_identity_item("arrowhead.record_class", record_class, ITEM_Q_OK))
+        identity_items = sorted(identity_items, key=lambda it: safe_str(it.get("k", "")))
+
+        sig_hash_keys = resolve_sig_hash_keys(
+            (ctx or {}).get("sig_hash_policies"), "arrowheads", _ARROWHEADS_SIG_HASH_KEYS_FALLBACK
+        )
+        semantic_keys = sorted(set(sig_hash_keys))
 
         # Required qs: style + tick_size must be OK (classifier depends on their presence)
         required_qs = [style_label_q, tick_in_q]
@@ -511,7 +544,8 @@ def extract(doc, ctx=None):
             status = STATUS_BLOCKED
             status_reasons = sorted(set(status_reasons)) or ["minima.required_not_ok"]
         else:
-            preimage = serialize_identity_items(identity_items)
+            sig_hash_items = [it for it in identity_items if safe_str(it.get("k", "")) in set(sig_hash_keys)]
+            preimage = serialize_identity_items(sig_hash_items)
             sig_hash = make_hash(preimage)
             v2_sig_hashes.append(sig_hash)
 

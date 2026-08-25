@@ -9,7 +9,7 @@ canonical evidence; a deterministic builder computes hashes from a pinned policy
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 
 def _is_list_of_str(x: Any) -> bool:
@@ -58,3 +58,33 @@ def get_domain_sig_hash_policy(policies: Any, domain_name: str) -> Optional[Dict
         return None
     pol = domains.get(domain_name)
     return pol if isinstance(pol, dict) else None
+
+
+def resolve_sig_hash_keys(policies: Any, domain_name: str, fallback: Sequence[str]) -> List[str]:
+    """Resolve the sig_hash preimage key set for a domain at extraction time.
+
+    Extractors that hand-classify captured fields into a narrower "semantic"
+    bucket for sig_hash (as opposed to the full field set exported to
+    identity_basis.items) previously hardcoded that key set as a Python
+    literal, independent of policies/domain_sig_hash_policies.json's
+    allowed_items for the same domain -- two independently-maintained copies
+    of "what counts as behavioral" that could silently drift apart (see
+    DECISIONS.md D-039, where they did). This resolves the key set from
+    ctx["sig_hash_policies"] (populated by runner/extraction_context.py from
+    the same JSON file core/sig_hash_builder.py's post-stage recompute reads)
+    when available, so the inline extractor and the post-stage recompute
+    consume a single source of truth going forward.
+
+    Falls back to the caller's hardcoded default when the policy isn't
+    present in ctx (e.g. a unit test that builds a minimal ctx by hand, or a
+    domain not yet migrated to this pattern). The fallback must be kept in
+    sync with the policy's allowed_items for that domain -- this function
+    does not detect a stale fallback; tests/test_sig_hash_join_key_policy_consistency.py
+    and each domain's own inline-vs-policy regression test are the guard for that.
+    """
+    pol = get_domain_sig_hash_policy(policies, domain_name)
+    if isinstance(pol, dict):
+        allowed = pol.get("allowed_items")
+        if isinstance(allowed, list) and allowed and _is_list_of_str(allowed):
+            return list(allowed)
+    return list(fallback)

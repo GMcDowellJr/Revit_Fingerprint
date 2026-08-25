@@ -1791,3 +1791,213 @@ comparison) is unaffected — the join-key policies were already correct.
   pattern rather than moving to the `arrowheads.py`/`identity.py` flat
   `identity_items` pattern. That migration, if pursued, is a separate,
   larger initiative.
+
+## D-040 — Policy-driven inline sig_hash resolution (`resolve_sig_hash_keys`); identity-items visibility promotions
+
+### Status
+Accepted (2026-08-25)
+
+### Context
+D-039 closed one instance of a structural risk it did not fully retire: every
+bucketing domain (`wall_types`, `floor_types`, `roof_types`, `ceiling_types`,
+`units`, `units_doc`, `worksets`, `worksets_doc`, `browser_organization`,
+`object_styles_*`, `arrowheads`) hand-maintained its own inline "which fields
+drive sig_hash" key set as a **hardcoded Python list/set**, entirely
+independent of `policies/domain_sig_hash_policies.json`'s `allowed_items` for
+that same domain — the exact JSON file `core/sig_hash_builder.py`'s
+post-extraction stage reads. Two independently-maintained copies of "what
+counts as behavioral" can drift apart with no mechanism to notice; D-039 was
+one such drift, discovered and fixed, but the underlying two-copies
+architecture that let it happen unnoticed was untouched. `tests/
+test_sig_hash_join_key_policy_consistency.py` (added alongside D-039) guards
+one drift *symptom* (sig_hash quietly re-including a field the domain's own
+join-key policy already flagged as non-behavioral); it does not remove the
+duplication that produces that symptom.
+
+Separately, several fields were captured during extraction but only ever
+reached a domain's `phase2.cosmetic_items`/`coordination_items`/
+`unknown_items` bucket, never `identity_basis.items` — structurally
+invisible to `discover_hash_policy.py`'s/`discover_join_policy.py`'s pareto
+search (`tools/extractor.py`'s flatten stage reads only
+`identity_basis.items`; the other three phase2 buckets never reach
+`identity_items.csv`). A sweep across every domain's phase2-bucket
+construction found five genuine cases (excluding the project's own
+ElementId/UniqueId/name exclusion rule, which the sweep confirmed accounts
+for the overwhelming majority of what's phase2-only): `arrowhead.record_class`
+(a coordination classifier, arrowheads.py), `lp.is_import` (line_patterns.py),
+`line_style.pattern_ref.synopsis` (a derived shape-summary string, not the
+pattern's own Revit name; line_styles.py), `text_type.leader_arrowhead_sig_hash`
+(a resolved cross-domain reference; text_types.py — already anticipated in
+`contracts/domain_identity_keys_v2.json`'s `allowed_keys` before this change,
+just never wired into the extractor), and `vt.assigned_view_count`
+(view_templates.py). Everything else found in the sweep was either
+ElementId/UniqueId/name (excluded per existing project convention) or a
+constant BI-slicer literal (e.g. `obj_style.domain_family`,
+`dim_type.domain_family`, `vt.view_type_family` — always the same value
+within a given domain's export, so promoting it adds no information) —
+deliberately left unpromoted.
+
+While wiring `text_types.py` (the flat canonical-items pilot domain) into
+this same mechanism, a **second, independent instance of the D-039 bug
+class** surfaced: `TEXT_TYPE_SEMANTIC_KEYS` included `text_type.name`,
+while `policies/domain_sig_hash_policies.json`'s compiled policy (and its
+own `contracts/domain_identity_keys_v2.json` `sig_hash_keys` override)
+already correctly excluded it — and a test
+(`tests/test_text_types_canonical_selectors.py`) had encoded the mismatch as
+apparently intentional ("semantic basis includes identity-bearing
+name/background"). No D-0xx decision ever authorized this; unlike D-010's
+documented phase-name exception, this reads as an unreviewed mistake. See
+D-041 below for the fix and its scoped impact (text_types.py already omits
+`sig_hash`/`join_key` from its own extractor output entirely in "canonical
+mode" — see the module's own comment — so this affects the domain's
+`hash_v2` aggregate rollup, not a per-record `sig_hash` field, which this
+domain never emits at extraction time regardless).
+
+### Decision
+1. Add `resolve_sig_hash_keys(policies, domain_name, fallback)` to
+   `core/sig_hash_policy.py`: resolves a domain's sig_hash preimage key set
+   from `ctx["sig_hash_policies"]`'s compiled `allowed_items` when present,
+   falling back to the caller-supplied hardcoded default otherwise (e.g. a
+   unit test building a minimal `ctx` by hand, or a call site that hasn't
+   adopted the new `ctx` key). `runner/extraction_context.py` now loads
+   `policies/domain_sig_hash_policies.json` into `ctx["sig_hash_policies"]`
+   at the same point it already loads `join_key_policies`/`name_key_policies`,
+   so a live Revit extraction run has it populated end to end.
+2. Convert `wall_types`, `floor_types`, `roof_types`, `ceiling_types`,
+   `units`, `units_doc`, `worksets`, `worksets_doc`, `browser_organization`,
+   `object_styles` (all 4 partitions, keyed correctly per-partition off
+   `domain_name` — `object_styles_model`/`_annotation`/`_analytical`/
+   `_imported` each have their own distinct policy entry, not one shared
+   "object_styles" key), `arrowheads`, and `text_types` to call
+   `resolve_sig_hash_keys()` instead of filtering by a hardcoded
+   list/set directly. The hardcoded lists are retained as the `fallback`
+   argument (renamed with a `_SIG_HASH_KEYS_FALLBACK` suffix where they
+   weren't already suitably named) — not deleted — so behavior is identical
+   when `ctx["sig_hash_policies"]` is absent, but a future *intentional* and
+   *reviewed* change to the JSON policy now propagates automatically to the
+   inline extractor too, rather than requiring someone to remember to
+   hand-edit two independent copies (exactly the step that got missed for
+   D-039). `arrowheads.py`'s conversion is a no-op against today's values
+   (already flat emission — hashes its whole `identity_items` list, and its
+   policy already matched that set exactly).
+   `tests/test_sig_hash_policy_builder.py::test_resolve_sig_hash_keys_real_policy_file_matches_hardcoded_fallbacks`
+   asserts every one of these fallbacks equals the real compiled policy, so a
+   future silent divergence between the two fails a test immediately instead
+   of waiting to be discovered.
+
+   Explicitly **not** touched: each domain's own required/degraded/blocked
+   status computation. `core/sig_hash_builder.py`'s `build_sig_hash_from_policy`
+   has different (stricter) status semantics than several domains' hand-rolled
+   logic — e.g. `wall_types.py` currently reports `status=ok` even when a
+   non-required semantic field (`wt.wraps_at_inserts`) is unreadable, which
+   `build_sig_hash_from_policy` would report as `degraded`
+   (`tests/test_compound_types_wall.py::test_unreadable_wrap_fields_do_not_block_required_identity`
+   pins this). Unifying status semantics across the two code paths is a
+   distinct, larger question, deliberately out of scope here — this decision
+   only unifies *which fields get hashed*, not *how completeness/blocking is
+   judged*.
+3. Promote the five genuinely-hidden fields identified above into their
+   domain's `identity_basis.items` (additively — each domain's sig_hash
+   fallback/policy key set does **not** include the newly-added key, so no
+   domain's `sig_hash` value changes from this promotion alone).
+   `arrowhead.record_class`'s promotion specifically required item 2's
+   conversion first (arrowheads hashes its entire `identity_items` list, so
+   adding a new key without first switching to policy-filtered hashing would
+   have been hash-breaking); the other four were safe to promote without any
+   hash-computation change since each domain already filters its hash
+   preimage to a narrower key set that doesn't include them.
+4. Fix `text_types.py`'s `TEXT_TYPE_SEMANTIC_KEYS` (renamed
+   `TEXT_TYPE_SEMANTIC_KEYS_FALLBACK`): removed `text_type.name`. Fixed the
+   corresponding assertion and misleading comment in
+   `tests/test_text_types_canonical_selectors.py`. See D-041.
+
+### Consequences
+- `records.csv`'s `sig_hash` column is unaffected by this decision for
+  every domain listed in item 2 (values are unchanged; only the source of
+  the key set moves from Python-hardcoded to ctx-provided-with-hardcoded-
+  fallback). A full corpus re-run of the `sig_hash` stage is **not** required
+  for this decision alone (contrast D-039, which was hash-breaking).
+- `identity_basis.items` gains one new key for each of the five promoted
+  fields, on every future extraction of arrowheads/line_patterns/
+  line_styles/text_types/view_templates records. `discover_hash_policy.py`/
+  `discover_join_policy.py` can now see these fields; whether policy
+  actually selects them for sig_hash/join_key remains a separate, future,
+  evidence-based decision — this change only grants visibility.
+- Going forward, any new domain wired into `resolve_sig_hash_keys()` gets
+  the single-source-of-truth property automatically; a domain not yet
+  wired in (anything not listed in item 2) still carries the D-039-class
+  drift risk until it is converted. This decision does not convert every
+  remaining bucketing domain — only the ones already touched by D-039 plus
+  `text_types`/`arrowheads` (the domains already under active work this
+  session).
+- `tests/test_compound_types_wall.py`, `tests/test_compound_types_floor.py`
+  (new), `tests/test_compound_types_roof.py` (new),
+  `tests/test_compound_types_ceiling.py` (new),
+  `tests/test_units_canonical_selectors.py`,
+  `tests/test_worksets_sig_hash_policy.py` (new),
+  `tests/test_browser_organization_sig_hash_policy.py` (new),
+  `tests/test_object_styles_sig_hash_policy.py` (new),
+  `tests/test_arrowheads_sig_hash_policy.py` (new), and
+  `tests/test_view_templates_assigned_view_count.py` (new) each include a
+  test that points `ctx["sig_hash_policies"]` at a deliberately different
+  key set and confirms the resulting `sig_hash` changes accordingly —
+  proving the ctx-wiring is load-bearing, not just present and ignored.
+
+## D-041 — `text_types` sig_hash: remove `text_type.name` from the hashed key set
+
+### Status
+Accepted (2026-08-25)
+
+### Context
+See D-040's Context section for how this was found (incidentally, while
+converting `text_types.py` to `resolve_sig_hash_keys()`). `TEXT_TYPE_SEMANTIC_KEYS`
+included `text_type.name`; `policies/domain_sig_hash_policies.json`'s
+`text_types` entry (compiled from `contracts/domain_identity_keys_v2.json`'s
+`sig_hash_keys` override, which already existed and already excluded
+`text_type.name`) did not. No decision record authorizes hashing this
+domain's own display name — unlike D-010's phase-name inclusion, which is a
+documented, deliberate exception. A test
+(`tests/test_text_types_canonical_selectors.py`) had asserted the divergent
+behavior as expected, with a comment describing the name as
+"identity-bearing" — read together with the complete absence of any D-0xx
+entry for it, this looks like an implementation-time mistake that was never
+caught, not a considered choice that just lacked paperwork.
+
+Actual impact is narrower than a typical sig_hash bug for this domain
+specifically: `domains/text_types.py` is the canonical flat-items pilot and
+its own extractor code explicitly omits `sig_hash`/`join_key` from its
+*exported* record entirely ("join_key/sig_hash are intentionally omitted
+from extractor output in canonical mode; they are post-extraction
+artifacts" — the module's own comment). The locally-computed `sig_hash_v2`
+this decision corrects is used for exactly one thing inside the extractor:
+contributing to `info["hash_v2"]`, the domain-level rollup hash summarizing
+"did anything change across all text_type records in this file" — it is
+not the per-record `sig_hash` ultimately used for governance/pattern
+clustering (that value is computed later, entirely from the JSON policy,
+which was already correct).
+
+### Decision
+Remove `text_type.name` from `TEXT_TYPE_SEMANTIC_KEYS_FALLBACK` (the
+renamed fallback constant; see D-040). `domains/text_types.py`'s inline
+`sig_hash_v2` computation now excludes the type's own display name,
+matching `policies/domain_sig_hash_policies.json`'s (and
+`contracts/domain_identity_keys_v2.json`'s `sig_hash_keys` override's)
+pre-existing, correct 12-key set exactly. Fixed the misleading
+"identity-bearing name" comment and added an explicit
+`"text_type.name" not in TEXT_TYPE_SEMANTIC_KEYS_FALLBACK` assertion to
+`tests/test_text_types_canonical_selectors.py` so this cannot silently
+regress.
+
+### Consequences
+- **Hash-breaking for `text_types`' domain-level `hash_v2` rollup only**:
+  two text-note-type records that previously produced different `hash_v2`
+  contributions solely because of a differing type name now contribute the
+  same value. No exported per-record `sig_hash` field changes, because this
+  domain does not emit one at extraction time (see Context).
+- No change to `identity_basis.items` (the name was never removed from
+  there — `text_type.name` remains fully captured and exported, per D-004/
+  the general "names are metadata only" pattern of keeping the name as
+  identity evidence while excluding it from the hash).
+- Consistent with every other domain's "names are metadata only, never in
+  behavior hashes" rule; the domain no longer has a code-level exception
+  that was never actually decided.
