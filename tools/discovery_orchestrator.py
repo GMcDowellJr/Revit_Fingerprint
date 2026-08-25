@@ -25,7 +25,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterable, Mapping
 
-DISCOVERY_ENGINE_VERSION = "discovery-sweep-v2"
+# Candidate/runtime scoring semantics changed in v3. Keeping a new version is
+# required so sweep caches produced under the policy-leaking v2 evaluator are
+# never reused as evidence for the corrected discovery semantics.
+DISCOVERY_ENGINE_VERSION = "discovery-sweep-v3"
 PROGRESS_HEARTBEAT_SECONDS = 30.0
 CACHE_SCHEMA_VERSION = 1
 SUMMARY_SCHEMA_VERSION = 1
