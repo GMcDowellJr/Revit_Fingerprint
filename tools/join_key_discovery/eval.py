@@ -134,13 +134,40 @@ def build_candidate_join_key_with_details(
         q, v = qv
         selected.append({"k": field, "q": q, "v": v})
 
+    # Domains configured with zero required_items (e.g. units_doc, worksets_doc --
+    # single synthetic document-level summary records; policy notes: "all fields
+    # optional... nothing blocks it") have no required fields to select from here.
+    # Previously that always fell through to selected=[] -> status="blocked",
+    # contradicting the policy's own documented intent. When the caller supplies
+    # optional_fields via gates AND zero required fields were configured (not
+    # "required fields configured but missing on this record" -- that still
+    # returns "missing_required" below, unchanged), fall back to whichever
+    # optional fields are actually present on the row. Gated behind an explicit
+    # gates["optional_fields"] key so discovery/scoring callers (greedy.py,
+    # pareto_joinkey_search.py, discover_hash_policy.py's score_candidate path),
+    # which never pass this key, keep their exact current candidate-scoring
+    # semantics -- this only activates for callers that opt in (apply_join_policy.py).
+    optional_fallback_used = False
+    optional_selected: List[str] = []
+    if not required and not selected:
+        optional_fields = [str(f) for f in (gates.get("optional_fields") or []) if str(f).strip()]
+        for field in optional_fields:
+            qv = row_items.get(field)
+            if not qv:
+                continue
+            q, v = qv
+            selected.append({"k": field, "q": q, "v": v})
+            optional_selected.append(field)
+        optional_fallback_used = bool(optional_fields)
+
     details = {
         "effective_required_fields": required,
         "missing_required_fields": sorted(missing, key=str.lower),
-        "effective_optional_fields": sorted(set(additional_optional), key=str.lower),
+        "effective_optional_fields": sorted(set(additional_optional) | set(optional_selected), key=str.lower),
         "discriminator_key": disc_key,
         "discriminator_value": shape_value,
         "shape_matched": shape_matched,
+        "optional_fallback_used": optional_fallback_used,
     }
     if missing:
         return ("missing_required", selected, ",".join(details["missing_required_fields"]), details)
