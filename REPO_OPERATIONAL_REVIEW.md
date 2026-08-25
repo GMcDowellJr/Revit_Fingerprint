@@ -149,7 +149,7 @@ Layer 3 — Runner (run_dynamo.py, 1301 lines)
 
 ### Operational Knowledge
 
-**Maintained as a parameterized script.** `tools/run_discovery_sweep.ps1` is the checked-in PowerShell entry point for discovery sweeps. Workstation-specific command transcripts have been removed.
+**Maintained as shared orchestration with thin entry points.** `run_discovery_sweep.ps1` and `run_discovery_sweep.py` are the checked-in entry points; both delegate to `tools/discovery_orchestrator.py`. Compatibility wrappers remain under `tools/`. Workstation-specific command transcripts have been removed.
 
 ### Probe-Driven Development
 
@@ -233,7 +233,7 @@ Layer 3 — Runner (run_dynamo.py, 1301 lines)
 
 **Risk:** The parameterized discovery-sweep script improves repeatability, but operational knowledge outside that workflow remains incompletely documented and could still be lost.
 
-**Evidence:** The former command transcript contained real project paths and was removed. `tools/run_discovery_sweep.ps1` now provides a parameterized workflow, though broader CLI `--help` coverage remains limited.
+**Evidence:** The former command transcript contained real project paths and was removed. The root discovery runbooks now provide parameterized PowerShell and Python workflows over one shared engine.
 
 ---
 

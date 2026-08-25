@@ -310,7 +310,7 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                             root folder and writes an include-flagged manifest CSV of Revit files to fingerprint;
                             sync_dc hydrates online-only Desktop Connector stub files before the BatchExtract
                             pyRevit run consumes them
-  run_discovery_sweep.ps1  Parameterized PowerShell entry point for discovery sweeps
+  discovery_orchestrator.py Shared staged/cache-aware discovery orchestration; root PowerShell/Python runbooks delegate here
 
   _archive/                Confirmed-superseded tools, pruned down to only what's still load-bearing:
                             join_key_derivation_phase05.py (still `import *`-ed live by join_key_derivation.py).
