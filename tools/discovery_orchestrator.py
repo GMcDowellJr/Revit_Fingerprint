@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterable, Mapping
 
-DISCOVERY_ENGINE_VERSION = "discovery-sweep-v3"
+DISCOVERY_ENGINE_VERSION = "discovery-sweep-v2"
 PROGRESS_HEARTBEAT_SECONDS = 30.0
 CACHE_SCHEMA_VERSION = 1
 SUMMARY_SCHEMA_VERSION = 1
