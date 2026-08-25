@@ -54,6 +54,7 @@ from core.record_v2 import (
     STATUS_OK,
     STATUS_BLOCKED,
     ITEM_Q_OK,
+    ITEM_Q_MISSING,
     ITEM_Q_UNREADABLE,
     SCHEMA_VERSION_RECORD_V2,
     canonicalize_str,
@@ -332,6 +333,12 @@ def extract(doc, ctx=None):
         leader_arrow_uid = None
         leader_arrow_name = None
         leader_arrow_sig_hash = None
+        # Whether a leader-arrowhead reference actually exists on this text type
+        # (as opposed to genuinely having none) -- distinguishes "no leader
+        # arrowhead" from "has one but its sig_hash couldn't be resolved" for
+        # the identity_basis.items promotion below (D-043).
+        leader_arrow_ref_present = False
+        leader_arrow_lookup_unreadable = False
 
         try:
             p_arrow = first_param(t, bip_names=["LEADER_ARROWHEAD"], ui_names=["Leader Arrowhead"])
@@ -341,6 +348,7 @@ def extract(doc, ctx=None):
                     arrow = doc.GetElement(arrow_id)
                     if arrow:
                         leader_arrow_uid = getattr(arrow, "UniqueId", None)
+                        leader_arrow_ref_present = True
 
                         try:
                             ah_map = (ctx or {}).get("arrowheads_by_type_id", {}) if ctx is not None else {}
@@ -349,6 +357,7 @@ def extract(doc, ctx=None):
                                 leader_arrow_sig_hash = ah_map.get(k, {}).get("sig_hash", None)
                         except Exception:
                             leader_arrow_sig_hash = None
+                            leader_arrow_lookup_unreadable = True
 
                         leader_arrow_name = get_type_display_name(arrow) or getattr(arrow, "Name", None)
                         leader_arrow_name = canon_str(leader_arrow_name)
@@ -513,11 +522,21 @@ def extract(doc, ctx=None):
         # Promoted here; contracts/domain_identity_keys_v2.json's text_types
         # allowed_keys already anticipated this field (present there before
         # this change), it just hadn't been wired into the extractor yet.
-        # Tri-state like the phase2 payload: q=ok always -- v=None is the
-        # explicit "no leader arrowhead" state, not a missing observation.
+        # Tri-state: q=ok + v=None is the explicit "no leader arrowhead" state
+        # (genuinely no reference); but when a reference DOES exist and its
+        # sig_hash lookup still comes back None (ctx["arrowheads_by_type_id"]
+        # missing the entry, the referenced arrowhead record was blocked, or
+        # the lookup itself raised), that's an unresolved dependency, not an
+        # explicit "none" -- D-043 fixes this to emit missing/unreadable
+        # instead of silently collapsing it into q=ok per the project's
+        # fail-soft policy (distinct states must not be collapsed).
         leader_arrow_sig_hash_v2 = safe_str(leader_arrow_sig_hash) if leader_arrow_sig_hash else None
+        if leader_arrow_sig_hash_v2 is None and leader_arrow_ref_present:
+            leader_arrow_sig_hash_q = ITEM_Q_UNREADABLE if leader_arrow_lookup_unreadable else ITEM_Q_MISSING
+        else:
+            leader_arrow_sig_hash_q = ITEM_Q_OK
         identity_items_v2.append(
-            make_identity_item("text_type.leader_arrowhead_sig_hash", leader_arrow_sig_hash_v2, ITEM_Q_OK)
+            make_identity_item("text_type.leader_arrowhead_sig_hash", leader_arrow_sig_hash_v2, leader_arrow_sig_hash_q)
         )
 
         required_qs = [name_q, font_q, size_in_q, width_q, bg_q, lw_q, rgb_q, show_q, leader_off_q, tab_q, bold_q, italic_q, underline_q]

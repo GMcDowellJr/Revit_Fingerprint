@@ -184,6 +184,22 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `test_sig_basis_keys_used_reflects_only_keys_present_for_record_class` to
   prove a `SizeOnly` arrowhead's `keys_used` excludes keys it never had. See
   DECISIONS.md D-043.
+- **`text_types`: `text_type.leader_arrowhead_sig_hash` no longer collapses
+  "unresolved leader-arrowhead reference" into the same state as "no leader
+  arrowhead" (D-044).** Found by automated PR review: when a text type has a
+  leader arrowhead assigned but `ctx["arrowheads_by_type_id"]` doesn't
+  resolve it (missing entry, absent map, or the lookup itself raises), the
+  item emitted `v=None, q=ok` -- identical to the genuine "no leader
+  arrowhead" state, violating the project's fail-soft policy against
+  collapsing distinct states. Now emits `q=missing` (dependency unresolved)
+  or `q=unreadable` (lookup raised) when a reference exists but its hash
+  didn't resolve; the explicit-none case (`v=None, q=ok`) is unchanged. Not
+  hash-breaking -- this key isn't in `required_keys` or
+  `TEXT_TYPE_SEMANTIC_KEYS_FALLBACK`, so `sig_hash`/`status`/`identity_quality`
+  are unaffected. Added `tests/test_text_types_leader_arrowhead_quality.py`,
+  the first test to exercise `text_types.py`'s `extract()` with an actual
+  leader-arrowhead reference present, closing the coverage gap that let this
+  ship. See DECISIONS.md D-044.
 - **`mapping/create_line_pattern_mappings.py`: an explicit but invalid `IN[2]`
   repo root now fails loudly instead of silently falling back to the
   environment or `__file__`.** A caller-supplied `IN[2]` is an explicit

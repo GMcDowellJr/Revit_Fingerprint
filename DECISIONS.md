@@ -2208,3 +2208,67 @@ observably wrong given today's data, in every other domain converted to
   D-039/D-042 established for the opposite direction (an
   already-registered key silently entering `sig_hash`); this decision closes
   the other direction (a newly-visible key never being registered at all).
+
+## D-044 — `text_types`: distinguish "no leader arrowhead" from "unresolved leader-arrowhead reference"
+
+### Status
+Accepted (2026-08-25)
+
+### Context
+Found by automated PR review (Codex bot) on the D-043 PR. D-040 promoted
+`text_type.leader_arrowhead_sig_hash` into `identity_basis.items` with a
+hardcoded `q=ITEM_Q_OK` whenever the computed value was `None`, carried over
+unchanged from the pre-existing phase2 `unknown_items` bucket convention
+("Tri-state: q=ok always -- v=None is the explicit 'no leader arrowhead'
+state"). That convention is correct for a text type that genuinely has no
+leader arrowhead assigned. But `leader_arrow_sig_hash` also comes back
+`None` in a second, distinct case: a leader arrowhead **is** assigned (a
+valid `LEADER_ARROWHEAD` parameter resolves to a real element with a
+`UniqueId`), but its `sig_hash` couldn't be resolved --
+`ctx["arrowheads_by_type_id"]` lacks that type's entry (that arrowhead's own
+record was blocked, the map wasn't populated, or `extract()` was called
+without the dependency wired at all) or the lookup itself raised. Before
+this decision, both cases produced identical `v=None, q=ok` items in
+`identity_basis.items` -- an unresolved dependency was indistinguishable
+from an explicit "none" state. This is exactly the kind of state-collapse
+the project's Fail-Soft Policy forbids ("NEVER silently collapse distinct
+states... Unreadable/inaccessible data MUST emit explicit markers"). No test
+in the suite exercised `domains/text_types.py`'s `extract()` with a leader
+arrowhead actually present, which is why this shipped across two PRs
+unnoticed -- `tests/test_text_types_conversion_convergence.py`'s existing
+extractor-level test hardcodes `first_param` to always return `None`, so the
+leader-arrowhead branch was never taken.
+
+### Decision
+Track two additional booleans through the leader-arrowhead read in
+`domains/text_types.py`: `leader_arrow_ref_present` (a valid element was
+actually resolved from the `LEADER_ARROWHEAD` parameter) and
+`leader_arrow_lookup_unreadable` (the `ctx["arrowheads_by_type_id"]` lookup
+itself raised, as opposed to simply not containing the entry). At the
+`identity_basis.items` promotion site: if no reference is present, keep the
+existing `v=None, q=ok` ("explicit none," unchanged). If a reference is
+present but its sig_hash didn't resolve, emit `q=ITEM_Q_UNREADABLE` when the
+lookup raised, else `q=ITEM_Q_MISSING` (dependency map absent or missing the
+entry) -- both with `v=None`. The pre-existing phase2 `unknown_items` bucket
+emission (`_phase2_build_payload()`, driven off the already-flattened `rec`
+dict, not this same code path) is unchanged; it's presentation/traceability
+metadata, not authoritative identity evidence, and correcting it wasn't part
+of this finding. Added `tests/test_text_types_leader_arrowhead_quality.py`,
+which exercises `extract()` with a real (mocked) leader-arrowhead element
+across all three states -- none / resolved / unresolved -- closing the
+coverage gap that let this ship.
+
+### Consequences
+- **Not hash-breaking.** `text_type.leader_arrowhead_sig_hash` is not in
+  `TEXT_TYPE_SEMANTIC_KEYS_FALLBACK` / `policies/domain_sig_hash_policies.json`'s
+  `text_types` `allowed_items` (D-041), and is not in `required_keys`, so
+  `sig_hash`, `status`, and `identity_quality` (which is computed only from
+  `required_qs` per `core/record_v2.py`'s `compute_identity_quality()`) are
+  all unaffected by this item's `q` value. This is purely an evidence-quality
+  correction on one non-required, non-hashed item.
+  `identity_basis.items` now surfaces the real state for any text type whose
+  leader arrowhead couldn't be resolved (going forward, on any extraction run
+  where `ctx["arrowheads_by_type_id"]` is present but incomplete, or absent
+  entirely, for a text type that does reference a leader arrowhead) -- these
+  records previously reported a misleading "no leader arrowhead" state for
+  what is actually an unresolved dependency.
