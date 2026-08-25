@@ -37,7 +37,7 @@ SUMMARY_FIELDS = [
     "pareto_required", "pareto_reason", "result_provenance_status",
     "domain_result_timestamp", "run_id", "source_run_id", "source_evidence_path",
     "refresh_attempted", "refresh_status", "input_fingerprint",
-    "discovery_engine_version",
+    "refresh_error", "discovery_engine_version",
 ]
 RUN_FIELDS = ["summary_timestamp", "domain", "join_result_status", "sig_result_status",
               "fresh_or_cached_or_carried", "refresh_status", "pareto_invoked",
@@ -84,6 +84,19 @@ def accepted(row: Mapping[str, object]) -> bool:
 def stage_cache_eligible(rows: Iterable[Mapping[str, object]]) -> bool:
     materialized = list(rows)
     return bool(materialized) and all(accepted(row) for row in materialized)
+
+
+def all_shape_gates_accepted(rows: Iterable[Mapping[str, object]], policy_mode: str) -> bool:
+    """True only when every represented gate has an accepted result for a mode."""
+    materialized = list(rows)
+    expected_gates = {str(row.get("shape_gate") or "__all__") for row in materialized}
+    by_gate: dict[str, list[Mapping[str, object]]] = {}
+    for row in materialized:
+        if row.get("policy_mode") == policy_mode:
+            by_gate.setdefault(str(row.get("shape_gate") or "__all__"), []).append(row)
+    return bool(expected_gates) and expected_gates == set(by_gate) and all(
+        any(accepted(row) for row in gate_rows) for gate_rows in by_gate.values()
+    )
 
 
 def cache_key(domain: str, target: str, policy_mode: str, search_mode: str, shape_gate: str) -> str:
@@ -229,7 +242,7 @@ class Orchestrator:
         log.write_text((cp.stdout or "") + (cp.stderr or ""), encoding="utf-8")
         if cp.returncode: raise RuntimeError(f"exit {cp.returncode}: {' '.join(cmd)}")
 
-    def _archive_artifacts(self, target: str, domain: str, mode: str, run_dir: Path) -> list[Path]:
+    def _archive_artifacts(self, target: str, domain: str, mode: str, search: str, run_dir: Path) -> list[Path]:
         diagnostics = self.cfg.exports_root / "diagnostics"
         pattern = f"*__{domain}__{mode}.csv"
         archived=[]
@@ -237,7 +250,10 @@ class Orchestrator:
             # A target invocation can only own files with its established prefix.
             if target == "join" and not src.name.startswith("join_key_"): continue
             if target == "sig" and not src.name.startswith("hash_sig_"): continue
-            dest=run_dir/target/src.name;dest.parent.mkdir(parents=True,exist_ok=True)
+            # Sig Greedy and Pareto share the same generated basename. Preserve
+            # both causes/effects of escalation under distinct immutable names.
+            name = f"{src.stem}__{search}{src.suffix}" if target == "sig" else src.name
+            dest=run_dir/target/name;dest.parent.mkdir(parents=True,exist_ok=True)
             shutil.move(src,dest);archived.append(dest)
         return archived
 
@@ -260,8 +276,8 @@ class Orchestrator:
         src = self._artifact(target, domain, mode, "greedy")
         rows = [r for r in read_csv(src) if r.get("policy_mode") == mode and r.get("search_mode") == "greedy"]
         if not rows: raise RuntimeError(f"no {target}/{mode}/greedy rows produced")
-        dest = run_dir / target / src.name
-        archived=self._archive_artifacts(target,domain,mode,run_dir)
+        archived=self._archive_artifacts(target,domain,mode,"greedy",run_dir)
+        dest = next((p for p in archived if p.name.startswith(src.stem)), run_dir / target / src.name)
         manifest["commands_executed"].append(cmd); manifest["result_files"] += [str(p) for p in archived]; manifest["logs"].append(str(log))
         for r in rows:
             gate = r.get("shape_gate", "__all__")
@@ -277,7 +293,7 @@ class Orchestrator:
             log = run_dir / "logs" / f"{target}_{mode}_pareto.log"; self._invoke(cmd, log)
             src = self._artifact(target, domain, mode, "pareto")
             prows = [r for r in read_csv(src) if r.get("policy_mode") == mode and r.get("search_mode") == "pareto"]
-            archived=self._archive_artifacts(target,domain,mode,run_dir)
+            archived=self._archive_artifacts(target,domain,mode,"pareto",run_dir)
             manifest["commands_executed"].append(cmd); manifest["result_files"] += [str(p) for p in archived]; manifest["logs"].append(str(log))
             rows += prows
         else: manifest["stages_skipped"].append({"stage": f"{mode}/pareto", "reason": "greedy_acceptance_gate_satisfied"})
@@ -324,7 +340,7 @@ class Orchestrator:
         if not rows:
             return {"decision_status": "skipped", "provenance": set(),
                     "refresh": set(), "pareto_invoked": False,
-                    "harsh_invoked": False, "blocked_reasons": []}
+                    "harsh_invoked": False, "blocked_reasons": [], "warnings": []}
         worst = max(rows, key=lambda r: DECISION_SEVERITY.get(r.get("decision_status", "blocked"), 5))
         return {
             "decision_status": worst.get("decision_status", "blocked"),
@@ -333,6 +349,7 @@ class Orchestrator:
             "pareto_invoked": any(r.get("pareto_required") == "true" for r in rows),
             "harsh_invoked": any(r.get("harsh_required") == "true" for r in rows),
             "blocked_reasons": [r.get("decision_reason", "") for r in rows if r.get("decision_status") == "blocked" and r.get("decision_reason")],
+            "warnings": [r.get("refresh_error", "") for r in rows if r.get("refresh_error")],
         }
 
     def run_sweep(self) -> dict:
@@ -378,8 +395,7 @@ class Orchestrator:
                     for mode in ("discover","validate"):
                         params=self._params(by_domain[domain],mode); manifest["parameters"][mode]=params
                         rs,cached,fp=self._stage(target,domain,mode,params,temp_dir,cache,manifest); rows+=rs;cache_flags.append(cached);fps.append(fp)
-                    validate=self._choose(rows,"validate")
-                    if not accepted(validate):
+                    if not all_shape_gates_accepted(rows,"validate"):
                         params=self._params(by_domain[domain],"harsh"); manifest["parameters"]["harsh"]=params
                         rs,cached,fp=self._stage(target,domain,"harsh",params,temp_dir,cache,manifest);rows+=rs;cache_flags.append(cached);fps.append(fp)
                     else: manifest["stages_skipped"].append({"stage":"harsh/*","reason":"validate_acceptance_gate_satisfied"})
@@ -406,10 +422,10 @@ class Orchestrator:
                     manifest["final_status"]="blocked";manifest["warnings"].append(str(exc));atomic_json(temp_dir/"run_manifest.json",manifest);os.replace(temp_dir,final_dir)
                     old=[dict(r) for r in prior_rows if r["domain"]==domain]
                     if old:
-                        for r in old:r.update(summary_timestamp=ts,result_provenance_status="blocked_refresh_previous_retained",refresh_attempted="true",refresh_status="blocked")
+                        for r in old:r.update(summary_timestamp=ts,result_provenance_status="blocked_refresh_previous_retained",refresh_attempted="true",refresh_status="blocked",refresh_error=str(exc))
                         new_by_target[target]+=old
                     else:
-                        new_by_target[target].append({"summary_timestamp":ts,"domain":domain,"target":target,"shape_gate":"__all__","decision_status":"blocked","decision_reason":str(exc),"governance_status":"unratified","result_provenance_status":"fresh","domain_result_timestamp":ts,"run_id":rid,"source_run_id":rid,"source_evidence_path":str(final_dir),"refresh_attempted":"true","refresh_status":"blocked","discovery_engine_version":self.cfg.engine_version})
+                        new_by_target[target].append({"summary_timestamp":ts,"domain":domain,"target":target,"shape_gate":"__all__","decision_status":"blocked","decision_reason":str(exc),"governance_status":"unratified","result_provenance_status":"fresh","domain_result_timestamp":ts,"run_id":rid,"source_run_id":rid,"source_evidence_path":str(final_dir),"refresh_attempted":"true","refresh_status":"blocked","refresh_error":str(exc),"discovery_engine_version":self.cfg.engine_version})
         # Validate everything before publishing anything.
         for target, rows in new_by_target.items():
             keys=[(r.get("domain"),r.get("target"),r.get("shape_gate") or "__all__") for r in rows]
@@ -427,7 +443,8 @@ class Orchestrator:
                 "refresh_status":";".join(sorted(join["refresh"]|sig["refresh"])),
                 "pareto_invoked":"true" if join["pareto_invoked"] or sig["pareto_invoked"] else "false",
                 "harsh_invoked":"true" if join["harsh_invoked"] or sig["harsh_invoked"] else "false",
-                "warnings":"","blocked_reason":";".join(join["blocked_reasons"]+sig["blocked_reasons"])})
+                "warnings":";".join(join["warnings"]+sig["warnings"]),
+                "blocked_reason":";".join(join["blocked_reasons"]+sig["blocked_reasons"])})
         atomic_csv(self.summaries/f"discovery_run_summary_{ts}.csv",run_rows,RUN_FIELDS);atomic_json(self.cache_path,cache)
         counts=Counter(r.get("decision_status") for rows in new_by_target.values() for r in rows);counts.update(r.get("result_provenance_status") for rows in new_by_target.values() for r in rows)
         print(json.dumps({"summary_timestamp":ts,"counts":dict(sorted(counts.items()))},indent=2));return {"timestamp":ts,"rows":new_by_target}

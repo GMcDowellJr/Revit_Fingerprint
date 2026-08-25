@@ -7,7 +7,7 @@ import pytest
 from tools.discovery_orchestrator import (
     DISCOVERY_ENGINE_VERSION, SUMMARY_FIELDS, Orchestrator, Config, acceptance_reasons,
     accepted, cache_key, canonical_json, input_fingerprint, stage_cache_eligible,
-    timestamp_now,
+    all_shape_gates_accepted, timestamp_now,
 )
 
 
@@ -126,13 +126,14 @@ def test_run_summary_aggregates_all_shape_gates_conservatively():
          "harsh_required":"false","result_provenance_status":"fresh","refresh_status":"completed"},
         {"shape_gate":"Windows","decision_status":"blocked","decision_reason":"missing evidence",
          "pareto_required":"true","harsh_required":"true","result_provenance_status":"cached",
-         "refresh_status":"blocked"},
+         "refresh_status":"blocked","refresh_error":"validation process failed"},
     ]
     result=Orchestrator._aggregate_domain(rows)
     assert result["decision_status"]=="blocked"
     assert result["pareto_invoked"] and result["harsh_invoked"]
     assert result["provenance"]=={"fresh","cached"}
     assert result["blocked_reasons"]==["missing evidence"]
+    assert result["warnings"]==["validation process failed"]
 
 
 @pytest.mark.parametrize("change",[
@@ -147,3 +148,36 @@ def test_ok_status_with_failed_gate_is_not_cache_eligible(change):
 def test_every_shape_gate_must_pass_before_aggregate_stage_is_cache_eligible():
     assert stage_cache_eligible([clean(),clean()])
     assert not stage_cache_eligible([clean(),clean(collision_rate_full=".1")])
+
+
+def test_harsh_is_required_when_any_validation_shape_gate_fails():
+    rows=[
+        {**clean(),"policy_mode":"validate","shape_gate":"Doors","search_mode":"greedy"},
+        {**clean(collision_rate_full=".1"),"policy_mode":"validate","shape_gate":"Windows","search_mode":"greedy"},
+        {**clean(),"policy_mode":"validate","shape_gate":"Windows","search_mode":"pareto"},
+    ]
+    assert all_shape_gates_accepted(rows,"validate")
+    rows[-1]={**rows[-1],"collision_rate_full":".1"}
+    assert not all_shape_gates_accepted(rows,"validate")
+
+
+def test_missing_validation_gate_requires_harsh():
+    rows=[
+        {**clean(),"policy_mode":"discover","shape_gate":"Doors"},
+        {**clean(),"policy_mode":"discover","shape_gate":"Windows"},
+        {**clean(),"policy_mode":"validate","shape_gate":"Doors"},
+    ]
+    assert not all_shape_gates_accepted(rows,"validate")
+
+
+def test_sig_archives_greedy_and_pareto_under_distinct_names(tmp_path):
+    exports,repo,_=fixture_inputs(tmp_path)
+    orchestrator=Orchestrator(Config(exports,repo,exports/"suggestions.csv"))
+    diagnostics=exports/"diagnostics";run_dir=tmp_path/"run"
+    generated=diagnostics/"hash_sig_discovery_exploration__walls__discover.csv"
+    generated.parent.mkdir(parents=True,exist_ok=True);generated.write_text("greedy")
+    greedy=orchestrator._archive_artifacts("sig","walls","discover","greedy",run_dir)
+    generated.write_text("pareto")
+    pareto=orchestrator._archive_artifacts("sig","walls","discover","pareto",run_dir)
+    assert greedy[0] != pareto[0]
+    assert greedy[0].read_text()=="greedy" and pareto[0].read_text()=="pareto"

@@ -26,6 +26,8 @@ new-format full snapshot exists. Every policy stage starts with Greedy. Pareto
 runs only when Greedy fails the strict gate: status `ok`, full coverage 1.0,
 zero full collision and fragmentation, and no sample/full divergence. Discover
 and validate run normally; harsh runs only when validate fails that same gate.
+For shape-gated domains, every gate must have an accepted validation result;
+one passing gate cannot suppress harsh evidence required by another gate.
 Full-population verification is always enabled by the runbook.
 
 `validate` retains its existing meaning: it searches within the governed
@@ -58,6 +60,8 @@ fingerprint-verified; `carried_forward` was outside scope and was not checked;
 `blocked_refresh_previous_retained` means a requested refresh failed and the
 prior result remains. `summary_timestamp` is snapshot age while
 `domain_result_timestamp` is evidence age.
+The run summary aggregates every shape gate conservatively and includes the
+exception text when a failed requested refresh retains prior evidence.
 
 ## Cache contract
 
