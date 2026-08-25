@@ -225,6 +225,31 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   raised). Not hash-breaking, same reasoning as D-044. Added two tests to
   `tests/test_text_types_leader_arrowhead_quality.py` covering the
   stale-reference and lookup-exception cases directly.
+- **`line_styles`: registered `line_style.pattern_ref.kind` in the domain key
+  registry and corrected the compiled `sig_hash` preimage to match the
+  extractor's real behavior (D-047).** Found by automated PR review while
+  pinning `sig_hash_keys` against a `pattern_ref.synopsis` widening risk
+  (same D-039 mechanism, a fourth domain): `contracts/domain_identity_keys_v2.json`'s
+  `line_styles` `allowed_keys` was missing `line_style.pattern_ref.kind`
+  entirely -- a key the extractor has always emitted into every record's
+  `identity_basis.items` -- so `validate_record_v2()` rejected every
+  real-export `line_styles` record with
+  `identity.key.not_allowed:line_style.pattern_ref.kind`. The same registry
+  block also allowed `color.rgb`/`weight.cut` into the compiled `sig_hash`
+  policy even though the extractor never hashes either (`weight.cut` isn't
+  even emitted). Added `pattern_ref.kind` to `allowed_keys`, added an
+  explicit `sig_hash_keys` override matching `LINE_STYLE_SEMANTIC_KEYS`
+  exactly (the extractor's real inline preimage), corrected the compiled
+  policy's `allowed_items` to match, and bumped `sig_hash_schema` to `.v2`
+  (D-045 discipline). Not hash-breaking for the extractor's own inline
+  `sig_hash` (unchanged); hash-breaking for the analysis-side `sig_hash`
+  stage recompute only, correcting it to match what the extractor has
+  always actually computed. Documented the resulting, legitimate
+  sig_hash/join_hash divergence (`pattern_ref.kind` is join-excluded for
+  collision-coarseness, not because it's non-behavioral) in
+  `ACCEPTED_SIG_HASH_JOIN_KEY_OVERLAPS`. Added regression tests closing the
+  "no test validates line_styles against the registry" gap. See
+  DECISIONS.md D-047.
 - **`mapping/create_line_pattern_mappings.py`: an explicit but invalid `IN[2]`
   repo root now fails loudly instead of silently falling back to the
   environment or `__file__`.** A caller-supplied `IN[2]` is an explicit

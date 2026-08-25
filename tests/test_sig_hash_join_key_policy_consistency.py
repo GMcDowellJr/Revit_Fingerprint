@@ -72,6 +72,12 @@ ACCEPTED_SIG_HASH_JOIN_KEY_OVERLAPS = {
     # deliberately different identity concepts for the same domain, not a
     # narrower/wider split of one concept.
     "line_patterns": {"line_pattern.segments_def_hash"},
+    # D-047: domain_join_key_policies.json's own notes for line_styles: "pattern_ref.kind
+    # is too coarse and produces high collisions; it must not be used for joins." That's
+    # a join-clustering concern, not a "this isn't behavioral" judgment -- the extractor's
+    # own inline sig_hash (LINE_STYLE_SEMANTIC_KEYS) has always included pattern_ref.kind
+    # as part of a line style's full behavioral definition.
+    "line_styles": {"line_style.pattern_ref.kind"},
     # domain_join_key_policies.json's own notes: join is family-granularity
     # and must match functionally-identical families across projects
     # regardless of current per-file counts/activation state; those counts

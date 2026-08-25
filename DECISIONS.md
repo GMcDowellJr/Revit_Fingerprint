@@ -2373,3 +2373,91 @@ branches directly.
   leader-arrowhead read (parameter absent → none; reference present but
   unresolvable element → missing/unreadable; element resolved but sig_hash
   lookup unresolved → missing/unreadable; fully resolved → ok).
+
+## D-047 — `line_styles`: register `pattern_ref.kind` in the domain key registry; correct the compiled sig_hash preimage to match the extractor
+
+### Status
+Accepted (2026-08-25)
+
+### Context
+Found by automated PR review (Codex bot) on the D-046 PR. The literal ask
+was narrow: `line_style.pattern_ref.synopsis` (a D-040 identity-visibility
+promotion) was in `contracts/domain_identity_keys_v2.json`'s `allowed_keys`
+for `line_styles` with no `sig_hash_keys` override, so a future
+`tools/generate_sig_hash_policy.py` regeneration would fall back to the
+full `allowed_keys` list and silently widen `sig_hash` to include it --
+the exact D-039 mechanism, on a fourth domain.
+
+Investigating that finding surfaced a deeper, pre-existing, unrelated bug in
+the same registry block. `domains/line_styles.py`'s actual inline `sig_hash`
+has always been computed from `LINE_STYLE_SEMANTIC_KEYS` -- `{pattern_ref.kind,
+pattern_ref.sig_hash, weight.projection}` -- but the registry's `allowed_keys`
+was `{weight.projection, color.rgb, weight.cut, pattern_ref.sig_hash,
+pattern_ref.synopsis}`: missing `pattern_ref.kind` entirely (an identity key
+the extractor emits into every record's `identity_basis.items` and always
+has), and including `color.rgb`/`weight.cut`, neither of which the extractor
+ever hashes (`weight.cut` isn't even emitted -- its `identity_items.append`
+call is commented out; `color.rgb` is emitted only to `phase2.cosmetic_items`).
+The compiled `policies/domain_sig_hash_policies.json` inherited the same
+wrong set. The missing `pattern_ref.kind` registration meant
+`validate_record_v2()` rejected every real-export `line_styles` record with
+`identity.key.not_allowed:line_style.pattern_ref.kind` -- the same class of
+bug as D-043, just discovered later, in a domain that had no test exercising
+that validator at all.
+
+A related discovery while fixing this: `tests/test_sig_hash_join_key_policy_consistency.py`'s
+D-040 drift guard (added earlier this session) correctly flagged the newly
+corrected `pattern_ref.kind` inclusion as an undocumented sig_hash/join_key
+overlap -- `domain_join_key_policies.json`'s own notes for `line_styles`
+explain `pattern_ref.kind` is excluded from `join_hash` because it "is too
+coarse and produces high collisions," a join-clustering concern, not a
+"this isn't behavioral" judgment. This is a genuine, reviewed divergence
+(sig_hash and join_hash answering different questions for the same field),
+not a fresh case of the drift the guard exists to catch.
+
+### Decision
+1. Add `line_style.pattern_ref.kind` to `allowed_keys` in the registry
+   (fixes the real, pre-existing contract-validation gap).
+2. Add an explicit `sig_hash_keys` override to the registry:
+   `["line_style.pattern_ref.kind", "line_style.pattern_ref.sig_hash",
+   "line_style.weight.projection"]` -- exactly `LINE_STYLE_SEMANTIC_KEYS`,
+   matching the extractor's real inline preimage and freezing it against
+   future regen widening (the literal finding). `color.rgb`/`weight.cut`
+   remain in `allowed_keys` (harmless, inert -- `weight.cut` is never
+   emitted at all) but are no longer eligible for the sig_hash preimage.
+3. Correct `policies/domain_sig_hash_policies.json`'s `line_styles`
+   `allowed_items` to the same 3-key set, with a note explaining the
+   correction. Bump `sig_hash_schema` to `.v2` (per D-045's discipline: any
+   correction to a domain's analysis-side sig_hash preimage must bump the
+   schema so old and newly-recomputed values aren't silently treated as
+   comparable).
+4. Add `"line_styles": {"line_style.pattern_ref.kind"}` to
+   `ACCEPTED_SIG_HASH_JOIN_KEY_OVERLAPS` in
+   `tests/test_sig_hash_join_key_policy_consistency.py`, documenting the
+   join-collision-coarseness reason from `domain_join_key_policies.json`'s
+   own notes.
+5. Added `test_line_style_pattern_ref_kind_passes_contract_validation`
+   (closing the "no test exercises `validate_record_v2()` for this domain"
+   gap, matching D-043's pattern) and
+   `test_line_styles_sig_hash_keys_override_matches_actual_inline_preimage`
+   (a drift guard tying the registry override directly to
+   `LINE_STYLE_SEMANTIC_KEYS`) to `tests/test_line_styles_canonical_selectors.py`.
+
+### Consequences
+- **Not hash-breaking for the extractor's own inline `sig_hash`** --
+  `domains/line_styles.py` never changes; `LINE_STYLE_SEMANTIC_KEYS` was
+  already correct and is untouched.
+- **Hash-breaking for the analysis-side `sig_hash` stage recompute only**
+  (`core/sig_hash_builder.py`, invoked by `run_extract_all.py`'s `sig_hash`
+  stage): a post-stage recompute against the old compiled policy would have
+  hashed `color.rgb`/never actually included `pattern_ref.kind`; after this
+  fix it matches the extractor's real, always-correct inline value. This is
+  a correction, not a regression -- the two were already meant to agree and
+  didn't.
+- Real exports of `line_styles` records were never actually run through
+  `validate_record_v2()` in production (same as D-043's finding for
+  arrowheads/line_patterns/view_templates), so this closes a
+  contract-validation gap before it produced externally-visible breakage.
+- `join_hash`/`identity_basis.items` are unaffected -- `pattern_ref.kind`
+  was already correctly excluded from the join-key policy for its own,
+  independent (join-collision) reason.
