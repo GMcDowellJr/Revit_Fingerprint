@@ -50,6 +50,20 @@ _OUTPUT_FIELDS = [
 
 
 def _iter_export_paths(export: str, export_dir: str) -> List[Path]:
+    """Resolve the CLI's --export/--export-dir args to a concrete, ordered list of export
+    files to process, applying the input-format-priority rule.
+
+    --- trace ---
+    reads: `export` (CLI --export, a single file path) and `export_dir` (CLI --export-dir,
+        a directory), both from main()'s argparse Namespace.
+    calls: none (pathlib.Path.glob only).
+    thresholds: the details > index > fallback(excluding *.legacy.json) priority order is
+        hardcoded control flow here, not a named constant or policy file (CLAUDE.md's
+        input-format-priority rule, restated as code) -- a table-driven policy scanner would
+        miss this as a "threshold" since it is not assigned to a name.
+    returns: sorted list[Path], one tier only (never a mix of details/index/fallback);
+        consumed by main(), which passes each Path to _rows_for_export().
+    """
     if export:
         return [Path(export)]
     root = Path(export_dir)
@@ -74,6 +88,18 @@ def _iter_export_paths(export: str, export_dir: str) -> List[Path]:
 
 
 def _iter_domain_payloads(export_data: Dict[str, Any]):
+    """Yield (top_key, payload) pairs for each top-level domain block that carries a
+    `records` list, skipping metadata keys.
+
+    --- trace ---
+    reads: `export_data` -- the parsed JSON dict of one *.details.json/*.index.json file,
+        passed in by _rows_for_export() (which just json.load()'d it).
+    calls: none.
+    thresholds: the filter itself (key not starting with "_", value is dict with a list
+        "records") is inline structural logic, not a named constant -- there is no schema
+        registry this reads against.
+    returns: generator of (str, dict) pairs; consumed only by _rows_for_export()'s loop.
+    """
     for key, payload in export_data.items():
         if not isinstance(key, str) or key.startswith("_"):
             continue
@@ -82,6 +108,22 @@ def _iter_domain_payloads(export_data: Dict[str, Any]):
 
 
 def _rows_for_export(export_path: Path, name_key_policies: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Load one export JSON file and reconstruct a join_key_name_identity output row for
+    every eligible-domain record it contains.
+
+    --- trace ---
+    reads: JSON file at `export_path` (one Path yielded by _iter_export_paths(), opened
+        here); `name_key_policies` (main()'s loaded policies/domain_name_key_policies.json,
+        passed through unchanged).
+    calls: _iter_domain_payloads(); core.name_key_builder.build_name_key_for_record()
+        (does the actual per-record reconstruction -- returns None for a domain with no
+        policy entry, which this function treats as "skip, out of scope").
+    thresholds: output row shape is the module-level _OUTPUT_FIELDS constant (l.40-49) --
+        not read here directly, but this function's dict literal must stay in sync with it
+        by convention (no assertion ties them together).
+    returns: list[dict[str,str]], one row per reconstructed record; consumed by main(),
+        which extends `all_rows` across every export file and writes them to the output CSV.
+    """
     with export_path.open("r", encoding="utf-8") as f:
         export_data = json.load(f)
     if not isinstance(export_data, dict):
@@ -111,6 +153,24 @@ def _rows_for_export(export_path: Path, name_key_policies: Dict[str, Any]) -> Li
 
 
 def main() -> None:
+    """CLI entry point: resolve export inputs, load the name-key policy, reconstruct rows
+    for every export, and write the combined CSV.
+
+    --- trace ---
+    reads: CLI args --export, --export-dir, --name-key-policy (default
+        `_DEFAULT_POLICY_PATH`, l.39 -> policies/domain_name_key_policies.json),
+        --out (default "Results_v21/name_key/name_key_results.csv").
+    calls: core.join_key_policy.load_join_key_policies(); _iter_export_paths();
+        _rows_for_export() (once per resolved export path).
+    thresholds: `_DEFAULT_POLICY_PATH` (module constant, l.39, sourced from the repo-root
+        policies/ directory); `_OUTPUT_FIELDS` (module constant, l.40-49, fixes CSV column
+        order); default --out path literal.
+    returns: writes CSV to `args.out`; consumed downstream by
+        tools/generate_name_key_patterns.py's --name-key-csv arg and by
+        tools/run_segment_orchestrator.py's Step 2b per-segment filter
+        (_filter_name_key_csv_to_segment(), run_segment_orchestrator.py l.1139+). Prints a
+        row-count summary to stdout; returns None.
+    """
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--export", default=None, help="Single *.details.json export file.")
     ap.add_argument("--export-dir", default=None, help="Directory of export JSON files (non-recursive).")
