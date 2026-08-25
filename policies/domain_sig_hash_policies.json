@@ -88,7 +88,7 @@
         "ct.total_thickness_in",
         "ct.stack_hash_loose"
       ],
-      "sig_hash_schema": "ceiling_types.sig_hash.v1"
+      "sig_hash_schema": "ceiling_types.sig_hash.v2"
     },
     "dimension_types_angular": {
       "allowed_item_prefixes": [],
@@ -549,7 +549,7 @@
         "ft.total_thickness_in",
         "ft.stack_hash_loose"
       ],
-      "sig_hash_schema": "floor_types.sig_hash.v1"
+      "sig_hash_schema": "floor_types.sig_hash.v2"
     },
     "identity": {
       "allowed_item_prefixes": [],
@@ -732,7 +732,7 @@
       "required_items": [
         "obj_style.row_key"
       ],
-      "sig_hash_schema": "object_styles_analytical.sig_hash.v1"
+      "sig_hash_schema": "object_styles_analytical.sig_hash.v2"
     },
     "object_styles_annotation": {
       "allowed_item_prefixes": [],
@@ -762,7 +762,7 @@
       "required_items": [
         "obj_style.row_key"
       ],
-      "sig_hash_schema": "object_styles_annotation.sig_hash.v1"
+      "sig_hash_schema": "object_styles_annotation.sig_hash.v2"
     },
     "object_styles_imported": {
       "allowed_item_prefixes": [],
@@ -792,7 +792,7 @@
       "required_items": [
         "obj_style.row_key"
       ],
-      "sig_hash_schema": "object_styles_imported.sig_hash.v1"
+      "sig_hash_schema": "object_styles_imported.sig_hash.v2"
     },
     "object_styles_model": {
       "allowed_item_prefixes": [],
@@ -824,7 +824,7 @@
       "required_items": [
         "obj_style.row_key"
       ],
-      "sig_hash_schema": "object_styles_model.sig_hash.v1"
+      "sig_hash_schema": "object_styles_model.sig_hash.v2"
     },
     "phase_filters": {
       "allowed_item_prefixes": [],
@@ -900,7 +900,7 @@
         "rt.total_thickness_in",
         "rt.stack_hash_loose"
       ],
-      "sig_hash_schema": "roof_types.sig_hash.v1"
+      "sig_hash_schema": "roof_types.sig_hash.v2"
     },
     "text_types": {
       "allowed_item_prefixes": [],
@@ -1235,7 +1235,7 @@
         "wt.total_thickness_in",
         "wt.stack_hash_loose"
       ],
-      "sig_hash_schema": "wall_types.sig_hash.v1"
+      "sig_hash_schema": "wall_types.sig_hash.v2"
     },
     "worksets": {
       "allowed_item_prefixes": [],

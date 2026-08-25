@@ -82,7 +82,7 @@
         "ct.type_name",
         "ct.coarse_fill_color_rgb"
       ],
-      "sig_hash_schema": "ceiling_types.sig_hash.v1",
+      "sig_hash_schema": "ceiling_types.sig_hash.v2",
       "sig_hash_keys": [
         "ct.layer_count",
         "ct.total_thickness_in",
@@ -671,7 +671,7 @@
         "ft.type_name",
         "ft.coarse_fill_color_rgb"
       ],
-      "sig_hash_schema": "floor_types.sig_hash.v1",
+      "sig_hash_schema": "floor_types.sig_hash.v2",
       "sig_hash_keys": [
         "ft.layer_count",
         "ft.total_thickness_in",
@@ -861,6 +861,7 @@
         "obj_style.is_cuttable",
         "obj_style.parent_name"
       ],
+      "sig_hash_schema": "object_styles_analytical.sig_hash.v2",
       "sig_hash_keys": [
         "obj_style.weight.projection",
         "obj_style.color.rgb",
@@ -886,6 +887,7 @@
         "obj_style.is_cuttable",
         "obj_style.parent_name"
       ],
+      "sig_hash_schema": "object_styles_annotation.sig_hash.v2",
       "sig_hash_keys": [
         "obj_style.weight.projection",
         "obj_style.color.rgb",
@@ -910,6 +912,7 @@
         "obj_style.is_cuttable",
         "obj_style.parent_name"
       ],
+      "sig_hash_schema": "object_styles_imported.sig_hash.v2",
       "sig_hash_keys": [
         "obj_style.weight.projection",
         "obj_style.color.rgb",
@@ -937,6 +940,7 @@
         "obj_style.is_cuttable",
         "obj_style.parent_name"
       ],
+      "sig_hash_schema": "object_styles_model.sig_hash.v2",
       "sig_hash_keys": [
         "obj_style.weight.projection",
         "obj_style.weight.cut",
@@ -1021,7 +1025,7 @@
         "rt.type_name",
         "rt.coarse_fill_color_rgb"
       ],
-      "sig_hash_schema": "roof_types.sig_hash.v1",
+      "sig_hash_schema": "roof_types.sig_hash.v2",
       "sig_hash_keys": [
         "rt.layer_count",
         "rt.total_thickness_in",
@@ -1387,7 +1391,7 @@
         "wt.type_name",
         "wt.coarse_fill_color_rgb"
       ],
-      "sig_hash_schema": "wall_types.sig_hash.v1",
+      "sig_hash_schema": "wall_types.sig_hash.v2",
       "sig_hash_keys": [
         "wt.function",
         "wt.layer_count",

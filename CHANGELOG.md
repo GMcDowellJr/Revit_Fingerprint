@@ -200,6 +200,18 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   the first test to exercise `text_types.py`'s `extract()` with an actual
   leader-arrowhead reference present, closing the coverage gap that let this
   ship. See DECISIONS.md D-044.
+- **`sig_hash_schema` bumped from `.v1` to `.v2` for `wall_types`/`floor_types`/
+  `roof_types`/`ceiling_types` and all four `object_styles_*` partitions
+  (D-045).** Found by automated PR review: D-039 (compound-types) and D-042
+  (`object_styles`) both narrowed these domains' `sig_hash` preimage in a
+  hash-breaking way but left the schema label at `.v1`, so an old export and
+  a freshly recomputed one carry the same schema string despite hashing
+  different fields -- no signal that the two `sig_hash` values aren't
+  comparable. No `sig_hash` value changes from this decision; only the
+  schema label. For the four `object_styles_*` domains this also adds an
+  explicit `sig_hash_schema` to the registry for the first time (previously
+  implicit via `generate_sig_hash_policy.py`'s `.v1` fallback). See
+  DECISIONS.md D-045.
 - **`mapping/create_line_pattern_mappings.py`: an explicit but invalid `IN[2]`
   repo root now fails loudly instead of silently falling back to the
   environment or `__file__`.** A caller-supplied `IN[2]` is an explicit

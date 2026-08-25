@@ -2272,3 +2272,58 @@ coverage gap that let this ship.
   entirely, for a text type that does reference a leader arrowhead) -- these
   records previously reported a misleading "no leader arrowhead" state for
   what is actually an unresolved dependency.
+
+## D-045 — Bump `sig_hash_schema` to `.v2` for the four compound-type domains and four object_styles partitions
+
+### Status
+Accepted (2026-08-25)
+
+### Context
+Found by automated PR review (Codex bot) on the D-044 PR (two separate
+comments, same root issue). D-039 narrowed `wall_types`/`floor_types`/
+`roof_types`/`ceiling_types`'s `sig_hash` preimage from the full
+`identity_basis.items` set down to a pinned semantic subset (excluding type
+name and fill color). D-042 removed the name-derived `obj_style.row_key`
+from all four `object_styles_*` partitions' `sig_hash` preimage. Both are
+correct, intentional, hash-breaking fixes -- but both left
+`sig_hash_schema` unchanged at `.v1` in `contracts/domain_identity_keys_v2.json`
+and the compiled `policies/domain_sig_hash_policies.json` (for
+`object_styles_*`, there was no explicit `sig_hash_schema` at all;
+`tools/generate_sig_hash_policy.py`'s fallback `"%s.sig_hash.v1" % name`
+supplied it). `sig_hash_schema` exists specifically so that a `sig_hash`
+value's preimage definition can be identified without recomputing it --
+an old export produced before D-039/D-042 and a freshly recomputed one
+produced after both carry the same schema string despite hashing different
+fields, so a comparison tool (or a person) has no signal that the two
+`sig_hash` values are not comparable, and no schema-version-gated migration
+path can distinguish "value computed under the wide preimage" from "value
+computed under the narrow one."
+
+### Decision
+Bump `sig_hash_schema` from `.v1` to `.v2` for all eight affected domains,
+in both `contracts/domain_identity_keys_v2.json` (the source of truth) and
+`policies/domain_sig_hash_policies.json` (the compiled artifact, hand-patched
+to match per the established convention for this file): `wall_types`,
+`floor_types`, `roof_types`, `ceiling_types`, `object_styles_model`,
+`object_styles_annotation`, `object_styles_analytical`,
+`object_styles_imported`. For the four `object_styles_*` domains, this also
+adds an explicit `sig_hash_schema` field to the registry for the first time
+(previously relying on `generate_sig_hash_policy.py`'s implicit `.v1`
+fallback), so future regenerations no longer depend on that fallback for
+these domains.
+
+### Consequences
+- No change to any `sig_hash` **value** -- this decision only changes the
+  schema label attached to those values. The actual preimage narrowing was
+  already completed and hash-breaking under D-039/D-042; this closes the
+  versioning gap those decisions left open.
+- Any tooling or stored artifact that keyed off the literal string
+  `"wall_types.sig_hash.v1"` / `"floor_types.sig_hash.v1"` /
+  `"roof_types.sig_hash.v1"` / `"ceiling_types.sig_hash.v1"` /
+  `"object_styles_{model,annotation,analytical,imported}.sig_hash.v1"` will
+  see `.v2` going forward -- this is the intended signal that a `sig_hash`
+  computed under the old (wider) preimage is not comparable to one computed
+  under the current (narrower) preimage without recomputation. No code in
+  this repository parses or branches on the schema string's version suffix
+  today (confirmed via full-suite pass with no assertions on the literal
+  value), so this is safe to bump without an accompanying migration.
