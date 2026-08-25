@@ -104,6 +104,45 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   extractor, not any per-record `sig_hash` field (which this domain never emits at
   extraction time). Fixed a test (`tests/test_text_types_canonical_selectors.py`) that
   had encoded the divergence as expected behavior. See DECISIONS.md D-041.
+- **`object_styles`: `obj_style.row_key` (a name-derived value) removed from
+  all four partitions' sig_hash key set (D-042).** Found by automated PR
+  review on the D-040 PR: `contracts/domain_identity_keys_v2.json`'s
+  pre-existing `sig_hash_keys` override for `object_styles_model`/
+  `_annotation`/`_analytical`/`_imported` included `obj_style.row_key`
+  (`"{parent}|{row}"`, derived from `Category.Name`), diverging from the
+  extractor's own `_MODEL_SEMANTIC_KEYS`/`_NON_MODEL_SEMANTIC_KEYS`
+  constants, which never included it. No decision record authorized hashing
+  a name into this domain's behavioral identity. Removed `row_key` from the
+  registry override and the compiled `policies/domain_sig_hash_policies.json`
+  `allowed_items` for all four domains (still required for `identity_basis.items`/
+  `join_key`, unaffected). **Hash-breaking** for these four domains' `sig_hash`
+  specifically: two categories/subcategories with identical graphic-override
+  behavior but different names now correctly produce the same `sig_hash`.
+  Does not affect already-exported JSON (the extractor's own inline
+  `sig_hash_v2` never included `row_key`); only the analysis-side `sig_hash`
+  stage recompute is affected. Also fixed the D-040 drift-guard test
+  (`test_resolve_sig_hash_keys_real_policy_file_matches_hardcoded_fallbacks`),
+  which had never checked any `object_styles_*` domain. See DECISIONS.md D-042.
+- **`core/sig_hash_policy.py`: `resolve_sig_hash_keys()` now resolves
+  `allowed_item_prefixes` and no longer treats a validated empty
+  `allowed_items` as policy-absent (D-042).** Also found by automated PR
+  review: the D-040 3-argument signature never resolved
+  `allowed_item_prefixes` against a record's actual keys (unlike
+  `core/sig_hash_builder.py`'s `_key_allowed()`, the post-stage recompute's
+  reference implementation), and treated a policy-validated but empty
+  `allowed_items` list as "absent," incorrectly falling back to the
+  hardcoded default instead of honoring the empty set. No currently-wired
+  domain relies on `allowed_item_prefixes` for sig_hash today, so this had
+  not yet produced an observably wrong hash, but would have reproduced the
+  exact D-039-class drift the first time a prefix-based policy adopted this
+  resolver. Signature is now `(policies, domain_name, candidate_keys,
+  fallback)`; every call site introduced in D-040
+  (`wall_types`/`floor_types`/`roof_types`/`ceiling_types`, `units` x2,
+  `worksets` x2, `browser_organization`, `object_styles`, `arrowheads`,
+  `text_types`) updated to pass the record's own identity-item keys as
+  `candidate_keys`. `object_styles.py`'s call moved inside its per-category
+  loop (it previously ran once before the loop, with no per-record keys
+  available for prefix resolution). See DECISIONS.md D-042.
 - **`mapping/create_line_pattern_mappings.py`: an explicit but invalid `IN[2]`
   repo root now fails loudly instead of silently falling back to the
   environment or `__file__`.** A caller-supplied `IN[2]` is an explicit

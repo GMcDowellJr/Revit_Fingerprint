@@ -513,7 +513,10 @@ def extract(doc, ctx=None):
         identity_items = sorted(identity_items, key=lambda it: safe_str(it.get("k", "")))
 
         sig_hash_keys = resolve_sig_hash_keys(
-            (ctx or {}).get("sig_hash_policies"), "arrowheads", _ARROWHEADS_SIG_HASH_KEYS_FALLBACK
+            (ctx or {}).get("sig_hash_policies"),
+            "arrowheads",
+            [it.get("k") for it in identity_items],
+            _ARROWHEADS_SIG_HASH_KEYS_FALLBACK,
         )
         semantic_keys = sorted(set(sig_hash_keys))
 

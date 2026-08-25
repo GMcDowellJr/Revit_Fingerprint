@@ -411,7 +411,10 @@ def _build_record(category, org, doc, is_workshared, bip_lookup, workset_name_to
     sig_hash = None
     if not blocked:
         sig_hash_keys = set(resolve_sig_hash_keys(
-            (ctx or {}).get("sig_hash_policies"), "browser_organization", BROWSER_ORGANIZATION_SEMANTIC_KEYS
+            (ctx or {}).get("sig_hash_policies"),
+            "browser_organization",
+            [it.get("k") for it in identity_items_sorted],
+            BROWSER_ORGANIZATION_SEMANTIC_KEYS,
         ))
         semantic_items = [it for it in identity_items_sorted if it.get("k") in sig_hash_keys]
         sig_hash = make_hash(serialize_identity_items(semantic_items))

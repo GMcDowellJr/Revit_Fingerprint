@@ -269,7 +269,12 @@ def _build_per_workset_record(ws, active_workset_id, active_workset_lookup_ok, k
 
     sig_hash = None
     if not blocked:
-        sig_hash_keys = set(resolve_sig_hash_keys((ctx or {}).get("sig_hash_policies"), "worksets", WORKSETS_SEMANTIC_KEYS))
+        sig_hash_keys = set(resolve_sig_hash_keys(
+            (ctx or {}).get("sig_hash_policies"),
+            "worksets",
+            [it.get("k") for it in identity_items_sorted],
+            WORKSETS_SEMANTIC_KEYS,
+        ))
         semantic_items = [it for it in identity_items_sorted if it.get("k") in sig_hash_keys]
         sig_hash = make_hash(serialize_identity_items(semantic_items))
 
@@ -378,7 +383,12 @@ def _build_doc_level_record(doc, is_workshared, active_workset_name, kind_counts
     # hiccup must not take down the per-workset records or leave the
     # summary record entirely absent.
     status = STATUS_DEGRADED if any_incomplete else STATUS_OK
-    doc_sig_hash_keys = set(resolve_sig_hash_keys((ctx or {}).get("sig_hash_policies"), "worksets_doc", WORKSETS_DOC_SEMANTIC_KEYS))
+    doc_sig_hash_keys = set(resolve_sig_hash_keys(
+        (ctx or {}).get("sig_hash_policies"),
+        "worksets_doc",
+        [it.get("k") for it in doc_items_sorted],
+        WORKSETS_DOC_SEMANTIC_KEYS,
+    ))
     semantic_items = [it for it in doc_items_sorted if it.get("k") in doc_sig_hash_keys]
     sig_hash = make_hash(serialize_identity_items(semantic_items))
 

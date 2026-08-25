@@ -194,40 +194,69 @@ def test_object_styles_model_sig_hash_excludes_area9_additions():
 
 
 def test_resolve_sig_hash_keys_falls_back_when_no_policies_present():
-    result = resolve_sig_hash_keys(None, "wall_types", ["a", "b"])
+    result = resolve_sig_hash_keys(None, "wall_types", ["a", "b"], ["a", "b"])
     assert result == ["a", "b"]
 
-    result = resolve_sig_hash_keys({}, "wall_types", ["a", "b"])
+    result = resolve_sig_hash_keys({}, "wall_types", ["a", "b"], ["a", "b"])
     assert result == ["a", "b"]
 
 
 def test_resolve_sig_hash_keys_falls_back_when_domain_not_in_policies():
     policies = {"domains": {"units": {"allowed_items": ["units.spec"]}}}
-    result = resolve_sig_hash_keys(policies, "wall_types", ["a", "b"])
+    result = resolve_sig_hash_keys(policies, "wall_types", ["a", "b"], ["a", "b"])
     assert result == ["a", "b"]
 
 
-def test_resolve_sig_hash_keys_falls_back_when_allowed_items_empty_or_malformed():
-    assert resolve_sig_hash_keys({"domains": {"wall_types": {"allowed_items": []}}}, "wall_types", ["a"]) == ["a"]
-    assert resolve_sig_hash_keys({"domains": {"wall_types": {"allowed_items": None}}}, "wall_types", ["a"]) == ["a"]
-    assert resolve_sig_hash_keys({"domains": {"wall_types": {"allowed_items": ["a", 1]}}}, "wall_types", ["b"]) == ["b"]
+def test_resolve_sig_hash_keys_treats_validated_empty_allowed_items_as_legitimate_not_absence():
+    # A validated empty allowed_items (with no prefixes) is a real policy decision --
+    # "nothing is behavioral for this domain" -- not a signal to fall back. See P2
+    # Codex review finding on the D-040 PR.
+    assert resolve_sig_hash_keys({"domains": {"wall_types": {"allowed_items": []}}}, "wall_types", ["a"], ["a"]) == []
+
+
+def test_resolve_sig_hash_keys_falls_back_when_allowed_items_malformed():
+    assert resolve_sig_hash_keys({"domains": {"wall_types": {"allowed_items": None}}}, "wall_types", ["a"], ["a"]) == ["a"]
+    assert resolve_sig_hash_keys({"domains": {"wall_types": {"allowed_items": ["a", 1]}}}, "wall_types", ["b"], ["b"]) == ["b"]
 
 
 def test_resolve_sig_hash_keys_uses_ctx_policy_when_present():
     policies = {"domains": {"wall_types": {"allowed_items": ["wt.layer_count"]}}}
-    result = resolve_sig_hash_keys(policies, "wall_types", ["wt.function", "wt.layer_count"])
+    result = resolve_sig_hash_keys(policies, "wall_types", ["wt.function", "wt.layer_count"], ["wt.function"])
     assert result == ["wt.layer_count"]
 
 
+def test_resolve_sig_hash_keys_resolves_allowed_item_prefixes_against_candidate_keys():
+    # P2 Codex review finding: allowed_item_prefixes must be resolved against the
+    # keys actually present on the record (candidate_keys), the same way
+    # core/sig_hash_builder.py's _key_allowed() does -- otherwise a domain relying
+    # on prefixes (e.g. view_filter_definitions' "vf.rule[") would silently lose
+    # those keys the moment it adopted this resolver.
+    policies = {
+        "domains": {
+            "view_filter_definitions": {
+                "allowed_items": ["vf.category_id"],
+                "allowed_item_prefixes": ["vf.rule["],
+            }
+        }
+    }
+    candidate_keys = ["vf.category_id", "vf.rule[0].param", "vf.rule[1].op", "vf.unrelated"]
+    result = resolve_sig_hash_keys(policies, "view_filter_definitions", candidate_keys, [])
+    assert result == sorted(["vf.category_id", "vf.rule[0].param", "vf.rule[1].op"])
+
+
 def test_resolve_sig_hash_keys_real_policy_file_matches_hardcoded_fallbacks():
-    """D-039/D-040 drift guard: for every domain that resolve_sig_hash_keys()
+    """D-039/D-040/D-042 drift guard: for every domain that resolve_sig_hash_keys()
     is actually wired into (wall/floor/roof/ceiling_types, units, worksets,
-    worksets_doc, browser_organization, arrowheads, text_types), the real
-    compiled policy's allowed_items must equal what each domain module
+    worksets_doc, browser_organization, object_styles x4, arrowheads, text_types),
+    the real compiled policy's allowed_items must equal what each domain module
     declares as its own hardcoded fallback -- if these two ever diverge, the
     module falls back to a stale value in any ctx lacking sig_hash_policies
     (e.g. a unit test, or a caller that hasn't adopted runner/extraction_context.py
-    yet), silently reproducing the exact class of bug D-039 fixed.
+    yet), silently reproducing the exact class of bug D-039 fixed. D-042 (an
+    automated PR review finding) was exactly this: object_styles was missing from
+    this check's domain list, so this test never actually verified it, and the
+    real compiled policy had silently carried obj_style.row_key -- absent from
+    _MODEL_SEMANTIC_KEYS/_NON_MODEL_SEMANTIC_KEYS -- with nothing catching it.
     """
     import domains.wall_types as wall_types
     import domains.floor_types as floor_types
@@ -236,6 +265,7 @@ def test_resolve_sig_hash_keys_real_policy_file_matches_hardcoded_fallbacks():
     import domains.units as units
     import domains.worksets as worksets
     import domains.browser_organization as browser_organization
+    import domains.object_styles as object_styles
     import domains.arrowheads as arrowheads
     import domains.text_types as text_types
 
@@ -251,6 +281,10 @@ def test_resolve_sig_hash_keys_real_policy_file_matches_hardcoded_fallbacks():
         ("worksets", worksets.WORKSETS_SEMANTIC_KEYS),
         ("worksets_doc", worksets.WORKSETS_DOC_SEMANTIC_KEYS),
         ("browser_organization", browser_organization.BROWSER_ORGANIZATION_SEMANTIC_KEYS),
+        ("object_styles_model", object_styles._MODEL_SEMANTIC_KEYS),
+        ("object_styles_annotation", object_styles._NON_MODEL_SEMANTIC_KEYS),
+        ("object_styles_analytical", object_styles._NON_MODEL_SEMANTIC_KEYS),
+        ("object_styles_imported", object_styles._NON_MODEL_SEMANTIC_KEYS),
         ("arrowheads", arrowheads._ARROWHEADS_SIG_HASH_KEYS_FALLBACK),
         ("text_types", text_types.TEXT_TYPE_SEMANTIC_KEYS_FALLBACK),
     ]

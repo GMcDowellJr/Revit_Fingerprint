@@ -300,7 +300,10 @@ def extract_wall_types(doc, ctx=None):
         status = STATUS_BLOCKED if required_not_ok else STATUS_OK
         status_reasons = ["required_identity_not_ok"] if required_not_ok else []
         sig_hash_keys = set(resolve_sig_hash_keys(
-            (ctx or {}).get("sig_hash_policies"), _DOMAIN_WALL, _WALL_TYPES_SIG_HASH_KEYS_FALLBACK
+            (ctx or {}).get("sig_hash_policies"),
+            _DOMAIN_WALL,
+            [it.get("k") for it in identity_items],
+            _WALL_TYPES_SIG_HASH_KEYS_FALLBACK,
         ))
         sig_hash_items = [it for it in identity_items if safe_str(it.get("k", "")) in sig_hash_keys]
         sig_hash = None if required_not_ok else make_hash(serialize_identity_items(sig_hash_items))

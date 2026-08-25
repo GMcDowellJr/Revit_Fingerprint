@@ -60,7 +60,12 @@ def get_domain_sig_hash_policy(policies: Any, domain_name: str) -> Optional[Dict
     return pol if isinstance(pol, dict) else None
 
 
-def resolve_sig_hash_keys(policies: Any, domain_name: str, fallback: Sequence[str]) -> List[str]:
+def resolve_sig_hash_keys(
+    policies: Any,
+    domain_name: str,
+    candidate_keys: Sequence[str],
+    fallback: Sequence[str],
+) -> List[str]:
     """Resolve the sig_hash preimage key set for a domain at extraction time.
 
     Extractors that hand-classify captured fields into a narrower "semantic"
@@ -75,16 +80,41 @@ def resolve_sig_hash_keys(policies: Any, domain_name: str, fallback: Sequence[st
     when available, so the inline extractor and the post-stage recompute
     consume a single source of truth going forward.
 
+    Args:
+        candidate_keys: the keys actually present on the record about to be
+            hashed (e.g. [it["k"] for it in identity_items]). Needed to
+            resolve `allowed_item_prefixes` into concrete key matches --
+            mirrors core/sig_hash_builder.py's `_key_allowed()`, which checks
+            both an exact `allowed_items` membership test and a prefix test
+            against each item's own key. Without this, a policy that relies
+            on `allowed_item_prefixes` (e.g. view_filter_definitions'
+            "vf.rule[") would silently lose prefix-matched keys the moment a
+            domain adopted this resolver, recreating the exact inline-vs-
+            post-stage drift this function exists to eliminate.
+
     Falls back to the caller's hardcoded default when the policy isn't
     present in ctx (e.g. a unit test that builds a minimal ctx by hand, or a
-    domain not yet migrated to this pattern). The fallback must be kept in
-    sync with the policy's allowed_items for that domain -- this function
-    does not detect a stale fallback; tests/test_sig_hash_join_key_policy_consistency.py
-    and each domain's own inline-vs-policy regression test are the guard for that.
+    domain not yet migrated to this pattern). A policy-validated empty
+    `allowed_items` list is a legitimate configuration (e.g. a domain relying
+    entirely on `allowed_item_prefixes`) and is honored, not treated as
+    absence -- only a missing/malformed policy triggers the fallback.
+
+    The fallback must be kept in sync with the policy's allowed_items for
+    that domain -- this function does not detect a stale fallback;
+    tests/test_sig_hash_join_key_policy_consistency.py and each domain's own
+    inline-vs-policy regression test are the guard for that.
     """
     pol = get_domain_sig_hash_policy(policies, domain_name)
     if isinstance(pol, dict):
         allowed = pol.get("allowed_items")
-        if isinstance(allowed, list) and allowed and _is_list_of_str(allowed):
-            return list(allowed)
+        prefixes = pol.get("allowed_item_prefixes")
+        if prefixes is None:
+            prefixes = []
+        if _is_list_of_str(allowed) and _is_list_of_str(prefixes):
+            resolved = set(allowed)
+            if prefixes:
+                for k in candidate_keys:
+                    if isinstance(k, str) and any(isinstance(p, str) and p and k.startswith(p) for p in prefixes):
+                        resolved.add(k)
+            return sorted(resolved)
     return list(fallback)

@@ -381,7 +381,12 @@ def extract(doc, ctx=None):
         # Resolved from ctx["sig_hash_policies"] (policies/domain_sig_hash_policies.json) when
         # available, with UNITS_SEMANTIC_KEYS as the fallback -- see core/sig_hash_policy.py's
         # resolve_sig_hash_keys() and DECISIONS.md D-039/D-040.
-        sig_hash_keys = set(resolve_sig_hash_keys((ctx or {}).get("sig_hash_policies"), "units", UNITS_SEMANTIC_KEYS))
+        sig_hash_keys = set(resolve_sig_hash_keys(
+            (ctx or {}).get("sig_hash_policies"),
+            "units",
+            [it.get("k") for it in items_sorted],
+            UNITS_SEMANTIC_KEYS,
+        ))
         semantic_items = [it for it in items_sorted if it.get("k") in sig_hash_keys]
 
         if blocked:
@@ -568,7 +573,12 @@ def extract_units_doc(doc, ctx=None):
             status_reasons.append("identity.incomplete:{}:{}".format(it.get("q"), it.get("k")))
 
     status = STATUS_DEGRADED if any_incomplete else STATUS_OK
-    doc_sig_hash_keys = set(resolve_sig_hash_keys((ctx or {}).get("sig_hash_policies"), "units_doc", UNITS_DOC_SEMANTIC_KEYS))
+    doc_sig_hash_keys = set(resolve_sig_hash_keys(
+        (ctx or {}).get("sig_hash_policies"),
+        "units_doc",
+        [it.get("k") for it in doc_items_sorted],
+        UNITS_DOC_SEMANTIC_KEYS,
+    ))
     semantic_items = [it for it in doc_items_sorted if it.get("k") in doc_sig_hash_keys]
     sig_hash = make_hash(serialize_identity_items(semantic_items))
 

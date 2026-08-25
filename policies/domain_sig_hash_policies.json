@@ -707,7 +707,6 @@
     "object_styles_analytical": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.color.rgb",
         "obj_style.pattern_ref.sig_hash"
@@ -722,7 +721,13 @@
         "sig_hash_keys pinned in the registry to the pre-existing allowed_keys set so the Area 9",
         "additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name) register",
         "as identity_basis.items without widening the sig_hash preimage -- open design question,",
-        "see CHANGELOG.md/PR description."
+        "see CHANGELOG.md/PR description.",
+        "obj_style.row_key removed (D-042): it is name-derived (parent/subcategory Category.Name)",
+        "and was never hashed by the extractor's own inline computation (_NON_MODEL_SEMANTIC_KEYS);",
+        "the prior inclusion here had no sig_hash_keys history and no decision authorizing it --",
+        "an automated PR review on the D-040 PR caught that wiring ctx-provided policies into the",
+        "extractor would have made this latent divergence live. row_key remains required_items",
+        "(blocking) and fully present in identity_basis.items -- only excluded from the hash."
       ],
       "required_items": [
         "obj_style.row_key"
@@ -732,7 +737,6 @@
     "object_styles_annotation": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.color.rgb",
         "obj_style.pattern_ref.sig_hash"
@@ -747,7 +751,13 @@
         "sig_hash_keys pinned in the registry to the pre-existing allowed_keys set so the Area 9",
         "additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name) register",
         "as identity_basis.items without widening the sig_hash preimage -- open design question,",
-        "see CHANGELOG.md/PR description."
+        "see CHANGELOG.md/PR description.",
+        "obj_style.row_key removed (D-042): it is name-derived (parent/subcategory Category.Name)",
+        "and was never hashed by the extractor's own inline computation (_NON_MODEL_SEMANTIC_KEYS);",
+        "the prior inclusion here had no sig_hash_keys history and no decision authorizing it --",
+        "an automated PR review on the D-040 PR caught that wiring ctx-provided policies into the",
+        "extractor would have made this latent divergence live. row_key remains required_items",
+        "(blocking) and fully present in identity_basis.items -- only excluded from the hash."
       ],
       "required_items": [
         "obj_style.row_key"
@@ -757,7 +767,6 @@
     "object_styles_imported": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.color.rgb",
         "obj_style.pattern_ref.sig_hash"
@@ -772,7 +781,13 @@
         "sig_hash_keys pinned in the registry to the pre-existing allowed_keys set so the Area 9",
         "additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name) register",
         "as identity_basis.items without widening the sig_hash preimage -- open design question,",
-        "see CHANGELOG.md/PR description."
+        "see CHANGELOG.md/PR description.",
+        "obj_style.row_key removed (D-042): it is name-derived (parent/subcategory Category.Name)",
+        "and was never hashed by the extractor's own inline computation (_NON_MODEL_SEMANTIC_KEYS);",
+        "the prior inclusion here had no sig_hash_keys history and no decision authorizing it --",
+        "an automated PR review on the D-040 PR caught that wiring ctx-provided policies into the",
+        "extractor would have made this latent divergence live. row_key remains required_items",
+        "(blocking) and fully present in identity_basis.items -- only excluded from the hash."
       ],
       "required_items": [
         "obj_style.row_key"
@@ -782,7 +797,6 @@
     "object_styles_model": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.weight.cut",
         "obj_style.color.rgb",
@@ -799,7 +813,13 @@
         "sig_hash_keys pinned in the registry to the pre-existing allowed_keys set so the Area 9",
         "additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name) register",
         "as identity_basis.items without widening the sig_hash preimage -- open design question,",
-        "see CHANGELOG.md/PR description."
+        "see CHANGELOG.md/PR description.",
+        "obj_style.row_key removed (D-042): it is name-derived (parent/subcategory Category.Name)",
+        "and was never hashed by the extractor's own inline computation (_MODEL_SEMANTIC_KEYS);",
+        "the prior inclusion here had no sig_hash_keys history and no decision authorizing it --",
+        "an automated PR review on the D-040 PR caught that wiring ctx-provided policies into the",
+        "extractor would have made this latent divergence live. row_key remains required_items",
+        "(blocking) and fully present in identity_basis.items -- only excluded from the hash."
       ],
       "required_items": [
         "obj_style.row_key"

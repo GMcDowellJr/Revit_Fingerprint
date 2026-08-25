@@ -528,7 +528,10 @@ def extract(doc, ctx=None):
 
         identity_items_v2_sorted = sorted(identity_items_v2, key=lambda d: str(d.get("k","")))
         sig_hash_keys = set(resolve_sig_hash_keys(
-            (ctx or {}).get("sig_hash_policies"), "text_types", TEXT_TYPE_SEMANTIC_KEYS_FALLBACK
+            (ctx or {}).get("sig_hash_policies"),
+            "text_types",
+            [it.get("k") for it in identity_items_v2_sorted],
+            TEXT_TYPE_SEMANTIC_KEYS_FALLBACK,
         ))
         semantic_items_v2 = [
             it for it in identity_items_v2_sorted

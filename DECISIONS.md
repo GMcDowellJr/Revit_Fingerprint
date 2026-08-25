@@ -2001,3 +2001,104 @@ regress.
 - Consistent with every other domain's "names are metadata only, never in
   behavior hashes" rule; the domain no longer has a code-level exception
   that was never actually decided.
+
+## D-042 — `object_styles`: remove `obj_style.row_key` from the sig_hash key set
+
+### Status
+Accepted (2026-08-25)
+
+### Context
+Found by an automated PR review (Codex bot) on the D-040 PR, immediately
+after D-040 wired `resolve_sig_hash_keys()` into `runner/extraction_context.py`
+via `ctx["sig_hash_policies"]`. `contracts/domain_identity_keys_v2.json`'s
+`sig_hash_keys` override for all four `object_styles_*` domains
+(`object_styles_model`, `_annotation`, `_analytical`, `_imported`) already
+included `obj_style.row_key` — pre-dating this session's work, not
+introduced by it — and `policies/domain_sig_hash_policies.json`'s compiled
+`allowed_items` carried it forward. `domains/object_styles.py`'s own inline
+`_MODEL_SEMANTIC_KEYS`/`_NON_MODEL_SEMANTIC_KEYS` constants, which the
+extractor actually hashes against today, do **not** include `row_key` and
+never have.
+
+`obj_style.row_key` is `"{parent_name}|{row_name}"` — derived entirely from
+`Category.Name`/subcategory `Category.Name`, i.e. a name, not a behavioral
+property. Including it in `sig_hash` means two subcategories with
+identical graphic overrides (color, weights, pattern, material) but
+different names would never cluster as the same pattern — the opposite of
+what `sig_hash` exists to do (D-002/D-010's naming/behavior distinction).
+No `DECISIONS.md` entry authorizes this domain's `sig_hash_keys` override
+including `row_key`; the misleading state was invisible before D-040
+because the inline extractor's own hardcoded key set didn't include it and
+nothing routed the JSON policy's `allowed_items` back into that inline
+computation to expose the mismatch. My own drift-guard test added in D-040
+(`test_resolve_sig_hash_keys_real_policy_file_matches_hardcoded_fallbacks`)
+had the same gap — it never checked any `object_styles_*` domain — so it
+did not catch this either; that gap is fixed as part of this decision.
+
+A companion, independent finding from the same review pass
+(`core/sig_hash_policy.py`'s `resolve_sig_hash_keys()`): the function's
+original 3-argument design (a) treated a validated, non-empty-but-legitimate
+empty `allowed_items` list as "policy absent" and silently fell back to the
+hardcoded default instead of honoring the empty set, and (b) never resolved
+`allowed_item_prefixes` at all, unlike `core/sig_hash_builder.py`'s
+`_key_allowed()` (the post-stage recompute's reference implementation),
+which checks both an exact membership test and a prefix test. No currently-
+wired domain relies on `allowed_item_prefixes` for its sig_hash policy today,
+so this had not yet produced an observable wrong hash, but it would have
+recreated the exact D-039-class drift the moment a domain using prefixes
+(e.g. a future `view_filter_definitions`-style `"vf.rule["` policy) adopted
+this resolver.
+
+### Decision
+1. Remove `obj_style.row_key` from the `sig_hash_keys` override in
+   `contracts/domain_identity_keys_v2.json` for all four `object_styles_*`
+   domains (keeping it in `required_keys`, since it is still required
+   canonical identity evidence for `identity_basis.items`/`join_key` — only
+   its presence in the *sig_hash* preimage is wrong). Removed the same key
+   from `policies/domain_sig_hash_policies.json`'s compiled `allowed_items`
+   for the same four domains, with a note citing this decision.
+2. Fix `tests/test_object_styles_canonical_selectors.py`, which had
+   asserted the sig_hash includes `row_key` (matching the buggy policy, not
+   the extractor's real behavior) — it now filters by
+   `domains.object_styles._MODEL_SEMANTIC_KEYS` before hashing, with an
+   explicit `"obj_style.row_key" not in _MODEL_SEMANTIC_KEYS` assertion.
+3. Add all four `object_styles_*` domains to
+   `test_resolve_sig_hash_keys_real_policy_file_matches_hardcoded_fallbacks`'s
+   checks (D-040's drift guard), closing the coverage gap that let this
+   ship in the first place.
+4. Redesign `resolve_sig_hash_keys()`'s signature from
+   `(policies, domain_name, fallback)` to
+   `(policies, domain_name, candidate_keys, fallback)`. `candidate_keys` is
+   the record's own identity-item keys at the call site (e.g.
+   `[it["k"] for it in identity_items]`), used to resolve
+   `allowed_item_prefixes` into concrete matches exactly as
+   `core/sig_hash_builder.py`'s `_key_allowed()` does. A policy-validated
+   empty `allowed_items` (with no prefix matches) now correctly resolves to
+   an empty key set rather than falling back to the hardcoded default —
+   only a missing/malformed policy triggers fallback. Updated every call
+   site (`wall_types`/`floor_types`/`roof_types`/`ceiling_types`, `units`
+   (x2), `worksets` (x2), `browser_organization`, `object_styles`,
+   `arrowheads`, `text_types`) to pass `candidate_keys`. `object_styles.py`'s
+   call moved from before its per-category loop to inside it (after
+   `identity_items_sorted` is built for that category), since prefix
+   resolution needs the actual per-record item keys, not a value computed
+   once outside the loop.
+
+### Consequences
+- **Hash-breaking for `object_styles_model`/`_annotation`/`_analytical`/
+  `_imported`'s exported `sig_hash` field**, but only in the direction of
+  correcting a name-derived value that should never have been present:
+  any two categories/subcategories whose graphic-override behavior was
+  identical but whose `row_key` differed will now (correctly) share the
+  same `sig_hash`. This affects the analysis-side `sig_hash` stage
+  (T0.5, policy-driven recompute) on any future re-run; it does **not**
+  affect the extractor's own inline `sig_hash_v2` (`_MODEL_SEMANTIC_KEYS`/
+  `_NON_MODEL_SEMANTIC_KEYS` never included `row_key`, so already-exported
+  JSON is unaffected — see the extraction-vs-re-extraction analysis
+  discussed with the user; no Revit re-extraction is required for this fix).
+- `resolve_sig_hash_keys()`'s signature change is a breaking API change
+  for all ~12 call sites introduced in D-040, all updated in this same
+  change; no caller is left on the old 3-arg form.
+- `join_hash`/`identity_basis.items` are unaffected — `row_key` remains
+  required canonical identity evidence and part of the join-key policy,
+  which was already correct and independent of this bug.
