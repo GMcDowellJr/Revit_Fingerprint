@@ -2461,3 +2461,46 @@ not a fresh case of the drift the guard exists to catch.
 - `join_hash`/`identity_basis.items` are unaffected -- `pattern_ref.kind`
   was already correctly excluded from the join-key policy for its own,
   independent (join-collision) reason.
+
+## D-048 — `text_types`: mark a failed leader-arrowhead reference read as unreadable, not "no reference"
+
+### Status
+Accepted (2026-08-25)
+
+### Context
+Found by automated PR review (Codex bot) on the D-047 PR -- a third
+follow-up round on the same `domains/text_types.py` leader-arrowhead read
+(D-044, D-046). D-046 fixed the case where a positive `AsElementId()`
+result fails to resolve to a real element. It left one earlier step
+unguarded: `p_arrow.AsElementId()` itself, and reading `arrow_id.IntegerValue`
+to test whether the reference is positive, were not wrapped in their own
+`try/except` -- only the function's outer catch-all covered them, which
+resets `leader_arrow_uid`/`leader_arrow_name` but does not set
+`leader_arrow_ref_present` or `leader_arrow_lookup_unreadable`. If either
+read raised, the code fell through with both flags still `False`, so the
+promoted `text_type.leader_arrowhead_sig_hash` item emitted `v=None, q=ok`
+-- "no leader arrowhead" -- when the true state is "couldn't tell whether
+one is assigned." A third, distinct outcome (a read failure, as opposed to
+"none" or "reference present but unresolved") was being silently collapsed
+into the first.
+
+### Decision
+Wrap `p_arrow.AsElementId()` and the `arrow_id.IntegerValue > 0` check in
+their own `try/except`, setting a new `leader_arrow_read_failed` flag on
+exception (distinct from `leader_arrow_ref_present`/
+`leader_arrow_lookup_unreadable`, since a read failure here means we don't
+even know whether a reference exists). At the `identity_basis.items`
+promotion site, check this flag first: `leader_arrow_read_failed` always
+emits `q=ITEM_Q_UNREADABLE`, ahead of the existing
+ref-present/lookup-unreadable/missing logic. Added
+`test_leader_arrowhead_reference_read_exception_is_unreadable` to
+`tests/test_text_types_leader_arrowhead_quality.py`.
+
+### Consequences
+- **Not hash-breaking**, same reasoning as D-044/D-046: this key isn't in
+  `required_keys` or the domain's sig_hash key set.
+- Closes what is (per three successive review rounds) now the complete set
+  of leader-arrowhead read outcomes: parameter absent/unset → none (q=ok);
+  reference-read itself fails → unreadable; reference present but element
+  unresolvable → missing/unreadable (D-046); element resolved but sig_hash
+  lookup unresolved → missing/unreadable (D-044); fully resolved → ok.

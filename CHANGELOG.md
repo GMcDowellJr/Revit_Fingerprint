@@ -250,6 +250,18 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `ACCEPTED_SIG_HASH_JOIN_KEY_OVERLAPS`. Added regression tests closing the
   "no test validates line_styles against the registry" gap. See
   DECISIONS.md D-047.
+- **`text_types`: a failed leader-arrowhead reference read no longer
+  collapses into "no leader arrowhead" (D-048).** Third review-round
+  follow-up on the same `domains/text_types.py` code path (D-044, D-046):
+  `p_arrow.AsElementId()` and the `arrow_id.IntegerValue > 0` check were not
+  wrapped in their own `try/except`, so if either raised, both quality flags
+  stayed at their initial `False` and the record fell through to `v=None,
+  q=ok` -- indistinguishable from a genuine "no leader arrowhead" text type.
+  Now a new `leader_arrow_read_failed` flag is set on that specific
+  exception and always resolves to `q=unreadable`. Not hash-breaking. Added
+  `test_leader_arrowhead_reference_read_exception_is_unreadable`, closing
+  what is now the complete set of leader-arrowhead read outcomes across
+  three review rounds. See DECISIONS.md D-048.
 - **`mapping/create_line_pattern_mappings.py`: an explicit but invalid `IN[2]`
   repo root now fails loudly instead of silently falling back to the
   environment or `__file__`.** A caller-supplied `IN[2]` is an explicit

@@ -339,12 +339,24 @@ def extract(doc, ctx=None):
         # the identity_basis.items promotion below (D-043).
         leader_arrow_ref_present = False
         leader_arrow_lookup_unreadable = False
+        # Set when reading the reference itself (AsElementId()/IntegerValue) raises --
+        # distinct from both "no leader arrowhead" and "reference present but
+        # unresolved": here we couldn't even determine whether a reference exists
+        # (D-047 follow-up).
+        leader_arrow_read_failed = False
 
         try:
             p_arrow = first_param(t, bip_names=["LEADER_ARROWHEAD"], ui_names=["Leader Arrowhead"])
             if p_arrow:
-                arrow_id = p_arrow.AsElementId()
-                if arrow_id and arrow_id.IntegerValue > 0:
+                try:
+                    arrow_id = p_arrow.AsElementId()
+                    arrow_id_positive = bool(arrow_id and arrow_id.IntegerValue > 0)
+                except Exception:
+                    arrow_id = None
+                    arrow_id_positive = False
+                    leader_arrow_read_failed = True
+
+                if arrow_id_positive:
                     # A positive reference ID is itself evidence a leader arrowhead
                     # is assigned -- mark this BEFORE attempting element resolution,
                     # so a stale/unresolvable reference (GetElement returns None or
@@ -538,9 +550,15 @@ def extract(doc, ctx=None):
         # the lookup itself raised), that's an unresolved dependency, not an
         # explicit "none" -- D-043 fixes this to emit missing/unreadable
         # instead of silently collapsing it into q=ok per the project's
-        # fail-soft policy (distinct states must not be collapsed).
+        # fail-soft policy (distinct states must not be collapsed). A third
+        # case: leader_arrow_read_failed means reading the reference itself
+        # (AsElementId()/IntegerValue) raised, so we couldn't even determine
+        # whether a leader arrowhead is assigned -- also unreadable, not ok
+        # (D-047 follow-up).
         leader_arrow_sig_hash_v2 = safe_str(leader_arrow_sig_hash) if leader_arrow_sig_hash else None
-        if leader_arrow_sig_hash_v2 is None and leader_arrow_ref_present:
+        if leader_arrow_read_failed:
+            leader_arrow_sig_hash_q = ITEM_Q_UNREADABLE
+        elif leader_arrow_sig_hash_v2 is None and leader_arrow_ref_present:
             leader_arrow_sig_hash_q = ITEM_Q_UNREADABLE if leader_arrow_lookup_unreadable else ITEM_Q_MISSING
         else:
             leader_arrow_sig_hash_q = ITEM_Q_OK

@@ -29,6 +29,11 @@ class _LeaderArrowParam:
         return _Id(555)
 
 
+class _RaisingLeaderArrowParam:
+    def AsElementId(self):
+        raise RuntimeError("AsElementId failed")
+
+
 class _Doc:
     def __init__(self, elem_by_int_id):
         self._elem_by_int_id = elem_by_int_id
@@ -129,6 +134,22 @@ def test_leader_arrowhead_element_lookup_exception_is_unreadable(monkeypatch):
     # Same positive-reference case, but doc.GetElement() itself raises --
     # distinct from "not found," reported as unreadable rather than missing.
     rec = _extract_record(monkeypatch, doc=_RaisingDoc(), ctx={}, first_param_fn=_first_param_with_leader_arrowhead)
+    item = _leader_item(rec)
+    assert item["v"] is None
+    assert item["q"] == "unreadable"
+
+
+def test_leader_arrowhead_reference_read_exception_is_unreadable(monkeypatch):
+    # P2 review follow-up on D-046: if p_arrow.AsElementId() (or reading its
+    # IntegerValue) itself raises, we can't even determine whether a leader
+    # arrowhead is assigned -- must not fall through to "no leader arrowhead"
+    # (q=ok) just because the earlier flags were never set.
+    def _first_param_raising(t, bip_names=None, ui_names=None):
+        if bip_names and "LEADER_ARROWHEAD" in bip_names:
+            return _RaisingLeaderArrowParam()
+        return None
+
+    rec = _extract_record(monkeypatch, doc=object(), ctx={}, first_param_fn=_first_param_raising)
     item = _leader_item(rec)
     assert item["v"] is None
     assert item["q"] == "unreadable"
