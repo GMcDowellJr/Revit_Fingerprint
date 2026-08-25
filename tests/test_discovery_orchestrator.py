@@ -1,5 +1,7 @@
 import csv
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -181,3 +183,94 @@ def test_sig_archives_greedy_and_pareto_under_distinct_names(tmp_path):
     pareto=orchestrator._archive_artifacts("sig","walls","discover","pareto",run_dir)
     assert greedy[0] != pareto[0]
     assert greedy[0].read_text()=="greedy" and pareto[0].read_text()=="pareto"
+
+
+def test_invoke_streams_output_and_reports_quiet_heartbeat(tmp_path,monkeypatch,capsys):
+    exports,repo,_=fixture_inputs(tmp_path)
+    orchestrator=Orchestrator(Config(exports,repo,exports/"suggestions.csv"))
+    monkeypatch.setattr("tools.discovery_orchestrator.PROGRESS_HEARTBEAT_SECONDS",0.01)
+    log=tmp_path/"logs/invoke.log"
+    orchestrator._invoke([sys.executable,"-c","import time; time.sleep(.03); print('finished')"],log)
+    console=capsys.readouterr().out
+    assert "START" in console and "still running" in console and "DONE" in console
+    assert "finished" in console and log.read_text()=="finished\n"
+
+
+def test_invoke_keeps_fake_runner_support_for_fast_orchestration_tests(tmp_path,capsys):
+    exports,repo,_=fixture_inputs(tmp_path)
+    calls=[]
+    def fake(cmd,**kwargs):
+        calls.append((cmd,kwargs));return subprocess.CompletedProcess(cmd,0,"fake output\n","")
+    orchestrator=Orchestrator(Config(exports,repo,exports/"suggestions.csv"),runner=fake)
+    log=tmp_path/"fake.log";orchestrator._invoke(["fake","command"],log)
+    assert calls and log.read_text()=="fake output\n"
+    assert "fake output" in capsys.readouterr().out
+
+
+def test_orchestrator_scans_each_large_fingerprint_csv_only_once(tmp_path,monkeypatch):
+    exports,repo,_=fixture_inputs(tmp_path)
+    import tools.discovery_orchestrator as module
+    original=module.iter_csv;calls=[]
+    def counting(path):
+        calls.append(Path(path).name);yield from original(path)
+    monkeypatch.setattr(module,"iter_csv",counting)
+    orchestrator=Orchestrator(Config(exports,repo,exports/"suggestions.csv"))
+    params={"sample_size":2,"sample_seed":17,"stratify_by":"","max_candidate_fields":4,"effective_max_k":2}
+    orchestrator._input_fingerprint("walls","join","discover","greedy","__all__",params)
+    orchestrator._input_fingerprint("walls","join","validate","greedy","__all__",params)
+    orchestrator._input_fingerprint("walls","sig","discover","greedy","__all__",params)
+    assert calls.count("records.csv")==1
+    assert calls.count("identity_items.csv")==1
+
+
+def test_mixed_stage_provenance_retains_every_source(tmp_path):
+    exports,repo,_=fixture_inputs(tmp_path)
+    orchestrator=Orchestrator(Config(exports,repo,exports/"suggestions.csv"))
+    rows=[]
+    for mode in ("discover","validate"):
+        rows.append({**clean(),"domain":"walls","policy_mode":mode,"search_mode":"greedy",
+                     "shape_gate":"__all__","selected_fields":"x"})
+    sources=[
+        {"policy_mode":"discover","search_mode":"greedy","provenance":"fresh",
+         "source_run_id":"current","source_evidence_path":"current/discover.csv"},
+        {"policy_mode":"validate","search_mode":"greedy","provenance":"cached",
+         "source_run_id":"prior","source_evidence_path":"prior/validate.csv","result_timestamp":"old"},
+    ]
+    summary=orchestrator._summarize("join","walls",rows,"now","current",tmp_path,"fp",sources)[0]
+    assert summary["result_provenance_status"]=="mixed"
+    assert summary["source_run_ids"]=="current;prior"
+    assert summary["source_evidence_paths"]=="current/discover.csv;prior/validate.csv"
+    assert {row["policy_mode"] for row in json.loads(summary["stage_provenance_json"])}=={"discover","validate"}
+
+
+def test_accepted_pareto_cache_hit_skips_expensive_pareto_invocation(tmp_path,monkeypatch):
+    exports,repo,_=fixture_inputs(tmp_path)
+    orchestrator=Orchestrator(Config(exports,repo,exports/"suggestions.csv"))
+    monkeypatch.setattr(orchestrator,"_input_fingerprint",lambda domain,target,mode,search,gate,params:search+gate)
+    params={"sample_size":2,"sample_seed":17,"stratify_by":"","max_candidate_fields":4,"effective_max_k":2}
+    pareto_path=tmp_path/"prior-pareto.csv"
+    fields=["domain","policy_mode","search_mode","shape_gate","status","coverage_full","collision_rate_full","fragmentation_rate_full","sample_vs_full_diverges"]
+    _write(pareto_path,fields,[{"domain":"walls","policy_mode":"discover","search_mode":"pareto","shape_gate":"__all__",**clean()}])
+    cache={"entries":{cache_key("walls","join","discover","pareto","__all__"):{
+        "input_fingerprint":"pareto__all__","result_status":"ok","result_run_id":"prior",
+        "result_timestamp":"old","result_path":str(pareto_path)}}}
+    manifest={"input_fingerprints":{},"stages_skipped":[],"commands_executed":[],"result_files":[],"logs":[],"run_id":"now","timestamp":"now"}
+    calls=[]
+    def invoke(cmd,log):
+        calls.append(cmd)
+        generated=orchestrator._artifact("join","walls","discover","greedy")
+        _write(generated,fields,[{"domain":"walls","policy_mode":"discover","search_mode":"greedy","shape_gate":"__all__",**clean(collision_rate_full=".1")}])
+    monkeypatch.setattr(orchestrator,"_invoke",invoke)
+    rows,sources,_=orchestrator._stage("join","walls","discover",params,tmp_path/"run",cache,manifest)
+    assert len(calls)==1
+    assert any(row["search_mode"]=="pareto" for row in rows)
+    assert any(source["search_mode"]=="pareto" and source["provenance"]=="cached" for source in sources)
+
+
+def test_both_targets_skipped_is_rejected(tmp_path):
+    exports,repo,_=fixture_inputs(tmp_path)
+    suggestions=exports/"diagnostics/discovery_param_suggestions.csv"
+    _write(suggestions,["domain"],[{"domain":"walls"}])
+    cfg=Config(exports,repo,suggestions,skip_join=True,skip_sig=True,what_if=True)
+    with pytest.raises(ValueError,match="cannot be used together"):
+        Orchestrator(cfg).run_sweep()

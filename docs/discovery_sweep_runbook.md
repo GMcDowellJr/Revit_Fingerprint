@@ -14,10 +14,19 @@ python run_discovery_sweep.py --domains walls,doors --run
 python run_discovery_sweep.py --what-if
 ```
 
+The command prints each subprocess at `START`, streams discovery output to the
+console and its immutable log, emits a `still running` heartbeat every 30
+seconds when a search is quiet, and prints `DONE` with elapsed time. Pareto can
+be computationally expensive; a quiet subprocess is no longer indistinguishable
+from a hung run. Press `Ctrl+C` to terminate the active child cleanly.
+Before subprocesses start, fingerprint preparation reports its scope. Large
+monolithic CSVs are scanned at most once per sweep and retained only as compact
+order-independent per-domain hashes; they are not rescanned for every mode.
+
 Both delegate to `tools/discovery_orchestrator.py`; `--force`/`-Force` bypasses
 matching cache entries. `ExportsRoot`, `RepoRoot`, `SuggestionsCsv`, `Domains`,
 `SkipJoin`, `SkipSig`, `WhatIf`, and `Run` are available in the spelling native
-to each shell.
+to each shell. Skipping both targets is rejected as an invalid no-op sweep.
 
 ## Execution model
 
@@ -60,6 +69,10 @@ fingerprint-verified; `carried_forward` was outside scope and was not checked;
 `blocked_refresh_previous_retained` means a requested refresh failed and the
 prior result remains. `summary_timestamp` is snapshot age while
 `domain_result_timestamp` is evidence age.
+`mixed` means the refreshed result combines fresh and cached stages. The
+`stage_provenance_json`, `source_run_ids`, and `source_evidence_paths` columns
+retain every stage's actual evidence location, including fully cached stages
+that originated in different runs.
 The run summary aggregates every shape gate conservatively and includes the
 exception text when a failed requested refresh retains prior evidence.
 
@@ -73,6 +86,9 @@ mapping order irrelevant. Only entries with result status `ok` are reused.
 An `ok` status is not sufficient by itself: every shape-gate row must also pass
 the full acceptance gate before the aggregate stage becomes reusable. A blocked
 domain run discards cache entries created by any earlier successful stage.
+Accepted Pareto evidence is cached independently; an unchanged rerun still
+executes a non-accepted Greedy search to establish escalation, but can reuse the
+accepted Pareto result instead of repeating that expensive search.
 Policy, data, parameter, target/mode/gate, or engine-version changes invalidate
 the relevant entry; `--force` bypasses it.
 
