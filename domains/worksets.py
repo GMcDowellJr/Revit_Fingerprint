@@ -59,6 +59,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.sig_hash_policy import resolve_sig_hash_keys
 from core.record_v2 import (
     STATUS_OK,
     STATUS_DEGRADED,
@@ -267,8 +268,15 @@ def _build_per_workset_record(ws, active_workset_id, active_workset_lookup_ok, k
     )
 
     sig_hash = None
+    semantic_items = []
     if not blocked:
-        semantic_items = [it for it in identity_items_sorted if it.get("k") in WORKSETS_SEMANTIC_KEYS]
+        sig_hash_keys = set(resolve_sig_hash_keys(
+            (ctx or {}).get("sig_hash_policies"),
+            "worksets",
+            [it.get("k") for it in identity_items_sorted],
+            WORKSETS_SEMANTIC_KEYS,
+        ))
+        semantic_items = [it for it in identity_items_sorted if it.get("k") in sig_hash_keys]
         sig_hash = make_hash(serialize_identity_items(semantic_items))
 
     label_quality = "human"
@@ -319,7 +327,7 @@ def _build_per_workset_record(ws, active_workset_id, active_workset_lookup_ok, k
     }
     rec["sig_basis"] = {
         "schema": "worksets.sig_basis.v1",
-        "keys_used": list(WORKSETS_SEMANTIC_KEYS),
+        "keys_used": sorted(it.get("k") for it in semantic_items),
     }
 
     return rec
@@ -376,7 +384,13 @@ def _build_doc_level_record(doc, is_workshared, active_workset_name, kind_counts
     # hiccup must not take down the per-workset records or leave the
     # summary record entirely absent.
     status = STATUS_DEGRADED if any_incomplete else STATUS_OK
-    semantic_items = [it for it in doc_items_sorted if it.get("k") in WORKSETS_DOC_SEMANTIC_KEYS]
+    doc_sig_hash_keys = set(resolve_sig_hash_keys(
+        (ctx or {}).get("sig_hash_policies"),
+        "worksets_doc",
+        [it.get("k") for it in doc_items_sorted],
+        WORKSETS_DOC_SEMANTIC_KEYS,
+    ))
+    semantic_items = [it for it in doc_items_sorted if it.get("k") in doc_sig_hash_keys]
     sig_hash = make_hash(serialize_identity_items(semantic_items))
 
     rec = build_record_v2(
@@ -420,7 +434,7 @@ def _build_doc_level_record(doc, is_workshared, active_workset_name, kind_counts
     }
     rec["sig_basis"] = {
         "schema": "worksets_doc.sig_basis.v1",
-        "keys_used": list(WORKSETS_DOC_SEMANTIC_KEYS),
+        "keys_used": sorted(it.get("k") for it in semantic_items),
     }
 
     return rec

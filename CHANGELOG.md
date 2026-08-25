@@ -30,7 +30,35 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `export_bundle_pattern_detail.py` semantics change -- this is purely
   additive. See `docs/line_pattern_mapping.md` and D-038.
 
+### Added
+- **Five fields promoted from phase2-only buckets into `identity_basis.items`, visible
+  to policy/pareto discovery for the first time (D-040).** `arrowhead.record_class`
+  (arrowheads.py), `lp.is_import` (line_patterns.py), `line_style.pattern_ref.synopsis`
+  (line_styles.py), `text_type.leader_arrowhead_sig_hash` (text_types.py -- already
+  present in `contracts/domain_identity_keys_v2.json`'s `allowed_keys` but never wired
+  into the extractor), and `vt.assigned_view_count` (view_templates.py) were previously
+  captured but routed only to `phase2.cosmetic_items`/`coordination_items`/`unknown_items`,
+  which `tools/extractor.py`'s flatten stage never reads -- structurally invisible to
+  `discover_hash_policy.py`'s/`discover_join_policy.py`'s pareto search. Purely additive:
+  no domain's `sig_hash`/`join_key` policy includes any of these five keys, so no hash
+  value changes. See DECISIONS.md D-040.
+
 ### Changed
+- **Policy-driven inline `sig_hash` resolution (D-040).** `wall_types`, `floor_types`,
+  `roof_types`, `ceiling_types`, `units`, `units_doc`, `worksets`, `worksets_doc`,
+  `browser_organization`, `object_styles` (all 4 partitions), and `arrowheads` now
+  resolve their inline sig_hash preimage key set via `core/sig_hash_policy.py`'s new
+  `resolve_sig_hash_keys()`, reading `ctx["sig_hash_policies"]` (populated by
+  `runner/extraction_context.py` from `policies/domain_sig_hash_policies.json`, the
+  same file `core/sig_hash_builder.py`'s post-stage recompute already reads) instead of
+  a hardcoded Python list/set. The hardcoded lists remain as fallbacks for when
+  `ctx["sig_hash_policies"]` is absent (e.g. a unit test), so this is a no-op against
+  today's values everywhere it's wired in -- not hash-breaking. Closes the structural
+  gap that let D-039 happen unnoticed: going forward there is one source of truth for
+  "which fields drive sig_hash" per domain, consumed by both the inline extractor and
+  the post-stage recompute, rather than two independently hand-maintained copies that
+  can silently drift apart. Each domain's own required/degraded/blocked status logic is
+  unchanged. See DECISIONS.md D-040.
 - **Repository-neutral runtime and sample defaults.** Dynamo runner discovery no
   longer searches an organization-specific user-profile path, both checked-in
   Dynamo graphs have blank workstation inputs/hints, and the default
@@ -42,6 +70,198 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   population membership.
 
 ### Fixed
+- **`wall_types`/`floor_types`/`roof_types`/`ceiling_types`: post-stage `sig_hash`
+  policy no longer hashes in the type's own display name/fill color (D-039).**
+  `policies/domain_sig_hash_policies.json`'s `allowed_items` for these four
+  domains previously mirrored the full `identity_basis.items` set (mechanically
+  inherited from `contracts/domain_identity_keys_v2.json`'s `allowed_keys`,
+  with no `sig_hash_keys` override present to narrow it) rather than the
+  narrower "semantic" subset each extractor (`domains/{wall,floor,roof,
+  ceiling}_types.py`) already hashes inline. A post-stage `sig_hash` stage
+  recompute (`core/sig_hash_builder.py`, invoked by `run_extract_all.py`'s
+  `sig_hash` stage and unconditionally overwriting `records.csv`) would
+  therefore have hashed `wt.type_name`/`ft.type_name`/`rt.type_name`/
+  `ct.type_name` and `*.coarse_fill_color_rgb` into `sig_hash`, contradicting
+  this project's own "names are metadata only, never in behavior hashes" rule
+  and diverging from the extractor's own inline `sig_hash` value for the same
+  record. Added an explicit `sig_hash_keys` override to each of the four
+  registry blocks and hand-narrowed the compiled policy to match (same
+  hand-patch convention already used for `object_styles_*`/`worksets`/
+  `browser_organization`). **Hash-breaking** for these four domains' `sig_hash`
+  values specifically: two records differing only by type name or fill color
+  now produce the same `sig_hash`. `join_hash` is unaffected -- the join-key
+  policies for these domains already excluded these fields correctly via
+  `explicitly_excluded_items`. See DECISIONS.md D-039.
+- **`text_types`: `text_type.name` removed from the domain-level `hash_v2` rollup's
+  hashed key set (D-041).** `TEXT_TYPE_SEMANTIC_KEYS` (now
+  `TEXT_TYPE_SEMANTIC_KEYS_FALLBACK`) included the type's own display name, diverging
+  from `policies/domain_sig_hash_policies.json`'s already-correct 12-key
+  `text_types` policy (which excludes it) with no D-0xx decision ever authorizing the
+  inclusion -- discovered incidentally while wiring `text_types.py` into D-040's
+  `resolve_sig_hash_keys()` mechanism. Impact is scoped: `domains/text_types.py`
+  already omits `sig_hash`/`join_key` from its own exported record entirely ("canonical
+  mode"), so this only changes the domain-level `hash_v2` aggregate computed inside the
+  extractor, not any per-record `sig_hash` field (which this domain never emits at
+  extraction time). Fixed a test (`tests/test_text_types_canonical_selectors.py`) that
+  had encoded the divergence as expected behavior. See DECISIONS.md D-041.
+- **`object_styles`: `obj_style.row_key` (a name-derived value) removed from
+  all four partitions' sig_hash key set (D-042).** Found by automated PR
+  review on the D-040 PR: `contracts/domain_identity_keys_v2.json`'s
+  pre-existing `sig_hash_keys` override for `object_styles_model`/
+  `_annotation`/`_analytical`/`_imported` included `obj_style.row_key`
+  (`"{parent}|{row}"`, derived from `Category.Name`), diverging from the
+  extractor's own `_MODEL_SEMANTIC_KEYS`/`_NON_MODEL_SEMANTIC_KEYS`
+  constants, which never included it. No decision record authorized hashing
+  a name into this domain's behavioral identity. Removed `row_key` from the
+  registry override and the compiled `policies/domain_sig_hash_policies.json`
+  `allowed_items` for all four domains (still required for `identity_basis.items`/
+  `join_key`, unaffected). **Hash-breaking** for these four domains' `sig_hash`
+  specifically: two categories/subcategories with identical graphic-override
+  behavior but different names now correctly produce the same `sig_hash`.
+  Does not affect already-exported JSON (the extractor's own inline
+  `sig_hash_v2` never included `row_key`); only the analysis-side `sig_hash`
+  stage recompute is affected. Also fixed the D-040 drift-guard test
+  (`test_resolve_sig_hash_keys_real_policy_file_matches_hardcoded_fallbacks`),
+  which had never checked any `object_styles_*` domain. See DECISIONS.md D-042.
+- **`core/sig_hash_policy.py`: `resolve_sig_hash_keys()` now resolves
+  `allowed_item_prefixes` and no longer treats a validated empty
+  `allowed_items` as policy-absent (D-042).** Also found by automated PR
+  review: the D-040 3-argument signature never resolved
+  `allowed_item_prefixes` against a record's actual keys (unlike
+  `core/sig_hash_builder.py`'s `_key_allowed()`, the post-stage recompute's
+  reference implementation), and treated a policy-validated but empty
+  `allowed_items` list as "absent," incorrectly falling back to the
+  hardcoded default instead of honoring the empty set. No currently-wired
+  domain relies on `allowed_item_prefixes` for sig_hash today, so this had
+  not yet produced an observably wrong hash, but would have reproduced the
+  exact D-039-class drift the first time a prefix-based policy adopted this
+  resolver. Signature is now `(policies, domain_name, candidate_keys,
+  fallback)`; every call site introduced in D-040
+  (`wall_types`/`floor_types`/`roof_types`/`ceiling_types`, `units` x2,
+  `worksets` x2, `browser_organization`, `object_styles`, `arrowheads`,
+  `text_types`) updated to pass the record's own identity-item keys as
+  `candidate_keys`. `object_styles.py`'s call moved inside its per-category
+  loop (it previously ran once before the loop, with no per-record keys
+  available for prefix resolution). See DECISIONS.md D-042.
+- **Registered three D-040 identity-visibility promotions that were never
+  added to the domain key registry, closing a contract-validation gap
+  (D-043).** `arrowhead.record_class`, `lp.is_import`, and
+  `vt.assigned_view_count` were promoted into `identity_basis.items` by
+  D-040 but never added to `contracts/domain_identity_keys_v2.json`'s
+  `allowed_keys` for `arrowheads`/`line_patterns`/`view_templates_*`, so
+  `validators/record_v2.py`'s `validate_record_v2()` would reject every
+  real-export record from these domains with
+  `identity.key.not_allowed:<key>`. Found by automated PR review; no test
+  in the suite called `validate_record_v2()` against any of these three
+  domains, which is why this shipped across two PRs unnoticed. Added the
+  missing `allowed_keys` entries; for `arrowheads` and the 5
+  `view_templates_*` partitions (which had no prior `sig_hash_keys`
+  override), also added an explicit override reproducing today's actual
+  sig_hash preimage so the newly-visible key can't silently widen sig_hash
+  on a future policy regeneration (the D-039 mechanism, this time closed
+  proactively). Not hash-breaking anywhere. Added regression tests
+  (`test_arrowhead_record_class_passes_contract_validation`,
+  `test_lp_is_import_passes_contract_validation`,
+  `test_vt_assigned_view_count_passes_contract_validation_for_every_partition`)
+  that build a record.v2 and assert clean `validate_record_v2()` results,
+  closing the coverage gap directly. See DECISIONS.md D-043.
+- **`sig_basis.keys_used` now reports the keys actually present in the hash
+  preimage instead of a hardcoded/fallback key set, across every domain
+  converted to `resolve_sig_hash_keys()` in D-040/D-042 (D-043).** Found by
+  automated PR review: `arrowheads.py`'s `sig_basis.keys_used` reported the
+  full cross-record-class union of sig_hash policy keys regardless of
+  record class, so a `SizeOnly`/`Unknown` arrowhead (whose
+  `identity_basis.items` never contains Arrow- or Tick-specific keys at
+  all) claimed those keys were hashed when they were never present on the
+  record -- unreproducible audit metadata. The same pattern (reporting a
+  fixed constant instead of the record's actual filtered key set) existed,
+  though not yet observably wrong given today's data, in `wall_types`,
+  `floor_types`, `roof_types`, `ceiling_types`, `units`/`units_doc`,
+  `worksets`/`worksets_doc`, `browser_organization`, and `object_styles`
+  (all 4 partitions) -- all fixed the same way. Not hash-breaking anywhere
+  (only the `sig_basis.keys_used` metadata field changes, and only where it
+  previously diverged from reality). Added
+  `test_sig_basis_keys_used_reflects_only_keys_present_for_record_class` to
+  prove a `SizeOnly` arrowhead's `keys_used` excludes keys it never had. See
+  DECISIONS.md D-043.
+- **`text_types`: `text_type.leader_arrowhead_sig_hash` no longer collapses
+  "unresolved leader-arrowhead reference" into the same state as "no leader
+  arrowhead" (D-044).** Found by automated PR review: when a text type has a
+  leader arrowhead assigned but `ctx["arrowheads_by_type_id"]` doesn't
+  resolve it (missing entry, absent map, or the lookup itself raises), the
+  item emitted `v=None, q=ok` -- identical to the genuine "no leader
+  arrowhead" state, violating the project's fail-soft policy against
+  collapsing distinct states. Now emits `q=missing` (dependency unresolved)
+  or `q=unreadable` (lookup raised) when a reference exists but its hash
+  didn't resolve; the explicit-none case (`v=None, q=ok`) is unchanged. Not
+  hash-breaking -- this key isn't in `required_keys` or
+  `TEXT_TYPE_SEMANTIC_KEYS_FALLBACK`, so `sig_hash`/`status`/`identity_quality`
+  are unaffected. Added `tests/test_text_types_leader_arrowhead_quality.py`,
+  the first test to exercise `text_types.py`'s `extract()` with an actual
+  leader-arrowhead reference present, closing the coverage gap that let this
+  ship. See DECISIONS.md D-044.
+- **`sig_hash_schema` bumped from `.v1` to `.v2` for `wall_types`/`floor_types`/
+  `roof_types`/`ceiling_types` and all four `object_styles_*` partitions
+  (D-045).** Found by automated PR review: D-039 (compound-types) and D-042
+  (`object_styles`) both narrowed these domains' `sig_hash` preimage in a
+  hash-breaking way but left the schema label at `.v1`, so an old export and
+  a freshly recomputed one carry the same schema string despite hashing
+  different fields -- no signal that the two `sig_hash` values aren't
+  comparable. No `sig_hash` value changes from this decision; only the
+  schema label. For the four `object_styles_*` domains this also adds an
+  explicit `sig_hash_schema` to the registry for the first time (previously
+  implicit via `generate_sig_hash_policy.py`'s `.v1` fallback). See
+  DECISIONS.md D-045.
+- **`text_types`: a stale/unresolvable leader-arrowhead element reference no
+  longer collapses into "no leader arrowhead" (D-046).** Direct follow-up to
+  D-044, found by automated PR review: `leader_arrow_ref_present` was set
+  only after `doc.GetElement(arrow_id)` successfully returned an element,
+  so a positive `AsElementId()` reference that then failed to resolve (a
+  stale/deleted element, or `GetElement()` raising) still fell back to
+  `v=None, q=ok` -- the same state-collapse D-044 fixed for the sig_hash
+  lookup, one step earlier. Now `leader_arrow_ref_present` is set as soon as
+  a positive reference ID is observed, and a failed/empty element
+  resolution reports `q=missing` (not found) or `q=unreadable` (lookup
+  raised). Not hash-breaking, same reasoning as D-044. Added two tests to
+  `tests/test_text_types_leader_arrowhead_quality.py` covering the
+  stale-reference and lookup-exception cases directly.
+- **`line_styles`: registered `line_style.pattern_ref.kind` in the domain key
+  registry and corrected the compiled `sig_hash` preimage to match the
+  extractor's real behavior (D-047).** Found by automated PR review while
+  pinning `sig_hash_keys` against a `pattern_ref.synopsis` widening risk
+  (same D-039 mechanism, a fourth domain): `contracts/domain_identity_keys_v2.json`'s
+  `line_styles` `allowed_keys` was missing `line_style.pattern_ref.kind`
+  entirely -- a key the extractor has always emitted into every record's
+  `identity_basis.items` -- so `validate_record_v2()` rejected every
+  real-export `line_styles` record with
+  `identity.key.not_allowed:line_style.pattern_ref.kind`. The same registry
+  block also allowed `color.rgb`/`weight.cut` into the compiled `sig_hash`
+  policy even though the extractor never hashes either (`weight.cut` isn't
+  even emitted). Added `pattern_ref.kind` to `allowed_keys`, added an
+  explicit `sig_hash_keys` override matching `LINE_STYLE_SEMANTIC_KEYS`
+  exactly (the extractor's real inline preimage), corrected the compiled
+  policy's `allowed_items` to match, and bumped `sig_hash_schema` to `.v2`
+  (D-045 discipline). Not hash-breaking for the extractor's own inline
+  `sig_hash` (unchanged); hash-breaking for the analysis-side `sig_hash`
+  stage recompute only, correcting it to match what the extractor has
+  always actually computed. Documented the resulting, legitimate
+  sig_hash/join_hash divergence (`pattern_ref.kind` is join-excluded for
+  collision-coarseness, not because it's non-behavioral) in
+  `ACCEPTED_SIG_HASH_JOIN_KEY_OVERLAPS`. Added regression tests closing the
+  "no test validates line_styles against the registry" gap. See
+  DECISIONS.md D-047.
+- **`text_types`: a failed leader-arrowhead reference read no longer
+  collapses into "no leader arrowhead" (D-048).** Third review-round
+  follow-up on the same `domains/text_types.py` code path (D-044, D-046):
+  `p_arrow.AsElementId()` and the `arrow_id.IntegerValue > 0` check were not
+  wrapped in their own `try/except`, so if either raised, both quality flags
+  stayed at their initial `False` and the record fell through to `v=None,
+  q=ok` -- indistinguishable from a genuine "no leader arrowhead" text type.
+  Now a new `leader_arrow_read_failed` flag is set on that specific
+  exception and always resolves to `q=unreadable`. Not hash-breaking. Added
+  `test_leader_arrowhead_reference_read_exception_is_unreadable`, closing
+  what is now the complete set of leader-arrowhead read outcomes across
+  three review rounds. See DECISIONS.md D-048.
 - **`mapping/create_line_pattern_mappings.py`: an explicit but invalid `IN[2]`
   repo root now fails loudly instead of silently falling back to the
   environment or `__file__`.** A caller-supplied `IN[2]` is an explicit

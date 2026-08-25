@@ -28,11 +28,23 @@
         "arrowhead.fill_tick",
         "arrowhead.arrow_closed",
         "arrowhead.tick_mark_centered",
-        "arrowhead.heavy_end_pen_weight"
+        "arrowhead.heavy_end_pen_weight",
+        "arrowhead.record_class"
       ],
       "required_keys": [
         "arrowhead.style",
         "arrowhead.tick_size_in"
+      ],
+      "sig_hash_keys": [
+        "arrowhead.style",
+        "arrowhead.arrow_style_raw_int",
+        "arrowhead.arrow_style_display",
+        "arrowhead.tick_size_in",
+        "arrowhead.width_angle_deg",
+        "arrowhead.fill_tick",
+        "arrowhead.arrow_closed",
+        "arrowhead.tick_mark_centered",
+        "arrowhead.heavy_end_pen_weight"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -69,6 +81,12 @@
         "ct.coarse_fill_pattern_sig_hash",
         "ct.type_name",
         "ct.coarse_fill_color_rgb"
+      ],
+      "sig_hash_schema": "ceiling_types.sig_hash.v2",
+      "sig_hash_keys": [
+        "ct.layer_count",
+        "ct.total_thickness_in",
+        "ct.stack_hash_loose"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -653,6 +671,12 @@
         "ft.type_name",
         "ft.coarse_fill_color_rgb"
       ],
+      "sig_hash_schema": "floor_types.sig_hash.v2",
+      "sig_hash_keys": [
+        "ft.layer_count",
+        "ft.total_thickness_in",
+        "ft.stack_hash_loose"
+      ],
       "minima": {
         "block_if_any_required_not_ok": true
       }
@@ -699,7 +723,8 @@
       "display_label": "Line Patterns",
       "allowed_keys": [
         "line_pattern.segment_count",
-        "line_pattern.segments_def_hash"
+        "line_pattern.segments_def_hash",
+        "lp.is_import"
       ],
       "allowed_key_prefixes": [
         "line_pattern.seg["
@@ -729,12 +754,19 @@
         "line_style.color.rgb",
         "line_style.weight.cut",
         "line_style.pattern_ref.sig_hash",
-        "line_style.pattern_ref.synopsis"
+        "line_style.pattern_ref.synopsis",
+        "line_style.pattern_ref.kind"
       ],
       "required_keys": [
         "line_style.weight.projection",
         "line_style.color.rgb",
         "line_style.pattern_ref.sig_hash"
+      ],
+      "sig_hash_schema": "line_styles.sig_hash.v2",
+      "sig_hash_keys": [
+        "line_style.pattern_ref.kind",
+        "line_style.pattern_ref.sig_hash",
+        "line_style.weight.projection"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -836,8 +868,8 @@
         "obj_style.is_cuttable",
         "obj_style.parent_name"
       ],
+      "sig_hash_schema": "object_styles_analytical.sig_hash.v2",
       "sig_hash_keys": [
-        "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.color.rgb",
         "obj_style.pattern_ref.sig_hash"
@@ -862,8 +894,8 @@
         "obj_style.is_cuttable",
         "obj_style.parent_name"
       ],
+      "sig_hash_schema": "object_styles_annotation.sig_hash.v2",
       "sig_hash_keys": [
-        "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.color.rgb",
         "obj_style.pattern_ref.sig_hash"
@@ -887,8 +919,8 @@
         "obj_style.is_cuttable",
         "obj_style.parent_name"
       ],
+      "sig_hash_schema": "object_styles_imported.sig_hash.v2",
       "sig_hash_keys": [
-        "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.color.rgb",
         "obj_style.pattern_ref.sig_hash"
@@ -915,8 +947,8 @@
         "obj_style.is_cuttable",
         "obj_style.parent_name"
       ],
+      "sig_hash_schema": "object_styles_model.sig_hash.v2",
       "sig_hash_keys": [
-        "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.weight.cut",
         "obj_style.color.rgb",
@@ -999,6 +1031,12 @@
         "rt.coarse_fill_pattern_sig_hash",
         "rt.type_name",
         "rt.coarse_fill_color_rgb"
+      ],
+      "sig_hash_schema": "roof_types.sig_hash.v2",
+      "sig_hash_keys": [
+        "rt.layer_count",
+        "rt.total_thickness_in",
+        "rt.stack_hash_loose"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
@@ -1224,12 +1262,16 @@
       "domain_family": "view_templates",
       "display_label": "View Templates — Ceiling Plans",
       "allowed_keys": [
-        "view_template.def_hash"
+        "view_template.def_hash",
+        "vt.assigned_view_count"
       ],
       "allowed_key_prefixes": [
         "view_template.sig."
       ],
       "required_keys": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_keys": [
         "view_template.def_hash"
       ],
       "minima": {
@@ -1240,12 +1282,16 @@
       "domain_family": "view_templates",
       "display_label": "View Templates — Elevations/Sections",
       "allowed_keys": [
-        "view_template.def_hash"
+        "view_template.def_hash",
+        "vt.assigned_view_count"
       ],
       "allowed_key_prefixes": [
         "view_template.sig."
       ],
       "required_keys": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_keys": [
         "view_template.def_hash"
       ],
       "minima": {
@@ -1256,12 +1302,16 @@
       "domain_family": "view_templates",
       "display_label": "View Templates — Floor/Structural Plans",
       "allowed_keys": [
-        "view_template.def_hash"
+        "view_template.def_hash",
+        "vt.assigned_view_count"
       ],
       "allowed_key_prefixes": [
         "view_template.sig."
       ],
       "required_keys": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_keys": [
         "view_template.def_hash"
       ],
       "minima": {
@@ -1272,12 +1322,16 @@
       "domain_family": "view_templates",
       "display_label": "View Templates — Renderings/Drafting",
       "allowed_keys": [
-        "view_template.def_hash"
+        "view_template.def_hash",
+        "vt.assigned_view_count"
       ],
       "allowed_key_prefixes": [
         "view_template.sig."
       ],
       "required_keys": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_keys": [
         "view_template.def_hash"
       ],
       "minima": {
@@ -1288,12 +1342,16 @@
       "domain_family": "view_templates",
       "display_label": "View Templates — Schedules",
       "allowed_keys": [
-        "view_template.def_hash"
+        "view_template.def_hash",
+        "vt.assigned_view_count"
       ],
       "allowed_key_prefixes": [
         "view_template.sig."
       ],
       "required_keys": [
+        "view_template.def_hash"
+      ],
+      "sig_hash_keys": [
         "view_template.def_hash"
       ],
       "minima": {
@@ -1339,6 +1397,15 @@
         "wt.has_embedded_sweeps",
         "wt.type_name",
         "wt.coarse_fill_color_rgb"
+      ],
+      "sig_hash_schema": "wall_types.sig_hash.v2",
+      "sig_hash_keys": [
+        "wt.function",
+        "wt.layer_count",
+        "wt.total_thickness_in",
+        "wt.stack_hash_loose",
+        "wt.wraps_at_inserts",
+        "wt.wraps_at_ends"
       ],
       "minima": {
         "block_if_any_required_not_ok": true

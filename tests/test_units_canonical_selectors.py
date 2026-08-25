@@ -133,3 +133,31 @@ def test_extract_units_doc_never_blocks_on_read_failure():
     assert rec["sig_hash"] is not None
     for it in rec["identity_basis"]["items"]:
         assert it["q"] == "unreadable"
+
+
+def test_units_doc_sig_hash_reads_allowed_items_from_ctx_sig_hash_policies_when_present():
+    """D-040: units/units_doc resolve their sig_hash preimage key set from
+    ctx["sig_hash_policies"] when present, falling back to
+    UNITS_SEMANTIC_KEYS/UNITS_DOC_SEMANTIC_KEYS otherwise -- prove the ctx
+    path actually drives the computed hash (not just the fallback)."""
+    ctx = {
+        "sig_hash_policies": {
+            "domains": {
+                "units_doc": {
+                    "sig_hash_schema": "units_doc.sig_hash.v1",
+                    "hash_alg": "md5_utf8_join_pipe",
+                    "allowed_items": ["units_doc.digit_grouping_amount"],
+                    "allowed_item_prefixes": [],
+                    "required_items": [],
+                    "minima": {"block_if_any_required_not_ok": False},
+                }
+            }
+        }
+    }
+    rec = extract_units_doc(_FakeDoc(), ctx=ctx)["records"][0]
+
+    narrowed_item = [it for it in rec["identity_basis"]["items"] if it["k"] == "units_doc.digit_grouping_amount"]
+    assert rec["sig_hash"] == make_hash(serialize_identity_items(narrowed_item))
+
+    default_rec = extract_units_doc(_FakeDoc(), ctx={})["records"][0]
+    assert rec["sig_hash"] != default_rec["sig_hash"]
