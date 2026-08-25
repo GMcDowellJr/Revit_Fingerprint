@@ -66,6 +66,9 @@ domain-scoped records/items, the relevant governed policy block, target,
 policy/search mode, shape gate, sampling and search parameters, mandatory full
 verification, and the discovery engine semantic version. Canonical JSON makes
 mapping order irrelevant. Only entries with result status `ok` are reused.
+An `ok` status is not sufficient by itself: every shape-gate row must also pass
+the full acceptance gate before the aggregate stage becomes reusable. A blocked
+domain run discards cache entries created by any earlier successful stage.
 Policy, data, parameter, target/mode/gate, or engine-version changes invalidate
 the relevant entry; `--force` bypasses it.
 

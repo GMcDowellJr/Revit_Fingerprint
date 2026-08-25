@@ -42,6 +42,10 @@ SUMMARY_FIELDS = [
 RUN_FIELDS = ["summary_timestamp", "domain", "join_result_status", "sig_result_status",
               "fresh_or_cached_or_carried", "refresh_status", "pareto_invoked",
               "harsh_invoked", "warnings", "blocked_reason"]
+DECISION_SEVERITY = {
+    "supported": 0, "supported_alternative": 1, "candidate_change": 2,
+    "ambiguous": 3, "degraded": 4, "blocked": 5,
+}
 
 
 def canonical_json(value: object) -> bytes:
@@ -75,6 +79,11 @@ def acceptance_reasons(row: Mapping[str, object]) -> list[str]:
 
 def accepted(row: Mapping[str, object]) -> bool:
     return not acceptance_reasons(row)
+
+
+def stage_cache_eligible(rows: Iterable[Mapping[str, object]]) -> bool:
+    materialized = list(rows)
+    return bool(materialized) and all(accepted(row) for row in materialized)
 
 
 def cache_key(domain: str, target: str, policy_mode: str, search_mode: str, shape_gate: str) -> str:
@@ -177,6 +186,13 @@ class Orchestrator:
         if value.get("schema_version") != CACHE_SCHEMA_VERSION: return {"schema_version": CACHE_SCHEMA_VERSION, "entries": {}}
         return value
 
+    @staticmethod
+    def _discard_run_cache_entries(cache: dict, run_id: str) -> None:
+        cache["entries"] = {
+            key: entry for key, entry in cache["entries"].items()
+            if entry.get("result_run_id") != run_id
+        }
+
     def _latest(self, target: str) -> tuple[Path | None, list[dict]]:
         prefix = "join_key" if target == "join" else "sig_hash"
         paths = sorted(self.summaries.glob(f"{prefix}_discovery_summary_*.csv"))
@@ -232,9 +248,12 @@ class Orchestrator:
         manifest["input_fingerprints"][ck] = greedy_fp
         hit = cache["entries"].get(ck)
         if hit and hit.get("input_fingerprint") == greedy_fp and hit.get("result_status") == "ok" and not self.cfg.force:
-            rows = read_csv(Path(hit["result_path"]))
-            manifest["stages_skipped"].append({"stage": f"{mode}/greedy", "reason": "cache_hit", "source_run_id": hit["result_run_id"]})
-            return rows, True, greedy_fp
+            rows = [r for r in read_csv(Path(hit["result_path"])) if r.get("policy_mode") == mode and r.get("search_mode") == "greedy"]
+            # Defend against manifests written by older orchestration versions:
+            # status=ok alone never makes incomplete/colliding/divergent evidence reusable.
+            if stage_cache_eligible(rows):
+                manifest["stages_skipped"].append({"stage": f"{mode}/greedy", "reason": "cache_hit", "source_run_id": hit["result_run_id"]})
+                return rows, True, greedy_fp
         cmd = self._command(target, domain, mode, "greedy", params)
         log = run_dir / "logs" / f"{target}_{mode}_greedy.log"; log.parent.mkdir(parents=True, exist_ok=True)
         self._invoke(cmd, log)
@@ -247,8 +266,9 @@ class Orchestrator:
         for r in rows:
             gate = r.get("shape_gate", "__all__")
             fp = input_fingerprint(self.records, self.policy_paths[target], domain, target, mode, "greedy", gate, params, self.cfg.engine_version)
-            cache["entries"][cache_key(domain,target,mode,"greedy",gate)] = {"domain":domain,"target":target,"policy_mode":mode,"search_mode":"greedy","shape_gate":gate,"input_fingerprint":fp,"result_run_id":manifest["run_id"],"result_timestamp":manifest["timestamp"],"result_path":str(dest),"result_status":r.get("status")}
-        if all(r.get("status") == "ok" for r in rows):
+            if accepted(r):
+                cache["entries"][cache_key(domain,target,mode,"greedy",gate)] = {"domain":domain,"target":target,"policy_mode":mode,"search_mode":"greedy","shape_gate":gate,"input_fingerprint":fp,"result_run_id":manifest["run_id"],"result_timestamp":manifest["timestamp"],"result_path":str(dest),"result_status":"ok"}
+        if stage_cache_eligible(rows):
             cache["entries"][ck] = {"domain":domain,"target":target,"policy_mode":mode,"search_mode":"greedy","shape_gate":"__all__","input_fingerprint":greedy_fp,"result_run_id":manifest["run_id"],"result_timestamp":manifest["timestamp"],"result_path":str(dest),"result_status":"ok"}
         reasons = sorted({x for r in rows for x in acceptance_reasons(r)})
         if reasons:
@@ -297,6 +317,23 @@ class Orchestrator:
                 "domain_result_timestamp":result_timestamp or ts,"run_id":run_id,"source_run_id":source_run_id or run_id,"source_evidence_path":source_evidence or str(evidence),
                 "refresh_attempted":"true","refresh_status":"completed","input_fingerprint":fingerprint,"discovery_engine_version":self.cfg.engine_version})
         return out
+
+    @staticmethod
+    def _aggregate_domain(rows: list[dict]) -> dict:
+        """Collapse shape gates conservatively for the run-level review row."""
+        if not rows:
+            return {"decision_status": "skipped", "provenance": set(),
+                    "refresh": set(), "pareto_invoked": False,
+                    "harsh_invoked": False, "blocked_reasons": []}
+        worst = max(rows, key=lambda r: DECISION_SEVERITY.get(r.get("decision_status", "blocked"), 5))
+        return {
+            "decision_status": worst.get("decision_status", "blocked"),
+            "provenance": {r.get("result_provenance_status", "") for r in rows},
+            "refresh": {r.get("refresh_status", "") for r in rows},
+            "pareto_invoked": any(r.get("pareto_required") == "true" for r in rows),
+            "harsh_invoked": any(r.get("harsh_required") == "true" for r in rows),
+            "blocked_reasons": [r.get("decision_reason", "") for r in rows if r.get("decision_status") == "blocked" and r.get("decision_reason")],
+        }
 
     def run_sweep(self) -> dict:
         suggestions = read_csv(self.cfg.suggestions_csv); by_domain={r["domain"]:r for r in suggestions}
@@ -361,6 +398,11 @@ class Orchestrator:
                     manifest["final_status"]="ok"; atomic_json(temp_dir/"run_manifest.json",manifest); os.replace(temp_dir,final_dir)
                     new_by_target[target]+=self._summarize(target,domain,rows,ts,rid,final_dir,sha256_value(sorted(fps)),provenance,source_run_id,result_ts,source_path)
                 except Exception as exc:
+                    # A later-stage failure invalidates this domain run as a cache
+                    # source. Discard every entry created by its earlier stages so
+                    # no manifest path can continue pointing at the renamed .tmp tree.
+                    self._discard_run_cache_entries(cache, rid)
+                    manifest=json.loads(json.dumps(manifest).replace(str(temp_dir),str(final_dir)))
                     manifest["final_status"]="blocked";manifest["warnings"].append(str(exc));atomic_json(temp_dir/"run_manifest.json",manifest);os.replace(temp_dir,final_dir)
                     old=[dict(r) for r in prior_rows if r["domain"]==domain]
                     if old:
@@ -377,8 +419,15 @@ class Orchestrator:
             prefix="join_key" if target=="join" else "sig_hash"; atomic_csv(self.summaries/f"{prefix}_discovery_summary_{ts}.csv",sorted(rows,key=lambda r:(r.get('domain',''),r.get('shape_gate',''))),SUMMARY_FIELDS)
         domains=sorted({r["domain"] for rows in new_by_target.values() for r in rows})
         for d in domains:
-            jr=next((r for r in new_by_target.get("join",[]) if r["domain"]==d),{});sr=next((r for r in new_by_target.get("sig",[]) if r["domain"]==d),{})
-            vals=[r for r in (jr,sr) if r]; run_rows.append({"summary_timestamp":ts,"domain":d,"join_result_status":jr.get("decision_status","skipped"),"sig_result_status":sr.get("decision_status","skipped"),"fresh_or_cached_or_carried":";".join(sorted({r.get("result_provenance_status","") for r in vals})),"refresh_status":";".join(sorted({r.get("refresh_status","") for r in vals})),"pareto_invoked":"true" if any(r.get("pareto_required")=="true" for r in vals) else "false","harsh_invoked":"true" if any(r.get("harsh_required")=="true" for r in vals) else "false","warnings":"","blocked_reason":";".join(r.get("decision_reason","") for r in vals if r.get("decision_status")=="blocked")})
+            join=self._aggregate_domain([r for r in new_by_target.get("join",[]) if r["domain"]==d])
+            sig=self._aggregate_domain([r for r in new_by_target.get("sig",[]) if r["domain"]==d])
+            run_rows.append({"summary_timestamp":ts,"domain":d,
+                "join_result_status":join["decision_status"],"sig_result_status":sig["decision_status"],
+                "fresh_or_cached_or_carried":";".join(sorted(join["provenance"]|sig["provenance"])),
+                "refresh_status":";".join(sorted(join["refresh"]|sig["refresh"])),
+                "pareto_invoked":"true" if join["pareto_invoked"] or sig["pareto_invoked"] else "false",
+                "harsh_invoked":"true" if join["harsh_invoked"] or sig["harsh_invoked"] else "false",
+                "warnings":"","blocked_reason":";".join(join["blocked_reasons"]+sig["blocked_reasons"])})
         atomic_csv(self.summaries/f"discovery_run_summary_{ts}.csv",run_rows,RUN_FIELDS);atomic_json(self.cache_path,cache)
         counts=Counter(r.get("decision_status") for rows in new_by_target.values() for r in rows);counts.update(r.get("result_provenance_status") for rows in new_by_target.values() for r in rows)
         print(json.dumps({"summary_timestamp":ts,"counts":dict(sorted(counts.items()))},indent=2));return {"timestamp":ts,"rows":new_by_target}
