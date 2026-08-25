@@ -8,6 +8,7 @@ Emits three flat CSVs for BI consumption:
   pattern_supplemental_values.csv — deduped variant values with weighted support
   pattern_reconstruction_summary.csv — one row per pattern with reconstruction status
   pattern_names.csv             — one row per (join_hash × observed name)
+  reconstruction_source_files.csv — greedy file cover for the emitted pattern population
 
 Usage:
     python export_bundle_pattern_detail.py \\
@@ -604,6 +605,101 @@ def _build_pattern_reconstruction_summary(
         })
     return output
 
+def _build_reconstruction_source_files(
+    segment_id: str,
+    domain: str,
+    purge_view: str,
+    in_scope_patterns: Set[str],
+    pattern_record_map: Dict[str, Set[RecordKey]],
+    record_meta: Dict[RecordKey, Dict[str, str]],
+) -> List[Dict[str, str]]:
+    """Return a deterministic greedy file cover for the emitted patterns.
+
+    Each selected export_run_id is credited only with patterns and sig_hashes
+    not credited to an earlier file. The target population is the exact
+    in_scope_patterns set established after top-bundle/Jenks filtering.
+
+    This is a greedy set-cover approximation, not proof of a globally minimum
+    file count. Selection is deterministic: most new patterns, then most new
+    sig_hashes, then most total in-scope patterns, then lexical export_run_id.
+    """
+    patterns_by_file: DefaultDict[str, Set[str]] = defaultdict(set)
+    sig_hashes_by_file: DefaultDict[str, Set[str]] = defaultdict(set)
+
+    for pattern_id in sorted(in_scope_patterns):
+        for record_key in sorted(pattern_record_map.get(pattern_id, set())):
+            export_run_id = record_key[0]
+            if not export_run_id:
+                continue
+            patterns_by_file[export_run_id].add(pattern_id)
+            sig_hash = record_meta.get(record_key, {}).get("sig_hash", "").strip()
+            if sig_hash:
+                sig_hashes_by_file[export_run_id].add(sig_hash)
+
+    uncovered_patterns = set(in_scope_patterns)
+    uncovered_sig_hashes: Set[str] = set()
+    for values in sig_hashes_by_file.values():
+        uncovered_sig_hashes.update(values)
+
+    candidates = set(patterns_by_file)
+    selected_rows: List[Dict[str, str]] = []
+    cumulative_pattern_count = 0
+    cumulative_sig_hash_count = 0
+    total_pattern_count = len(in_scope_patterns)
+    total_sig_hash_count = len(uncovered_sig_hashes)
+    cover_rank = 1
+
+    while uncovered_patterns and candidates:
+        ranked: List[Tuple[int, int, int, str, Set[str], Set[str]]] = []
+        for export_run_id in candidates:
+            new_patterns = patterns_by_file[export_run_id] & uncovered_patterns
+            new_sig_hashes = sig_hashes_by_file[export_run_id] & uncovered_sig_hashes
+            ranked.append((
+                len(new_patterns),
+                len(new_sig_hashes),
+                len(patterns_by_file[export_run_id]),
+                export_run_id,
+                new_patterns,
+                new_sig_hashes,
+            ))
+        ranked.sort(key=lambda item: (-item[0], -item[1], -item[2], item[3]))
+        new_pattern_count, new_sig_hash_count, file_pattern_count, export_run_id, new_patterns, new_sig_hashes = ranked[0]
+        if new_pattern_count == 0:
+            break
+
+        candidates.remove(export_run_id)
+        uncovered_patterns.difference_update(new_patterns)
+        uncovered_sig_hashes.difference_update(new_sig_hashes)
+        cumulative_pattern_count += new_pattern_count
+        cumulative_sig_hash_count += new_sig_hash_count
+
+        selected_rows.append({
+            "segment_id": segment_id,
+            "domain": domain,
+            "purge_view": purge_view,
+            "cover_rank": str(cover_rank),
+            "export_run_id": export_run_id,
+            "new_pattern_count": str(new_pattern_count),
+            "new_pattern_ids": "|".join(sorted(new_patterns)),
+            "new_sig_hash_count": str(new_sig_hash_count),
+            "new_sig_hashes": "|".join(sorted(new_sig_hashes)),
+            "file_in_scope_pattern_count": str(file_pattern_count),
+            "cumulative_pattern_count": str(cumulative_pattern_count),
+            "total_pattern_count": str(total_pattern_count),
+            "cumulative_coverage_pct": (
+                f"{(100.0 * cumulative_pattern_count / total_pattern_count):.6f}"
+                if total_pattern_count else "0.000000"
+            ),
+            "remaining_pattern_count": str(len(uncovered_patterns)),
+            "cumulative_sig_hash_count": str(cumulative_sig_hash_count),
+            "total_sig_hash_count": str(total_sig_hash_count),
+            "remaining_sig_hash_count": str(len(uncovered_sig_hashes)),
+            "cover_complete": "1" if not uncovered_patterns else "0",
+        })
+        cover_rank += 1
+
+    return selected_rows
+
 
 def _process_domain(
     segment_id: str,
@@ -618,13 +714,13 @@ def _process_domain(
     join_policy: Dict[str, Any],
     top_bundles: Optional[int],
     top_bundles_auto: bool,
-) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]], int, int, int, int, Optional[Dict[str, Any]]]:
+) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]], int, int, int, int, Optional[Dict[str, Any]]]:
     domain_out_dir = ba_root / domain
     bundles_path = domain_out_dir / "bundles.csv"
     bundle_membership_path = domain_out_dir / "bundle_membership.csv"
     if not bundles_path.exists() or not bundle_membership_path.exists():
         print(f"[WARN] bundle inputs missing for domain '{domain}', skipping", file=sys.stderr)
-        return [], [], [], [], 0, 0, 0, 0, None
+        return [], [], [], [], [], 0, 0, 0, 0, None
 
     bundles = _read_csv(bundles_path)
     threshold_diag: Optional[Dict[str, Any]] = None
@@ -653,6 +749,14 @@ def _process_domain(
         key for pid in in_scope_patterns for key in pattern_record_map.get(pid, set())
     }
     record_meta = _load_record_metadata(records_csv, domain, all_member_keys)
+    reconstruction_source_files = _build_reconstruction_source_files(
+        segment_id=segment_id,
+        domain=domain,
+        purge_view=purge_view,
+        in_scope_patterns=in_scope_patterns,
+        pattern_record_map=pattern_record_map,
+        record_meta=record_meta,
+    )
     signature_map = _build_pattern_signature_map(pattern_record_map, record_meta)
     representative_keys = {
         group["representative_key"]
@@ -731,6 +835,7 @@ def _process_domain(
         sorted(settings, key=lambda r: (r["domain"], r["pattern_id"], r["k"])),
         sorted(supplemental, key=lambda r: (r["domain"], r["pattern_id"], r["k"], r["v"], r["q"])),
         sorted(names, key=lambda r: (r["domain"], r["join_hash"], r["label_v"])),
+        reconstruction_source_files,
         len(bundles), len(inventory), len(seen_patterns), len(seen_names), threshold_diag,
     )
 
@@ -774,6 +879,14 @@ _THRESHOLDS_FIELDS: Tuple[str, ...] = (
     "segment_id", "domain", "purge_view", "method", "break_value",
     "n_bundles_before", "n_bundles_after", "n_distinct_values",
     "source_value_min", "source_value_max",
+)
+_RECONSTRUCTION_SOURCE_FIELDS: Tuple[str, ...] = (
+    "segment_id", "domain", "purge_view", "cover_rank", "export_run_id",
+    "new_pattern_count", "new_pattern_ids", "new_sig_hash_count", "new_sig_hashes",
+    "file_in_scope_pattern_count", "cumulative_pattern_count", "total_pattern_count",
+    "cumulative_coverage_pct", "remaining_pattern_count",
+    "cumulative_sig_hash_count", "total_sig_hash_count", "remaining_sig_hash_count",
+    "cover_complete",
 )
 
 
@@ -857,6 +970,7 @@ def main() -> None:
     all_settings: List[Dict[str, str]] = []
     all_supplemental: List[Dict[str, str]] = []
     all_names: List[Dict[str, str]] = []
+    all_reconstruction_source_files: List[Dict[str, str]] = []
     all_thresholds: List[Dict[str, str]] = []
 
     total_domains = 0
@@ -868,7 +982,7 @@ def main() -> None:
     policies = _load_join_policies(Path(args.join_policy).resolve() if args.join_policy else None)
 
     for domain in domains:
-        inv, sett, supplemental, names, nb, np_, jhi, jhn, threshold_diag = _process_domain(
+        inv, sett, supplemental, names, reconstruction_source_files, nb, np_, jhi, jhn, threshold_diag = _process_domain(
             segment_id=segment_id,
             domain=domain,
             purge_view=args.purge_view,
@@ -889,6 +1003,7 @@ def main() -> None:
         all_settings.extend(sett)
         all_supplemental.extend(supplemental)
         all_names.extend(names)
+        all_reconstruction_source_files.extend(reconstruction_source_files)
         total_domains += 1
         total_bundles += nb
         total_patterns += np_
@@ -929,6 +1044,11 @@ def main() -> None:
         all_summaries,
     )
     _atomic_write_csv(out_dir / "pattern_names.csv", _NAMES_FIELDS, all_names)
+    _atomic_write_csv(
+        out_dir / "reconstruction_source_files.csv",
+        _RECONSTRUCTION_SOURCE_FIELDS,
+        all_reconstruction_source_files,
+    )
     if args.top_bundles_auto:
         _atomic_write_csv(out_dir / "bundle_selection_thresholds.csv", _THRESHOLDS_FIELDS, all_thresholds)
 
@@ -938,7 +1058,8 @@ def main() -> None:
         f"join_hashes_with_items={total_jh_items} "
         f"join_hashes_with_names={total_jh_names} "
         f"invariant_rows={len(all_settings)} supplemental_rows={len(all_supplemental)} "
-        f"summary_rows={len(all_summaries)}"
+        f"summary_rows={len(all_summaries)} "
+        f"reconstruction_source_file_rows={len(all_reconstruction_source_files)}"
     )
 
 
