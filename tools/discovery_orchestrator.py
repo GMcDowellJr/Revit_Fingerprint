@@ -41,7 +41,8 @@ SUMMARY_FIELDS = [
     "pareto_required", "pareto_reason", "result_provenance_status",
     "domain_result_timestamp", "run_id", "source_run_id", "source_evidence_path",
     "refresh_attempted", "refresh_status", "input_fingerprint",
-    "refresh_error", "discovery_engine_version",
+    "refresh_error", "stage_provenance_json", "source_run_ids",
+    "source_evidence_paths", "discovery_engine_version",
 ]
 RUN_FIELDS = ["summary_timestamp", "domain", "join_result_status", "sig_result_status",
               "fresh_or_cached_or_carried", "refresh_status", "pareto_invoked",
@@ -356,7 +357,7 @@ class Orchestrator:
         return archived
 
     def _stage(self, target: str, domain: str, mode: str, params: dict, run_dir: Path,
-               cache: dict, manifest: dict) -> tuple[list[dict], bool, str]:
+               cache: dict, manifest: dict) -> tuple[list[dict], list[dict], str]:
         greedy_fp = self._input_fingerprint(domain, target, mode, "greedy", "__all__", params)
         ck = cache_key(domain, target, mode, "greedy", "__all__")
         manifest["input_fingerprints"][ck] = greedy_fp
@@ -367,7 +368,9 @@ class Orchestrator:
             # status=ok alone never makes incomplete/colliding/divergent evidence reusable.
             if stage_cache_eligible(rows):
                 manifest["stages_skipped"].append({"stage": f"{mode}/greedy", "reason": "cache_hit", "source_run_id": hit["result_run_id"]})
-                return rows, True, greedy_fp
+                return rows, [{"policy_mode":mode,"search_mode":"greedy","provenance":"cached",
+                    "source_run_id":hit["result_run_id"],"source_evidence_path":hit["result_path"],
+                    "result_timestamp":hit.get("result_timestamp","")}], greedy_fp
         cmd = self._command(target, domain, mode, "greedy", params)
         log = run_dir / "logs" / f"{target}_{mode}_greedy.log"; log.parent.mkdir(parents=True, exist_ok=True)
         self._invoke(cmd, log)
@@ -377,6 +380,8 @@ class Orchestrator:
         archived=self._archive_artifacts(target,domain,mode,"greedy",run_dir)
         dest = next((p for p in archived if p.name.startswith(src.stem)), run_dir / target / src.name)
         manifest["commands_executed"].append(cmd); manifest["result_files"] += [str(p) for p in archived]; manifest["logs"].append(str(log))
+        sources=[{"policy_mode":mode,"search_mode":"greedy","provenance":"fresh",
+                  "source_run_id":manifest["run_id"],"source_evidence_path":str(dest)}]
         for r in rows:
             gate = r.get("shape_gate", "__all__")
             fp = self._input_fingerprint(domain, target, mode, "greedy", gate, params)
@@ -387,15 +392,39 @@ class Orchestrator:
         reasons = sorted({x for r in rows for x in acceptance_reasons(r)})
         if reasons:
             pareto_params = params
-            cmd = self._command(target, domain, mode, "pareto", pareto_params)
-            log = run_dir / "logs" / f"{target}_{mode}_pareto.log"; self._invoke(cmd, log)
-            src = self._artifact(target, domain, mode, "pareto")
-            prows = [r for r in read_csv(src) if r.get("policy_mode") == mode and r.get("search_mode") == "pareto"]
-            archived=self._archive_artifacts(target,domain,mode,"pareto",run_dir)
-            manifest["commands_executed"].append(cmd); manifest["result_files"] += [str(p) for p in archived]; manifest["logs"].append(str(log))
+            pareto_fp=self._input_fingerprint(domain,target,mode,"pareto","__all__",pareto_params)
+            pck=cache_key(domain,target,mode,"pareto","__all__")
+            manifest["input_fingerprints"][pck]=pareto_fp
+            phit=cache["entries"].get(pck)
+            prows=[]
+            if phit and phit.get("input_fingerprint")==pareto_fp and phit.get("result_status")=="ok" and not self.cfg.force:
+                prows=[r for r in read_csv(Path(phit["result_path"])) if r.get("policy_mode")==mode and r.get("search_mode")=="pareto"]
+                if stage_cache_eligible(prows):
+                    manifest["stages_skipped"].append({"stage":f"{mode}/pareto","reason":"cache_hit","source_run_id":phit["result_run_id"]})
+                    sources.append({"policy_mode":mode,"search_mode":"pareto","provenance":"cached",
+                        "source_run_id":phit["result_run_id"],"source_evidence_path":phit["result_path"],
+                        "result_timestamp":phit.get("result_timestamp","")})
+                else: prows=[]
+            if not prows:
+                cmd = self._command(target, domain, mode, "pareto", pareto_params)
+                log = run_dir / "logs" / f"{target}_{mode}_pareto.log"; self._invoke(cmd, log)
+                src = self._artifact(target, domain, mode, "pareto")
+                prows = [r for r in read_csv(src) if r.get("policy_mode") == mode and r.get("search_mode") == "pareto"]
+                archived=self._archive_artifacts(target,domain,mode,"pareto",run_dir)
+                pdest=next((p for p in archived if p.name.startswith(src.stem)),run_dir/target/src.name)
+                manifest["commands_executed"].append(cmd); manifest["result_files"] += [str(p) for p in archived]; manifest["logs"].append(str(log))
+                sources.append({"policy_mode":mode,"search_mode":"pareto","provenance":"fresh",
+                    "source_run_id":manifest["run_id"],"source_evidence_path":str(pdest)})
+                for r in prows:
+                    gate=r.get("shape_gate","__all__")
+                    fp=self._input_fingerprint(domain,target,mode,"pareto",gate,pareto_params)
+                    if accepted(r):
+                        cache["entries"][cache_key(domain,target,mode,"pareto",gate)]={"domain":domain,"target":target,"policy_mode":mode,"search_mode":"pareto","shape_gate":gate,"input_fingerprint":fp,"result_run_id":manifest["run_id"],"result_timestamp":manifest["timestamp"],"result_path":str(pdest),"result_status":"ok"}
+                if stage_cache_eligible(prows):
+                    cache["entries"][pck]={"domain":domain,"target":target,"policy_mode":mode,"search_mode":"pareto","shape_gate":"__all__","input_fingerprint":pareto_fp,"result_run_id":manifest["run_id"],"result_timestamp":manifest["timestamp"],"result_path":str(pdest),"result_status":"ok"}
             rows += prows
         else: manifest["stages_skipped"].append({"stage": f"{mode}/pareto", "reason": "greedy_acceptance_gate_satisfied"})
-        return rows, False, greedy_fp
+        return rows, sources, greedy_fp
 
     @staticmethod
     def _choose(rows: Iterable[dict], mode: str) -> dict:
@@ -404,9 +433,13 @@ class Orchestrator:
         return (good or candidates or [{}])[-1]
 
     def _summarize(self, target: str, domain: str, rows: list[dict], ts: str, run_id: str,
-                   evidence: Path, fingerprint: str, provenance: str,
-                   source_run_id: str | None = None, result_timestamp: str | None = None,
-                   source_evidence: str | None = None) -> list[dict]:
+                   evidence: Path, fingerprint: str, stage_provenance: list[dict]) -> list[dict]:
+        provenance_values={s["provenance"] for s in stage_provenance}
+        provenance="mixed" if len(provenance_values)>1 else next(iter(provenance_values),"fresh")
+        source_run_ids=sorted({s["source_run_id"] for s in stage_provenance})
+        source_paths=sorted({s["source_evidence_path"] for s in stage_provenance})
+        cached_timestamps=[s.get("result_timestamp") for s in stage_provenance if s.get("provenance")=="cached" and s.get("result_timestamp")]
+        result_timestamp=min(cached_timestamps) if provenance=="cached" and cached_timestamps else ts
         gates = sorted({r.get("shape_gate", "__all__") or "__all__" for r in rows}) or ["__all__"]
         out=[]
         for gate in gates:
@@ -428,8 +461,11 @@ class Orchestrator:
                 "harsh_selected_fields":h.get("selected_fields",""),"harsh_search_mode_used":h.get("search_mode",""),"harsh_status":h.get("status", "skipped" if va else "blocked"),
                 "coverage_full":final.get("coverage_full",""),"collision_rate_full":final.get("collision_rate_full",""),"fragmentation_rate_full":final.get("fragmentation_rate_full",""),"sample_vs_full_diverges":final.get("sample_vs_full_diverges",""),
                 "pareto_required":"true" if preasons else "false","pareto_reason":";".join(preasons),"result_provenance_status":provenance,
-                "domain_result_timestamp":result_timestamp or ts,"run_id":run_id,"source_run_id":source_run_id or run_id,"source_evidence_path":source_evidence or str(evidence),
-                "refresh_attempted":"true","refresh_status":"completed","input_fingerprint":fingerprint,"discovery_engine_version":self.cfg.engine_version})
+                "domain_result_timestamp":result_timestamp,"run_id":run_id,"source_run_id":";".join(source_run_ids),"source_evidence_path":";".join(source_paths),
+                "refresh_attempted":"true","refresh_status":"completed","input_fingerprint":fingerprint,
+                "stage_provenance_json":json.dumps(stage_provenance,sort_keys=True,separators=(",",":")),
+                "source_run_ids":";".join(source_run_ids),"source_evidence_paths":";".join(source_paths),
+                "discovery_engine_version":self.cfg.engine_version})
         return out
 
     @staticmethod
@@ -451,6 +487,8 @@ class Orchestrator:
         }
 
     def run_sweep(self) -> dict:
+        if self.cfg.skip_join and self.cfg.skip_sig:
+            raise ValueError("--skip-join and --skip-sig cannot be used together")
         suggestions = read_csv(self.cfg.suggestions_csv); by_domain={r["domain"]:r for r in suggestions}
         all_domains=sorted(by_domain); requested=sorted(self.cfg.domains or all_domains)
         missing=set(requested)-set(all_domains)
@@ -490,28 +528,22 @@ class Orchestrator:
                 policy_block, policy_hash=_policy_block(self.policy_paths[target],domain)
                 manifest={"schema_version":1,"run_id":rid,"timestamp":ts,"domain":domain,"requested_targets":[target],"commands_executed":[],"stages_skipped":[],"input_fingerprints":{},"policy_file_identifiers":{str(self.policy_paths[target]):policy_hash},"parameters":{},"discovery_engine_version":self.cfg.engine_version,"source_suggestions_row":by_domain[domain],"result_files":[],"logs":[],"warnings":[],"final_status":"running"}
                 try:
-                    rows=[]; cache_flags=[]; fps=[]
+                    rows=[]; stage_provenance=[]; fps=[]
                     for mode in ("discover","validate"):
                         params=self._params(by_domain[domain],mode); manifest["parameters"][mode]=params
-                        rs,cached,fp=self._stage(target,domain,mode,params,temp_dir,cache,manifest); rows+=rs;cache_flags.append(cached);fps.append(fp)
+                        rs,sources,fp=self._stage(target,domain,mode,params,temp_dir,cache,manifest); rows+=rs;stage_provenance+=sources;fps.append(fp)
                     if not all_shape_gates_accepted(rows,"validate"):
                         params=self._params(by_domain[domain],"harsh"); manifest["parameters"]["harsh"]=params
-                        rs,cached,fp=self._stage(target,domain,"harsh",params,temp_dir,cache,manifest);rows+=rs;cache_flags.append(cached);fps.append(fp)
+                        rs,sources,fp=self._stage(target,domain,"harsh",params,temp_dir,cache,manifest);rows+=rs;stage_provenance+=sources;fps.append(fp)
                     else: manifest["stages_skipped"].append({"stage":"harsh/*","reason":"validate_acceptance_gate_satisfied"})
-                    provenance="cached" if cache_flags and all(cache_flags) else "fresh"
-                    source_run_id=result_ts=source_path=None
-                    if provenance == "cached":
-                        skips=[s for s in manifest["stages_skipped"] if s.get("reason")=="cache_hit"]
-                        source_run_id=skips[0].get("source_run_id") if skips else None
-                        source_entry=next((e for e in cache["entries"].values() if e.get("result_run_id")==source_run_id),{})
-                        result_ts=source_entry.get("result_timestamp");source_path=source_entry.get("result_path")
                     # Paths were recorded while evidence was in its temporary sibling.
                     manifest=json.loads(json.dumps(manifest).replace(str(temp_dir),str(final_dir)))
+                    stage_provenance=json.loads(json.dumps(stage_provenance).replace(str(temp_dir),str(final_dir)))
                     for entry in cache["entries"].values():
                         if entry.get("result_run_id")==rid:
                             entry["result_path"]=str(entry.get("result_path","")).replace(str(temp_dir),str(final_dir))
                     manifest["final_status"]="ok"; atomic_json(temp_dir/"run_manifest.json",manifest); os.replace(temp_dir,final_dir)
-                    new_by_target[target]+=self._summarize(target,domain,rows,ts,rid,final_dir,sha256_value(sorted(fps)),provenance,source_run_id,result_ts,source_path)
+                    new_by_target[target]+=self._summarize(target,domain,rows,ts,rid,final_dir,sha256_value(sorted(fps)),stage_provenance)
                 except Exception as exc:
                     # A later-stage failure invalidates this domain run as a cache
                     # source. Discard every entry created by its earlier stages so
