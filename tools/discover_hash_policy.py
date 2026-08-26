@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import Dict,List
 try:
     from tools.discover_join_policy import _read_csv,_write_csv,_sample_domain_records,_stratified_sample,_pick_candidate_fields,_without_excluded,_pareto_search_adapter,_diagnostics_domain_suffix,_full_population_verify
-    from tools.discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_candidates
+    from tools.discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_and_cap_candidates
     from tools.join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate, summarize_shape_gate_usage
     from tools.join_key_discovery.greedy import discover_greedy
 except ModuleNotFoundError:
     from discover_join_policy import _read_csv,_write_csv,_sample_domain_records,_stratified_sample,_pick_candidate_fields,_without_excluded,_pareto_search_adapter,_diagnostics_domain_suffix,_full_population_verify
-    from discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_candidates
+    from discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_and_cap_candidates
     from join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate, summarize_shape_gate_usage
     from join_key_discovery.greedy import discover_greedy
 
@@ -108,8 +108,8 @@ def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
                 continue
             sampled={r.get('record_pk','').strip() for r in dom_records}
             dom_items=[it for it in dom_items_all if not sampled or it.get('record_pk','').strip() in sampled]
-            raw_unfiltered=_pick_candidate_fields(dom_items,args.max_candidate_fields)
-            candidate_filter=filter_candidates(domain,raw_unfiltered)
+            raw_unfiltered=_pick_candidate_fields(dom_items,0)
+            candidate_filter=filter_and_cap_candidates(domain,raw_unfiltered,args.max_candidate_fields)
             raw=candidate_filter["eligible"]
             scoped=_without_excluded(raw,excluded)
             if domain=="loaded_family_types" and CATEGORY_GATE_KEY in raw:

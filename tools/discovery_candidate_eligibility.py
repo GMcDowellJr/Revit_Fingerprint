@@ -75,6 +75,35 @@ def filter_candidates(domain: str, candidates: Sequence[str], registry: Optional
     }
 
 
+def filter_and_cap_candidates(domain: str, ranked_candidates: Sequence[str], max_fields: int,
+                              registry: Optional[Mapping[str, object]] = None) -> Dict[str, object]:
+    """Filter a complete ranked surface, then cap only eligible candidates.
+
+    ``ranked_candidates`` must already be ordered by the discovery frequency
+    ranking.  Ineligible high-frequency evidence must never consume a cap slot.
+    """
+    raw = []
+    seen = set()
+    for value in ranked_candidates:
+        item = str(value).strip()
+        if item and item not in seen:
+            seen.add(item)
+            raw.append(item)
+    decisions = [classify_candidate(domain, item, registry) for item in raw]
+    result = {
+        "raw": raw,
+        "eligible": [d.item for d in decisions if d.eligible],
+        "excluded": [d for d in decisions if not d.eligible and not d.canonical_item],
+        "alias_suppressed": [d for d in decisions if bool(d.canonical_item)],
+        "decisions": decisions,
+    }
+    eligible = list(result["eligible"])
+    if max_fields > 0:
+        eligible = eligible[:max_fields]
+    result["eligible"] = eligible
+    return result
+
+
 def diagnostic_fields(result: Mapping[str, object]) -> Dict[str, str]:
     excluded = result.get("excluded", [])
     aliases = result.get("alias_suppressed", [])

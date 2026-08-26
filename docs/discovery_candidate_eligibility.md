@@ -48,6 +48,15 @@ or another size-only style requires a separate extractor-coverage change.
 Run `python tools/audit_discovery_candidates.py [--phase0-dir PATH]`. Static
 extractor declarations are unioned with flattened corpus evidence when supplied;
 the deterministic outputs are `discovery_candidate_inventory.csv` and
-`discovery_candidate_inventory_summary.json`.
+`discovery_candidate_inventory_summary.json`. Static discovery covers both
+identity-item constructor calls and dictionary-based `{"k": ...}` declarations.
+Items in multi-domain extractor modules are attributed using governed policy
+membership and the enclosing record builder's emitted domain, rather than the
+module filename.
+
+Eligibility is applied to the complete frequency-ranked field list before
+`--max-candidate-fields` is enforced. Consequently, an excluded high-frequency
+traceability field cannot consume a cap slot that should be available to the
+next eligible semantic field.
 
 > Discovery previously allowed any exposed, non-policy-excluded item to compete, which permitted traceability identifiers, routing metadata, and duplicate representations to become candidate fingerprint fields. Discovery now applies an explicit, observable candidate-eligibility layer before greedy/Pareto evaluation. Runtime fingerprint policies and hashes are unchanged. Some discovery selections and metrics may change because non-semantic shortcuts no longer compete.

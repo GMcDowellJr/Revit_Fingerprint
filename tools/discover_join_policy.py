@@ -12,11 +12,11 @@ from typing import Dict, List, Sequence
 
 try:
     from tools.join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate, summarize_shape_gate_usage
-    from tools.discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_candidates
+    from tools.discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_and_cap_candidates
     from tools.join_key_discovery.greedy import discover_greedy
 except ModuleNotFoundError:
     from join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate, summarize_shape_gate_usage
-    from discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_candidates
+    from discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_and_cap_candidates
     from join_key_discovery.greedy import discover_greedy
 
 
@@ -490,8 +490,8 @@ def main() -> None:
         sample_rate = (float(records_sampled_domain) / float(records_total_domain)) if records_total_domain else 0.0
         sampled_pks = {r.get("record_pk", "").strip() for r in dom_records if r.get("record_pk", "").strip()}
         dom_items_sampled = [it for it in dom_items_all if not sampled_pks or it.get("record_pk", "").strip() in sampled_pks]
-        candidate_fields_unfiltered = _pick_candidate_fields(dom_items_sampled, int(args.max_candidate_fields))
-        candidate_filter = filter_candidates(domain, candidate_fields_unfiltered)
+        candidate_fields_unfiltered = _pick_candidate_fields(dom_items_sampled, 0)
+        candidate_filter = filter_and_cap_candidates(domain, candidate_fields_unfiltered, int(args.max_candidate_fields))
         candidate_fields = candidate_filter["eligible"]
         domain_has_candidates = bool(candidate_fields)
 
@@ -796,7 +796,7 @@ def main() -> None:
                     )
                 partition_pks = {r.get("record_pk", "").strip() for r in partition_records}
                 partition_items = [it for it in partition_items_all if it.get("record_pk", "").strip() in partition_pks]
-                partition_filter = filter_candidates(domain, _pick_candidate_fields(partition_items, int(args.max_candidate_fields)))
+                partition_filter = filter_and_cap_candidates(domain, _pick_candidate_fields(partition_items, 0), int(args.max_candidate_fields))
                 partition_candidates = _without_excluded(partition_filter["eligible"], excluded)
                 domain_has_candidates = domain_has_candidates or bool(partition_candidates)
                 for search_mode in search_modes:

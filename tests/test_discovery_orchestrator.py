@@ -98,12 +98,13 @@ def test_canonical_json_ignores_mapping_order():
     assert canonical_json({"b":2,"a":1})==canonical_json({"a":1,"b":2})
 
 
-def test_partial_without_baseline_is_blocked(tmp_path):
+def test_partial_without_baseline_is_allowed(tmp_path):
     exports,repo,_=fixture_inputs(tmp_path)
     suggestions=exports/"diagnostics/discovery_param_suggestions.csv"
     _write(suggestions,["domain","suggested_sample_size","suggested_max_candidate_fields","suggested_max_k_discover","suggested_max_k_harsh_validate","stratify_by_recommended"],[{"domain":"walls","suggested_sample_size":"2","suggested_max_candidate_fields":"2","suggested_max_k_discover":"1","suggested_max_k_harsh_validate":"1","stratify_by_recommended":""}])
     cfg=Config(exports,repo,suggestions,["walls"],what_if=True)
-    with pytest.raises(RuntimeError,match="initial full summary"):Orchestrator(cfg).run_sweep()
+    plan = Orchestrator(cfg).run_sweep()
+    assert plan["requested_domains"] == ["walls"]
 
 
 def test_force_is_preserved_in_shared_config(tmp_path):

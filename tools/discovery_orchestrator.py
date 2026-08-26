@@ -25,10 +25,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterable, Mapping
 
-# Candidate/runtime scoring semantics changed in v3. Keeping a new version is
-# required so sweep caches produced under the policy-leaking v2 evaluator are
-# never reused as evidence for the corrected discovery semantics.
-DISCOVERY_ENGINE_VERSION = "discovery-sweep-v3"
+# Keep a new version whenever candidate or orchestration semantics can change
+# selected evidence, so older cache entries are never silently reused.
+DISCOVERY_ENGINE_VERSION = "discovery-sweep-v4"
 PROGRESS_HEARTBEAT_SECONDS = 30.0
 CACHE_SCHEMA_VERSION = 1
 SUMMARY_SCHEMA_VERSION = 1
@@ -506,7 +505,9 @@ class Orchestrator:
         if missing: raise ValueError("unknown domains: " + ",".join(sorted(missing)))
         targets=[t for t in TARGETS if not ((t=="join" and self.cfg.skip_join) or (t=="sig" and self.cfg.skip_sig))]
         prior={t:self._latest(t) for t in targets}
-        if self.cfg.domains and any(not prior[t][1] for t in targets): raise RuntimeError("partial sweep requires an initial full summary")
+        # A scoped first run is valid: it publishes a summary containing only
+        # requested domains. Later scoped runs carry forward whatever prior
+        # domains exist and add/refresh the newly requested subset.
         cache=self._load_cache()
         print(f"[sweep] preparing fingerprints for {len(requested)} domain(s); each source CSV is scanned at most once", flush=True)
         likely_hits=[]

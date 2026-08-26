@@ -1,4 +1,4 @@
-from tools.discovery_candidate_eligibility import classify_candidate, diagnostic_fields, filter_candidates
+from tools.discovery_candidate_eligibility import classify_candidate, diagnostic_fields, filter_and_cap_candidates, filter_candidates
 
 
 def test_traceability_identifiers_are_excluded_but_semantic_value_remains():
@@ -31,3 +31,10 @@ def test_domain_rule_does_not_leak_and_results_are_deterministic():
     values = ["arrowhead.record_class", "z", "A", "z"]
     assert classify_candidate("other", "arrowhead.record_class").eligible
     assert filter_candidates("arrowheads", values) == filter_candidates("arrowheads", list(reversed(values)))
+
+
+def test_ineligible_high_frequency_field_does_not_consume_candidate_cap():
+    ranked = ["example.source_unique_id", "semantic.value", "semantic.other"]
+    result = filter_and_cap_candidates("example", ranked, 1)
+    assert result["eligible"] == ["semantic.value"]
+    assert [d.item for d in result["excluded"]] == ["example.source_unique_id"]

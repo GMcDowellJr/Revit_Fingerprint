@@ -39,8 +39,10 @@ to each shell. Skipping both targets is rejected as an invalid no-op sweep.
 
 ## Execution model
 
-An initial run must be a full sweep. A partial run is rejected until a prior
-new-format full snapshot exists. Every policy stage starts with Greedy. Pareto
+The first run may target one domain or any comma-separated subset with
+`--domains`; it does not require a prior full-domain snapshot. A later partial
+run carries forward any domains present in the latest snapshot and adds or
+refreshes the requested subset. Every policy stage starts with Greedy. Pareto
 runs only when Greedy fails the strict gate: status `ok`, full coverage 1.0,
 zero full collision and fragmentation, and no sample/full divergence. Discover
 and validate run normally; harsh runs only when validate fails that same gate.
@@ -113,8 +115,9 @@ other result-affecting orchestration semantics change. Do not bump it for a
 documentation-only change.
 
 The candidate/runtime scoring separation changed result-affecting evaluation
-semantics, so its sweep cache contract is `discovery-sweep-v3`. Evidence cached
-under v2 cannot be reused for the corrected discovery results.
+semantics, and candidate eligibility is now applied before the field cap, so
+the sweep cache contract is `discovery-sweep-v4`. Evidence cached under older
+versions cannot be reused for corrected discovery results.
 
 WhatIf computes the plan without publishing summaries or cache changes. It
 reports requested domains, likely fingerprint-verified cache hits, initial
