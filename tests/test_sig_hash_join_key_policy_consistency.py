@@ -83,7 +83,9 @@ ACCEPTED_SIG_HASH_JOIN_KEY_OVERLAPS = {
     # regardless of current per-file counts/activation state; those counts
     # remain legitimate parts of the family's own sig_hash fingerprint.
     "loaded_family_types": {
+        "lft.can_have_structural_section",
         "lft.family_symbol_count",
+        "lft.has_thermal_properties",
         "lft.is_active",
         "lft.shape_gate.category_id",
         "lft.structural_material_type",
