@@ -3,7 +3,7 @@
     "display_alias": 1,
     "raw_alias": 1,
     "routing_metadata": 1,
-    "semantic_candidate": 423,
+    "semantic_candidate": 418,
     "traceability_identifier": 42
   },
   "by_domain": {
@@ -14,8 +14,8 @@
     "dimension_types_diameter": 18,
     "dimension_types_linear": 31,
     "dimension_types_radial": 18,
-    "dimension_types_spot_coordinate": 26,
-    "dimension_types_spot_elevation": 25,
+    "dimension_types_spot_coordinate": 25,
+    "dimension_types_spot_elevation": 24,
     "dimension_types_spot_slope": 16,
     "fill_patterns_drafting": 9,
     "fill_patterns_model": 9,
@@ -36,7 +36,6 @@
     "text_types": 18,
     "units": 11,
     "units_doc": 3,
-    "view_category_overrides": 3,
     "view_category_overrides_annotation": 9,
     "view_category_overrides_model": 9,
     "view_filter_applications_view_templates": 6,
@@ -50,7 +49,7 @@
     "worksets": 7,
     "worksets_doc": 2
   },
-  "eligible": 423,
+  "eligible": 418,
   "ineligible": 45,
-  "total": 468
+  "total": 463
 }

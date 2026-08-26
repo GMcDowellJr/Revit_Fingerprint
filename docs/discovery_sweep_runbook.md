@@ -97,7 +97,8 @@ exception text when a failed requested refresh retains prior evidence.
 
 The versioned JSON manifest uses deterministic SHA-256 fingerprints over
 domain-scoped records/items, the relevant governed policy block, target,
-policy/search mode, shape gate, sampling and search parameters, mandatory full
+policy/search mode, shape gate, the global and domain-specific discovery
+candidate eligibility rules, sampling and search parameters, mandatory full
 verification, and the discovery engine semantic version. Canonical JSON makes
 mapping order irrelevant. Only entries with result status `ok` are reused.
 An `ok` status is not sufficient by itself: every shape-gate row must also pass
@@ -107,7 +108,8 @@ Accepted Pareto evidence is cached independently; an unchanged rerun still
 executes a non-accepted Greedy search to establish escalation, but can reuse the
 accepted Pareto result instead of repeating that expensive search.
 Policy, data, parameter, target/mode/gate, or engine-version changes invalidate
-the relevant entry; `--force` bypasses it.
+the relevant entry; eligibility-registry changes invalidate affected domains
+without requiring a manual engine-version bump. `--force` bypasses the cache.
 
 `DISCOVERY_ENGINE_VERSION` is defined in `tools/discovery_orchestrator.py`.
 Bump it whenever discovery inputs, evaluation behavior, acceptance logic, or

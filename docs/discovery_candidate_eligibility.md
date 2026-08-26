@@ -59,4 +59,12 @@ Eligibility is applied to the complete frequency-ranked field list before
 traceability field cannot consume a cap slot that should be available to the
 next eligible semantic field.
 
+Because eligibility changes the ranked candidate count used for sizing,
+regenerate `discovery_param_suggestions.csv` with
+`tools/suggest_discovery_params.py` before the next sweep. Existing suggestions
+are not runtime fingerprint truth, but retaining pre-eligibility sizing can
+overstate candidate-pool and Pareto search costs. Sweep cache fingerprints
+include the registry's global and per-domain rules, so changing eligibility
+rules invalidates affected cached evidence automatically.
+
 > Discovery previously allowed any exposed, non-policy-excluded item to compete, which permitted traceability identifiers, routing metadata, and duplicate representations to become candidate fingerprint fields. Discovery now applies an explicit, observable candidate-eligibility layer before greedy/Pareto evaluation. Runtime fingerprint policies and hashes are unchanged. Some discovery selections and metrics may change because non-semantic shortcuts no longer compete.

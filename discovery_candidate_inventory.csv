@@ -31,7 +31,7 @@ ceiling_types,ct.stack_hash_strict,identity,domains/ceiling_types.py:171,semanti
 ceiling_types,ct.total_layer_rows,identity,domains/ceiling_types.py:170,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 ceiling_types,ct.total_thickness_in,identity,domains/ceiling_types.py:129,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 ceiling_types,ct.type_name,identity,domains/ceiling_types.py:127,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
-dimension_types_angular,dim_type.accuracy,identity,domains/dimension_types.py:1624,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_angular,dim_type.accuracy,identity,domains/dimension_types.py:863,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_angular,dim_type.centerline_pattern_sig_hash,identity,domains/dimension_types.py:880,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_angular,dim_type.centerline_symbol_name,identity,domains/dimension_types.py:881,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_angular,dim_type.centerline_tick_mark_sig_hash,identity,domains/dimension_types.py:882,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
@@ -42,10 +42,10 @@ dimension_types_angular,dim_type.interior_tick_mark_display,identity,domains/dim
 dimension_types_angular,dim_type.interior_tick_mark_sig_hash,identity,domains/dimension_types.py:883,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_angular,dim_type.leader_tick_mark_sig_hash,identity,domains/dimension_types.py:871,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_angular,dim_type.leader_type,identity,domains/dimension_types.py:872,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_angular,dim_type.name,identity,domains/dimension_types.py:3037,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+dimension_types_angular,dim_type.name,identity,domains/dimension_types.py:990,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 dimension_types_angular,dim_type.prefix,identity,domains/dimension_types.py:868,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_angular,dim_type.rounding,identity,domains/dimension_types.py:867,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_angular,dim_type.shape,identity,domains/dimension_types.py:2912,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_angular,dim_type.shape,identity,domains/dimension_types.py:862,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_angular,dim_type.show_leader_when_text_moves,identity,domains/dimension_types.py:873,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_angular,dim_type.source_element_id,phase2.unknown,domains/dimension_types.py:1017,traceability_identifier,false,,File-local Revit ElementId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
 dimension_types_angular,dim_type.source_unique_id,phase2.unknown,domains/dimension_types.py:1018,traceability_identifier,false,,Revit UniqueId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
@@ -53,8 +53,8 @@ dimension_types_angular,dim_type.suffix,identity,domains/dimension_types.py:869,
 dimension_types_angular,dim_type.suppress_spaces,identity,domains/dimension_types.py:870,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_angular,dim_type.text_offset_in,identity,domains/dimension_types.py:885,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_angular,dim_type.tick_mark_line_weight,identity,domains/dimension_types.py:874,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_angular,dim_type.tick_mark_sig_hash,identity,domains/dimension_types.py:1625,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_angular,dim_type.unit_format_id,identity,domains/dimension_types.py:2913,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_angular,dim_type.tick_mark_sig_hash,identity,domains/dimension_types.py:864,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_angular,dim_type.unit_format_id,identity,domains/dimension_types.py:866,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_angular,dim_type.witness_line_control,identity,domains/dimension_types.py:865,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_angular,dim_type.witness_line_extension_in,identity,domains/dimension_types.py:875,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_angular,dim_type.witness_line_gap_to_element_in,identity,domains/dimension_types.py:876,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
@@ -67,8 +67,8 @@ dimension_types_diameter,dim_type.diameter_symbol_text,identity,domains/dimensio
 dimension_types_diameter,dim_type.domain_family,phase2.coordination,domains/dimension_types.py:1751,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_diameter,dim_type.leader_tick_mark_sig_hash,identity,domains/dimension_types.py:1632,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_diameter,dim_type.leader_type,identity,domains/dimension_types.py:1633,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_diameter,dim_type.name,identity,domains/dimension_types.py:3037,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
-dimension_types_diameter,dim_type.shape,identity,domains/dimension_types.py:2912,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_diameter,dim_type.name,identity,domains/dimension_types.py:1736,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+dimension_types_diameter,dim_type.shape,identity,domains/dimension_types.py:1623,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_diameter,dim_type.show_leader_when_text_moves,identity,domains/dimension_types.py:1634,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_diameter,dim_type.source_element_id,phase2.unknown,domains/dimension_types.py:1763,traceability_identifier,false,,File-local Revit ElementId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
 dimension_types_diameter,dim_type.source_unique_id,phase2.unknown,domains/dimension_types.py:1764,traceability_identifier,false,,Revit UniqueId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
@@ -76,8 +76,8 @@ dimension_types_diameter,dim_type.suppress_spaces,identity,domains/dimension_typ
 dimension_types_diameter,dim_type.text_offset_in,identity,domains/dimension_types.py:1636,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_diameter,dim_type.tick_mark_line_weight,identity,domains/dimension_types.py:1635,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_diameter,dim_type.tick_mark_sig_hash,identity,domains/dimension_types.py:1625,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_diameter,dim_type.unit_format_id,identity,domains/dimension_types.py:2913,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_linear,dim_type.accuracy,identity,domains/dimension_types.py:1624,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_diameter,dim_type.unit_format_id,identity,domains/dimension_types.py:1630,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_linear,dim_type.accuracy,identity,domains/dimension_types.py:417,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_linear,dim_type.centerline_pattern_sig_hash,identity,domains/dimension_types.py:435,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_linear,dim_type.centerline_symbol_name,identity,domains/dimension_types.py:436,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_linear,dim_type.centerline_tick_mark_sig_hash,identity,domains/dimension_types.py:437,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
@@ -89,43 +89,43 @@ dimension_types_linear,dim_type.interior_tick_mark_display,identity,domains/dime
 dimension_types_linear,dim_type.interior_tick_mark_sig_hash,identity,domains/dimension_types.py:438,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_linear,dim_type.leader_tick_mark_sig_hash,identity,domains/dimension_types.py:425,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_linear,dim_type.leader_type,identity,domains/dimension_types.py:426,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_linear,dim_type.name,identity,domains/dimension_types.py:3037,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
-dimension_types_linear,dim_type.prefix,identity,domains/dimension_types.py:868,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_linear,dim_type.rounding,identity,domains/dimension_types.py:867,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_linear,dim_type.shape,identity,domains/dimension_types.py:2912,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_linear,dim_type.name,identity,domains/dimension_types.py:561,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+dimension_types_linear,dim_type.prefix,identity,domains/dimension_types.py:422,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_linear,dim_type.rounding,identity,domains/dimension_types.py:421,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_linear,dim_type.shape,identity,domains/dimension_types.py:416,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_linear,dim_type.show_leader_when_text_moves,identity,domains/dimension_types.py:427,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_linear,dim_type.show_opening_height,identity,domains/dimension_types.py:442,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_linear,dim_type.source_element_id,phase2.unknown,domains/dimension_types.py:590,traceability_identifier,false,,File-local Revit ElementId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
 dimension_types_linear,dim_type.source_unique_id,phase2.unknown,domains/dimension_types.py:591,traceability_identifier,false,,Revit UniqueId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
-dimension_types_linear,dim_type.suffix,identity,domains/dimension_types.py:869,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_linear,dim_type.suffix,identity,domains/dimension_types.py:423,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_linear,dim_type.suppress_spaces,identity,domains/dimension_types.py:424,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_linear,dim_type.text_offset_in,identity,domains/dimension_types.py:440,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_linear,dim_type.tick_mark_line_weight,identity,domains/dimension_types.py:428,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_linear,dim_type.tick_mark_sig_hash,identity,domains/dimension_types.py:1625,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_linear,dim_type.unit_format_id,identity,domains/dimension_types.py:2913,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_linear,dim_type.witness_line_control,identity,domains/dimension_types.py:865,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_linear,dim_type.tick_mark_sig_hash,identity,domains/dimension_types.py:418,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_linear,dim_type.unit_format_id,identity,domains/dimension_types.py:420,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_linear,dim_type.witness_line_control,identity,domains/dimension_types.py:419,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_linear,dim_type.witness_line_extension_in,identity,domains/dimension_types.py:429,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_linear,dim_type.witness_line_gap_to_element_in,identity,domains/dimension_types.py:430,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_linear,dim_type.witness_line_length_in,identity,domains/dimension_types.py:431,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_linear,dim_type.witness_line_tick_mark_sig_hash,identity,domains/dimension_types.py:432,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_radial,dim_type.accuracy,identity,domains/dimension_types.py:1624,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_radial,dim_type.center_mark_size,identity,domains/dimension_types.py:1627,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_radial,dim_type.center_marks,identity,domains/dimension_types.py:1626,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_radial,dim_type.accuracy,identity,domains/dimension_types.py:1251,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_radial,dim_type.center_mark_size,identity,domains/dimension_types.py:1254,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_radial,dim_type.center_marks,identity,domains/dimension_types.py:1253,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_radial,dim_type.domain_family,phase2.coordination,domains/dimension_types.py:1378,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_radial,dim_type.leader_tick_mark_sig_hash,identity,domains/dimension_types.py:1259,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_radial,dim_type.leader_type,identity,domains/dimension_types.py:1260,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_radial,dim_type.name,identity,domains/dimension_types.py:3037,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+dimension_types_radial,dim_type.name,identity,domains/dimension_types.py:1363,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 dimension_types_radial,dim_type.radius_symbol_location,identity,domains/dimension_types.py:1255,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_radial,dim_type.radius_symbol_text,identity,domains/dimension_types.py:1256,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_radial,dim_type.shape,identity,domains/dimension_types.py:2912,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_radial,dim_type.shape,identity,domains/dimension_types.py:1250,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_radial,dim_type.show_leader_when_text_moves,identity,domains/dimension_types.py:1261,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_radial,dim_type.source_element_id,phase2.unknown,domains/dimension_types.py:1390,traceability_identifier,false,,File-local Revit ElementId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
 dimension_types_radial,dim_type.source_unique_id,phase2.unknown,domains/dimension_types.py:1391,traceability_identifier,false,,Revit UniqueId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
 dimension_types_radial,dim_type.suppress_spaces,identity,domains/dimension_types.py:1258,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_radial,dim_type.text_offset_in,identity,domains/dimension_types.py:1263,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_radial,dim_type.tick_mark_line_weight,identity,domains/dimension_types.py:1262,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_radial,dim_type.tick_mark_sig_hash,identity,domains/dimension_types.py:1625,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_radial,dim_type.unit_format_id,identity,domains/dimension_types.py:2913,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_radial,dim_type.tick_mark_sig_hash,identity,domains/dimension_types.py:1252,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_radial,dim_type.unit_format_id,identity,domains/dimension_types.py:1257,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_coordinate,dim_type.bottom_coordinate,identity,domains/dimension_types.py:2560,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_coordinate,dim_type.coordinate_base,identity,domains/dimension_types.py:2576,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_spot_coordinate,dim_type.domain_family,phase2.coordination,domains/dimension_types.py:2687,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
@@ -134,14 +134,13 @@ dimension_types_spot_coordinate,dim_type.elevation_indicator,identity,domains/di
 dimension_types_spot_coordinate,dim_type.include_elevation,identity,domains/dimension_types.py:2563,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_coordinate,dim_type.indicator_as_prefix_suffix,identity,domains/dimension_types.py:2565,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_coordinate,dim_type.leader_arrowhead_line_weight,identity,domains/dimension_types.py:2573,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_spot_coordinate,dim_type.leader_arrowhead_name,identity,domains/dimension_types.py:2918,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+dimension_types_spot_coordinate,dim_type.leader_arrowhead_name,identity,domains/dimension_types.py:2571,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 dimension_types_spot_coordinate,dim_type.leader_arrowhead_sig_hash,identity,domains/dimension_types.py:2572,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_spot_coordinate,dim_type.leader_arrowhead_uid,identity,domains/dimension_types.py:2917,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+dimension_types_spot_coordinate,dim_type.leader_arrowhead_uid,identity,domains/dimension_types.py:2570,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 dimension_types_spot_coordinate,dim_type.leader_line_weight,identity,domains/dimension_types.py:2574,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_spot_coordinate,dim_type.name,identity,domains/dimension_types.py:3037,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 dimension_types_spot_coordinate,dim_type.north_south_indicator,identity,domains/dimension_types.py:2561,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_coordinate,dim_type.rotate_with_component,identity,domains/dimension_types.py:2575,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_spot_coordinate,dim_type.shape,identity,domains/dimension_types.py:2912,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_spot_coordinate,dim_type.shape,identity,domains/dimension_types.py:2557,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_coordinate,dim_type.source_element_id,phase2.unknown,domains/dimension_types.py:2699,traceability_identifier,false,,File-local Revit ElementId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
 dimension_types_spot_coordinate,dim_type.source_unique_id,phase2.unknown,domains/dimension_types.py:2700,traceability_identifier,false,,Revit UniqueId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
 dimension_types_spot_coordinate,dim_type.suppress_spaces,identity,domains/dimension_types.py:2569,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
@@ -151,32 +150,31 @@ dimension_types_spot_coordinate,dim_type.text_offset_from_leader_in,identity,dom
 dimension_types_spot_coordinate,dim_type.text_offset_from_symbol_in,identity,domains/dimension_types.py:2578,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_spot_coordinate,dim_type.text_orientation,identity,domains/dimension_types.py:2566,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_coordinate,dim_type.top_coordinate,identity,domains/dimension_types.py:2559,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_spot_coordinate,dim_type.unit_format_id,identity,domains/dimension_types.py:2913,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_spot_coordinate,dim_type.unit_format_id,identity,domains/dimension_types.py:2558,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.bottom_indicator,identity,domains/dimension_types.py:2090,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.bottom_indicator_as_prefix_suffix,identity,domains/dimension_types.py:2092,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.domain_family,phase2.coordination,domains/dimension_types.py:2210,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.elevation_base,identity,domains/dimension_types.py:2103,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_spot_elevation,dim_type.elevation_indicator,identity,domains/dimension_types.py:2564,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_spot_elevation,dim_type.elevation_indicator,identity,domains/dimension_types.py:2087,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.elevation_indicator_as_prefix_suffix,identity,domains/dimension_types.py:2088,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.leader_arrowhead_line_weight,identity,domains/dimension_types.py:2100,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_spot_elevation,dim_type.leader_arrowhead_name,identity,domains/dimension_types.py:2918,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+dimension_types_spot_elevation,dim_type.leader_arrowhead_name,identity,domains/dimension_types.py:2098,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 dimension_types_spot_elevation,dim_type.leader_arrowhead_sig_hash,identity,domains/dimension_types.py:2099,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_spot_elevation,dim_type.leader_arrowhead_uid,identity,domains/dimension_types.py:2917,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+dimension_types_spot_elevation,dim_type.leader_arrowhead_uid,identity,domains/dimension_types.py:2097,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 dimension_types_spot_elevation,dim_type.leader_line_weight,identity,domains/dimension_types.py:2101,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_spot_elevation,dim_type.name,identity,domains/dimension_types.py:3037,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 dimension_types_spot_elevation,dim_type.rotate_with_component,identity,domains/dimension_types.py:2102,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_spot_elevation,dim_type.shape,identity,domains/dimension_types.py:2912,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_spot_elevation,dim_type.shape,identity,domains/dimension_types.py:2085,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.source_element_id,phase2.unknown,domains/dimension_types.py:2222,traceability_identifier,false,,File-local Revit ElementId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.source_unique_id,phase2.unknown,domains/dimension_types.py:2223,traceability_identifier,false,,Revit UniqueId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.suppress_spaces,identity,domains/dimension_types.py:2096,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_spot_elevation,dim_type.symbol_name,identity,domains/dimension_types.py:2568,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_spot_elevation,dim_type.text_location,identity,domains/dimension_types.py:2567,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_spot_elevation,dim_type.symbol_name,identity,domains/dimension_types.py:2095,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_spot_elevation,dim_type.text_location,identity,domains/dimension_types.py:2094,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.text_offset_from_leader_in,identity,domains/dimension_types.py:2104,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.text_offset_from_symbol_in,identity,domains/dimension_types.py:2105,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-dimension_types_spot_elevation,dim_type.text_orientation,identity,domains/dimension_types.py:2566,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_spot_elevation,dim_type.text_orientation,identity,domains/dimension_types.py:2093,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.top_indicator,identity,domains/dimension_types.py:2089,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_elevation,dim_type.top_indicator_as_prefix_suffix,identity,domains/dimension_types.py:2091,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-dimension_types_spot_elevation,dim_type.unit_format_id,identity,domains/dimension_types.py:2913,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+dimension_types_spot_elevation,dim_type.unit_format_id,identity,domains/dimension_types.py:2086,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 dimension_types_spot_slope,dim_type.domain_family,phase2.coordination,domains/dimension_types.py:3052,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_spot_slope,dim_type.leader_arrowhead_line_weight,identity,domains/dimension_types.py:2920,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_spot_slope,dim_type.leader_arrowhead_name,identity,domains/dimension_types.py:2918,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
@@ -194,13 +192,13 @@ dimension_types_spot_slope,dim_type.suppress_spaces,identity,domains/dimension_t
 dimension_types_spot_slope,dim_type.text_offset_from_leader_in,identity,domains/dimension_types.py:2923,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 dimension_types_spot_slope,dim_type.unit_format_id,identity,domains/dimension_types.py:2913,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 fill_patterns_drafting,fill_pattern.elem_id,identity,domains/fill_patterns.py:1327,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-fill_patterns_drafting,fill_pattern.grid_count,identity,domains/fill_patterns.py:1693,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+fill_patterns_drafting,fill_pattern.grid_count,identity,domains/fill_patterns.py:786,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 fill_patterns_drafting,fill_pattern.grids_def_hash,identity,domains/fill_patterns.py:1492,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 fill_patterns_drafting,fill_pattern.is_import,identity,domains/fill_patterns.py:1362,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-fill_patterns_drafting,fill_pattern.name,identity,domains/fill_patterns.py:1867,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+fill_patterns_drafting,fill_pattern.name,identity,domains/fill_patterns.py:960,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 fill_patterns_drafting,fill_pattern.source_element_id,identity,domains/fill_patterns.py:1340,traceability_identifier,false,,File-local Revit ElementId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
 fill_patterns_drafting,fill_pattern.source_unique_id,identity,domains/fill_patterns.py:1341,traceability_identifier,false,,Revit UniqueId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
-fill_patterns_drafting,fill_pattern.target,identity,domains/fill_patterns.py:1691,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+fill_patterns_drafting,fill_pattern.target,identity,domains/fill_patterns.py:1344,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 fill_patterns_drafting,fill_pattern.uid,identity,domains/fill_patterns.py:1325,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 fill_patterns_model,fill_pattern.elem_id,identity,domains/fill_patterns.py:1327,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 fill_patterns_model,fill_pattern.grid_count,identity,domains/fill_patterns.py:1693,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
@@ -381,14 +379,11 @@ units,units.use_plus_prefix,identity,domains/units.py:315,semantic_candidate,tru
 units_doc,units_doc.decimal_symbol,identity,domains/units.py:562,semantic_candidate,true,,,true,true,optional,,false,true,false,0,0,0,0
 units_doc,units_doc.digit_grouping_amount,identity,domains/units.py:563,semantic_candidate,true,,,true,true,optional,,false,true,false,0,0,0,0
 units_doc,units_doc.digit_grouping_symbol,identity,domains/units.py:564,semantic_candidate,true,,,true,true,optional,,false,true,false,0,0,0,0
-view_category_overrides,vco.baseline_category_path,identity,domains/view_category_overrides_model.py:262,semantic_candidate,true,,,true,true,required,,true,false,false,0,0,0,0
-view_category_overrides,vco.baseline_sig_hash,identity,domains/view_category_overrides_model.py:263,semantic_candidate,true,,,true,true,required,,true,false,false,0,0,0,0
-view_category_overrides,vco.override_properties_hash,identity,domains/view_category_overrides_model.py:264,semantic_candidate,true,,,true,true,required,,true,false,false,0,0,0,0
-view_category_overrides_annotation,vco.baseline_category_path,identity,domains/view_category_overrides_model.py:262,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-view_category_overrides_annotation,vco.baseline_sig_hash,identity,domains/view_category_overrides_model.py:263,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+view_category_overrides_annotation,vco.baseline_category_path,identity,domains/view_category_overrides_annotation.py:219,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+view_category_overrides_annotation,vco.baseline_sig_hash,identity,domains/view_category_overrides_annotation.py:220,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 view_category_overrides_annotation,vco.category_hidden,identity,domains/view_category_overrides_annotation.py:80,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_category_overrides_annotation,vco.context_type,identity,domains/view_category_overrides_annotation.py:280,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
-view_category_overrides_annotation,vco.override_properties_hash,identity,domains/view_category_overrides_model.py:264,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
+view_category_overrides_annotation,vco.override_properties_hash,identity,domains/view_category_overrides_annotation.py:221,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
 view_category_overrides_annotation,vco.template_element_id,identity,domains/view_category_overrides_annotation.py:297,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_category_overrides_annotation,vco.template_name,identity,domains/view_category_overrides_annotation.py:288,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_category_overrides_annotation,vco.template_unique_id,identity,domains/view_category_overrides_annotation.py:302,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
@@ -418,25 +413,25 @@ view_filter_definitions,vf.source_element_id,identity,domains/view_filter_defini
 view_filter_definitions,vf.source_unique_id,identity,domains/view_filter_definitions.py:521,traceability_identifier,false,,Revit UniqueId emitted for source traceability; not portable configuration identity,false,false,,,false,false,false,0,0,0,0
 view_templates_ceiling_plans,view_template.category_overrides_def_hash,identity,domains/view_templates.py:356,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 view_templates_ceiling_plans,view_template.def_hash,identity,domains/view_templates.py:354,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-view_templates_ceiling_plans,view_template.name,identity,domains/view_templates.py:2475,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+view_templates_ceiling_plans,view_template.name,identity,domains/view_templates.py:1180,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 view_templates_ceiling_plans,vt.assigned_view_count,phase2.cosmetic,domains/view_templates.py:118,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_templates_ceiling_plans,vt.view_type_family,phase2.coordination,domains/view_templates.py:1147,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_templates_ceiling_plans,vt.view_type_raw,phase2.coordination,domains/view_templates.py:1148,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_templates_elevations_sections_detail,view_template.category_overrides_def_hash,identity,domains/view_templates.py:356,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 view_templates_elevations_sections_detail,view_template.def_hash,identity,domains/view_templates.py:354,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-view_templates_elevations_sections_detail,view_template.name,identity,domains/view_templates.py:2475,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+view_templates_elevations_sections_detail,view_template.name,identity,domains/view_templates.py:1623,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 view_templates_elevations_sections_detail,vt.assigned_view_count,phase2.cosmetic,domains/view_templates.py:118,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_templates_elevations_sections_detail,vt.view_type_family,phase2.coordination,domains/view_templates.py:1590,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_templates_elevations_sections_detail,vt.view_type_raw,phase2.coordination,domains/view_templates.py:1591,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_templates_floor_structural_area_plans,view_template.category_overrides_def_hash,identity,domains/view_templates.py:356,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 view_templates_floor_structural_area_plans,view_template.def_hash,identity,domains/view_templates.py:354,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-view_templates_floor_structural_area_plans,view_template.name,identity,domains/view_templates.py:2475,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+view_templates_floor_structural_area_plans,view_template.name,identity,domains/view_templates.py:763,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 view_templates_floor_structural_area_plans,vt.assigned_view_count,phase2.cosmetic,domains/view_templates.py:118,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_templates_floor_structural_area_plans,vt.view_type_family,phase2.coordination,domains/view_templates.py:730,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_templates_floor_structural_area_plans,vt.view_type_raw,phase2.coordination,domains/view_templates.py:731,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_templates_renderings_drafting,view_template.category_overrides_def_hash,identity,domains/view_templates.py:356,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 view_templates_renderings_drafting,view_template.def_hash,identity,domains/view_templates.py:354,semantic_candidate,true,,,true,true,required,required,true,false,false,0,0,0,0
-view_templates_renderings_drafting,view_template.name,identity,domains/view_templates.py:2475,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
+view_templates_renderings_drafting,view_template.name,identity,domains/view_templates.py:2043,semantic_candidate,true,,,true,true,excluded,,false,false,true,0,0,0,0
 view_templates_renderings_drafting,vt.assigned_view_count,phase2.cosmetic,domains/view_templates.py:118,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_templates_renderings_drafting,vt.view_type_family,phase2.coordination,domains/view_templates.py:2010,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0
 view_templates_renderings_drafting,vt.view_type_raw,phase2.coordination,domains/view_templates.py:2011,semantic_candidate,true,,,true,true,,,false,false,false,0,0,0,0

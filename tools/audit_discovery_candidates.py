@@ -98,7 +98,9 @@ def _static_items(repo: Path, policy_domains_by_key):
             if "unknown_items" in context: layer = "phase2.unknown"
             elif "coordination_items" in context: layer = "phase2.coordination"
             elif "cosmetic_items" in context: layer = "phase2.cosmetic"
-            domains = set(policy_domains_by_key.get(key, ())) or _emitted_domain(node, parents, module_constants, tree) or module_domains
+            emitted_domains = _emitted_domain(node, parents, module_constants, tree) or module_domains
+            policy_domains = set(policy_domains_by_key.get(key, ()))
+            domains = (emitted_domains & policy_domains) if emitted_domains and policy_domains else emitted_domains or policy_domains
             if not domains:
                 domains = {path.stem}
             for domain in domains:

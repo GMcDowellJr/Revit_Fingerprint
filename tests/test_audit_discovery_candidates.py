@@ -32,3 +32,8 @@ def test_multi_domain_module_items_are_attributed_to_emitted_domains():
     assert ("object_styles_annotation", "obj_style.source_element_id") in evidence
     assert not any(domain == "view_templates" for domain, _ in evidence)
     assert ("view_templates_ceiling_plans", "vt.assigned_view_count") in evidence
+    assert ("view_category_overrides_model", "vco.baseline_category_path") in evidence
+    assert ("view_category_overrides_annotation", "vco.baseline_category_path") in evidence
+    assert evidence[("view_category_overrides_model", "vco.baseline_category_path")][1].startswith("domains/view_category_overrides_model.py:")
+    assert evidence[("view_category_overrides_annotation", "vco.baseline_category_path")][1].startswith("domains/view_category_overrides_annotation.py:")
+    assert not any(domain == "view_category_overrides" for domain, key in evidence if key == "vco.baseline_category_path")

@@ -160,6 +160,16 @@ def _policy_block(path: Path, domain: str) -> tuple[object, str]:
     return data.get("domains", {}).get(domain, {}), hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _eligibility_rules(path: Path, domain: str) -> object:
+    """Return the global and requested-domain rules that affect a sweep."""
+    if not path.exists():
+        return {"registry_status": "missing"}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    domains = data.get("domains", {}) if isinstance(data.get("domains"), dict) else {}
+    return {"schema_version": data.get("schema_version"), "global": data.get("global", {}),
+            "domain": domains.get(domain, {})}
+
+
 def _domain_data(records_dir: Path, domain: str, target: str) -> dict:
     """Hash only relevant domain rows, sorting rows because CSV order is not semantic."""
     names = ["records.csv"]
@@ -184,10 +194,12 @@ def input_fingerprint(records_dir: Path, policy_path: Path, domain: str, target:
                       engine_version: str = DISCOVERY_ENGINE_VERSION,
                       domain_data: object | None = None) -> str:
     policy, _ = _policy_block(policy_path, domain)
+    eligibility = _eligibility_rules(policy_path.parent / "discovery_candidate_eligibility.json", domain)
     return sha256_value({"domain": domain, "target": target, "policy_mode": policy_mode,
         "search_mode": search_mode, "shape_gate": shape_gate or "__all__",
         "domain_data": _domain_data(records_dir, domain, target) if domain_data is None else domain_data,
-        "policy": policy, "parameters": dict(params), "full_verification": True,
+        "policy": policy, "candidate_eligibility": eligibility,
+        "parameters": dict(params), "full_verification": True,
         "discovery_engine_version": engine_version})
 
 
@@ -214,6 +226,7 @@ class Orchestrator:
         self.cache_path = self.root / "cache_manifest.json"
         self.policy_paths = {"join": cfg.repo_root / "policies/domain_join_key_policies.json",
                              "sig": cfg.repo_root / "policies/domain_sig_hash_policies.json"}
+        self.eligibility_path = cfg.repo_root / "policies/discovery_candidate_eligibility.json"
         self._file_domain_hashes: dict[Path, dict[str, str]] = {}
 
     def _hashes_by_domain(self, path: Path) -> dict[str, str]:
@@ -538,7 +551,8 @@ class Orchestrator:
                 rid=f"{ts}-{domain}-{uuid.uuid4().hex[:8]}"; final_dir=self.root/"domains"/domain/rid
                 temp_dir=final_dir.with_name(final_dir.name+".tmp"); temp_dir.mkdir(parents=True)
                 policy_block, policy_hash=_policy_block(self.policy_paths[target],domain)
-                manifest={"schema_version":1,"run_id":rid,"timestamp":ts,"domain":domain,"requested_targets":[target],"commands_executed":[],"stages_skipped":[],"input_fingerprints":{},"policy_file_identifiers":{str(self.policy_paths[target]):policy_hash},"parameters":{},"discovery_engine_version":self.cfg.engine_version,"source_suggestions_row":by_domain[domain],"result_files":[],"logs":[],"warnings":[],"final_status":"running"}
+                eligibility_hash = hashlib.sha256(self.eligibility_path.read_bytes()).hexdigest() if self.eligibility_path.exists() else "missing"
+                manifest={"schema_version":1,"run_id":rid,"timestamp":ts,"domain":domain,"requested_targets":[target],"commands_executed":[],"stages_skipped":[],"input_fingerprints":{},"policy_file_identifiers":{str(self.policy_paths[target]):policy_hash,str(self.eligibility_path):eligibility_hash},"parameters":{},"discovery_engine_version":self.cfg.engine_version,"source_suggestions_row":by_domain[domain],"result_files":[],"logs":[],"warnings":[],"final_status":"running"}
                 try:
                     rows=[]; stage_provenance=[]; fps=[]
                     for mode in ("discover","validate"):
