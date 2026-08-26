@@ -14,6 +14,68 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **`loaded_family_types` domain: `can_have_structural_section`/`has_thermal_properties`
+  identity fields (Audit 16 §2 / PR2, Tier 1 capability flags only).**
+  `domains/loaded_family_types.py`'s existing per-family loop now also reads
+  `FamilySymbol.CanHaveStructuralSection()` and `FamilySymbol.HasThermalProperties()`
+  -- these are **zero-arg instance methods**, not properties (confirmed via the
+  Area 12 probe's own reflection sweep,
+  `audit_results/audit_11_domain_extractor_delta_step0_findings.md` §12, which
+  discovered both as `method_kind="method"` but never invoked either, since
+  neither was on the probe's method-invocation safety allowlist -- so unlike
+  `structural_material_type`/`is_active`, there is **no probe evidence at all**,
+  in either direction, on family-vs-symbol constancy for these two fields).
+  `_safe_attr` (a `getattr` wrapper) would have returned the bound method
+  object itself rather than a bool, so a new `_safe_call` helper was added
+  (same try/except-to-default convention as `_safe_attr`, but calls the
+  zero-arg method). Given the total absence of probe evidence, and this
+  domain's own prior history of the family-constant assumption failing for
+  `is_active`, both new fields are treated conservatively as **per-symbol
+  (type) capability queries** and aggregated across every symbol in the
+  family group to a `"true"`/`"false"`/`"partial"` tri-state -- the same
+  pattern `is_active` uses -- rather than read off a single representative
+  symbol the way `structural_material_type` is. The aggregation logic itself
+  (`ITEM_Q_UNREADABLE` dominant over `ITEM_Q_MISSING` dominant over
+  `ITEM_Q_OK`-derived true/false/partial) was extracted out of the inline
+  `is_active` block into a shared `_aggregate_bool_pairs()` helper, now used
+  by all three fields, with no behavior change to `is_active` itself.
+  Added as `lft.can_have_structural_section` and `lft.has_thermal_properties`
+  in `identity_items`.
+  **Hash-breaking:** `loaded_family_types`'s `sig_hash` is
+  `make_hash(serialize_identity_items(identity_items))` with no filtering
+  step, so adding these 2 items changes `sig_hash` for every record in this
+  domain; full re-extraction required (same D-015 "hash-breaking" precedent
+  as the Area 12 change). `contracts/domain_identity_keys_v2.json`'s
+  `loaded_family_types.allowed_keys`/`optional` and
+  `policies/domain_sig_hash_policies.json`'s `loaded_family_types.allowed_items`
+  are updated to register both new keys (hand-patched, not regenerated via
+  `tools/generate_sig_hash_policy.py`, same precedent as the Area 12/Area 9
+  entries above), and `policies/domain_join_key_policies.json`'s
+  `loaded_family_types.explicitly_excluded_items` gains both keys too --
+  without this, `tools/discover_join_policy.py`'s default `discover`/`harsh`
+  modes would nominate them as join-key candidates despite being per-symbol
+  operational/capability state, not definitional family properties (same
+  reasoning as `is_active`'s existing exclusion). `tests/
+  test_sig_hash_join_key_policy_consistency.py`'s
+  `ACCEPTED_SIG_HASH_JOIN_KEY_OVERLAPS["loaded_family_types"]` allowlist is
+  extended with both keys for the same reason its existing `is_active`/
+  `structural_material_type` entries exist (sig_hash and join_hash are
+  legitimately answering different questions for these fields).
+  **Schema version bump:** `sig_hash_schema` for this domain is bumped from
+  `loaded_family_types.sig_hash.v2` to `loaded_family_types.sig_hash.v3` in
+  both `contracts/domain_identity_keys_v2.json` and
+  `policies/domain_sig_hash_policies.json` (same v1->v2 precedent from Area 12
+  and the identity domain's D-025 pin) -- otherwise a future
+  `tools/generate_sig_hash_policy.py` regeneration would silently keep the
+  stale `v2` label despite the widened preimage.
+  **Out of scope for this PR (deferred to Tier 2/3):** no `parameter_rows`/
+  `lftp.*` values are promoted into `identity_items`; no new `shape_gating`
+  or per-category branching was introduced.
+  New coverage: `tests/test_loaded_family_types.py` (no prior test file for
+  this domain existed) -- unit tests for the new `_safe_call`/
+  `_aggregate_bool_pairs` helpers (including the true/false/partial/missing/
+  unreadable aggregation states) plus contract-validation coverage of the two
+  new identity items across `q=ok`/`missing`/`unreadable`/`partial`.
 - **`lp.is_solid` in `phase2.coordination_items` for `line_patterns` records.**
   Mirrors `fill_patterns.py`'s existing `fill_pattern.is_solid` (a filter
   criterion, not identity): derived from `segment_count <= 1`, gated on

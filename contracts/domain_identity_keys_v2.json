@@ -785,7 +785,9 @@
         "lft.family_symbol_count",
         "lft.type_count",
         "lft.structural_material_type",
-        "lft.is_active"
+        "lft.is_active",
+        "lft.can_have_structural_section",
+        "lft.has_thermal_properties"
       ],
       "required_keys": [
         "lft.shape_gate.category",
@@ -799,12 +801,14 @@
         "lft.shape_gate.category_id",
         "lft.type_count",
         "lft.structural_material_type",
-        "lft.is_active"
+        "lft.is_active",
+        "lft.can_have_structural_section",
+        "lft.has_thermal_properties"
       ],
       "minima": {
         "block_if_any_required_not_ok": true
       },
-      "sig_hash_schema": "loaded_family_types.sig_hash.v2",
+      "sig_hash_schema": "loaded_family_types.sig_hash.v3",
       "notes": [
         "Records are emitted at family granularity (one record per Family element, not per FamilySymbol).",
         "lft.family_name is label-only — excluded from identity_basis so sig_hash is name-independent.",
@@ -815,8 +819,9 @@
         "lft.family_is_editable and lft.family_is_in_place are discrimination signals (loaded vs system).",
         "lft.structural_material_type is read from the family's representative FamilySymbol (Area 12 probe: constant across a family's types, unique_value_count=1 in every sampled case).",
         "lft.is_active is a per-symbol (type) property, not per-family, and was observed to vary within a family in the Area 12 probe corpus; it is aggregated across all of a family's types to true/false/partial rather than read off a single arbitrary type, so the family record stays independent of collect_types() ordering.",
-        "sig_hash = f(category + schema_hash + is_in_place + is_editable + counts + structural_material_type + is_active).",
-        "sig_hash_schema is pinned to loaded_family_types.sig_hash.v2 (not the generator's default loaded_family_types.sig_hash.v1) because Area 12 changed the sig_hash preimage composition -- tools/generate_sig_hash_policy.py's build_policy() defaults any domain without this override to '<domain>.sig_hash.v1', which would silently erase the version bump on the next regeneration and make post-Area-12 hashes appear compatible with the old preimage (PR review follow-up, same precedent as the identity domain's D-025 sig_hash_schema pin above).",
+        "lft.can_have_structural_section and lft.has_thermal_properties (PR2/Tier 1) are zero-arg FamilySymbol instance methods, not properties -- CanHaveStructuralSection/HasThermalProperties were reflection-discovered as method_kind='method' in the Area 12 probe but never invoked (not on the probe's method-invocation allowlist), so no probe evidence of family-vs-symbol constancy exists for either. Treated conservatively as per-symbol (type) capability queries -- same true/false/partial aggregation across a family's types as lft.is_active, not the read-off-first-symbol pattern used for lft.structural_material_type -- because this domain has already been burned once by assuming family-constant without evidence.",
+        "sig_hash = f(category + schema_hash + is_in_place + is_editable + counts + structural_material_type + is_active + can_have_structural_section + has_thermal_properties).",
+        "sig_hash_schema is pinned to loaded_family_types.sig_hash.v3 (bumped from v2 by PR2/Tier 1's 2 new identity items; not the generator's implicit '<domain>.sig_hash.v1' default) so that a future tools/generate_sig_hash_policy.py regeneration cannot silently erase the version bump and make pre/post-PR2 hashes appear compatible with an older preimage (same precedent as the Area 12 v1->v2 bump and the identity domain's D-025 sig_hash_schema pin).",
         "join_hash discovery: schema_hash is the behavioral anchor; individual parameter value items",
         "  (from parameter_rows) are future discovery work (see domain future-steps)."
       ]

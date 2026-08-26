@@ -674,7 +674,9 @@
         "lft.family_symbol_count",
         "lft.type_count",
         "lft.structural_material_type",
-        "lft.is_active"
+        "lft.is_active",
+        "lft.can_have_structural_section",
+        "lft.has_thermal_properties"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -688,7 +690,7 @@
         "lft.shape_gate.category",
         "lft.type_parameter_schema_hash"
       ],
-      "sig_hash_schema": "loaded_family_types.sig_hash.v2"
+      "sig_hash_schema": "loaded_family_types.sig_hash.v3"
     },
     "materials": {
       "allowed_item_prefixes": [],
