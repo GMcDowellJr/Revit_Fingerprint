@@ -1,0 +1,39 @@
+{
+  "by_classification": {
+    "display_alias": 1,
+    "raw_alias": 1,
+    "routing_metadata": 1,
+    "semantic_candidate": 251,
+    "traceability_identifier": 10
+  },
+  "by_domain": {
+    "arrowheads": 13,
+    "browser_organization": 10,
+    "ceiling_types": 9,
+    "dimension_types": 64,
+    "fill_patterns": 5,
+    "floor_types": 11,
+    "identity": 6,
+    "line_patterns": 8,
+    "line_styles": 10,
+    "loaded_family_types": 11,
+    "materials": 3,
+    "object_styles": 16,
+    "phase_filters": 1,
+    "phase_graphics": 3,
+    "phases": 2,
+    "roof_types": 9,
+    "text_types": 14,
+    "units": 14,
+    "view_category_overrides_annotation": 9,
+    "view_category_overrides_model": 9,
+    "view_filter_applications_view_templates": 3,
+    "view_filter_definitions": 5,
+    "view_templates": 6,
+    "wall_types": 14,
+    "worksets": 9
+  },
+  "eligible": 251,
+  "ineligible": 13,
+  "total": 264
+}

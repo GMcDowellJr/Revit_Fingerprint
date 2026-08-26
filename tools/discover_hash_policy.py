@@ -5,10 +5,12 @@ from pathlib import Path
 from typing import Dict,List
 try:
     from tools.discover_join_policy import _read_csv,_write_csv,_sample_domain_records,_stratified_sample,_pick_candidate_fields,_without_excluded,_pareto_search_adapter,_diagnostics_domain_suffix,_full_population_verify
+    from tools.discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_candidates
     from tools.join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate, summarize_shape_gate_usage
     from tools.join_key_discovery.greedy import discover_greedy
 except ModuleNotFoundError:
     from discover_join_policy import _read_csv,_write_csv,_sample_domain_records,_stratified_sample,_pick_candidate_fields,_without_excluded,_pareto_search_adapter,_diagnostics_domain_suffix,_full_population_verify
+    from discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_candidates
     from join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate, summarize_shape_gate_usage
     from join_key_discovery.greedy import discover_greedy
 
@@ -106,7 +108,9 @@ def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
                 continue
             sampled={r.get('record_pk','').strip() for r in dom_records}
             dom_items=[it for it in dom_items_all if not sampled or it.get('record_pk','').strip() in sampled]
-            raw=_pick_candidate_fields(dom_items,args.max_candidate_fields)
+            raw_unfiltered=_pick_candidate_fields(dom_items,args.max_candidate_fields)
+            candidate_filter=filter_candidates(domain,raw_unfiltered)
+            raw=candidate_filter["eligible"]
             scoped=_without_excluded(raw,excluded)
             if domain=="loaded_family_types" and CATEGORY_GATE_KEY in raw:
                 scoped=[CATEGORY_GATE_KEY]+[f for f in scoped if f!=CATEGORY_GATE_KEY]
@@ -196,7 +200,7 @@ def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
                     elif not selected:
                         full_verify_status="skipped_no_selection"
 
-                    rows.append({"domain":domain,"discovery_target":target,"policy_mode":pm,"mode":pm,"search_mode":sm,"status":status,"reason":reason,"selected_fields":"|".join(selected),"effective_fields_actually_scored":"|".join(str(x) for x in metrics.get('effective_fields_actually_scored',[])),"candidate_fields_available":"|".join(scoped),"candidate_fields_evaluated":"|".join(work),"policy_required_fields":"|".join(req),"policy_optional_fields":"|".join(opt),"policy_excluded_fields":"|".join(sorted(excluded)),"discriminator_key":str(gates.get('discriminator_key','')),"discriminator_source":"existing_policy" if gates.get('discriminator_key') else "","discriminator_value":gate,"coverage":f"{float(metrics.get('coverage',0.0)):.6f}","collision_rate":f"{float(metrics.get('collision_rate',1.0)):.6f}","fragmentation_rate":f"{float(metrics.get('fragmentation_rate',1.0)):.6f}","records_total":str(int(metrics.get('records_total',0) or 0)),"records_covered":str(int(metrics.get('records_covered',0) or 0)),"collision_records":str(int(metrics.get('collision_records',0) or 0)),"signature_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="sig" else "","join_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="join" else "","frontier_size":str(frontier),"fallback_used":"true" if fallback else "false","shape_gate":gate,"stratify_by":stratify_key,
+                    rows.append({"domain":domain,"discovery_target":target,"policy_mode":pm,"mode":pm,"search_mode":sm,"status":status,"reason":reason,"selected_fields":"|".join(selected),"effective_fields_actually_scored":"|".join(str(x) for x in metrics.get('effective_fields_actually_scored',[])),**_candidate_diagnostics(candidate_filter),"candidate_fields_available":"|".join(scoped),"candidate_fields_evaluated":"|".join(work),"policy_required_fields":"|".join(req),"policy_optional_fields":"|".join(opt),"policy_excluded_fields":"|".join(sorted(excluded)),"discriminator_key":str(gates.get('discriminator_key','')),"discriminator_source":"existing_policy" if gates.get('discriminator_key') else "","discriminator_value":gate,"coverage":f"{float(metrics.get('coverage',0.0)):.6f}","collision_rate":f"{float(metrics.get('collision_rate',1.0)):.6f}","fragmentation_rate":f"{float(metrics.get('fragmentation_rate',1.0)):.6f}","records_total":str(int(metrics.get('records_total',0) or 0)),"records_covered":str(int(metrics.get('records_covered',0) or 0)),"collision_records":str(int(metrics.get('collision_records',0) or 0)),"signature_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="sig" else "","join_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="join" else "","frontier_size":str(frontier),"fallback_used":"true" if fallback else "false","shape_gate":gate,"stratify_by":stratify_key,
                         "coverage_full":f"{float(metrics_full.get('coverage',0.0)):.6f}" if metrics_full else "",
                         "collision_rate_full":f"{float(metrics_full.get('collision_rate',1.0)):.6f}" if metrics_full else "",
                         "fragmentation_rate_full":f"{float(metrics_full.get('fragmentation_rate',1.0)):.6f}" if metrics_full else "",
