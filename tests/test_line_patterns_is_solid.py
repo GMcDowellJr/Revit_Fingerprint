@@ -63,8 +63,19 @@ def _extract_one(monkeypatch, segments):
     return out["records"][0]
 
 
-def test_solid_pattern_reports_is_solid_true(monkeypatch):
+def test_zero_segment_pattern_reports_is_solid_true(monkeypatch):
     rec = _extract_one(monkeypatch, segments=[])
+
+    item = _coordination_item(rec, "lp.is_solid")
+    assert item["v"] == "true"
+    assert item["q"] == "ok"
+
+
+def test_one_segment_pattern_reports_is_solid_true(monkeypatch):
+    # A single-segment pattern (e.g. one long Dash) renders as a continuous
+    # line -- the real-world "solid" case, since the true built-in Solid
+    # pattern has no LinePatternElement and never reaches this loop at all.
+    rec = _extract_one(monkeypatch, segments=[_Seg(0, 1.0)])
 
     item = _coordination_item(rec, "lp.is_solid")
     assert item["v"] == "true"

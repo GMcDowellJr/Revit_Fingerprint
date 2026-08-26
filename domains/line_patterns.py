@@ -488,13 +488,18 @@ def extract(doc, ctx=None):
         # an identity item's k/q/v into a phase2 bucket for BI convenience.
 
         # is_solid: coordination-only filter criterion (mirrors
-        # fill_patterns.py's is_solid), not identity. Derived from
-        # segment_count == 0, gated on seg_count_q so a genuine zero
-        # (the symbolic solid pattern, per LINE_PATTERN_SYMBOLIC_SOLID) is
-        # never confused with an unreadable segment_count reporting False.
+        # fill_patterns.py's is_solid), not identity. The true built-in Solid
+        # pattern has no LinePatternElement (see line_styles.py's
+        # GetLinePatternId handling) and so never reaches this per-instance
+        # loop at all -- this field can only describe *collected* patterns
+        # that render as solid. Per the documented segment semantics in
+        # tools/label_synthesis/domain_prompts/line_patterns.py ("a
+        # single-segment pattern is a solid line -- no actual dashes"),
+        # that means segment_count of 0 or 1, gated on seg_count_q so an
+        # unreadable segment count reports q=unreadable rather than False.
         if seg_count_q == ITEM_Q_OK:
             try:
-                is_solid_v, is_solid_q = canonicalize_bool(int(seg_count_v) == 0)
+                is_solid_v, is_solid_q = canonicalize_bool(int(seg_count_v) <= 1)
             except Exception:
                 is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
         else:
