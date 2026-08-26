@@ -12,9 +12,11 @@ from typing import Dict, List, Sequence
 
 try:
     from tools.join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate, summarize_shape_gate_usage
+    from tools.discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_and_cap_candidates
     from tools.join_key_discovery.greedy import discover_greedy
 except ModuleNotFoundError:
     from join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate, summarize_shape_gate_usage
+    from discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_and_cap_candidates
     from join_key_discovery.greedy import discover_greedy
 
 
@@ -488,7 +490,9 @@ def main() -> None:
         sample_rate = (float(records_sampled_domain) / float(records_total_domain)) if records_total_domain else 0.0
         sampled_pks = {r.get("record_pk", "").strip() for r in dom_records if r.get("record_pk", "").strip()}
         dom_items_sampled = [it for it in dom_items_all if not sampled_pks or it.get("record_pk", "").strip() in sampled_pks]
-        candidate_fields = _pick_candidate_fields(dom_items_sampled, int(args.max_candidate_fields))
+        candidate_fields_unfiltered = _pick_candidate_fields(dom_items_sampled, 0)
+        candidate_filter = filter_and_cap_candidates(domain, candidate_fields_unfiltered, int(args.max_candidate_fields))
+        candidate_fields = candidate_filter["eligible"]
         domain_has_candidates = bool(candidate_fields)
 
         # Built from the FULL (unsampled) item set, not just the sampled subset: a
@@ -556,8 +560,7 @@ def main() -> None:
                     "sample_seed_arg": str(args.sample_seed),
                     "max_candidate_fields_arg": str(args.max_candidate_fields),
                     "max_k_effective": "",
-                    "candidate_fields_raw": "|".join(candidate_fields),
-                    "candidate_fields_raw_count": str(len(candidate_fields)),
+                    **_candidate_diagnostics(candidate_filter),
                     "scoped_candidates": "|".join(scoped_candidates),
                     "scoped_candidates_count": str(len(scoped_candidates)),
                     "work_candidates": "|".join(work_candidates),
@@ -705,8 +708,7 @@ def main() -> None:
                     "sample_seed_arg": str(args.sample_seed),
                     "max_candidate_fields_arg": str(args.max_candidate_fields),
                     "max_k_effective": str(max_k),
-                    "candidate_fields_raw": "|".join(candidate_fields),
-                    "candidate_fields_raw_count": str(len(candidate_fields)),
+                    **_candidate_diagnostics(candidate_filter),
                     "scoped_candidates": "|".join(scoped_candidates),
                     "scoped_candidates_count": str(len(scoped_candidates)),
                     "work_candidates": "|".join(work_candidates),
@@ -794,9 +796,8 @@ def main() -> None:
                     )
                 partition_pks = {r.get("record_pk", "").strip() for r in partition_records}
                 partition_items = [it for it in partition_items_all if it.get("record_pk", "").strip() in partition_pks]
-                partition_candidates = _without_excluded(
-                    _pick_candidate_fields(partition_items, int(args.max_candidate_fields)), excluded
-                )
+                partition_filter = filter_and_cap_candidates(domain, _pick_candidate_fields(partition_items, 0), int(args.max_candidate_fields))
+                partition_candidates = _without_excluded(partition_filter["eligible"], excluded)
                 domain_has_candidates = domain_has_candidates or bool(partition_candidates)
                 for search_mode in search_modes:
                     cfg = {"max_k": int(args.max_k), "gates": {"discriminator_key": discriminator_key}, "evaluation_mode": "candidate"}
@@ -833,7 +834,7 @@ def main() -> None:
                         "partition_sample_rate": f"{(len(partition_records) / len(partition_records_all)) if partition_records_all else 0.0:.6f}",
                         "sample_size_arg": str(args.sample_size), "sample_seed_arg": str(args.sample_seed),
                         "max_candidate_fields_arg": str(args.max_candidate_fields), "max_k_effective": str(args.max_k),
-                        "candidate_fields_raw": "|".join(partition_candidates), "candidate_fields_raw_count": str(len(partition_candidates)),
+                        **_candidate_diagnostics(partition_filter),
                         "scoped_candidates": "|".join(partition_candidates), "scoped_candidates_count": str(len(partition_candidates)),
                         "work_candidates": "|".join(partition_candidates), "work_candidates_count": str(len(partition_candidates)),
                         "candidate_fields_available": "|".join(partition_candidates), "candidate_fields_evaluated": "|".join(partition_candidates),
@@ -945,7 +946,9 @@ def main() -> None:
     fields = [
         "domain", "policy_mode", "search_mode", "status", "reason",
         "records_total_domain", "records_sampled_domain", "sample_rate", "records_total_partition", "records_sampled_partition", "partition_sample_rate", "sample_size_arg", "sample_seed_arg", "max_candidate_fields_arg", "max_k_effective",
-        "candidate_fields_raw", "candidate_fields_raw_count", "scoped_candidates", "scoped_candidates_count", "work_candidates", "work_candidates_count",
+        "candidate_fields_raw", "candidate_fields_raw_count", "candidate_fields_excluded", "candidate_fields_excluded_count",
+        "candidate_fields_alias_suppressed", "candidate_fields_alias_suppressed_count", "candidate_fields_eligible", "candidate_fields_eligible_count",
+        "scoped_candidates", "scoped_candidates_count", "work_candidates", "work_candidates_count",
         "candidate_fields_available", "candidate_fields_evaluated", "effective_fields_actually_scored",
         "policy_required_fields", "policy_optional_fields", "policy_excluded_fields", "discriminator_key", "discriminator_source", "discriminator_value", "mode", "result_scope",
         "selected_fields", "coverage", "collision_rate", "fragmentation_rate",

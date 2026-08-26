@@ -86,9 +86,11 @@ from typing import Dict, List, Optional, Sequence
 
 try:
     from tools.discover_join_policy import _pick_candidate_fields, _read_csv, _write_csv
+    from tools.discovery_candidate_eligibility import filter_and_cap_candidates
     from tools.join_key_discovery.eval import normalize_policy_block
 except ModuleNotFoundError:
     from discover_join_policy import _pick_candidate_fields, _read_csv, _write_csv
+    from discovery_candidate_eligibility import filter_and_cap_candidates
     from join_key_discovery.eval import normalize_policy_block
 
 
@@ -140,7 +142,9 @@ def compute_domain_stats(
     # validate pool size as a true deduplicated union against required/
     # optional field names, instead of a pessimistic arithmetic sum.
     dom_items = [it for it in items if it.get("domain", "") == domain]
-    candidate_field_names_ranked = _pick_candidate_fields(dom_items, 0)
+    candidate_field_names_ranked = filter_and_cap_candidates(
+        domain, _pick_candidate_fields(dom_items, 0), 0
+    )["eligible"]
     return {
         "records_total_domain": n,
         "distinct_sig_hash_groups": g,

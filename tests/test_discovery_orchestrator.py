@@ -52,6 +52,7 @@ def fixture_inputs(tmp_path: Path):
     _write(records/"identity_items.csv",["domain","record_pk","item_key","item_value"],[{"domain":"walls","record_pk":"1","item_key":"x","item_value":"1"}])
     for name in ("domain_join_key_policies.json","domain_sig_hash_policies.json"):
         p=repo/"policies"/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(json.dumps({"domains":{"walls":{"required_fields":["x"]}}}))
+    (repo/"policies"/"discovery_candidate_eligibility.json").write_text(json.dumps({"schema_version":"1.0","global":{},"domains":{"walls":{}}}))
     return exports,repo,records
 
 
@@ -64,7 +65,7 @@ def test_fingerprint_is_deterministic_and_csv_order_independent(tmp_path):
     assert input_fingerprint(records,policy,"walls","join","discover","greedy","__all__",params)==a
 
 
-@pytest.mark.parametrize("mutation",["data","policy","parameter","version"])
+@pytest.mark.parametrize("mutation",["data","policy","eligibility","parameter","version"])
 def test_result_affecting_changes_invalidate_fingerprint(tmp_path, mutation):
     exports,repo,records=fixture_inputs(tmp_path);policy=repo/"policies/domain_join_key_policies.json"
     params={"sample_size":2,"sample_seed":17,"stratify_by":"","max_candidate_fields":4,"effective_max_k":2}
@@ -73,6 +74,7 @@ def test_result_affecting_changes_invalidate_fingerprint(tmp_path, mutation):
     if mutation=="data":
         with (records/"records.csv").open("a") as f:f.write("walls,3,c\n")
     elif mutation=="policy": policy.write_text(json.dumps({"domains":{"walls":{"required_fields":["y"]}}}))
+    elif mutation=="eligibility": (repo/"policies"/"discovery_candidate_eligibility.json").write_text(json.dumps({"schema_version":"1.0","global":{"excluded_candidates":[{"item":"x"}]},"domains":{"walls":{}}}))
     elif mutation=="parameter": params={**params,"sample_size":1}
     else: version="next"
     assert input_fingerprint(records,policy,"walls","join","validate","greedy","__all__",params,version)!=a
@@ -98,12 +100,13 @@ def test_canonical_json_ignores_mapping_order():
     assert canonical_json({"b":2,"a":1})==canonical_json({"a":1,"b":2})
 
 
-def test_partial_without_baseline_is_blocked(tmp_path):
+def test_partial_without_baseline_is_allowed(tmp_path):
     exports,repo,_=fixture_inputs(tmp_path)
     suggestions=exports/"diagnostics/discovery_param_suggestions.csv"
     _write(suggestions,["domain","suggested_sample_size","suggested_max_candidate_fields","suggested_max_k_discover","suggested_max_k_harsh_validate","stratify_by_recommended"],[{"domain":"walls","suggested_sample_size":"2","suggested_max_candidate_fields":"2","suggested_max_k_discover":"1","suggested_max_k_harsh_validate":"1","stratify_by_recommended":""}])
     cfg=Config(exports,repo,suggestions,["walls"],what_if=True)
-    with pytest.raises(RuntimeError,match="initial full summary"):Orchestrator(cfg).run_sweep()
+    plan = Orchestrator(cfg).run_sweep()
+    assert plan["requested_domains"] == ["walls"]
 
 
 def test_force_is_preserved_in_shared_config(tmp_path):

@@ -39,8 +39,10 @@ to each shell. Skipping both targets is rejected as an invalid no-op sweep.
 
 ## Execution model
 
-An initial run must be a full sweep. A partial run is rejected until a prior
-new-format full snapshot exists. Every policy stage starts with Greedy. Pareto
+The first run may target one domain or any comma-separated subset with
+`--domains`; it does not require a prior full-domain snapshot. A later partial
+run carries forward any domains present in the latest snapshot and adds or
+refreshes the requested subset. Every policy stage starts with Greedy. Pareto
 runs only when Greedy fails the strict gate: status `ok`, full coverage 1.0,
 zero full collision and fragmentation, and no sample/full divergence. Discover
 and validate run normally; harsh runs only when validate fails that same gate.
@@ -95,7 +97,8 @@ exception text when a failed requested refresh retains prior evidence.
 
 The versioned JSON manifest uses deterministic SHA-256 fingerprints over
 domain-scoped records/items, the relevant governed policy block, target,
-policy/search mode, shape gate, sampling and search parameters, mandatory full
+policy/search mode, shape gate, the global and domain-specific discovery
+candidate eligibility rules, sampling and search parameters, mandatory full
 verification, and the discovery engine semantic version. Canonical JSON makes
 mapping order irrelevant. Only entries with result status `ok` are reused.
 An `ok` status is not sufficient by itself: every shape-gate row must also pass
@@ -105,7 +108,8 @@ Accepted Pareto evidence is cached independently; an unchanged rerun still
 executes a non-accepted Greedy search to establish escalation, but can reuse the
 accepted Pareto result instead of repeating that expensive search.
 Policy, data, parameter, target/mode/gate, or engine-version changes invalidate
-the relevant entry; `--force` bypasses it.
+the relevant entry; eligibility-registry changes invalidate affected domains
+without requiring a manual engine-version bump. `--force` bypasses the cache.
 
 `DISCOVERY_ENGINE_VERSION` is defined in `tools/discovery_orchestrator.py`.
 Bump it whenever discovery inputs, evaluation behavior, acceptance logic, or
@@ -113,8 +117,9 @@ other result-affecting orchestration semantics change. Do not bump it for a
 documentation-only change.
 
 The candidate/runtime scoring separation changed result-affecting evaluation
-semantics, so its sweep cache contract is `discovery-sweep-v3`. Evidence cached
-under v2 cannot be reused for the corrected discovery results.
+semantics, and candidate eligibility is now applied before the field cap, so
+the sweep cache contract is `discovery-sweep-v4`. Evidence cached under older
+versions cannot be reused for corrected discovery results.
 
 WhatIf computes the plan without publishing summaries or cache changes. It
 reports requested domains, likely fingerprint-verified cache hits, initial
