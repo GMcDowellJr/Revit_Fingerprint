@@ -18,6 +18,7 @@ import tempfile
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from queue import Empty, Queue
 from collections import Counter
 from dataclasses import dataclass
@@ -33,6 +34,29 @@ CACHE_SCHEMA_VERSION = 1
 SUMMARY_SCHEMA_VERSION = 1
 POLICY_MODES = ("discover", "validate", "harsh")
 TARGETS = ("join", "sig")
+DEFAULT_WORKERS = 4
+# ThreadPoolExecutor raises ValueError when max_workers > 61 on Windows
+# (WaitForMultipleObjects handle-count limit) -- mirrors
+# compare_cross_segment.py::resolve_worker_count()'s _WIN32_MAX_WORKERS cap;
+# not imported from there since that module is protected and this is a
+# small, stable, single-purpose utility not worth a shared-module extraction.
+_WIN32_MAX_WORKERS = 61
+
+
+def resolve_worker_count(value: str, headroom: int = 2) -> int:
+    """Resolve --workers, accepting either an int or the literal string 'auto'.
+
+    'auto' derives a single-layer worker count from available logical cores
+    minus headroom -- the sweep's ThreadPoolExecutor is not nested inside
+    another worker pool, so there is no second layer to coordinate against.
+    """
+    if str(value).strip().lower() == "auto":
+        cpu_count = os.cpu_count()
+        workers = max(1, cpu_count - headroom) if cpu_count else DEFAULT_WORKERS
+        if sys.platform == "win32":
+            workers = min(workers, _WIN32_MAX_WORKERS)
+        return workers
+    return int(value)
 SUMMARY_FIELDS = [
     "summary_timestamp", "domain", "target", "shape_gate", "decision_status",
     "decision_reason", "governance_status", "discover_selected_fields",
@@ -215,6 +239,7 @@ class Config:
     what_if: bool = False
     run: bool = False
     engine_version: str = DISCOVERY_ENGINE_VERSION
+    workers: int = DEFAULT_WORKERS
 
 
 class Orchestrator:
@@ -228,22 +253,33 @@ class Orchestrator:
                              "sig": cfg.repo_root / "policies/domain_sig_hash_policies.json"}
         self.eligibility_path = cfg.repo_root / "policies/discovery_candidate_eligibility.json"
         self._file_domain_hashes: dict[Path, dict[str, str]] = {}
+        # Concurrent (target, domain) units can share a source CSV (records.csv
+        # is common to every domain) or each own a distinct one (sharded
+        # identity_items_by_domain/<domain>.csv). A single global lock would
+        # needlessly serialize the common case that parallelization is meant to
+        # speed up, so lock per resolved path instead; this tiny guard lock only
+        # protects creation of those per-path locks, never the scan itself.
+        self._file_domain_hashes_locks: dict[Path, threading.Lock] = {}
+        self._file_domain_hashes_locks_guard = threading.Lock()
 
     def _hashes_by_domain(self, path: Path) -> dict[str, str]:
         """Scan a large CSV once and retain compact, order-independent domain hashes."""
         path = path.resolve()
-        if path not in self._file_domain_hashes:
-            started = time.monotonic()
-            print(f"[sweep] fingerprint scan START {path}", flush=True)
-            row_hashes: dict[str, list[str]] = {}
-            for row in iter_csv(path):
-                domain = row.get("domain", "")
-                row_hashes.setdefault(domain, []).append(hashlib.sha256(canonical_json(row)).hexdigest())
-            self._file_domain_hashes[path] = {
-                domain: sha256_value(sorted(hashes)) for domain, hashes in row_hashes.items()
-            }
-            print(f"[sweep] fingerprint scan DONE ({int(time.monotonic() - started)}s) {path}", flush=True)
-        return self._file_domain_hashes[path]
+        with self._file_domain_hashes_locks_guard:
+            lock = self._file_domain_hashes_locks.setdefault(path, threading.Lock())
+        with lock:
+            if path not in self._file_domain_hashes:
+                started = time.monotonic()
+                print(f"[sweep] fingerprint scan START {path}", flush=True)
+                row_hashes: dict[str, list[str]] = {}
+                for row in iter_csv(path):
+                    domain = row.get("domain", "")
+                    row_hashes.setdefault(domain, []).append(hashlib.sha256(canonical_json(row)).hexdigest())
+                self._file_domain_hashes[path] = {
+                    domain: sha256_value(sorted(hashes)) for domain, hashes in row_hashes.items()
+                }
+                print(f"[sweep] fingerprint scan DONE ({int(time.monotonic() - started)}s) {path}", flush=True)
+            return self._file_domain_hashes[path]
 
     def _fingerprint_domain_data(self, domain: str, target: str) -> dict[str, str]:
         paths = [self.records / "records.csv"]
@@ -509,6 +545,62 @@ class Orchestrator:
             "warnings": [r.get("refresh_error", "") for r in rows if r.get("refresh_error")],
         }
 
+    def _process_unit(self, target: str, domain: str, ts: str, base_entries: dict,
+                      prior_rows: list[dict], suggestions_row: Mapping[str, str]) -> dict:
+        """Run one (target, domain)'s discover->validate->[harsh] sequence.
+
+        Runs on a private cache view seeded from ``base_entries`` -- a frozen
+        snapshot taken once before any unit is dispatched -- so this never reads
+        or writes the shared cache dict directly; concurrent units (disjoint
+        cache keys per domain+target, see ``cache_key``) cannot interfere with
+        each other. The caller (run_sweep's as_completed loop, single-threaded)
+        commits this unit's ``new_cache_entries`` into the shared cache and
+        extends ``new_by_target`` with its ``rows`` after this returns -- the
+        only two pieces of state this whole sweep shares across (target, domain)
+        units. On failure, ``new_cache_entries`` is empty, so a failed run's
+        stage-level cache writes never reach the shared cache (equivalent to the
+        prior discard-by-run_id behavior, but by simply never propagating them).
+        """
+        rid = f"{ts}-{domain}-{uuid.uuid4().hex[:8]}"; final_dir = self.root / "domains" / domain / rid
+        temp_dir = final_dir.with_name(final_dir.name + ".tmp"); temp_dir.mkdir(parents=True)
+        local_cache = {"entries": dict(base_entries)}
+        policy_block, policy_hash = _policy_block(self.policy_paths[target], domain)
+        eligibility_hash = hashlib.sha256(self.eligibility_path.read_bytes()).hexdigest() if self.eligibility_path.exists() else "missing"
+        manifest = {"schema_version": 1, "run_id": rid, "timestamp": ts, "domain": domain, "requested_targets": [target],
+                    "commands_executed": [], "stages_skipped": [], "input_fingerprints": {},
+                    "policy_file_identifiers": {str(self.policy_paths[target]): policy_hash, str(self.eligibility_path): eligibility_hash},
+                    "parameters": {}, "discovery_engine_version": self.cfg.engine_version, "source_suggestions_row": suggestions_row,
+                    "result_files": [], "logs": [], "warnings": [], "final_status": "running"}
+        try:
+            rows=[]; stage_provenance=[]; fps=[]
+            for mode in ("discover","validate"):
+                params=self._params(suggestions_row,mode); manifest["parameters"][mode]=params
+                rs,sources,fp=self._stage(target,domain,mode,params,temp_dir,local_cache,manifest); rows+=rs;stage_provenance+=sources;fps.append(fp)
+            if not all_shape_gates_accepted(rows,"validate"):
+                params=self._params(suggestions_row,"harsh"); manifest["parameters"]["harsh"]=params
+                rs,sources,fp=self._stage(target,domain,"harsh",params,temp_dir,local_cache,manifest);rows+=rs;stage_provenance+=sources;fps.append(fp)
+            else: manifest["stages_skipped"].append({"stage":"harsh/*","reason":"validate_acceptance_gate_satisfied"})
+            # Paths were recorded while evidence was in its temporary sibling.
+            manifest=json.loads(json.dumps(manifest).replace(str(temp_dir),str(final_dir)))
+            stage_provenance=json.loads(json.dumps(stage_provenance).replace(str(temp_dir),str(final_dir)))
+            for entry in local_cache["entries"].values():
+                if entry.get("result_run_id")==rid:
+                    entry["result_path"]=str(entry.get("result_path","")).replace(str(temp_dir),str(final_dir))
+            manifest["final_status"]="ok"; atomic_json(temp_dir/"run_manifest.json",manifest); os.replace(temp_dir,final_dir)
+            new_cache_entries = {k: v for k, v in local_cache["entries"].items() if v.get("result_run_id") == rid}
+            summary_rows = self._summarize(target,domain,rows,ts,rid,final_dir,sha256_value(sorted(fps)),stage_provenance)
+            return {"target": target, "domain": domain, "rows": summary_rows, "new_cache_entries": new_cache_entries}
+        except Exception as exc:
+            manifest=json.loads(json.dumps(manifest).replace(str(temp_dir),str(final_dir)))
+            manifest["final_status"]="blocked";manifest["warnings"].append(str(exc));atomic_json(temp_dir/"run_manifest.json",manifest);os.replace(temp_dir,final_dir)
+            old=[dict(r) for r in prior_rows if r["domain"]==domain]
+            if old:
+                for r in old:r.update(summary_timestamp=ts,result_provenance_status="blocked_refresh_previous_retained",refresh_attempted="true",refresh_status="blocked",refresh_error=str(exc))
+                rows_out=old
+            else:
+                rows_out=[{"summary_timestamp":ts,"domain":domain,"target":target,"shape_gate":"__all__","decision_status":"blocked","decision_reason":str(exc),"governance_status":"unratified","result_provenance_status":"fresh","domain_result_timestamp":ts,"run_id":rid,"source_run_id":rid,"source_evidence_path":str(final_dir),"refresh_attempted":"true","refresh_status":"blocked","refresh_error":str(exc),"discovery_engine_version":self.cfg.engine_version}]
+            return {"target": target, "domain": domain, "rows": rows_out, "new_cache_entries": {}}
+
     def run_sweep(self) -> dict:
         if self.cfg.skip_join and self.cfg.skip_sig:
             raise ValueError("--skip-join and --skip-sig cannot be used together")
@@ -547,42 +639,25 @@ class Orchestrator:
                 if old["domain"] not in requested_set:
                     old=dict(old); old.update(summary_timestamp=ts,result_provenance_status="carried_forward",refresh_attempted="false",refresh_status="not_requested")
                     new_by_target[target].append(old)
-            for domain in requested:
-                rid=f"{ts}-{domain}-{uuid.uuid4().hex[:8]}"; final_dir=self.root/"domains"/domain/rid
-                temp_dir=final_dir.with_name(final_dir.name+".tmp"); temp_dir.mkdir(parents=True)
-                policy_block, policy_hash=_policy_block(self.policy_paths[target],domain)
-                eligibility_hash = hashlib.sha256(self.eligibility_path.read_bytes()).hexdigest() if self.eligibility_path.exists() else "missing"
-                manifest={"schema_version":1,"run_id":rid,"timestamp":ts,"domain":domain,"requested_targets":[target],"commands_executed":[],"stages_skipped":[],"input_fingerprints":{},"policy_file_identifiers":{str(self.policy_paths[target]):policy_hash,str(self.eligibility_path):eligibility_hash},"parameters":{},"discovery_engine_version":self.cfg.engine_version,"source_suggestions_row":by_domain[domain],"result_files":[],"logs":[],"warnings":[],"final_status":"running"}
-                try:
-                    rows=[]; stage_provenance=[]; fps=[]
-                    for mode in ("discover","validate"):
-                        params=self._params(by_domain[domain],mode); manifest["parameters"][mode]=params
-                        rs,sources,fp=self._stage(target,domain,mode,params,temp_dir,cache,manifest); rows+=rs;stage_provenance+=sources;fps.append(fp)
-                    if not all_shape_gates_accepted(rows,"validate"):
-                        params=self._params(by_domain[domain],"harsh"); manifest["parameters"]["harsh"]=params
-                        rs,sources,fp=self._stage(target,domain,"harsh",params,temp_dir,cache,manifest);rows+=rs;stage_provenance+=sources;fps.append(fp)
-                    else: manifest["stages_skipped"].append({"stage":"harsh/*","reason":"validate_acceptance_gate_satisfied"})
-                    # Paths were recorded while evidence was in its temporary sibling.
-                    manifest=json.loads(json.dumps(manifest).replace(str(temp_dir),str(final_dir)))
-                    stage_provenance=json.loads(json.dumps(stage_provenance).replace(str(temp_dir),str(final_dir)))
-                    for entry in cache["entries"].values():
-                        if entry.get("result_run_id")==rid:
-                            entry["result_path"]=str(entry.get("result_path","")).replace(str(temp_dir),str(final_dir))
-                    manifest["final_status"]="ok"; atomic_json(temp_dir/"run_manifest.json",manifest); os.replace(temp_dir,final_dir)
-                    new_by_target[target]+=self._summarize(target,domain,rows,ts,rid,final_dir,sha256_value(sorted(fps)),stage_provenance)
-                except Exception as exc:
-                    # A later-stage failure invalidates this domain run as a cache
-                    # source. Discard every entry created by its earlier stages so
-                    # no manifest path can continue pointing at the renamed .tmp tree.
-                    self._discard_run_cache_entries(cache, rid)
-                    manifest=json.loads(json.dumps(manifest).replace(str(temp_dir),str(final_dir)))
-                    manifest["final_status"]="blocked";manifest["warnings"].append(str(exc));atomic_json(temp_dir/"run_manifest.json",manifest);os.replace(temp_dir,final_dir)
-                    old=[dict(r) for r in prior_rows if r["domain"]==domain]
-                    if old:
-                        for r in old:r.update(summary_timestamp=ts,result_provenance_status="blocked_refresh_previous_retained",refresh_attempted="true",refresh_status="blocked",refresh_error=str(exc))
-                        new_by_target[target]+=old
-                    else:
-                        new_by_target[target].append({"summary_timestamp":ts,"domain":domain,"target":target,"shape_gate":"__all__","decision_status":"blocked","decision_reason":str(exc),"governance_status":"unratified","result_provenance_status":"fresh","domain_result_timestamp":ts,"run_id":rid,"source_run_id":rid,"source_evidence_path":str(final_dir),"refresh_attempted":"true","refresh_status":"blocked","refresh_error":str(exc),"discovery_engine_version":self.cfg.engine_version})
+        # Each (target, domain) pair owns its own rid/temp_dir/manifest and a
+        # disjoint slice of cache keys (see cache_key), so the whole pair is the
+        # unit of parallelism; only its own internal discover->validate->harsh
+        # escalation stays sequential (inside _process_unit). Workers read from
+        # a frozen pre-dispatch snapshot of the cache and return their results
+        # for the (single-threaded) as_completed loop below to commit -- no
+        # worker ever touches the shared `cache` or `new_by_target` directly.
+        units=[(target,domain) for target in targets for domain in requested]
+        base_entries=dict(cache["entries"])
+        print(f"[sweep] dispatching {len(units)} (target, domain) unit(s) across {self.cfg.workers} worker(s)", flush=True)
+        with ThreadPoolExecutor(max_workers=self.cfg.workers) as executor:
+            futures={
+                executor.submit(self._process_unit,target,domain,ts,base_entries,prior[target][1],by_domain[domain]):(target,domain)
+                for target,domain in units
+            }
+            for future in as_completed(futures):
+                result=future.result()
+                cache["entries"].update(result["new_cache_entries"])
+                new_by_target[result["target"]]+=result["rows"]
         # Validate everything before publishing anything.
         for target, rows in new_by_target.items():
             keys=[(r.get("domain"),r.get("target"),r.get("shape_gate") or "__all__") for r in rows]
@@ -611,11 +686,12 @@ def build_parser() -> argparse.ArgumentParser:
     p=argparse.ArgumentParser(description="Run staged, cache-aware JoinKey/SigHash discovery")
     p.add_argument("--exports-root",default="Fingerprint_Data");p.add_argument("--repo-root",default=str(Path(__file__).resolve().parents[1]));p.add_argument("--suggestions-csv")
     p.add_argument("--domains");p.add_argument("--skip-join",action="store_true");p.add_argument("--skip-sig",action="store_true");p.add_argument("--force",action="store_true");p.add_argument("--what-if",action="store_true");p.add_argument("--run",action="store_true")
+    p.add_argument("--workers",default=str(DEFAULT_WORKERS),help="Parallel (target, domain) workers, or 'auto' (cpu_count - 2, capped at 61 on Windows)")
     return p
 
 
 def config_from_args(ns: argparse.Namespace) -> Config:
-    exports=Path(ns.exports_root).resolve(); return Config(exports,Path(ns.repo_root).resolve(),Path(ns.suggestions_csv).resolve() if ns.suggestions_csv else exports/"diagnostics/discovery_param_suggestions.csv",[x.strip() for x in ns.domains.split(",") if x.strip()] if ns.domains else None,ns.skip_join,ns.skip_sig,ns.force,ns.what_if,ns.run)
+    exports=Path(ns.exports_root).resolve(); return Config(exports,Path(ns.repo_root).resolve(),Path(ns.suggestions_csv).resolve() if ns.suggestions_csv else exports/"diagnostics/discovery_param_suggestions.csv",[x.strip() for x in ns.domains.split(",") if x.strip()] if ns.domains else None,ns.skip_join,ns.skip_sig,ns.force,ns.what_if,ns.run,workers=resolve_worker_count(ns.workers))
 
 
 def main(argv: list[str] | None=None) -> int:
