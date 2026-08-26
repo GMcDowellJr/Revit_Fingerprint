@@ -11,6 +11,8 @@ from core.hashing import make_hash
 from core.record_v2 import ITEM_Q_OK, ITEM_Q_MISSING, make_identity_item, serialize_identity_items
 from core.join_key_builder import build_join_key_from_policy
 from core.join_key_policy import load_join_key_policies, get_domain_join_key_policy
+from core.sig_hash_builder import build_sig_hash_from_policy
+from core.sig_hash_policy import load_sig_hash_policies, get_domain_sig_hash_policy
 from domains.arrowheads import (
     _build_common_identity_items,
     _build_arrow_identity_items,
@@ -293,3 +295,29 @@ def test_join_key_keys_used_and_hash_for_arrow_style():
     join_preimage = serialize_identity_items([it for it in items if it["k"] in jk["keys_used"]])
     assert join_hash == make_hash(join_preimage)
     assert join_hash != sig_hash
+
+
+def test_analysis_side_sig_hash_matches_inline_extractor_for_every_style_bucket(monkeypatch):
+    # D-049 P1 fix (Codex review finding on the D-049 PR): once extract()
+    # started emitting all five style-specific fields unconditionally,
+    # core/sig_hash_builder.py's analysis-side sig_hash stage
+    # (tools/run_extract_all.py's `sig_hash` stage, used post-flatten) would
+    # have started hashing them in for non-owning buckets too, since it
+    # only ever checked allowed_items membership -- silently diverging from
+    # the inline extractor's own hash for every SizeOnly/Unknown record.
+    # policies/domain_sig_hash_policies.json's arrowheads.shape_gating now
+    # sets applies_to_sig_hash: true so build_sig_hash_from_policy() applies
+    # the same bucket-ownership filter. This proves the two computations
+    # stay byte-identical across every record class.
+    policies = load_sig_hash_policies("policies/domain_sig_hash_policies.json")
+    pol = get_domain_sig_hash_policy(policies, "arrowheads")
+
+    for style in ("Arrow", "Heavy end tick mark", "Dot", "SomeFutureUnknownStyle"):
+        rec = _extract_one(monkeypatch, style, _ALL_STYLE_SPECIFIC_PARAMS)
+        analysis_sig_hash, _status, _reasons, hash_items = build_sig_hash_from_policy(
+            domain_policy=pol, items=rec["identity_basis"]["items"]
+        )
+        assert analysis_sig_hash == rec["sig_hash"], "style={!r} sig_hash diverged".format(style)
+        assert sorted(it["k"] for it in hash_items) == rec["sig_basis"]["keys_used"], (
+            "style={!r} keys_used diverged".format(style)
+        )

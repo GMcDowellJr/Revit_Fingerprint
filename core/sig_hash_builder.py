@@ -35,6 +35,61 @@ def _key_allowed(k: str, allowed: Sequence[str], prefixes: Sequence[str]) -> boo
     return False
 
 
+def _shape_gated_hash_keys(
+    shape_gating: Optional[Dict[str, Any]],
+    kmap: Dict[str, Dict[str, Any]],
+) -> Tuple[frozenset, frozenset]:
+    """Resolve (gated_keys, owned_keys) for a domain policy's `shape_gating` block.
+
+    `gated_keys` is the union of every shape's `additional_required` +
+    `additional_optional` across the whole `shape_requirements` map --
+    i.e. every key whose hash participation depends on which shape this
+    specific record is. `owned_keys` is the subset of those actually owned
+    by *this* record's own shape (resolved from `kmap` via
+    `discriminator_key`); empty if the shape doesn't match any entry
+    (`default_shape_behavior: "common_only"` is the only mode this builder
+    understands -- "block" is not implemented here since it's out of scope
+    for D-049's fix).
+
+    Only consulted when the policy opts in via
+    `shape_gating.applies_to_sig_hash: true` (see D-049) -- this mirrors,
+    for the analysis-side hash reconstruction, the same per-record
+    bucket-ownership filter `domains/arrowheads.py`'s inline extractor
+    already applies via its own `hash_bucket_keys`. Domains whose policy
+    doesn't opt in (e.g. `identity`, whose `shape_gating` remains
+    informational/discovery-only per its own policy notes) are completely
+    unaffected -- this function returns `(frozenset(), frozenset())` for
+    them, a no-op against `_key_allowed()`'s existing behavior.
+    """
+    if not isinstance(shape_gating, dict) or not shape_gating.get("applies_to_sig_hash"):
+        return frozenset(), frozenset()
+
+    shape_requirements = shape_gating.get("shape_requirements")
+    if not isinstance(shape_requirements, dict):
+        return frozenset(), frozenset()
+
+    gated_keys = set()
+    for req in shape_requirements.values():
+        if not isinstance(req, dict):
+            continue
+        gated_keys.update(k for k in (req.get("additional_required") or []) if isinstance(k, str))
+        gated_keys.update(k for k in (req.get("additional_optional") or []) if isinstance(k, str))
+
+    owned_keys = set()
+    disc_key = shape_gating.get("discriminator_key")
+    if isinstance(disc_key, str):
+        disc_item = kmap.get(disc_key)
+        disc_v = disc_item.get("v") if isinstance(disc_item, dict) else None
+        disc_q = disc_item.get("q") if isinstance(disc_item, dict) else None
+        if disc_q == ITEM_Q_OK and disc_v is not None:
+            shape_req = shape_requirements.get(str(disc_v).strip())
+            if isinstance(shape_req, dict):
+                owned_keys.update(k for k in (shape_req.get("additional_required") or []) if isinstance(k, str))
+                owned_keys.update(k for k in (shape_req.get("additional_optional") or []) if isinstance(k, str))
+
+    return frozenset(gated_keys), frozenset(owned_keys)
+
+
 def build_sig_hash_from_policy(
     *,
     domain_policy: Dict[str, Any],
@@ -50,6 +105,18 @@ def build_sig_hash_from_policy(
     q=ok also degrades status (never blocks) -- an incomplete item that
     contributes to the hash must not be silently invisible to the record's
     reported status.
+
+    If the policy's `shape_gating` block sets `applies_to_sig_hash: true`,
+    an `allowed_items` key that's also one of shape_gating's per-shape
+    `additional_required`/`additional_optional` keys only feeds the hash
+    when it's owned by *this* record's own shape (see
+    `_shape_gated_hash_keys()`). This exists so a domain like `arrowheads`
+    -- whose extractor now emits every style-specific field unconditionally
+    into `identity_basis.items` (D-049), regardless of style bucket -- gets
+    the same per-record bucket-gating applied here that the inline
+    extractor already applies to its own hash, keeping this analysis-side
+    reconstruction consistent with the extractor's inline `sig_hash` value.
+    Policies that don't set this flag (the default) are unaffected.
     """
     pol = domain_policy or {}
     allowed = list(pol.get("allowed_items") or [])
@@ -62,13 +129,25 @@ def build_sig_hash_from_policy(
     reasons = sorted({str(x) for x in (status_reasons or []) if str(x)})
     kmap = _items_to_map(src_items or [])
 
+    # D-049: a policy that opts in via shape_gating.applies_to_sig_hash further
+    # restricts which allowed_items actually feed the hash for THIS record,
+    # based on its own discriminator value -- see _shape_gated_hash_keys().
+    # A key in gated_keys but not in owned_keys is allowed_items-eligible but
+    # not owned by this record's shape, so it's excluded from hash_items
+    # entirely (not merely hashed with its q, since it was never meant to
+    # participate for this shape at all).
+    gated_keys, owned_keys = _shape_gated_hash_keys(pol.get("shape_gating"), kmap)
+
     hash_items: List[Dict[str, Any]] = []
     for it in src_items or []:
         if not isinstance(it, dict):
             continue
         k = it.get("k")
-        if isinstance(k, str) and _key_allowed(k, allowed, prefixes):
-            hash_items.append({"k": k, "q": it.get("q"), "v": it.get("v")})
+        if not isinstance(k, str) or not _key_allowed(k, allowed, prefixes):
+            continue
+        if k in gated_keys and k not in owned_keys:
+            continue
+        hash_items.append({"k": k, "q": it.get("q"), "v": it.get("v")})
 
     required_qs: List[str] = []
     required_not_ok: List[str] = []

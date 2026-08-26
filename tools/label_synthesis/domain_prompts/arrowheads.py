@@ -38,36 +38,42 @@ Arrowheads fall into three record classes based on their style. The identity ite
 you're shown below are only the ones that read as present for THIS record (fields
 that aren't applicable to a given style's UI usually come back unset for that
 style, and are filtered out before you see them) — a sparse list is normal, not
-missing data. Occasionally a style-specific field reads as genuinely present
-outside its usual class (e.g. fill_tick has been observed to vary on some Dot
-types); when that happens it's real data and worth naming on, even though it
-still isn't part of that style's join key.
+missing data.
+
+IMPORTANT: name only on fields that are part of the style's join key (see each
+CLASS below). You are shown identity items from a single representative record
+for this join key, chosen arbitrarily from potentially many records that share
+it. A field that ISN'T part of the join key (see CLASS 3 note below) can differ
+across other records sharing the same join key without you ever seeing them —
+naming off it would mislabel records that don't actually share that value.
 
 CLASS 1 — Arrow
   Style: "Arrow"
   Identity items: style + tick_size_in + width_angle_deg + fill_tick + arrow_closed
-  These are true geometric arrows. Naming is style-first, then fill state and angle
-  when they differentiate.
+  All five are part of this style's join key. These are true geometric arrows.
+  Naming is style-first, then fill state and angle when they differentiate.
 
 CLASS 2 — Heavy end tick mark
   Style: "Heavy end tick mark"
   Identity items: style + tick_size_in + tick_mark_centered + heavy_end_pen_weight
-  A bold diagonal tick used in structural dimension conventions.
+  All four are part of this style's join key. A bold diagonal tick used in
+  structural dimension conventions.
   Naming: "Tick", "Heavy Tick", "Structural Tick", or with size (e.g. "Tick 1/8").
 
 CLASS 3 — SizeOnly
   Styles: "Dot", "Diagonal", "Box", "Loop", "Elevation Target", "Datum triangle"
-  Identity items you'll normally use: style + tick_size_in. The other fields
-  (width_angle_deg/fill_tick/arrow_closed/tick_mark_centered/heavy_end_pen_weight)
-  are always present but usually read as missing/unset for these styles — that's
-  expected, not an error. Occasionally one genuinely varies (fill_tick is
-  confirmed to vary on some Dot types, e.g. an observed "Dot Filled-Small" type) —
-  when a field shows up with a real value for a SizeOnly record, treat it as a
-  legitimate differentiator for naming, even though it is not part of this
-  style's join key. The join key for each is still fully defined by style + size.
-  Two Dots at different sizes are distinct patterns; two Dots at the same size
-  with different names are the same governance pattern. Name by style + size,
-  adding a genuinely-present differentiator (like "Filled") when it helps.
+  Only style + tick_size_in are part of this style's join key, so those are the
+  only fields shown to you below for these styles — this is complete and
+  correct, not missing data. (The other fields -- width_angle_deg/fill_tick/
+  arrow_closed/tick_mark_centered/heavy_end_pen_weight -- are still read and
+  stored on the record at extraction time, and at least fill_tick is confirmed
+  to genuinely vary on some Dot types, e.g. an observed "Dot Filled-Small"
+  type -- but none of that is part of this style's join key, and you're only
+  ever shown one arbitrarily-chosen representative record for it, so it's
+  deliberately withheld from you here rather than risk you naming the whole
+  group after one record's non-representative reading.) Two Dots at different
+  sizes are distinct patterns; two Dots at the same size are the same
+  governance pattern. Name by style + size only.
 
 # KEY PARAMETERS
 
@@ -91,11 +97,12 @@ arrowhead.width_angle_deg  [normally Arrow class]
   Narrow angles (15°–20°) are slender/precise; wide angles (45°+) are bold.
   Include angle only when it differentiates patterns in the corpus.
 
-arrowhead.fill_tick  [normally Arrow class, but confirmed to also appear on Dot]
+arrowhead.fill_tick  [Arrow class join key only]
   true = filled (solid), false = open.
   For Arrow class, this is a primary discriminator: "Filled Arrow" vs "Open Arrow".
-  When it appears with a real value outside Arrow class (e.g. on a Dot), treat it
-  the same way: "Filled Dot" vs plain "Dot".
+  It has been observed with a real value outside Arrow class too (e.g. on a Dot),
+  but it is NOT part of any other style's join key, so you won't be shown it for
+  those styles — see CLASS 3 above for why.
 
 arrowhead.arrow_closed  [normally Arrow class]
   true = closed outline, false = open sides.
@@ -245,16 +252,18 @@ def build_prompt(
     if record_class == "SizeOnly":
         lines.append(
             "NOTE: This is a SizeOnly arrowhead style (Dot, Diagonal, Box, Loop, etc.).\n"
-            "Usually only style and size appear below — that's complete and correct,\n"
-            "not missing data. Occasionally another field (e.g. Filled) shows up with a\n"
-            "real value for this style too; if it does, treat it as genuine and name on it —\n"
-            "it just isn't part of this style's join key."
+            "Name on style + size ONLY — those are the only fields in this style's join\n"
+            "key, and the only ones shown below. That's complete and correct, not missing\n"
+            "data: other style-specific fields (e.g. fill_tick) are deliberately withheld\n"
+            "here even when they read a real value on the underlying record, because\n"
+            "they're not part of this style's join key and you're only ever shown one\n"
+            "arbitrarily-chosen representative record for it."
         )
         lines.append("")
 
     # --- Behavioral parameters ---
     lines.append("BEHAVIORAL PARAMETERS")
-    param_lines = _format_identity_items(identity_items)
+    param_lines = _format_identity_items(identity_items, record_class)
     if param_lines:
         lines.extend(f"  {l}" for l in param_lines)
     else:
@@ -329,6 +338,26 @@ _SIZEONLY_STYLES = frozenset({
     "Dot", "Diagonal", "Box", "Loop", "Elevation Target", "Datum triangle"
 })
 
+# D-049 P2 fix: which style-specific keys are actually part of each record
+# class's own join key. build_identity_items_lookup.py picks one arbitrary
+# representative record per (domain, join_hash) group before this prompt
+# ever runs -- a field that ISN'T part of the join key (e.g. fill_tick for
+# a SizeOnly record) can differ across the OTHER records sharing that same
+# join_hash, which this prompt never sees. Showing such a field and asking
+# the LLM not to name on it (prompt-only enforcement) was judged too weak;
+# _format_identity_items() below hard-excludes any style-specific key not
+# owned by the record's own class, so the LLM has no basis to name on it at
+# all -- fill_tick genuinely reading true on a Dot is still real, useful
+# extraction-side evidence (see identity_basis.items / D-049's extract-
+# always fix), it's just never surfaced to this particular prompt.
+_JOIN_KEY_STYLE_SPECIFIC_KEYS_BY_CLASS = {
+    "Arrow": frozenset({"arrowhead.width_angle_deg", "arrowhead.fill_tick", "arrowhead.arrow_closed"}),
+    "Tick": frozenset({"arrowhead.tick_mark_centered", "arrowhead.heavy_end_pen_weight"}),
+}
+_ALL_STYLE_SPECIFIC_KEYS = frozenset(
+    k for keys in _JOIN_KEY_STYLE_SPECIFIC_KEYS_BY_CLASS.values() for k in keys
+)
+
 
 def _detect_record_class(identity_items: List[Dict[str, Any]]) -> str:
     kv = {
@@ -357,7 +386,8 @@ def _fmt_size(val_str: str) -> str:
         return val_str
 
 
-def _format_identity_items(identity_items: List[Dict[str, Any]]) -> List[str]:
+def _format_identity_items(identity_items: List[Dict[str, Any]], record_class: str) -> List[str]:
+    owned_style_specific_keys = _JOIN_KEY_STYLE_SPECIFIC_KEYS_BY_CLASS.get(record_class, frozenset())
     out = []
     for item in identity_items:
         k = str(item.get("k", ""))
@@ -365,6 +395,11 @@ def _format_identity_items(identity_items: List[Dict[str, Any]]) -> List[str]:
         v = item.get("v")
 
         if k in _SKIP_KEYS:
+            continue
+        # D-049 P2 fix: never show a style-specific key that isn't part of
+        # THIS record class's own join key -- see the comment above
+        # _JOIN_KEY_STYLE_SPECIFIC_KEYS_BY_CLASS.
+        if k in _ALL_STYLE_SPECIFIC_KEYS and k not in owned_style_specific_keys:
             continue
         if q != "ok" or v is None:
             continue

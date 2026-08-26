@@ -18,21 +18,25 @@
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "shape_gating added pending discovery evidence (see conversation log / prospective D-0xx):",
-        "not yet consumed by core/sig_hash_builder.py -- currently informational/discovery-only.",
-        "D-049: as of this policy version, domains/arrowheads.py captures width_angle_deg/fill_tick/",
-        "arrow_closed/tick_mark_centered/heavy_end_pen_weight into identity_basis.items",
-        "UNCONDITIONALLY for every record, regardless of style bucket -- the earlier assumption that",
-        "these fields are 'never unconditionally applicable' (see policies/domain_join_key_policies.json's",
-        "own arrowheads notes, corrected in the same PR) is confirmed wrong for fill_tick, which",
-        "genuinely varies on at least one SizeOnly style (Dot). Whether a given record's fields",
-        "actually feed sig_hash is still gated by style-bucket ownership -- via the extractor's own",
-        "hardcoded _ARROW_BUCKET_HASH_KEYS/_TICK_BUCKET_HASH_KEYS, NOT via this policy's shape_gating",
-        "block, which remains uninvolved in that decision (informational/discovery-only, as above).",
-        "governed BLOCKING semantics (minima.block_if_any_required_not_ok) per shape, not new hash",
-        "coverage; default_shape_behavior (common_only) describes only that required-ness question --",
-        "it has no bearing on whether a style-specific field is captured, since D-049 made capture",
-        "unconditional. Confirm with sig-target discovery before treating additional_required as final."
+        "D-049: domains/arrowheads.py captures width_angle_deg/fill_tick/arrow_closed/",
+        "tick_mark_centered/heavy_end_pen_weight into identity_basis.items UNCONDITIONALLY for every",
+        "record, regardless of style bucket -- the earlier assumption that these fields are 'never",
+        "unconditionally applicable' (see policies/domain_join_key_policies.json's own arrowheads",
+        "notes, corrected in the same PR) is confirmed wrong for fill_tick, which genuinely varies on",
+        "at least one SizeOnly style (Dot). Which of a given record's fields actually feed sig_hash is",
+        "still gated by style-bucket ownership: the inline extractor applies this via its own",
+        "hardcoded _ARROW_BUCKET_HASH_KEYS/_TICK_BUCKET_HASH_KEYS, and -- as of this policy version --",
+        "shape_gating.applies_to_sig_hash (below) makes core/sig_hash_builder.py's analysis-side",
+        "reconstruction apply the identical per-record filter (see _shape_gated_hash_keys() in that",
+        "module), so the two hash computations stay consistent for every style bucket. Before",
+        "applies_to_sig_hash was added, shape_gating here was purely informational/discovery-only and",
+        "the analysis-side builder ignored it entirely -- harmless only as long as gated fields were",
+        "absent from identity_basis.items for non-owning buckets, which D-049 changed (a P1 review",
+        "finding on the D-049 PR caught the resulting divergence before it shipped).",
+        "default_shape_behavior (common_only) still also governs BLOCKING semantics",
+        "(minima.block_if_any_required_not_ok) per shape via required_items/additional_required --",
+        "unchanged by D-049, which only affects what's captured/hashed, not what's required.",
+        "Confirm with sig-target discovery before treating additional_required as final."
       ],
       "required_items": [
         "arrowhead.style",
@@ -40,6 +44,7 @@
       ],
       "shape_gating": {
         "discriminator_key": "arrowhead.style",
+        "applies_to_sig_hash": true,
         "shape_requirements": {
           "Arrow": {
             "additional_required": [
