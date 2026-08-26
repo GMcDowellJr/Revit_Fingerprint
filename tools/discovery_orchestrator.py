@@ -28,7 +28,7 @@ from typing import Callable, Iterable, Mapping
 
 # Keep a new version whenever candidate or orchestration semantics can change
 # selected evidence, so older cache entries are never silently reused.
-DISCOVERY_ENGINE_VERSION = "discovery-sweep-v4"
+DISCOVERY_ENGINE_VERSION = "discovery-sweep-v5"
 PROGRESS_HEARTBEAT_SECONDS = 30.0
 CACHE_SCHEMA_VERSION = 1
 SUMMARY_SCHEMA_VERSION = 1
@@ -64,6 +64,9 @@ SUMMARY_FIELDS = [
     "validate_search_mode_used", "validate_status", "harsh_required", "harsh_reason",
     "harsh_selected_fields", "harsh_search_mode_used", "harsh_status", "coverage_full",
     "collision_rate_full", "fragmentation_rate_full", "sample_vs_full_diverges",
+    "search_sample_size", "work_budget", "estimated_search_work", "actual_subsets_evaluated",
+    "maximum_k_attempted", "pareto_stop_reason", "frontier_retained", "pareto_elapsed_seconds",
+    "full_verify_status",
     "pareto_required", "pareto_reason", "result_provenance_status",
     "domain_result_timestamp", "run_id", "source_run_id", "source_evidence_path",
     "refresh_attempted", "refresh_status", "input_fingerprint",
@@ -240,6 +243,9 @@ class Config:
     run: bool = False
     engine_version: str = DISCOVERY_ENGINE_VERSION
     workers: int = DEFAULT_WORKERS
+    work_budget: int | None = None
+    pareto_frontier_limit: int = 10
+    pareto_progress: bool = True
 
 
 class Orchestrator:
@@ -324,13 +330,15 @@ class Orchestrator:
         paths = sorted(self.summaries.glob(f"{prefix}_discovery_summary_*.csv"))
         return (paths[-1], read_csv(paths[-1])) if paths else (None, [])
 
-    @staticmethod
-    def _params(row: Mapping[str, str], mode: str) -> dict:
-        max_k = row.get("suggested_max_k_discover", "4") if mode == "discover" else row.get("suggested_max_k_harsh_validate", "4")
+    def _params(self, row: Mapping[str, str], mode: str) -> dict:
+        max_k = row.get("suggested_max_k_discover", "4") if mode == "discover" else row.get(f"suggested_max_k_{mode}", row.get("suggested_max_k_harsh_validate", "4"))
         return {"sample_size": int(row.get("suggested_sample_size") or 5000), "sample_seed": 17,
                 "stratify_by": row.get("stratify_by_recommended", ""),
                 "max_candidate_fields": int(row.get("suggested_max_candidate_fields") or 64),
-                "effective_max_k": int(max_k or 4)}
+                "effective_max_k": int(max_k or 4),
+                "work_budget": int(self.cfg.work_budget if self.cfg.work_budget is not None else (row.get("work_budget") or 0)),
+                "pareto_frontier_limit": int(self.cfg.pareto_frontier_limit),
+                "pareto_progress": bool(self.cfg.pareto_progress)}
 
     def _command(self, target: str, domain: str, mode: str, search: str, params: Mapping[str, object]) -> list[str]:
         tool = "tools/discover_join_policy.py" if target == "join" else "tools/discover_hash_policy.py"
@@ -338,7 +346,9 @@ class Orchestrator:
                "--policy-json", str(self.policy_paths[target]), "--policy-modes", mode,
                "--search-modes", search, "--sample-size", str(params["sample_size"]),
                "--sample-seed", str(params["sample_seed"]), "--max-candidate-fields", str(params["max_candidate_fields"]),
-               "--max-k", str(params["effective_max_k"])]
+               "--max-k", str(params["effective_max_k"]), "--work-budget", str(params.get("work_budget", 0)),
+               "--pareto-frontier-limit", str(params.get("pareto_frontier_limit", 10))]
+        if not params.get("pareto_progress", True): cmd += ["--no-pareto-progress"]
         if target == "sig": cmd += ["--discovery-target", "sig"]
         else: cmd += ["--warn-only"]
         if params["stratify_by"]: cmd += ["--stratify-by", str(params["stratify_by"])]
@@ -526,6 +536,11 @@ class Orchestrator:
                 "harsh_required":"false" if va else "true","harsh_reason":"" if va else ";".join(acceptance_reasons(v)),
                 "harsh_selected_fields":h.get("selected_fields",""),"harsh_search_mode_used":h.get("search_mode",""),"harsh_status":h.get("status", "skipped" if va else "blocked"),
                 "coverage_full":final.get("coverage_full",""),"collision_rate_full":final.get("collision_rate_full",""),"fragmentation_rate_full":final.get("fragmentation_rate_full",""),"sample_vs_full_diverges":final.get("sample_vs_full_diverges",""),
+                "search_sample_size":final.get("records_sampled_domain",""),"work_budget":final.get("pareto_work_budget",""),
+                "estimated_search_work":final.get("pareto_estimated_search_work",""),"actual_subsets_evaluated":final.get("pareto_subsets_evaluated",""),
+                "maximum_k_attempted":final.get("pareto_max_k_attempted",""),"pareto_stop_reason":final.get("pareto_stop_reason",""),
+                "frontier_retained":final.get("pareto_frontier_retained",""),"pareto_elapsed_seconds":final.get("pareto_elapsed_seconds",""),
+                "full_verify_status":final.get("full_verify_status",""),
                 "pareto_required":"true" if preasons else "false","pareto_reason":";".join(preasons),"result_provenance_status":provenance,
                 "domain_result_timestamp":result_timestamp,"run_id":run_id,"source_run_id":";".join(source_run_ids),"source_evidence_path":";".join(source_paths),
                 "refresh_attempted":"true","refresh_status":"completed","input_fingerprint":fingerprint,
@@ -635,6 +650,7 @@ class Orchestrator:
             "initial_stages":[f"{t}:{d}:discover/greedy,validate/greedy" for t in targets for d in requested],
             "likely_cache_hits":likely_hits,
             "intended_results_root":str(self.root),
+            "pareto_controls":{"work_budget_override":self.cfg.work_budget,"frontier_limit":self.cfg.pareto_frontier_limit,"progress":self.cfg.pareto_progress},
             "escalation":"Pareto and harsh cannot be known until Greedy/validate evidence is evaluated"}
         if self.cfg.what_if:
             print(json.dumps(planned,indent=2)); return planned
@@ -705,11 +721,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--exports-root",default="Fingerprint_Data");p.add_argument("--repo-root",default=str(Path(__file__).resolve().parents[1]));p.add_argument("--suggestions-csv")
     p.add_argument("--domains");p.add_argument("--skip-join",action="store_true");p.add_argument("--skip-sig",action="store_true");p.add_argument("--force",action="store_true");p.add_argument("--what-if",action="store_true");p.add_argument("--run",action="store_true")
     p.add_argument("--workers",default=str(DEFAULT_WORKERS),help="Parallel (target, domain) workers, or 'auto' (cpu_count - 2, capped at 61 on Windows)")
+    p.add_argument("--work-budget",type=int,default=None,help="Override every domain's suggestions-CSV work budget (records x candidate evaluations)")
+    p.add_argument("--pareto-frontier-limit",type=int,default=10,help="Retained Pareto diagnostic alternatives per search (default 10)")
+    p.add_argument("--no-pareto-progress",action="store_true",help="Suppress per-depth Pareto progress emitted by discovery subprocesses")
     return p
 
 
 def config_from_args(ns: argparse.Namespace) -> Config:
-    exports=Path(ns.exports_root).resolve(); return Config(exports,Path(ns.repo_root).resolve(),Path(ns.suggestions_csv).resolve() if ns.suggestions_csv else exports/"diagnostics/discovery_param_suggestions.csv",[x.strip() for x in ns.domains.split(",") if x.strip()] if ns.domains else None,ns.skip_join,ns.skip_sig,ns.force,ns.what_if,ns.run,workers=resolve_worker_count(ns.workers))
+    exports=Path(ns.exports_root).resolve(); return Config(exports,Path(ns.repo_root).resolve(),Path(ns.suggestions_csv).resolve() if ns.suggestions_csv else exports/"diagnostics/discovery_param_suggestions.csv",[x.strip() for x in ns.domains.split(",") if x.strip()] if ns.domains else None,ns.skip_join,ns.skip_sig,ns.force,ns.what_if,ns.run,workers=resolve_worker_count(ns.workers),work_budget=ns.work_budget,pareto_frontier_limit=ns.pareto_frontier_limit,pareto_progress=not ns.no_pareto_progress)
 
 
 def main(argv: list[str] | None=None) -> int:

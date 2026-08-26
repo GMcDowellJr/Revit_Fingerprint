@@ -16,6 +16,7 @@ point.
 python run_discovery_sweep.py --run
 python run_discovery_sweep.py --domains walls,doors --run
 python run_discovery_sweep.py --what-if
+python run_discovery_sweep.py --domains materials --work-budget 20000000 --pareto-frontier-limit 10 --run
 ```
 
 The command prints each subprocess at `START`, streams discovery output to the
@@ -35,7 +36,14 @@ compatibility and delegates to the same orchestrator. The orchestrator invokes
 `--force`/`-Force` bypasses
 matching cache entries. `ExportsRoot`, `RepoRoot`, `SuggestionsCsv`, `Domains`,
 `SkipJoin`, `SkipSig`, `WhatIf`, and `Run` are available in the spelling native
-to each shell. Skipping both targets is rejected as an invalid no-op sweep.
+to each shell. `WorkBudget`/`--work-budget` optionally overrides the per-domain
+budget in the suggestions CSV, while `ParetoFrontierLimit`/
+`--pareto-frontier-limit` and `NoParetoProgress`/`--no-pareto-progress` are
+forwarded through the orchestrator to both JoinKey and SigHash discovery.
+Without an override, each suggestions row's `work_budget` remains authoritative.
+These controls are included in cache fingerprints and immutable run manifests;
+WhatIf prints their effective values. Skipping both targets is rejected as an
+invalid no-op sweep.
 
 ## Execution model
 
@@ -116,10 +124,11 @@ Bump it whenever discovery inputs, evaluation behavior, acceptance logic, or
 other result-affecting orchestration semantics change. Do not bump it for a
 documentation-only change.
 
-The candidate/runtime scoring separation changed result-affecting evaluation
-semantics, and candidate eligibility is now applied before the field cap, so
-the sweep cache contract is `discovery-sweep-v4`. Evidence cached under older
-versions cannot be reused for corrected discovery results.
+Progressive Pareto, finalist verification, bounded frontiers, and deterministic
+work budgets change result-affecting evaluation semantics. Both JoinKey and
+SigHash stage commands now receive the same sweep controls, so the cache
+contract is `discovery-sweep-v5`. Evidence cached under older versions cannot
+be reused for corrected discovery results.
 
 WhatIf computes the plan without publishing summaries or cache changes. It
 reports requested domains, likely fingerprint-verified cache hits, initial
