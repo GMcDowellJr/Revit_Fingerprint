@@ -261,6 +261,11 @@ class Orchestrator:
         # protects creation of those per-path locks, never the scan itself.
         self._file_domain_hashes_locks: dict[Path, threading.Lock] = {}
         self._file_domain_hashes_locks_guard = threading.Lock()
+        # SIGINT only interrupts the main thread; a worker blocked in _invoke's
+        # subprocess wait never sees it directly. This event is how the main
+        # thread (run_sweep's as_completed loop) tells still-running workers to
+        # terminate their child and unwind, instead of running to completion.
+        self._interrupt_event = threading.Event()
 
     def _hashes_by_domain(self, path: Path) -> dict[str, str]:
         """Scan a large CSV once and retain compact, order-independent domain hashes."""
@@ -380,6 +385,8 @@ class Orchestrator:
                     try:
                         line = output.get(timeout=PROGRESS_HEARTBEAT_SECONDS)
                     except Empty:
+                        if self._interrupt_event.is_set():
+                            raise KeyboardInterrupt("discovery sweep interrupted")
                         elapsed = int(time.monotonic() - started)
                         print(f"[sweep] still running ({elapsed}s); live log: {log}", flush=True)
                         continue
@@ -648,16 +655,27 @@ class Orchestrator:
         # worker ever touches the shared `cache` or `new_by_target` directly.
         units=[(target,domain) for target in targets for domain in requested]
         base_entries=dict(cache["entries"])
+        self._interrupt_event.clear()
         print(f"[sweep] dispatching {len(units)} (target, domain) unit(s) across {self.cfg.workers} worker(s)", flush=True)
         with ThreadPoolExecutor(max_workers=self.cfg.workers) as executor:
             futures={
                 executor.submit(self._process_unit,target,domain,ts,base_entries,prior[target][1],by_domain[domain]):(target,domain)
                 for target,domain in units
             }
-            for future in as_completed(futures):
-                result=future.result()
-                cache["entries"].update(result["new_cache_entries"])
-                new_by_target[result["target"]]+=result["rows"]
+            try:
+                for future in as_completed(futures):
+                    result=future.result()
+                    cache["entries"].update(result["new_cache_entries"])
+                    new_by_target[result["target"]]+=result["rows"]
+            except KeyboardInterrupt:
+                # SIGINT only reaches this thread; tell every still-running
+                # worker (polling this event in _invoke) to terminate its
+                # subprocess, and drop everything not yet started so the
+                # executor's shutdown-on-exit doesn't wait for it to run.
+                self._interrupt_event.set()
+                for pending in futures:
+                    pending.cancel()
+                raise
         # Validate everything before publishing anything.
         for target, rows in new_by_target.items():
             keys=[(r.get("domain"),r.get("target"),r.get("shape_gate") or "__all__") for r in rows]
