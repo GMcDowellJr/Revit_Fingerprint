@@ -13,7 +13,30 @@ from tools.suggest_discovery_params import (
     suggest_params_for_domain,
     _emit_command,
     _load_policy_fields,
+    estimate_search_work,
 )
+
+
+def test_work_budget_jointly_bounds_sample_and_depth():
+    stats = {"records_total_domain": 10000, "distinct_sig_hash_groups": 1000,
+             "distinct_file_count": 5, "candidate_field_count": 10}
+    large = suggest_params_for_domain(stats, work_budget=50_000, min_k=2)
+    small = suggest_params_for_domain(stats, work_budget=1_000_000, min_k=2)
+    assert large["sample_compute_bounded"] is True
+    assert large["estimated_search_work"] <= large["work_budget"]
+    assert small["suggested_search_sample_size"] >= large["suggested_search_sample_size"]
+    assert small["suggested_max_k_discover"] >= large["suggested_max_k_discover"]
+
+
+def test_work_estimate_matches_progressive_subset_generation_and_required_baseline():
+    assert estimate_search_work(100, _cumulative_subset_count(4, 2)) == 1000
+    stats = {"records_total_domain": 100, "distinct_sig_hash_groups": 2,
+             "distinct_file_count": 1, "candidate_field_count": 4}
+    result = suggest_params_for_domain(stats, required_count=3, optional_count=1,
+                                       work_budget=1000)
+    # Required fields consume max-k width but are one structural baseline,
+    # rather than three independently selected combinatorial extras.
+    assert result["suggested_max_k_validate"] >= 3
 
 
 def _write_csv(path: Path, fields, rows):

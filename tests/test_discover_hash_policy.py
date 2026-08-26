@@ -51,6 +51,29 @@ def test_discover_hash_policy_join_and_sig(tmp_path: Path):
     assert all(r['shape_gate'] in ('Doors','Windows') for r in rows)
 
 
+def test_hash_discovery_accepts_sweep_pareto_controls_and_emits_stage_metadata(tmp_path: Path):
+    phase0=tmp_path/'results'/'records'
+    _write_csv(phase0/'records.csv',["file_id","domain","record_pk","sig_hash"],[
+        {"file_id":"f","domain":"materials","record_pk":str(i),"sig_hash":f"s{i}"} for i in range(3)
+    ])
+    _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
+        {"domain":"materials","record_pk":str(i),"item_key":"material.name_class_hash","item_value_type":"str","item_value":str(i)} for i in range(3)
+    ])
+    subprocess.run([
+        sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
+        '--domains','materials','--discovery-target','sig','--policy-modes','discover',
+        '--search-modes','pareto','--work-budget','100','--pareto-frontier-limit','5',
+        '--no-pareto-progress',
+    ],cwd=Path(__file__).resolve().parents[1],check=True)
+    path=_exploration_csv(phase0.parent/'diagnostics','sig',['materials'],['discover'])
+    row=next(csv.DictReader(path.open(encoding='utf-8',newline='')))
+    assert row['pareto_subsets_evaluated']=='1'
+    assert row['pareto_k_levels_attempted']=='1'
+    assert row['pareto_stop_reason']=='accepted_finalist'
+    assert row['pareto_work_budget']=='100'
+    assert row['full_verify_status']=='ok'
+
+
 def test_validate_marks_blocked_when_required_fields_missing_from_selected(tmp_path: Path):
     phase0 = tmp_path / 'Results_v21' / 'phase0_v21'
     _write_csv(phase0/'records.csv',["file_id","domain","record_pk","sig_hash"],[

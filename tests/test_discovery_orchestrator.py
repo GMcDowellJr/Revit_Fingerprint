@@ -10,7 +10,7 @@ import pytest
 from tools.discovery_orchestrator import (
     DISCOVERY_ENGINE_VERSION, SUMMARY_FIELDS, Orchestrator, Config, acceptance_reasons,
     accepted, cache_key, canonical_json, input_fingerprint, stage_cache_eligible,
-    all_shape_gates_accepted, sweep_evidence_rows, timestamp_now,
+    all_shape_gates_accepted, sweep_evidence_rows, timestamp_now, build_parser, config_from_args,
 )
 
 
@@ -119,8 +119,22 @@ def test_force_is_preserved_in_shared_config(tmp_path):
 def test_powershell_is_thin_shared_entry_point():
     text=Path("run_discovery_sweep.ps1").read_text(encoding="utf-8")
     assert "run_discovery_sweep.py" in text and "discover_join_policy.py" not in text
-    for flag in ("ExportsRoot","RepoRoot","SuggestionsCsv","Domains","SkipJoin","SkipSig","Force","WhatIf","Run"):
+    for flag in ("ExportsRoot","RepoRoot","SuggestionsCsv","Domains","SkipJoin","SkipSig","Force","WhatIf","Run","WorkBudget","ParetoFrontierLimit","NoParetoProgress"):
         assert f"${flag}" in text
+
+
+def test_sweep_entrypoint_overrides_are_wired_into_both_discovery_targets(tmp_path):
+    ns=build_parser().parse_args(["--work-budget","12345","--pareto-frontier-limit","7","--no-pareto-progress"])
+    cfg=config_from_args(ns)
+    assert cfg.work_budget==12345 and cfg.pareto_frontier_limit==7 and not cfg.pareto_progress
+    orchestrator=Orchestrator(cfg)
+    params=orchestrator._params({"suggested_sample_size":"100","suggested_max_candidate_fields":"8","suggested_max_k_discover":"2","work_budget":"999"},"discover")
+    assert params["work_budget"]==12345
+    for target in ("join","sig"):
+        command=orchestrator._command(target,"materials","discover","pareto",params)
+        assert command[command.index("--work-budget")+1]=="12345"
+        assert command[command.index("--pareto-frontier-limit")+1]=="7"
+        assert "--no-pareto-progress" in command
 
 
 def test_blocked_run_cache_entries_are_discarded_without_touching_history():

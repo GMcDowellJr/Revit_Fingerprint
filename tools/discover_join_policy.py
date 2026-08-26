@@ -360,6 +360,9 @@ def main() -> None:
     )
     ap.add_argument("--max-candidate-fields", type=int, default=64)
     ap.add_argument("--max-k", type=int, default=4, help="Max subset size for Pareto search (validate mode auto-bumps to required count).")
+    ap.add_argument("--work-budget", type=int, default=0, help="Deterministic Pareto search-work ceiling (sampled records x candidate evaluations); 0 is unlimited.")
+    ap.add_argument("--pareto-frontier-limit", type=int, default=10, help="Maximum diagnostic Pareto alternatives retained (default 10).")
+    ap.add_argument("--no-pareto-progress", action="store_true", help="Suppress per-depth Pareto progress diagnostics.")
     ap.add_argument("--base-policy", default=None, help="Optional policy to preserve metadata/shape gates when writing out-policy.")
     ap.add_argument("--warn-only", action="store_true")
     ap.add_argument(
@@ -612,6 +615,10 @@ def main() -> None:
                 max_k = max(max_k, len(req))
             cfg = {
                 "max_k": max_k,
+                "work_budget": int(args.work_budget),
+                "frontier_limit": int(args.pareto_frontier_limit),
+                "progress": not bool(args.no_pareto_progress),
+                "domain": domain,
                 "gates": dict(gates),
                 "evaluation_mode": "candidate" if policy_mode == "discover" else "runtime",
                 "runtime_required_fields": [] if policy_mode == "discover" else list(req),
@@ -622,15 +629,36 @@ def main() -> None:
                 metrics: Dict[str, object] = {}
                 reason = ""
                 frontier_size = 0
+                search_diagnostics: Dict[str, object] = {}
+                pareto_full_verification = None
                 fallback_used = False
                 if search_mode == "pareto":
+                    if full_verify:
+                        def _verify_finalist(finalist):
+                            finalist_metrics = finalist.get("metrics", {})
+                            finalist_fields = [x for x in str(finalist.get("keys", "")).split("|") if x]
+                            full_metrics, finalist_diverges = _full_population_verify(
+                                dom_records_all, identity_index, finalist_fields, cfg,
+                                finalist_metrics, divergence_delta,
+                                coverage_drop_threshold=coverage_drop_threshold,
+                            )
+                            accepted_full = (
+                                float(full_metrics.get("coverage", 0.0)) == 1.0
+                                and float(full_metrics.get("collision_rate", 1.0)) == 0.0
+                                and float(full_metrics.get("fragmentation_rate", 1.0)) == 0.0
+                                and not finalist_diverges
+                            )
+                            return {"metrics": full_metrics, "diverges": finalist_diverges, "accepted_full": accepted_full}
+                        cfg["finalist_verifier"] = _verify_finalist
                     p = _pareto_search_adapter(dom_records, identity_index, work_candidates, cfg)
+                    search_diagnostics = p.get("diagnostics", {}) if isinstance(p.get("diagnostics"), dict) else {}
+                    pareto_full_verification = search_diagnostics.get("full_verification")
                     frontier = p.get("frontier") if isinstance(p.get("frontier"), list) else []
                     if policy_mode == "validate" and req:
                         frontier = [row for row in frontier if set(req).issubset(set(str(row.get("keys", "")).split("|")))]
                     frontier_size = len(frontier)
                     if frontier:
-                        chosen = sorted(frontier, key=lambda x: (x.get("collision_rate", 1.0), x.get("coverage_gap", 1.0), x.get("k_count", 99), x.get("keys", "")))[0]
+                        chosen = p.get("chosen") if isinstance(p.get("chosen"), dict) else sorted(frontier, key=lambda x: (x.get("k_count", 99), x.get("coverage_gap", 1.0), x.get("collision_rate", 1.0), x.get("fragmentation_rate", 1.0), x.get("keys", "")))[0]
                         selected = [x for x in str(chosen.get("keys", "")).split("|") if x]
                         metrics = chosen.get("metrics", {}) if isinstance(chosen.get("metrics"), dict) else {}
                     elif policy_mode == "validate" and req:
@@ -676,7 +704,11 @@ def main() -> None:
                 full_verify_status = "skipped_no_full_verify_flag"
                 metrics_full: Dict[str, object] = {}
                 diverges = False
-                if selected and full_verify:
+                if selected and full_verify and isinstance(pareto_full_verification, dict):
+                    metrics_full = pareto_full_verification.get("metrics", {})
+                    diverges = bool(pareto_full_verification.get("diverges", False))
+                    full_verify_status = "ok"
+                elif selected and full_verify:
                     metrics_full, diverges = _full_population_verify(
                         dom_records_all, identity_index, selected, verify_cfg, metrics, divergence_delta,
                         coverage_drop_threshold=coverage_drop_threshold,
@@ -738,6 +770,15 @@ def main() -> None:
                     "effective_cluster_count": f"{float(metrics.get('effective_cluster_count', 0.0)):.6f}",
                     "failures_json": json.dumps(metrics.get("failures", {}) if isinstance(metrics.get("failures"), dict) else {}, sort_keys=True),
                     "frontier_size": str(frontier_size),
+                    "pareto_subsets_evaluated": str(search_diagnostics.get("subsets_evaluated", "")),
+                    "pareto_k_levels_attempted": "|".join(str(x) for x in search_diagnostics.get("k_levels_attempted", [])),
+                    "pareto_max_k_attempted": str(search_diagnostics.get("max_k_attempted", "")),
+                    "pareto_stop_reason": str(search_diagnostics.get("stop_reason", "")),
+                    "pareto_frontier_retained": str(search_diagnostics.get("frontier_retained", "")),
+                    "pareto_estimated_search_work": str(search_diagnostics.get("estimated_search_work", "")),
+                    "pareto_work_budget": str(search_diagnostics.get("work_budget", args.work_budget if search_mode == "pareto" else "")),
+                    "pareto_work_budget_exhausted": str(search_diagnostics.get("work_budget_exhausted", "")).lower(),
+                    "pareto_elapsed_seconds": f"{float(search_diagnostics.get('elapsed_seconds', 0.0)):.6f}" if search_diagnostics else "",
                     "fallback_used": "true" if fallback_used else "false",
                     "required_count": str(len(req)),
                     "required_fields": "|".join(req),
@@ -953,6 +994,7 @@ def main() -> None:
         "policy_required_fields", "policy_optional_fields", "policy_excluded_fields", "discriminator_key", "discriminator_source", "discriminator_value", "mode", "result_scope",
         "selected_fields", "coverage", "collision_rate", "fragmentation_rate",
         "records_total", "records_covered", "collision_records", "fragmented_sig_count", "join_group_count", "hhi", "effective_cluster_count", "failures_json", "frontier_size", "fallback_used",
+        "pareto_subsets_evaluated", "pareto_k_levels_attempted", "pareto_max_k_attempted", "pareto_stop_reason", "pareto_frontier_retained", "pareto_estimated_search_work", "pareto_work_budget", "pareto_work_budget_exhausted", "pareto_elapsed_seconds",
         "required_count", "required_fields", "optional_count", "optional_items", "excluded_count", "excluded_items",
         "stratify_by",
         "policy_shape_gate_enabled", "policy_shape_gate_discriminator_key",

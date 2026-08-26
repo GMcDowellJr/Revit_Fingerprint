@@ -137,21 +137,44 @@ def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
                     max_k = max(max_k, len(req))
                 score_cfg={
                     "max_k":max_k,
+                    "work_budget":int(args.work_budget),
+                    "frontier_limit":int(args.pareto_frontier_limit),
+                    "progress":not bool(args.no_pareto_progress),
+                    "domain":domain,
                     "gates":dict(gates),
                     "evaluation_mode":"candidate" if pm=="discover" else "runtime",
                     "runtime_required_fields":[] if pm=="discover" else list(req),
                 }
                 for sm in args.search_modes:
                     selected=[];metrics={};status="ok";reason="";frontier=0;fallback=False
+                    search_diagnostics={};pareto_full_verification=None
                     if not work: status="no_candidates"
                     elif sm=="pareto":
+                        if full_verify:
+                            def _verify_finalist(finalist):
+                                finalist_metrics=finalist.get("metrics",{})
+                                finalist_fields=[x for x in str(finalist.get("keys","")).split("|") if x]
+                                full_metrics,finalist_diverges=_full_population_verify(
+                                    dom_records_all,full_idx,finalist_fields,score_cfg,finalist_metrics,
+                                    divergence_delta,coverage_drop_threshold=coverage_drop_threshold,
+                                )
+                                accepted_full=(
+                                    float(full_metrics.get("coverage",0.0))==1.0
+                                    and float(full_metrics.get("collision_rate",1.0))==0.0
+                                    and float(full_metrics.get("fragmentation_rate",1.0))==0.0
+                                    and not finalist_diverges
+                                )
+                                return {"metrics":full_metrics,"diverges":finalist_diverges,"accepted_full":accepted_full}
+                            score_cfg["finalist_verifier"]=_verify_finalist
                         p=_pareto_search_adapter(dom_records,idx,work,score_cfg)
+                        search_diagnostics=p.get("diagnostics",{}) if isinstance(p.get("diagnostics"),dict) else {}
+                        pareto_full_verification=search_diagnostics.get("full_verification")
                         fr=p.get('frontier') if isinstance(p.get('frontier'),list) else [];frontier=len(fr)
                         if pm == "validate" and req:
                             fr = [row for row in fr if set(req).issubset(set(str(row.get("keys", "")).split("|")))]
                             frontier = len(fr)
                         if fr:
-                            ch=sorted(fr,key=lambda x:(x.get('collision_rate',1.0),x.get('coverage_gap',1.0),x.get('k_count',99),x.get('keys','')))[0]
+                            ch=p.get("chosen") if isinstance(p.get("chosen"),dict) else sorted(fr,key=lambda x:(x.get('k_count',99),x.get('coverage_gap',1.0),x.get('collision_rate',1.0),x.get('fragmentation_rate',1.0),x.get('keys','')))[0]
                             selected=[x for x in str(ch.get('keys','')).split('|') if x];metrics=ch.get('metrics',{}) if isinstance(ch.get('metrics'),dict) else {}
                         elif pm == "validate" and req:
                             selected = list(req)
@@ -181,7 +204,11 @@ def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
                     full_verify_status="skipped_no_full_verify_flag"
                     metrics_full={}
                     diverges=False
-                    if selected and full_verify:
+                    if selected and full_verify and isinstance(pareto_full_verification,dict):
+                        metrics_full=pareto_full_verification.get("metrics",{})
+                        diverges=bool(pareto_full_verification.get("diverges",False))
+                        full_verify_status="ok"
+                    elif selected and full_verify:
                         metrics_full,diverges=_full_population_verify(
                             dom_records_all,full_idx,selected,verify_cfg,metrics,divergence_delta,
                             coverage_drop_threshold=coverage_drop_threshold,
@@ -201,6 +228,16 @@ def _run_target(target,args,records,domains,base_domains,phase0_dir: Path):
                         full_verify_status="skipped_no_selection"
 
                     rows.append({"domain":domain,"discovery_target":target,"policy_mode":pm,"mode":pm,"search_mode":sm,"status":status,"reason":reason,"selected_fields":"|".join(selected),"effective_fields_actually_scored":"|".join(str(x) for x in metrics.get('effective_fields_actually_scored',[])),**_candidate_diagnostics(candidate_filter),"candidate_fields_available":"|".join(scoped),"candidate_fields_evaluated":"|".join(work),"policy_required_fields":"|".join(req),"policy_optional_fields":"|".join(opt),"policy_excluded_fields":"|".join(sorted(excluded)),"discriminator_key":str(gates.get('discriminator_key','')),"discriminator_source":"existing_policy" if gates.get('discriminator_key') else "","discriminator_value":gate,"coverage":f"{float(metrics.get('coverage',0.0)):.6f}","collision_rate":f"{float(metrics.get('collision_rate',1.0)):.6f}","fragmentation_rate":f"{float(metrics.get('fragmentation_rate',1.0)):.6f}","records_total":str(int(metrics.get('records_total',0) or 0)),"records_covered":str(int(metrics.get('records_covered',0) or 0)),"collision_records":str(int(metrics.get('collision_records',0) or 0)),"signature_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="sig" else "","join_group_count":str(int(metrics.get('join_group_count',0) or 0)) if target=="join" else "","frontier_size":str(frontier),"fallback_used":"true" if fallback else "false","shape_gate":gate,"stratify_by":stratify_key,
+                        "records_sampled_domain":str(len(dom_records)),
+                        "pareto_subsets_evaluated":str(search_diagnostics.get("subsets_evaluated","")),
+                        "pareto_k_levels_attempted":"|".join(str(x) for x in search_diagnostics.get("k_levels_attempted",[])),
+                        "pareto_max_k_attempted":str(search_diagnostics.get("max_k_attempted","")),
+                        "pareto_stop_reason":str(search_diagnostics.get("stop_reason","")),
+                        "pareto_frontier_retained":str(search_diagnostics.get("frontier_retained","")),
+                        "pareto_estimated_search_work":str(search_diagnostics.get("estimated_search_work","")),
+                        "pareto_work_budget":str(search_diagnostics.get("work_budget",args.work_budget if sm=="pareto" else "")),
+                        "pareto_work_budget_exhausted":str(search_diagnostics.get("work_budget_exhausted","")).lower(),
+                        "pareto_elapsed_seconds":f"{float(search_diagnostics.get('elapsed_seconds',0.0)):.6f}" if search_diagnostics else "",
                         "coverage_full":f"{float(metrics_full.get('coverage',0.0)):.6f}" if metrics_full else "",
                         "collision_rate_full":f"{float(metrics_full.get('collision_rate',1.0)):.6f}" if metrics_full else "",
                         "fragmentation_rate_full":f"{float(metrics_full.get('fragmentation_rate',1.0)):.6f}" if metrics_full else "",
@@ -303,6 +340,9 @@ def main():
     ap.add_argument('--stratify-by',default='', help='Item key to stratify sampling by so each unique value gets equal representation regardless of group size (e.g. lft.family_name for loaded_family_types join discovery). Falls back to flat sampling when the key has no coverage.')
     ap.add_argument('--max-candidate-fields',type=int,default=64, help='Max discovered candidate fields per domain/gate.')
     ap.add_argument('--max-k',type=int,default=4, help='Max field subset size for greedy/Pareto evaluation.')
+    ap.add_argument('--work-budget',type=int,default=0,help='Deterministic Pareto search-work ceiling (sampled records x candidate evaluations); 0 is unlimited.')
+    ap.add_argument('--pareto-frontier-limit',type=int,default=10,help='Maximum diagnostic Pareto alternatives retained (default 10).')
+    ap.add_argument('--no-pareto-progress',action='store_true',help='Suppress per-depth Pareto progress diagnostics.')
     ap.add_argument(
         "--no-full-verify",
         action="store_true",
