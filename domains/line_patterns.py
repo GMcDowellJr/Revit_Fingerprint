@@ -44,6 +44,7 @@ from core.record_v2 import (
     canonicalize_str,
     canonicalize_int,
     canonicalize_float,
+    canonicalize_bool,
     make_identity_item,
     serialize_identity_items,
     build_record_v2,
@@ -485,8 +486,23 @@ def extract(doc, ctx=None):
         # same is_import_v/is_import_q values here for the coordination_items
         # explainability bucket, matching other domains' pattern of duplicating
         # an identity item's k/q/v into a phase2 bucket for BI convenience.
+
+        # is_solid: coordination-only filter criterion (mirrors
+        # fill_patterns.py's is_solid), not identity. Derived from
+        # segment_count == 0, gated on seg_count_q so a genuine zero
+        # (the symbolic solid pattern, per LINE_PATTERN_SYMBOLIC_SOLID) is
+        # never confused with an unreadable segment_count reporting False.
+        if seg_count_q == ITEM_Q_OK:
+            try:
+                is_solid_v, is_solid_q = canonicalize_bool(int(seg_count_v) == 0)
+            except Exception:
+                is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
+
         lp_coordination_items = [
             make_identity_item("lp.is_import", is_import_v, is_import_q),
+            make_identity_item("lp.is_solid", is_solid_v, is_solid_q),
         ]
 
         rec_v2["phase2"] = {

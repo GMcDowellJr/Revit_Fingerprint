@@ -14,6 +14,15 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Added
+- **`lp.is_solid` in `phase2.coordination_items` for `line_patterns` records.**
+  Mirrors `fill_patterns.py`'s existing `fill_pattern.is_solid` (a filter
+  criterion, not identity): derived from `segment_count == 0`, gated on
+  `seg_count_q` so an unreadable segment count reports `q=unreadable` rather
+  than a false negative. Coordination-only -- not added to `identity_items`,
+  `sig_hash`, `join_key`, or any policy/contract file, so no hash value
+  changes.
+
+### Added
 - **`mapping/` line_patterns Revit mapping utility (D-038).** New downstream,
   Revit-writing package (separate from `core/`/`domains/`/`runner/`/`tools/`)
   that reads `tools/export_bundle_pattern_detail.py`'s
