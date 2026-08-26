@@ -11,10 +11,12 @@ from pathlib import Path
 from typing import Dict, List, Sequence
 
 try:
-    from tools.join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate
+    from tools.join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate, summarize_shape_gate_usage
+    from tools.discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_and_cap_candidates
     from tools.join_key_discovery.greedy import discover_greedy
 except ModuleNotFoundError:
-    from join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate
+    from join_key_discovery.eval import build_identity_index, normalize_policy_block, score_candidate, summarize_shape_gate_usage
+    from discovery_candidate_eligibility import diagnostic_fields as _candidate_diagnostics, filter_and_cap_candidates
     from join_key_discovery.greedy import discover_greedy
 
 
@@ -358,6 +360,9 @@ def main() -> None:
     )
     ap.add_argument("--max-candidate-fields", type=int, default=64)
     ap.add_argument("--max-k", type=int, default=4, help="Max subset size for Pareto search (validate mode auto-bumps to required count).")
+    ap.add_argument("--work-budget", type=int, default=0, help="Deterministic Pareto search-work ceiling (sampled records x candidate evaluations); 0 is unlimited.")
+    ap.add_argument("--pareto-frontier-limit", type=int, default=10, help="Maximum diagnostic Pareto alternatives retained (default 10).")
+    ap.add_argument("--no-pareto-progress", action="store_true", help="Suppress per-depth Pareto progress diagnostics.")
     ap.add_argument("--base-policy", default=None, help="Optional policy to preserve metadata/shape gates when writing out-policy.")
     ap.add_argument("--warn-only", action="store_true")
     ap.add_argument(
@@ -488,10 +493,10 @@ def main() -> None:
         sample_rate = (float(records_sampled_domain) / float(records_total_domain)) if records_total_domain else 0.0
         sampled_pks = {r.get("record_pk", "").strip() for r in dom_records if r.get("record_pk", "").strip()}
         dom_items_sampled = [it for it in dom_items_all if not sampled_pks or it.get("record_pk", "").strip() in sampled_pks]
-        candidate_fields = _pick_candidate_fields(dom_items_sampled, int(args.max_candidate_fields))
-        if not candidate_fields:
-            failures.append(domain)
-            continue
+        candidate_fields_unfiltered = _pick_candidate_fields(dom_items_sampled, 0)
+        candidate_filter = filter_and_cap_candidates(domain, candidate_fields_unfiltered, int(args.max_candidate_fields))
+        candidate_fields = candidate_filter["eligible"]
+        domain_has_candidates = bool(candidate_fields)
 
         # Built from the FULL (unsampled) item set, not just the sampled subset: a
         # record_pk absent from the sample is simply never looked up when scoring
@@ -505,6 +510,11 @@ def main() -> None:
         opt = normalized["optional_items"]
         excluded = set(normalized["explicitly_excluded_items"])
         gates = normalized["gates"]
+        gate_cfg = {"required_fields": req, **gates}
+        shape_gate_summary_sample = summarize_shape_gate_usage(dom_records, identity_index, req, gate_cfg)
+        shape_gate_summary_full = summarize_shape_gate_usage(dom_records_all, identity_index, req, gate_cfg)
+        shape_gate_summary_json = json.dumps(shape_gate_summary_sample, sort_keys=True, separators=(",", ":"))
+        shape_gate_summary_full_json = json.dumps(shape_gate_summary_full, sort_keys=True, separators=(",", ":"))
         scoped_candidates = _without_excluded(candidate_fields, excluded)
 
         # Required fields that never appear anywhere in this domain's populated
@@ -553,8 +563,7 @@ def main() -> None:
                     "sample_seed_arg": str(args.sample_seed),
                     "max_candidate_fields_arg": str(args.max_candidate_fields),
                     "max_k_effective": "",
-                    "candidate_fields_raw": "|".join(candidate_fields),
-                    "candidate_fields_raw_count": str(len(candidate_fields)),
+                    **_candidate_diagnostics(candidate_filter),
                     "scoped_candidates": "|".join(scoped_candidates),
                     "scoped_candidates_count": str(len(scoped_candidates)),
                     "work_candidates": "|".join(work_candidates),
@@ -580,6 +589,12 @@ def main() -> None:
                     "excluded_count": str(len(excluded)),
                     "excluded_items": "|".join(sorted(excluded)),
                     "stratify_by": stratify_key,
+                    "policy_shape_gate_enabled": "true" if shape_gate_summary_sample.get("enabled") else "false",
+                    "policy_shape_gate_discriminator_key": str(shape_gate_summary_sample.get("discriminator_key", "")),
+                    "policy_shape_gate_summary_json": shape_gate_summary_json,
+                    "policy_shape_gate_summary_full_json": shape_gate_summary_full_json,
+                    "policy_shape_gate_missing_required_sample": str(shape_gate_summary_sample.get("records_missing_required", 0)),
+                    "policy_shape_gate_missing_required_full": str(shape_gate_summary_full.get("records_missing_required", 0)),
                     "coverage_full": "0",
                     "collision_rate_full": "1",
                     "fragmentation_rate_full": "1",
@@ -598,22 +613,52 @@ def main() -> None:
             max_k = int(args.max_k)
             if policy_mode == "validate" and req:
                 max_k = max(max_k, len(req))
-            cfg = {"max_k": max_k, "gates": {"required_fields": req, **gates}}
+            cfg = {
+                "max_k": max_k,
+                "work_budget": int(args.work_budget),
+                "frontier_limit": int(args.pareto_frontier_limit),
+                "progress": not bool(args.no_pareto_progress),
+                "domain": domain,
+                "gates": dict(gates),
+                "evaluation_mode": "candidate" if policy_mode == "discover" else "runtime",
+                "runtime_required_fields": [] if policy_mode == "discover" else list(req),
+            }
             for search_mode in search_modes:
                 status = "ok"
                 selected: List[str] = []
                 metrics: Dict[str, object] = {}
                 reason = ""
                 frontier_size = 0
+                search_diagnostics: Dict[str, object] = {}
+                pareto_full_verification = None
                 fallback_used = False
                 if search_mode == "pareto":
+                    if full_verify:
+                        def _verify_finalist(finalist):
+                            finalist_metrics = finalist.get("metrics", {})
+                            finalist_fields = [x for x in str(finalist.get("keys", "")).split("|") if x]
+                            full_metrics, finalist_diverges = _full_population_verify(
+                                dom_records_all, identity_index, finalist_fields, cfg,
+                                finalist_metrics, divergence_delta,
+                                coverage_drop_threshold=coverage_drop_threshold,
+                            )
+                            accepted_full = (
+                                float(full_metrics.get("coverage", 0.0)) == 1.0
+                                and float(full_metrics.get("collision_rate", 1.0)) == 0.0
+                                and float(full_metrics.get("fragmentation_rate", 1.0)) == 0.0
+                                and not finalist_diverges
+                            )
+                            return {"metrics": full_metrics, "diverges": finalist_diverges, "accepted_full": accepted_full}
+                        cfg["finalist_verifier"] = _verify_finalist
                     p = _pareto_search_adapter(dom_records, identity_index, work_candidates, cfg)
+                    search_diagnostics = p.get("diagnostics", {}) if isinstance(p.get("diagnostics"), dict) else {}
+                    pareto_full_verification = search_diagnostics.get("full_verification")
                     frontier = p.get("frontier") if isinstance(p.get("frontier"), list) else []
                     if policy_mode == "validate" and req:
                         frontier = [row for row in frontier if set(req).issubset(set(str(row.get("keys", "")).split("|")))]
                     frontier_size = len(frontier)
                     if frontier:
-                        chosen = sorted(frontier, key=lambda x: (x.get("collision_rate", 1.0), x.get("coverage_gap", 1.0), x.get("k_count", 99), x.get("keys", "")))[0]
+                        chosen = p.get("chosen") if isinstance(p.get("chosen"), dict) else sorted(frontier, key=lambda x: (x.get("k_count", 99), x.get("coverage_gap", 1.0), x.get("collision_rate", 1.0), x.get("fragmentation_rate", 1.0), x.get("keys", "")))[0]
                         selected = [x for x in str(chosen.get("keys", "")).split("|") if x]
                         metrics = chosen.get("metrics", {}) if isinstance(chosen.get("metrics"), dict) else {}
                     elif policy_mode == "validate" and req:
@@ -655,12 +700,15 @@ def main() -> None:
                 # one) whenever `selected` differs from req. Stripping the same gate
                 # for verification, unconditional on search_mode, keeps it consistent
                 # with whichever engine actually produced `selected`.
-                verify_gates = {k: v for k, v in (cfg.get("gates") or {}).items() if k != "required_fields"}
-                verify_cfg = {**cfg, "gates": verify_gates}
+                verify_cfg = dict(cfg)
                 full_verify_status = "skipped_no_full_verify_flag"
                 metrics_full: Dict[str, object] = {}
                 diverges = False
-                if selected and full_verify:
+                if selected and full_verify and isinstance(pareto_full_verification, dict):
+                    metrics_full = pareto_full_verification.get("metrics", {})
+                    diverges = bool(pareto_full_verification.get("diverges", False))
+                    full_verify_status = "ok"
+                elif selected and full_verify:
                     metrics_full, diverges = _full_population_verify(
                         dom_records_all, identity_index, selected, verify_cfg, metrics, divergence_delta,
                         coverage_drop_threshold=coverage_drop_threshold,
@@ -692,13 +740,24 @@ def main() -> None:
                     "sample_seed_arg": str(args.sample_seed),
                     "max_candidate_fields_arg": str(args.max_candidate_fields),
                     "max_k_effective": str(max_k),
-                    "candidate_fields_raw": "|".join(candidate_fields),
-                    "candidate_fields_raw_count": str(len(candidate_fields)),
+                    **_candidate_diagnostics(candidate_filter),
                     "scoped_candidates": "|".join(scoped_candidates),
                     "scoped_candidates_count": str(len(scoped_candidates)),
                     "work_candidates": "|".join(work_candidates),
                     "work_candidates_count": str(len(work_candidates)),
                     "selected_fields": "|".join(selected),
+                    "effective_fields_actually_scored": "|".join(
+                        str(x) for x in metrics.get("effective_fields_actually_scored", [])
+                    ),
+                    "candidate_fields_available": "|".join(scoped_candidates),
+                    "candidate_fields_evaluated": "|".join(work_candidates),
+                    "policy_required_fields": "|".join(req),
+                    "policy_optional_fields": "|".join(opt),
+                    "policy_excluded_fields": "|".join(sorted(excluded)),
+                    "discriminator_key": str(gates.get("discriminator_key", "")),
+                    "discriminator_source": "existing_policy" if gates.get("discriminator_key") else "",
+                    "discriminator_value": "__all__",
+                    "mode": policy_mode,
                     "coverage": f"{float(metrics.get('coverage', 0.0)):.6f}",
                     "collision_rate": f"{float(metrics.get('collision_rate', 1.0)):.6f}",
                     "fragmentation_rate": f"{float(metrics.get('fragmentation_rate', 1.0)):.6f}",
@@ -711,6 +770,15 @@ def main() -> None:
                     "effective_cluster_count": f"{float(metrics.get('effective_cluster_count', 0.0)):.6f}",
                     "failures_json": json.dumps(metrics.get("failures", {}) if isinstance(metrics.get("failures"), dict) else {}, sort_keys=True),
                     "frontier_size": str(frontier_size),
+                    "pareto_subsets_evaluated": str(search_diagnostics.get("subsets_evaluated", "")),
+                    "pareto_k_levels_attempted": "|".join(str(x) for x in search_diagnostics.get("k_levels_attempted", [])),
+                    "pareto_max_k_attempted": str(search_diagnostics.get("max_k_attempted", "")),
+                    "pareto_stop_reason": str(search_diagnostics.get("stop_reason", "")),
+                    "pareto_frontier_retained": str(search_diagnostics.get("frontier_retained", "")),
+                    "pareto_estimated_search_work": str(search_diagnostics.get("estimated_search_work", "")),
+                    "pareto_work_budget": str(search_diagnostics.get("work_budget", args.work_budget if search_mode == "pareto" else "")),
+                    "pareto_work_budget_exhausted": str(search_diagnostics.get("work_budget_exhausted", "")).lower(),
+                    "pareto_elapsed_seconds": f"{float(search_diagnostics.get('elapsed_seconds', 0.0)):.6f}" if search_diagnostics else "",
                     "fallback_used": "true" if fallback_used else "false",
                     "required_count": str(len(req)),
                     "required_fields": "|".join(req),
@@ -719,6 +787,12 @@ def main() -> None:
                     "excluded_count": str(len(excluded)),
                     "excluded_items": "|".join(sorted(excluded)),
                     "stratify_by": stratify_key,
+                    "policy_shape_gate_enabled": "true" if shape_gate_summary_sample.get("enabled") else "false",
+                    "policy_shape_gate_discriminator_key": str(shape_gate_summary_sample.get("discriminator_key", "")),
+                    "policy_shape_gate_summary_json": shape_gate_summary_json,
+                    "policy_shape_gate_summary_full_json": shape_gate_summary_full_json,
+                    "policy_shape_gate_missing_required_sample": str(shape_gate_summary_sample.get("records_missing_required", 0)),
+                    "policy_shape_gate_missing_required_full": str(shape_gate_summary_full.get("records_missing_required", 0)),
                     "coverage_full": f"{float(metrics_full.get('coverage', 0.0)):.6f}",
                     "collision_rate_full": f"{float(metrics_full.get('collision_rate', 1.0)):.6f}",
                     "fragmentation_rate_full": f"{float(metrics_full.get('fragmentation_rate', 1.0)):.6f}",
@@ -732,6 +806,117 @@ def main() -> None:
                     "full_verify_status": full_verify_status,
                     "sample_vs_full_diverges": "true" if diverges else "false",
                 })
+
+        # A discriminator supplied by the existing policy is partitioning context,
+        # not a discovery key requirement. Emit independent per-value challenger
+        # rows in addition to the common/global rows above. This intentionally does
+        # not reuse shape_requirements: those contain ratified runtime fields.
+        discriminator_key = str(gates.get("discriminator_key") or "").strip()
+        if "discover" in policy_modes and discriminator_key:
+            by_value: Dict[str, List[Dict[str, str]]] = {}
+            # Partition the full population before applying the sample cap. If the
+            # global sample were partitioned instead, an imbalanced domain could
+            # silently lose a rare discriminator value altogether.
+            for record in dom_records_all:
+                pk = record.get("record_pk", "").strip()
+                qv = identity_index.get(pk, {}).get(discriminator_key)
+                value = qv[1].strip() if qv else "__missing_discriminator__"
+                by_value.setdefault(value or "__missing_discriminator__", []).append(record)
+            for discriminator_value in sorted(by_value, key=str.lower):
+                partition_records_all = by_value[discriminator_value]
+                partition_pks_all = {r.get("record_pk", "").strip() for r in partition_records_all}
+                partition_items_all = [it for it in dom_items_all if it.get("record_pk", "").strip() in partition_pks_all]
+                if stratify_key:
+                    partition_records = _stratified_sample(
+                        partition_records_all, partition_items_all, stratify_key,
+                        int(args.sample_size), int(args.sample_seed),
+                    )
+                else:
+                    partition_records = _sample_domain_records(
+                        partition_records_all, int(args.sample_size), int(args.sample_seed)
+                    )
+                partition_pks = {r.get("record_pk", "").strip() for r in partition_records}
+                partition_items = [it for it in partition_items_all if it.get("record_pk", "").strip() in partition_pks]
+                partition_filter = filter_and_cap_candidates(domain, _pick_candidate_fields(partition_items, 0), int(args.max_candidate_fields))
+                partition_candidates = _without_excluded(partition_filter["eligible"], excluded)
+                domain_has_candidates = domain_has_candidates or bool(partition_candidates)
+                for search_mode in search_modes:
+                    cfg = {"max_k": int(args.max_k), "gates": {"discriminator_key": discriminator_key}, "evaluation_mode": "candidate"}
+                    if search_mode == "pareto":
+                        result = _pareto_search_adapter(partition_records, identity_index, partition_candidates, cfg)
+                        frontier = result.get("frontier") if isinstance(result.get("frontier"), list) else []
+                        chosen = sorted(frontier, key=lambda x: (x.get("collision_rate", 1.0), x.get("coverage_gap", 1.0), x.get("k_count", 99), x.get("keys", "")))[0] if frontier else None
+                        selected = [x for x in str(chosen.get("keys", "")).split("|") if x] if chosen else []
+                        metrics = chosen.get("metrics", {}) if chosen and isinstance(chosen.get("metrics"), dict) else {}
+                    else:
+                        result = discover_greedy(partition_records, identity_index, partition_candidates, cfg)
+                        selected = [str(x) for x in result.get("selected_fields", []) if str(x).strip()]
+                        metrics = result.get("metrics", {}) if isinstance(result.get("metrics"), dict) else {}
+                        frontier = []
+                    metrics_full: Dict[str, object] = {}
+                    partition_diverges = False
+                    partition_verify_status = "skipped_no_full_verify_flag"
+                    if selected and full_verify:
+                        metrics_full, partition_diverges = _full_population_verify(
+                            partition_records_all, identity_index, selected, cfg, metrics,
+                            divergence_delta, coverage_drop_threshold=coverage_drop_threshold,
+                        )
+                        partition_verify_status = "ok"
+                    elif not selected:
+                        partition_verify_status = "skipped_no_selection"
+                    report_rows.append({
+                        "domain": domain, "policy_mode": "discover", "mode": "discover", "search_mode": search_mode,
+                        "result_scope": "partition_diagnostic",
+                        "status": "ok" if selected else "blocked", "reason": "" if selected else "no_frontier",
+                        "records_total_domain": str(records_total_domain), "records_sampled_domain": str(records_sampled_domain),
+                        "sample_rate": f"{sample_rate:.6f}",
+                        "records_total_partition": str(len(partition_records_all)),
+                        "records_sampled_partition": str(len(partition_records)),
+                        "partition_sample_rate": f"{(len(partition_records) / len(partition_records_all)) if partition_records_all else 0.0:.6f}",
+                        "sample_size_arg": str(args.sample_size), "sample_seed_arg": str(args.sample_seed),
+                        "max_candidate_fields_arg": str(args.max_candidate_fields), "max_k_effective": str(args.max_k),
+                        **_candidate_diagnostics(partition_filter),
+                        "scoped_candidates": "|".join(partition_candidates), "scoped_candidates_count": str(len(partition_candidates)),
+                        "work_candidates": "|".join(partition_candidates), "work_candidates_count": str(len(partition_candidates)),
+                        "candidate_fields_available": "|".join(partition_candidates), "candidate_fields_evaluated": "|".join(partition_candidates),
+                        "selected_fields": "|".join(selected),
+                        "effective_fields_actually_scored": "|".join(str(x) for x in metrics.get("effective_fields_actually_scored", [])),
+                        "policy_required_fields": "|".join(req), "policy_optional_fields": "|".join(opt),
+                        "policy_excluded_fields": "|".join(sorted(excluded)), "discriminator_key": discriminator_key,
+                        "discriminator_source": "existing_policy", "discriminator_value": discriminator_value,
+                        "coverage": f"{float(metrics.get('coverage', 0.0)):.6f}",
+                        "collision_rate": f"{float(metrics.get('collision_rate', 1.0)):.6f}",
+                        "fragmentation_rate": f"{float(metrics.get('fragmentation_rate', 1.0)):.6f}",
+                        "records_total": str(int(metrics.get("records_total", 0) or 0)),
+                        "records_covered": str(int(metrics.get("records_covered", 0) or 0)),
+                        "collision_records": str(int(metrics.get("collision_records", 0) or 0)),
+                        "fragmented_sig_count": str(int(metrics.get("fragmented_sig_count", 0) or 0)),
+                        "join_group_count": str(int(metrics.get("join_group_count", 0) or 0)),
+                        "hhi": f"{float(metrics.get('hhi', 0.0)):.6f}",
+                        "effective_cluster_count": f"{float(metrics.get('effective_cluster_count', 0.0)):.6f}",
+                        "failures_json": json.dumps(metrics.get("failures", {}), sort_keys=True),
+                        "frontier_size": str(len(frontier)), "fallback_used": "false",
+                        "required_count": str(len(req)), "required_fields": "|".join(req),
+                        "optional_count": str(len(opt)), "optional_items": "|".join(opt),
+                        "excluded_count": str(len(excluded)), "excluded_items": "|".join(sorted(excluded)),
+                        "stratify_by": stratify_key, "policy_shape_gate_enabled": "true",
+                        "policy_shape_gate_discriminator_key": discriminator_key,
+                        "coverage_full": f"{float(metrics_full.get('coverage', 0.0)):.6f}" if metrics_full else "",
+                        "collision_rate_full": f"{float(metrics_full.get('collision_rate', 1.0)):.6f}" if metrics_full else "",
+                        "fragmentation_rate_full": f"{float(metrics_full.get('fragmentation_rate', 1.0)):.6f}" if metrics_full else "",
+                        "records_total_full": str(int(metrics_full.get("records_total", 0) or 0)) if metrics_full else "",
+                        "records_covered_full": str(int(metrics_full.get("records_covered", 0) or 0)) if metrics_full else "",
+                        "collision_records_full": str(int(metrics_full.get("collision_records", 0) or 0)) if metrics_full else "",
+                        "fragmented_sig_count_full": str(int(metrics_full.get("fragmented_sig_count", 0) or 0)) if metrics_full else "",
+                        "join_group_count_full": str(int(metrics_full.get("join_group_count", 0) or 0)) if metrics_full else "",
+                        "hhi_full": f"{float(metrics_full.get('hhi', 0.0)):.6f}" if metrics_full else "",
+                        "effective_cluster_count_full": f"{float(metrics_full.get('effective_cluster_count', 0.0)):.6f}" if metrics_full else "",
+                        "full_verify_status": partition_verify_status,
+                        "sample_vs_full_diverges": "true" if partition_diverges else "false",
+                    })
+
+        if not domain_has_candidates:
+            failures.append(domain)
 
         # optional compatibility policy JSON generation. Requires a non-diverging
         # full-population verification (sample_vs_full_diverges != "true") -- a
@@ -801,12 +986,20 @@ def main() -> None:
     diagnostics_dir = phase0_dir.parent / "diagnostics"
     fields = [
         "domain", "policy_mode", "search_mode", "status", "reason",
-        "records_total_domain", "records_sampled_domain", "sample_rate", "sample_size_arg", "sample_seed_arg", "max_candidate_fields_arg", "max_k_effective",
-        "candidate_fields_raw", "candidate_fields_raw_count", "scoped_candidates", "scoped_candidates_count", "work_candidates", "work_candidates_count",
+        "records_total_domain", "records_sampled_domain", "sample_rate", "records_total_partition", "records_sampled_partition", "partition_sample_rate", "sample_size_arg", "sample_seed_arg", "max_candidate_fields_arg", "max_k_effective",
+        "candidate_fields_raw", "candidate_fields_raw_count", "candidate_fields_excluded", "candidate_fields_excluded_count",
+        "candidate_fields_alias_suppressed", "candidate_fields_alias_suppressed_count", "candidate_fields_eligible", "candidate_fields_eligible_count",
+        "scoped_candidates", "scoped_candidates_count", "work_candidates", "work_candidates_count",
+        "candidate_fields_available", "candidate_fields_evaluated", "effective_fields_actually_scored",
+        "policy_required_fields", "policy_optional_fields", "policy_excluded_fields", "discriminator_key", "discriminator_source", "discriminator_value", "mode", "result_scope",
         "selected_fields", "coverage", "collision_rate", "fragmentation_rate",
         "records_total", "records_covered", "collision_records", "fragmented_sig_count", "join_group_count", "hhi", "effective_cluster_count", "failures_json", "frontier_size", "fallback_used",
+        "pareto_subsets_evaluated", "pareto_k_levels_attempted", "pareto_max_k_attempted", "pareto_stop_reason", "pareto_frontier_retained", "pareto_estimated_search_work", "pareto_work_budget", "pareto_work_budget_exhausted", "pareto_elapsed_seconds",
         "required_count", "required_fields", "optional_count", "optional_items", "excluded_count", "excluded_items",
         "stratify_by",
+        "policy_shape_gate_enabled", "policy_shape_gate_discriminator_key",
+        "policy_shape_gate_summary_json", "policy_shape_gate_summary_full_json",
+        "policy_shape_gate_missing_required_sample", "policy_shape_gate_missing_required_full",
         "coverage_full", "collision_rate_full", "fragmentation_rate_full", "records_total_full", "records_covered_full",
         "collision_records_full", "fragmented_sig_count_full", "join_group_count_full", "hhi_full", "effective_cluster_count_full",
         "full_verify_status", "sample_vs_full_diverges",

@@ -17,7 +17,8 @@ Governance posture:
   governed semantic hash inputs.
 
 sig_hash composition: category + schema_hash + is_in_place + is_editable +
-structural_material_type + is_active.
+structural_material_type + is_active + can_have_structural_section +
+has_thermal_properties.
 family_name is label-only — not included in sig or join hashes.
 
 Future steps:
@@ -79,6 +80,42 @@ def _safe_attr(obj, attr, default=None):
         return getattr(obj, attr, default)
     except Exception:
         return default
+
+
+def _safe_call(obj, method_name, default=None):
+    """Invoke a zero-arg instance method, swallowing missing-member/exception cases.
+
+    Mirrors _safe_attr's error-to-default convention, but for methods
+    (CanHaveStructuralSection/HasThermalProperties are .NET methods, not
+    properties -- _safe_attr would return the bound method object itself
+    rather than calling it).
+    """
+    try:
+        method = getattr(obj, method_name, None)
+        if method is None:
+            return default
+        return method()
+    except Exception:
+        return default
+
+
+def _aggregate_bool_pairs(pairs):
+    """Aggregate per-symbol canonicalize_bool() (v, q) pairs into a family-level state.
+
+    Mirrors the any_true/all_true -> true/partial/false pattern already used for
+    lftp.has_value below: a single unreadable read poisons the whole aggregate
+    (checked ahead of missing so it dominates), and a single missing read --
+    without any unreadable -- reports q=missing rather than being silently
+    dropped by the OK-only branch (see the lft.is_active fix, CHANGELOG Area 12).
+    """
+    if any(q == ITEM_Q_UNREADABLE for _, q in pairs):
+        return None, ITEM_Q_UNREADABLE
+    if any(q == ITEM_Q_MISSING for _, q in pairs):
+        return None, ITEM_Q_MISSING
+    trues = [v == "true" for v, q in pairs]
+    any_true = any(trues)
+    all_true = all(trues) if trues else False
+    return ("true" if all_true else ("partial" if any_true else "false")), ITEM_Q_OK
 
 
 def _param_id_int(param):
@@ -261,19 +298,30 @@ def extract(doc, ctx=None):
         # any_true/all_true -> true/partial/false pattern already used above for
         # lftp.has_value.
         is_active_pairs = [canonicalize_bool(_safe_attr(sym, "IsActive", None)) for sym in fam_syms]
-        if any(q == ITEM_Q_UNREADABLE for _, q in is_active_pairs):
-            is_active_v, is_active_q = None, ITEM_Q_UNREADABLE
-        elif any(q == ITEM_Q_MISSING for _, q in is_active_pairs):
-            # A single missing read must not be silently dropped from the
-            # aggregate by the OK-only filter below -- that would let a
-            # partially-unobserved family report q=ok off the readable subset.
-            is_active_v, is_active_q = None, ITEM_Q_MISSING
-        else:
-            actives = [v == "true" for v, q in is_active_pairs]
-            any_active = any(actives)
-            all_active = all(actives) if actives else False
-            is_active_v = "true" if all_active else ("partial" if any_active else "false")
-            is_active_q = ITEM_Q_OK
+        is_active_v, is_active_q = _aggregate_bool_pairs(is_active_pairs)
+
+        # CanHaveStructuralSection/HasThermalProperties are zero-arg instance
+        # methods on FamilySymbol (confirmed via the probe's own reflection
+        # sweep -- audit_11 findings §12 -- as "method" member_kind, not
+        # "property"; _safe_attr would return the bound method object itself
+        # rather than a bool, so these use _safe_call instead). Both are
+        # per-type capability queries, not family-level constants like
+        # structural_material_type above -- this file has already been burned
+        # once by assuming family-constant without evidence (see is_active
+        # above), so aggregate across all symbols in the family the same way.
+        can_have_structural_section_pairs = [
+            canonicalize_bool(_safe_call(sym, "CanHaveStructuralSection")) for sym in fam_syms
+        ]
+        can_have_structural_section_v, can_have_structural_section_q = _aggregate_bool_pairs(
+            can_have_structural_section_pairs
+        )
+
+        has_thermal_properties_pairs = [
+            canonicalize_bool(_safe_call(sym, "HasThermalProperties")) for sym in fam_syms
+        ]
+        has_thermal_properties_v, has_thermal_properties_q = _aggregate_bool_pairs(
+            has_thermal_properties_pairs
+        )
 
         fam_symbol_count_raw = None
         try:
@@ -351,6 +399,8 @@ def extract(doc, ctx=None):
             make_identity_item("lft.type_count", type_count_v, type_count_q),
             make_identity_item("lft.structural_material_type", struct_material_type_v, struct_material_type_q),
             make_identity_item("lft.is_active", is_active_v, is_active_q),
+            make_identity_item("lft.can_have_structural_section", can_have_structural_section_v, can_have_structural_section_q),
+            make_identity_item("lft.has_thermal_properties", has_thermal_properties_v, has_thermal_properties_q),
         ]
 
         status_reasons = []

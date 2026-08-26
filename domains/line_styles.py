@@ -376,6 +376,13 @@ def extract(doc, ctx=None):
 
             identity_items.append(make_identity_item("line_style.pattern_ref.sig_hash", lp_sig_hash_v, lp_sig_hash_q))
 
+            # D-040: pattern_ref.synopsis (a derived shape summary, e.g. "[solid]" or a
+            # dash/dot sequence description -- not the pattern's own Revit name) is also
+            # added to identity_basis.items so it's visible to discover_hash_policy.py's
+            # pareto search; it stays out of LINE_STYLE_SEMANTIC_KEYS below, so this does
+            # not change sig_hash. Previously only emitted into phase2.coordination_items.
+            identity_items.append(make_identity_item("line_style.pattern_ref.synopsis", lp_synopsis_v, lp_synopsis_q))
+
             # Enforce minima: required not-ok => blocked
             if any(q != ITEM_Q_OK for q in required_qs):
                 status_v2 = STATUS_BLOCKED

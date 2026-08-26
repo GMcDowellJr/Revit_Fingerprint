@@ -1,0 +1,329 @@
+# Routing catalog: `archived (page 3)`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 11
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `archived` partition): `a10201250a29a18d2265a41f13d9edd500558df3e37d62b9f0c989d241809fc3`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tools/patterns_analysis/_archive/run_identity_collision_diagnostics.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: run identity collision diagnostics
+- Important symbols (3 total):
+  - `_multiplicity_map` (function) — line 14
+  - `run_identity_collision_diagnostics` (function) — line 32
+  - `main` (function) — line 163
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/index.py`
+  - imports `tools/patterns_analysis/_archive/io.py`
+  - imports `tools/patterns_analysis/_archive/report.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/run_identity_collision_diagnostics.py:178)`
+  - `_run_all_phase2 (tools/patterns_analysis/_archive/run_dimension_types_by_family.py:302)`
+  - `main (tools/patterns_analysis/_archive/run_identity_collision_diagnostics.py:170)`
+  - `run_identity_collision_diagnostics (tools/patterns_analysis/_archive/run_identity_collision_diagnostics.py:71)`
+  - `run_identity_collision_diagnostics (tools/patterns_analysis/_archive/run_identity_collision_diagnostics.py:98)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`5fcb59683725ddd8…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/run_identity_collision_diagnostics.py`)
+
+### `tools/patterns_analysis/_archive/run_joinhash_label_population.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: run joinhash label population
+- Important symbols (4 total):
+  - `_get_join_hash` (function) — line 14
+  - `_extract_label_qv` (function) — line 28
+  - `run_joinhash_label_population` (function) — line 78
+  - `main` (function) — line 216
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/io.py`
+  - imports `tools/patterns_analysis/_archive/report.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/run_joinhash_label_population.py:231)`
+  - `_run_all_phase2 (tools/patterns_analysis/_archive/run_dimension_types_by_family.py:276)`
+  - `main (tools/patterns_analysis/_archive/run_joinhash_label_population.py:223)`
+  - `run_joinhash_label_population (tools/patterns_analysis/_archive/run_joinhash_label_population.py:109)`
+  - `run_joinhash_label_population (tools/patterns_analysis/_archive/run_joinhash_label_population.py:114)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`dbf930e689cbccc6…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/run_joinhash_label_population.py`)
+
+### `tools/patterns_analysis/_archive/run_joinhash_parameter_population.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: run joinhash parameter population
+- Important symbols (8 total):
+  - `_get_join_hash` (function) — line 14
+  - `_stable_json` (function) — line 28
+  - `_is_scalar` (function) — line 41
+  - `_extract_qv_from_value` (function) — line 45
+  - `_phase2_bucket_items` (function) — line 87
+  - `_iter_record_parameters` (function) — line 101
+  - `run_joinhash_parameter_population` (function) — line 173
+  - `main` (function) — line 411
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/io.py`
+  - imports `tools/patterns_analysis/_archive/report.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/run_joinhash_parameter_population.py:440)`
+  - `_extract_qv_from_value (tools/patterns_analysis/_archive/run_joinhash_parameter_population.py:55)`
+  - `_iter_record_parameters (tools/patterns_analysis/_archive/run_joinhash_parameter_population.py:123)`
+  - `_iter_record_parameters (tools/patterns_analysis/_archive/run_joinhash_parameter_population.py:124)`
+  - `_iter_record_parameters.emit_bucket (tools/patterns_analysis/_archive/run_joinhash_parameter_population.py:133)`
+  - `_run_all_phase2 (tools/patterns_analysis/_archive/run_dimension_types_by_family.py:282)`
+  - `main (tools/patterns_analysis/_archive/run_joinhash_parameter_population.py:426)`
+  - `run_joinhash_parameter_population (tools/patterns_analysis/_archive/run_joinhash_parameter_population.py:214)`
+  - `run_joinhash_parameter_population (tools/patterns_analysis/_archive/run_joinhash_parameter_population.py:222)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`ac73e20e24394be6…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/run_joinhash_parameter_population.py`)
+
+### `tools/patterns_analysis/_archive/run_population_stability.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: run population stability
+- Important symbols (3 total):
+  - `run_population_stability` (function) — line 14
+  - `_parse_args` (function) — line 89
+  - `main` (function) — line 102
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/index.py`
+  - imports `tools/patterns_analysis/_archive/io.py`
+  - imports `tools/patterns_analysis/_archive/report.py`
+  - imports `tools/patterns_analysis/_archive/stability.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/run_population_stability.py:114)`
+  - `_run_all_phase2 (tools/patterns_analysis/_archive/run_dimension_types_by_family.py:263)`
+  - `main (tools/patterns_analysis/_archive/run_population_stability.py:103)`
+  - `main (tools/patterns_analysis/_archive/run_population_stability.py:105)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`17f4faba7c8d1530…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/run_population_stability.py`)
+
+### `tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: run text types candidate joinkey simulation
+- Important symbols (6 total):
+  - `_norm_scalar` (function) — line 13
+  - `_get_top` (function) — line 23
+  - `_get_p2_value` (function) — line 27
+  - `_extract_features` (function) — line 43
+  - `run` (function) — line 61
+  - `main` (function) — line 165
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/io.py`
+  - imports `tools/patterns_analysis/_archive/report.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py:175)`
+  - `_extract_features (tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py:51)`
+  - `_extract_features (tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py:54)`
+  - `_extract_features (tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py:55)`
+  - `_extract_features (tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py:56)`
+  - `_get_p2_value (tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py:39)`
+  - `_get_top (tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py:24)`
+  - `main (tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py:171)`
+  - `run (tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py:88)`
+  - `run (tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py:95)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`1d03d454cea13064…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/run_text_types_candidate_joinkey_simulation.py`)
+
+### `tools/patterns_analysis/_archive/run_view_category_overrides_joinkey_analysis.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - module docstring: View Category Overrides Join Key Discovery
+  - filename/path terms: run view category overrides joinkey analysis
+- Important symbols (4 total):
+  - `_stable_delta_hash` (function) — line 21
+  - `_extract_override_record` (function) — line 28
+  - `analyze_override_patterns` (function) — line 55
+  - `main` (function) — line 188
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/run_view_category_overrides_joinkey_analysis.py:197)`
+  - `_extract_override_record (tools/patterns_analysis/_archive/run_view_category_overrides_joinkey_analysis.py:44)`
+  - `analyze_override_patterns (tools/patterns_analysis/_archive/run_view_category_overrides_joinkey_analysis.py:80)`
+  - `main (tools/patterns_analysis/_archive/run_view_category_overrides_joinkey_analysis.py:193)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`309b6acf6204dc13…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/run_view_category_overrides_joinkey_analysis.py`)
+
+### `tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - module docstring: View Templates Join Key Discovery
+  - filename/path terms: run view templates joinkey analysis
+- Important symbols (9 total):
+  - `_join_key_from_record` (function) — line 20
+  - `_detect_demo_plan` (function) — line 30
+  - `_project_identifier` (function) — line 42
+  - `_pareto_cover` (function) — line 55
+  - `test_join_key` (function) — line 68
+  - `_print_option_summary` (function) — line 127
+  - `_print_sample_interpretation` (function) — line 145
+  - `analyze_view_templates` (function) — line 155
+  - `main` (function) — line 190
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py:200)`
+  - `analyze_view_templates (tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py:184)`
+  - `analyze_view_templates (tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py:185)`
+  - `analyze_view_templates (tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py:187)`
+  - `main (tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py:196)`
+  - `test_join_key (tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py:105)`
+  - `test_join_key (tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py:86)`
+  - `test_join_key (tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py:96)`
+  - `test_join_key (tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py:97)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`90fadf030b1de2f6…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/run_view_templates_joinkey_analysis.py`)
+
+### `tools/patterns_analysis/_archive/split_detection.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - module docstring: Core split detection functionality.
+  - filename/path terms: split detection
+- Important symbols (11 total):
+  - `Cluster` (class) — line 20
+  - `SplitSignal` (class) — line 33
+  - `extract_metadata_patterns` (function) — line 42
+  - `find_common_path_components` (function) — line 85
+  - `infer_region_from_paths` (function) — line 105
+  - `infer_office_from_paths` (function) — line 132
+  - `extract_dates_from_paths` (function) — line 161
+  - `compute_silhouette_score` (function) — line 180
+  - `interpret_silhouette_score` (function) — line 200
+  - `cluster_assignments_to_labels` (function) — line 213
+  - `build_distance_matrix_from_similarity` (function) — line 227
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `extract_metadata_patterns (tools/patterns_analysis/_archive/split_detection.py:64)`
+  - `extract_metadata_patterns (tools/patterns_analysis/_archive/split_detection.py:67)`
+  - `extract_metadata_patterns (tools/patterns_analysis/_archive/split_detection.py:70)`
+  - `extract_metadata_patterns (tools/patterns_analysis/_archive/split_detection.py:73)`
+  - `hierarchical_cluster_files (tools/patterns_analysis/_archive/split_detection_file_level.py:225)`
+  - `hierarchical_cluster_files (tools/patterns_analysis/_archive/split_detection_file_level.py:269)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:482)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:493)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:500)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:501)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:502)`
+  - `threshold_graph_cluster_files (tools/patterns_analysis/_archive/split_detection_file_level.py:298)`
+  - `threshold_graph_cluster_files (tools/patterns_analysis/_archive/split_detection_file_level.py:352)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`9a6db0eb287fec4d…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/split_detection.py`)
+
+### `tools/patterns_analysis/_archive/split_detection_element_level.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - module docstring: Element-level classification against reference standards.
+  - filename/path terms: split detection element level
+- Important symbols (7 total):
+  - `_read_csv_rows` (function) — line 21
+  - `extract_label_display` (function) — line 30
+  - `classify_file_elements` (function) — line 76
+  - `compute_element_statistics` (function) — line 187
+  - `generate_remediation_plan` (function) — line 227
+  - `run_element_level_classification` (function) — line 280
+  - `main` (function) — line 433
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/io.py`
+  - imports `tools/patterns_analysis/_archive/report.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/split_detection_element_level.py:487)`
+  - `classify_file_elements (tools/patterns_analysis/_archive/split_detection_element_level.py:101)`
+  - `classify_file_elements (tools/patterns_analysis/_archive/split_detection_element_level.py:135)`
+  - `classify_file_elements (tools/patterns_analysis/_archive/split_detection_element_level.py:152)`
+  - `classify_file_elements (tools/patterns_analysis/_archive/split_detection_element_level.py:177)`
+  - `main (tools/patterns_analysis/_archive/split_detection_element_level.py:475)`
+  - `run_element_level_classification (tools/patterns_analysis/_archive/split_detection_element_level.py:344)`
+  - `run_element_level_classification (tools/patterns_analysis/_archive/split_detection_element_level.py:356)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`3d9fb7b6b020b3cd…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/split_detection_element_level.py`)
+
+### `tools/patterns_analysis/_archive/split_detection_file_level.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - module docstring: File-level split detection via domain profile clustering.
+  - filename/path terms: split detection file level
+- Important symbols (13 total):
+  - `compute_named_cluster_flags` (function) — line 33
+  - `build_element_profiles` (function) — line 76
+  - `compute_pairwise_similarity_candidates` (function) — line 111
+  - `_files_with_any_candidate` (function) — line 179
+  - `compute_pairwise_similarity` (function) — line 187
+  - `hierarchical_cluster_files` (function) — line 213
+  - `threshold_graph_cluster_files` (function) — line 280
+  - `compute_avg_internal_similarity` (function) — line 362
+  - `compute_avg_between_cluster_similarity` (function) — line 381
+  - `select_cluster_representative` (function) — line 403
+  - `infer_standard_name` (function) — line 428
+  - `run_file_level_clustering` (function) — line 445
+  - `main` (function) — line 616
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/io.py`
+  - imports `tools/patterns_analysis/_archive/report.py`
+  - imports `tools/patterns_analysis/_archive/split_detection.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/_archive/split_detection_file_level.py:672)`
+  - `compute_pairwise_similarity_candidates (tools/patterns_analysis/_archive/split_detection_file_level.py:165)`
+  - `hierarchical_cluster_files (tools/patterns_analysis/_archive/split_detection_file_level.py:267)`
+  - `main (tools/patterns_analysis/_archive/split_detection_file_level.py:661)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:457)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:467)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:470)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:473)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:476)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:486)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:505)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:512)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:526)`
+  - `run_file_level_clustering (tools/patterns_analysis/_archive/split_detection_file_level.py:542)`
+  - `test_compute_named_cluster_flags_largest_gap_and_equal_shares (tests/test_split_named_clusters_and_thresholds.py:31)`
+  - ... and 3 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_split_named_clusters_and_thresholds.py`
+- Retrieval identity: sha256=`c55b6950850fd915…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/split_detection_file_level.py`)
+
+### `tools/patterns_analysis/_archive/stability.py`
+- Role: `archived_or_legacy` (evidence: path contains archival directory segment '_archive')
+- Purpose clues:
+  - filename/path terms: stability
+- Important symbols (4 total):
+  - `PresenceStability` (class) — line 21
+  - `presence_counts` (function) — line 28
+  - `stable_join_hashes` (function) — line 37
+  - `stability_distribution` (function) — line 58
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/_archive/index.py`
+- Called by (high/medium-confidence static callers):
+  - `run_attribute_stress (tools/patterns_analysis/_archive/run_attribute_stress.py:46)`
+  - `run_attribute_stress_all_joinable (tools/patterns_analysis/_archive/run_attribute_stress_all_joinable.py:72)`
+  - `run_population_stability (tools/patterns_analysis/_archive/run_population_stability.py:34)`
+  - `run_population_stability (tools/patterns_analysis/_archive/run_population_stability.py:46)`
+  - `stability_distribution (tools/patterns_analysis/_archive/stability.py:71)`
+  - `stability_distribution (tools/patterns_analysis/_archive/stability.py:82)`
+  - `stable_join_hashes (tools/patterns_analysis/_archive/stability.py:54)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`5c8ba041daadd0e2…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/_archive/stability.py`)
+

@@ -1,0 +1,124 @@
+# Routing catalog: `tools/probes (page 4)`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 3
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/probes` partition): `764135461a8a642b2f798a2b03eb1cb4bd5bd2629b37925ce66714173e6ad324`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tools/probes/probe_wall_types.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: probe wall types
+- Important symbols (23 total):
+  - `_safe` (function) — line 86
+  - `_safe_name` (function) — line 92
+  - `_safe_type_name` (function) — line 95
+  - `_wall_kind_label` (function) — line 107
+  - `_safe_param_def_name` (function) — line 118
+  - `_safe_get_datatype` (function) — line 125
+  - `_is_length_datatype` (function) — line 134
+  - `_fmt_display` (function) — line 142
+  - `_format_param_contract` (function) — line 153
+  - `_maybe_set_example` (function) — line 252
+  - `_observe_synth` (function) — line 305
+  - `_pv` (function) — line 339
+  - `_resolve_material` (function) — line 408
+  - `_resolve_similar_type` (function) — line 418
+  - `_resolve_workset` (function) — line 435
+  - `_reflect_member_names` (function) — line 525
+  - `_reflect_try_get` (function) — line 673
+  - `_reflect_contract` (function) — line 695
+  - `_run_reflection_sweep` (function) — line 766
+  - `_probe_revit_version` (function) — line 828
+  - `_probe_document_identity` (function) — line 837
+  - `_probe_run_id` (function) — line 844
+  - `_probe_wrap` (function) — line 853
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/probes/probe_wall_types.py:217)`
+  - `<module> (tools/probes/probe_wall_types.py:232)`
+  - `<module> (tools/probes/probe_wall_types.py:261)`
+  - `<module> (tools/probes/probe_wall_types.py:263)`
+  - `<module> (tools/probes/probe_wall_types.py:265)`
+  - `<module> (tools/probes/probe_wall_types.py:268)`
+  - `<module> (tools/probes/probe_wall_types.py:272)`
+  - `<module> (tools/probes/probe_wall_types.py:292)`
+  - `<module> (tools/probes/probe_wall_types.py:303)`
+  - `<module> (tools/probes/probe_wall_types.py:348)`
+  - `<module> (tools/probes/probe_wall_types.py:350)`
+  - `<module> (tools/probes/probe_wall_types.py:352)`
+  - `<module> (tools/probes/probe_wall_types.py:354)`
+  - `<module> (tools/probes/probe_wall_types.py:357)`
+  - `<module> (tools/probes/probe_wall_types.py:358)`
+  - ... and 68 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`2c5a41dfd5ff1138…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_wall_types.py`)
+
+### `tools/probes/probe_worksets.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - filename/path terms: probe worksets
+- Important symbols (12 total):
+  - `_safe` (function) — line 97
+  - `_pv` (function) — line 104
+  - `_discover_enum_members` (function) — line 152
+  - `_add_inventory_obs` (function) — line 225
+  - `_reflect_member_names` (function) — line 363
+  - `_reflect_try_get` (function) — line 512
+  - `_reflect_contract` (function) — line 535
+  - `_run_reflection_sweep` (function) — line 607
+  - `_probe_revit_version` (function) — line 677
+  - `_probe_document_identity` (function) — line 687
+  - `_probe_run_id` (function) — line 695
+  - `_probe_wrap` (function) — line 706
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/probes/probe_worksets.py:175)`
+  - `<module> (tools/probes/probe_worksets.py:181)`
+  - `<module> (tools/probes/probe_worksets.py:191)`
+  - `<module> (tools/probes/probe_worksets.py:204)`
+  - `<module> (tools/probes/probe_worksets.py:206)`
+  - `<module> (tools/probes/probe_worksets.py:209)`
+  - `<module> (tools/probes/probe_worksets.py:210)`
+  - `<module> (tools/probes/probe_worksets.py:248)`
+  - `<module> (tools/probes/probe_worksets.py:249)`
+  - `<module> (tools/probes/probe_worksets.py:252)`
+  - `<module> (tools/probes/probe_worksets.py:253)`
+  - `<module> (tools/probes/probe_worksets.py:255)`
+  - `<module> (tools/probes/probe_worksets.py:257)`
+  - `<module> (tools/probes/probe_worksets.py:262)`
+  - `<module> (tools/probes/probe_worksets.py:263)`
+  - ... and 35 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`4d6aa47898d1b820…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/probe_worksets.py`)
+
+### `tools/probes/sweep_line_pattern_normhash_precision.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - filename/path terms: sweep line pattern normhash precision
+- Important symbols (4 total):
+  - `md5s` (function) — line 19
+  - `detect_cols` (function) — line 22
+  - `compute_norm_hash_for_group` (function) — line 29
+  - `main` (function) — line 97
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/probes/sweep_line_pattern_normhash_precision.py:144)`
+  - `compute_norm_hash_for_group (tools/probes/sweep_line_pattern_normhash_precision.py:64)`
+  - `compute_norm_hash_for_group (tools/probes/sweep_line_pattern_normhash_precision.py:95)`
+  - `main (tools/probes/sweep_line_pattern_normhash_precision.py:105)`
+  - `main (tools/probes/sweep_line_pattern_normhash_precision.py:120)`
+  - `main (tools/probes/sweep_line_pattern_normhash_precision.py:134)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`06db3ee9588fe3b9…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/probes/sweep_line_pattern_normhash_precision.py`)
+

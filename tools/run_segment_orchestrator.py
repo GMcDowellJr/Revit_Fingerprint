@@ -67,7 +67,20 @@ BI_MERGE_FILES = [
 # ── CSV helpers ──────────────────────────────────────────────────────────────
 
 def load_manifest(path: Path) -> Dict[str, dict]:
-    """Load segment_manifest.csv keyed by segment_id."""
+    """Load segment_manifest.csv keyed by segment_id.
+
+    --- trace ---
+    reads: `path` -- Path to segment_manifest.csv, from run_orchestrator()'s
+        --manifest-file (tools/build_segment_manifest.py's MANIFEST_FIELDNAMES output:
+        segment_id, parent_segment_id, segment_level, unit_system, governance_role,
+        client_label, discipline_label, business_center_label, run_type, file_count,
+        ...).
+    calls: none (stdlib csv.DictReader).
+    thresholds: none.
+    returns: Dict[segment_id, row-dict]; consumed by run_orchestrator() as `manifest`,
+        passed to build_run_plan()/validate_membership_against_manifest() and read per
+        segment (segment_level, governance_role, etc.) throughout _run_one_segment().
+    """
     manifest: Dict[str, dict] = {}
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
@@ -78,7 +91,21 @@ def load_manifest(path: Path) -> Dict[str, dict]:
 
 
 def load_registry(path: Path) -> List[dict]:
-    """Load run_registry.csv as a list of row dicts."""
+    """Load run_registry.csv as a list of row dicts.
+
+    --- trace ---
+    reads: `path` -- Path to run_registry.csv, from run_orchestrator()'s
+        --registry-file (tools/build_segment_manifest.py's REGISTRY_FIELDNAMES output:
+        segment_id, parent_segment_id, run_type, population_hash,
+        conformance_reference_mode, output_folder, status, last_run_utc, notes,
+        segment_purpose, segment_label).
+    calls: none (stdlib csv.DictReader).
+    thresholds: none.
+    returns: list[dict], one row per registered segment; consumed by run_orchestrator()
+        as `registry`, mutated in place by _run_one_segment() (status/last_run_utc/
+        notes) under registry_lock and persisted via write_registry_atomic() after
+        each segment.
+    """
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         return list(csv.DictReader(f))
 
@@ -88,6 +115,19 @@ def load_membership(path: Path) -> Dict[str, List[str]]:
 
     Replaces the old segment_manifest.csv `export_run_ids` pipe-delimited column,
     which could exceed spreadsheet cell limits for large populations.
+
+    --- trace ---
+    reads: `path` -- Path to segment_membership.csv, from run_orchestrator()'s
+        --membership-file (default: sibling of --manifest-file); reads its
+        segment_id/export_run_id columns (tools/build_segment_manifest.py's
+        MEMBERSHIP_FIELDNAMES output).
+    calls: none (stdlib csv.DictReader).
+    thresholds: none.
+    returns: Dict[segment_id, sorted list[export_run_id]]; consumed by
+        run_orchestrator() as `membership`, passed to
+        validate_membership_against_manifest() and used throughout
+        (_run_one_segment()'s export_run_ids, preshard's segment_plans allowed_ids,
+        dry-run's file_count) as the authoritative per-segment file population.
     """
     membership: Dict[str, List[str]] = {}
     with path.open("r", encoding="utf-8-sig", newline="") as f:
@@ -103,7 +143,20 @@ def load_membership(path: Path) -> Dict[str, List[str]]:
 
 
 def write_registry_atomic(path: Path, rows: List[dict]) -> None:
-    """Write registry rows atomically via temp-file + replace."""
+    """Write registry rows atomically via temp-file + replace.
+
+    --- trace ---
+    reads: `path`, `rows` -- caller-supplied; _run_one_segment() calls this with
+        registry_file and the shared in-memory `registry` list (mutated in place under
+        registry_lock immediately before this call).
+    calls: none (stdlib csv.DictWriter).
+    thresholds: none.
+    returns: None; no-op if `rows` is empty. Writes run_registry.csv's exact current
+        in-memory field set (fieldnames = list(rows[0].keys())) atomically (temp file +
+        Path.replace()). Called by _run_one_segment() after every segment's status
+        update, so run_registry.csv reflects live progress rather than only a final
+        batch write.
+    """
     if not rows:
         return
     fieldnames = list(rows[0].keys())
@@ -116,6 +169,15 @@ def write_registry_atomic(path: Path, rows: List[dict]) -> None:
 
 
 def utc_now_iso() -> str:
+    """Return the current UTC time as an ISO-8601 "Z"-suffixed string.
+
+    --- trace ---
+    reads: system clock (datetime.now(timezone.utc)).
+    calls: none (stdlib datetime).
+    thresholds: the format string "%Y-%m-%dT%H:%M:%SZ" is a hardcoded literal.
+    returns: str; consumed by _run_one_segment() (registry last_run_utc) and
+        run_orchestrator() (run_start_utc/run_end_utc for the run summary).
+    """
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -137,6 +199,22 @@ def compute_worker_split(
     coordinated to the same CPU budget instead of defaulting to
     run_bundle_analysis.py's own fixed default of 4 — which would otherwise let
     total concurrency grow unbounded as N grows (N x 4 instead of ~N).
+
+    --- trace ---
+    reads: `total_budget` -- Optional int, from main() only when --workers is not
+        "auto" (the explicit-N path calls this with segment_workers=N and
+        total_budget left None, so it's derived from os.cpu_count() internally);
+        `headroom` -- int, default 2 (not overridden by any caller in this file);
+        `segment_workers` -- Optional int, from main()'s parsed --workers value in the
+        explicit-N branch.
+    calls: os.cpu_count() (stdlib).
+    thresholds: `headroom = 2` (default param); the hardcoded (4, 4) fallback when
+        os.cpu_count() returns None; the sqrt-biased split constant `0.8`
+        (`round(math.sqrt(total_budget) * 0.8)`) for the auto (segment_workers=None)
+        case.
+    returns: (segment_workers, domain_workers) tuple of ints; consumed by main() to set
+        args.workers/args.bundle_workers, for both the "auto" (--workers auto) and
+        explicit-N (coordinate bundle_workers to the same CPU budget) cases.
     """
     if total_budget is None:
         cpu_count = os.cpu_count()
@@ -168,7 +246,25 @@ def _write_run_summary(
     bundle_workers: int,
     workers_auto: bool,
 ) -> Path:
-    """Write run_summary.txt to segments_root atomically (temp + replace)."""
+    """Write run_summary.txt to segments_root atomically (temp + replace).
+
+    --- trace ---
+    reads: `segments_root` -- Path, from run_orchestrator()'s --segments-root;
+        `run_start_utc`/`run_end_utc` -- str, from run_orchestrator()'s utc_now_iso()
+        calls bracketing the run; `total_elapsed_s` -- int, run_orchestrator()'s
+        wall-clock elapsed; `segment_results` -- list[dict], accumulated by
+        run_orchestrator() from every _run_one_segment() return value plus
+        skip/exception entries (keys: segment_id/status/level/files/prepare_s/
+        patterns_s/bundle_s/bi_merge_s/total_s/worker_id/patterns_top5/failure_note);
+        `workers`/`bundle_workers`/`workers_auto` -- from run_orchestrator()'s args.
+    calls: none (str.format()/print-style formatting only).
+    thresholds: none named -- column widths, "top 3"/"top-5" slicing
+        (`sorted_by_pat[:3]`, `[:5]`), and the 120-char failure-note truncation
+        (`[:120]`) are hardcoded literals.
+    returns: Path to the written run_summary.txt (segments_root/run_summary.txt,
+        written atomically via a ".tmp" sibling + Path.replace()); consumed by
+        run_orchestrator() only to print the path, not read back.
+    """
     out_path = segments_root / "run_summary.txt"
     tmp_path = segments_root / "run_summary.txt.tmp"
 
@@ -293,12 +389,35 @@ def _write_run_summary(
 # ── Subprocess helpers ────────────────────────────────────────────────────────
 
 def run_step(cmd: List[str]) -> subprocess.CompletedProcess:
-    """Run a subprocess step, capturing stderr, raising on non-zero exit."""
+    """Run a subprocess step, capturing stderr, raising on non-zero exit.
+
+    --- trace ---
+    reads: `cmd` -- list[str], a subprocess argv; no caller in this file currently
+        invokes run_step() directly (run_step_capture()/run_step_log() are used
+        instead throughout _run_one_segment()/run_orchestrator()) -- retained as a
+        simple raising variant.
+    calls: subprocess.run() (stdlib, check=True).
+    thresholds: none.
+    returns: subprocess.CompletedProcess; raises subprocess.CalledProcessError on
+        non-zero exit (check=True).
+    """
     return subprocess.run(cmd, check=True, capture_output=False, text=True)
 
 
 def run_step_capture(cmd: List[str], cwd: Optional[str] = None) -> tuple[int, str, str]:
-    """Run a subprocess step, return (returncode, last_20_lines_stderr, full_stderr)."""
+    """Run a subprocess step, return (returncode, last_20_lines_stderr, full_stderr).
+
+    --- trace ---
+    reads: `cmd` -- list[str] subprocess argv; `cwd` -- Optional[str] working
+        directory; no caller in this file currently invokes run_step_capture()
+        directly (run_step_log() is used throughout instead) -- retained as a
+        capture-without-file-logging variant.
+    calls: subprocess.run() (stdlib, capture_output=True).
+    thresholds: `-20` (last-20-lines tail, hardcoded literal, matching
+        run_step_log()'s own convention).
+    returns: (returncode, tail (last 20 stderr lines joined), full stderr); never
+        raises on non-zero exit (no check=True).
+    """
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
     stderr_lines = (result.stderr or "").splitlines()
     tail = "\n".join(stderr_lines[-20:]) if stderr_lines else ""
@@ -312,6 +431,19 @@ def run_step_log(
 ) -> tuple[int, str, str]:
     """Run subprocess writing all output (stdout+stderr) to log_path.
     Returns (returncode, last_20_lines, full_output).
+
+    --- trace ---
+    reads: `cmd` -- list[str] subprocess argv, from _run_one_segment()'s per-step
+        command lists (extract_cmd/name_patterns_cmd/bundle_cmd/name_bundle_cmd);
+        `log_path` -- Path, one of
+        out_root/{patterns,name_patterns,bundle,bundle_name}.log; `cwd` --
+        Optional[str], always str(repo_root) at every call site in this file.
+    calls: subprocess.run() (stdlib, stdout+stderr merged to `log_path`).
+    thresholds: `-20` (last-20-lines tail, hardcoded literal).
+    returns: (returncode, tail (last 20 lines of the combined log), full log content);
+        consumed by _run_one_segment() to decide step_failed/failure_notes for each of
+        the 4 subprocess steps, and to scan for "[patterns_timing]"-prefixed lines
+        after the patterns step.
     """
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("w", encoding="utf-8", errors="replace") as log_f:
@@ -335,6 +467,22 @@ def _preshard_one_shard(
 ) -> tuple[str, int, int]:
     """Process one corpus shard file, fan out to all segment shard dirs.
     Returns (shard_name, files_written, files_skipped).
+
+    --- trace ---
+    reads: `shard_file` -- one Path under records_dir/identity_items_by_domain/, from
+        _preshard_corpus_records()'s ThreadPoolExecutor.submit() loop over every *.csv
+        shard; `segment_plans` -- Dict[sid, plan] built by run_orchestrator() (each
+        plan: sid/segment_records_dir/allowed_ids/status), passed through unchanged;
+        `force` -- bool, from run_orchestrator()'s args.force/--force-preshard.
+    calls: csv.reader()/csv.writer() (stdlib) only; no other module function.
+    thresholds: _PRESHARD_BATCH = 64 (module constant, l.49: max simultaneous open
+        destination file handles per fan-out batch, so total open fds stay well below
+        typical OS limits regardless of segment count); the shard file's own
+        "export_run_id" column is looked up by name (`header.index("export_run_id")`),
+        not a hardcoded column index.
+    returns: (shard_name, files_written, files_skipped) tuple; consumed by
+        _preshard_corpus_records() only to accumulate `total_written` for its own
+        summary print -- no other function reads the individual per-shard result.
     """
     if not shard_file.is_file() or shard_file.suffix != ".csv":
         return shard_file.name, 0, 0
@@ -417,6 +565,30 @@ def _preshard_corpus_records(
     Stream each corpus source file once and fan out rows to per-segment
     destination files keyed by export_run_id.  Segments whose destination
     files already exist and are non-empty are skipped when force=False.
+
+    --- trace ---
+    reads: `records_dir` -- Path, corpus-level results/records/ (run_orchestrator()'s
+        --records-dir); reads records.csv/file_metadata.csv directly and
+        identity_items_by_domain/*.csv via _preshard_one_shard(); `segment_plans` --
+        Dict built by run_orchestrator() (see _preshard_one_shard()); `force` -- bool,
+        from run_orchestrator()'s args.force.
+    calls: csv.reader()/csv.writer() (stdlib, for records.csv/file_metadata.csv);
+        _preshard_one_shard() (via ThreadPoolExecutor, one submission per shard file);
+        concurrent.futures.ThreadPoolExecutor/as_completed() (stdlib).
+    thresholds: _PRESHARD_BATCH = 64 (module constant, shared with
+        _preshard_one_shard()); `shard_pool_size = max(1, min(8, _PRESHARD_BATCH //
+        max_seg))` (hardcoded `8` cap on concurrent shard-processing threads, derived
+        from _PRESHARD_BATCH and segment count); records.csv/file_metadata.csv's
+        "export_run_id" column looked up by name, matching _preshard_one_shard()'s
+        convention.
+    returns: None; writes each segment's records.csv/file_metadata.csv/
+        identity_items_by_domain/*.csv under segment_plans[sid]["segment_records_dir"],
+        plus ".preshard_complete" and identity_items_by_domain/.complete marker files --
+        but only for segments in `segments_to_write` (force=True, or status !=
+        "complete"), so an already-complete segment's existing sharded records are
+        left untouched. Consumed by run_orchestrator() as a side-effecting step before
+        the per-segment executor runs; the resulting ".preshard_complete" markers are
+        read back by _write_segment_records().
     """
     # csv.field_size_limit() converts to a C long; on Windows CPython the C long
     # is 32-bit so sys.maxsize overflows.  Cap at 2^31-1 which fits everywhere.
@@ -566,6 +738,27 @@ def _write_segment_records(
 
     Missing source files are skipped silently — patterns stage will simply see
     an empty (or absent) input and the guard will surface the failure cleanly.
+
+    --- trace ---
+    reads: `records_dir` -- corpus records dir; `segment_records_dir` -- this
+        segment's own results/records/ dir, from _run_one_segment()'s Step 1;
+        `allowed_ids` -- set of export_run_ids for this segment, from
+        _run_one_segment()'s `export_run_ids` (membership.get(sid, [])). Also checks
+        `segment_records_dir / ".preshard_complete"` and whether
+        `segment_records_dir/records.csv` actually exists.
+    calls: none (stdlib csv.DictReader/DictWriter only) -- this is the per-segment
+        row-by-row fallback path used only when _preshard_corpus_records() did NOT
+        already write this segment's inputs.
+    thresholds: none named -- the "trust the marker only if records.csv is also
+        present" defense-in-depth check (`preshard_marker_valid`) is inline control
+        flow, not a named constant.
+    returns: None; writes segment_records_dir/{records.csv,file_metadata.csv} and
+        segment_records_dir/identity_items_by_domain/*.csv (plus a .complete marker),
+        each filtered to rows whose export_run_id is in `allowed_ids` -- but only for
+        files/rows not already written by a valid preshard marker. Missing source
+        files are skipped silently (see the docstring above): the patterns stage
+        surfaces the resulting empty/absent input as its own failure via
+        _build_patterns_missing_notes().
     """
     preshard_marker = segment_records_dir / ".preshard_complete"
     # Defense in depth: trust the marker only if records.csv is actually present
@@ -656,11 +849,41 @@ def _filter_name_key_csv_to_segment(
     membership list, not a heuristic guess, so trying the raw id against it is safe.
 
     Returns the number of rows written.
+
+    --- trace ---
+    reads: `name_key_results_csv` -- Path to the corpus-wide name_key_results.csv
+        (tools/apply_name_key_policy.py's output, e.g. from --name-key-results-csv),
+        passed in by _run_one_segment()'s Step 2b; `out_csv` -- this segment's
+        results/name_key/name_key_results.csv Path; `allowed_ids` -- this segment's
+        export_run_ids set.
+    calls: nested _in_segment() (per row); normalize_export_run_id()
+        (tools/bundle_analysis/name_projection_adapter.py, imported at module top), via
+        _in_segment().
+    thresholds: none named -- membership is tested against `allowed_ids` itself (this
+        segment's real population), not a hardcoded list.
+    returns: int rows written; raises FileNotFoundError if `name_key_results_csv` is
+        missing. Writes `out_csv` with the same fieldnames as the corpus-wide input,
+        filtered to rows whose (normalized-or-raw) export_file is in `allowed_ids`.
+        Consumed by _run_one_segment(), which then invokes
+        tools/generate_name_key_patterns.py --comparison-target name against this
+        filtered file.
     """
     if not name_key_results_csv.is_file():
         raise FileNotFoundError(f"--name-key-results-csv not found: {name_key_results_csv}")
 
     def _in_segment(raw_export_file: str) -> bool:
+        """Test whether one name_key_results.csv row belongs to this segment, trying
+        the normalized export_run_id first and the raw export_file second.
+
+        --- trace ---
+        reads: `raw_export_file` -- one row's raw `export_file` cell value; closes
+            over `allowed_ids` (the enclosing _filter_name_key_csv_to_segment()'s
+            parameter).
+        calls: normalize_export_run_id() (tools/bundle_analysis/name_projection_adapter.py).
+        thresholds: none.
+        returns: bool; consumed by the enclosing function's row filter (list
+            comprehension).
+        """
         if not raw_export_file:
             return False
         if normalize_export_run_id(raw_export_file) in allowed_ids:
@@ -687,7 +910,25 @@ def _build_patterns_missing_notes(
     records_dir: Path,
     patterns_stderr: str,
 ) -> str:
-    """Build a diagnostic failure message when patterns exits 0 but writes no output."""
+    """Build a diagnostic failure message when patterns exits 0 but writes no output.
+
+    --- trace ---
+    reads: `sid` -- segment_id, for the message header; `out_root` -- this segment's
+        output root, to locate export_run_ids.txt; `records_dir` -- this segment's
+        results/records/ dir, to locate records.csv/file_metadata.csv;
+        `patterns_stderr` -- the captured stderr/stdout content from the patterns
+        subprocess (run_step_log()'s third return value), passed in by
+        _run_one_segment().
+    calls: none (file reads + csv.reader() only).
+    thresholds: `[WARN extract_all]` (hardcoded literal substring used to filter
+        relevant warning lines out of patterns_stderr); `-10` (last-10-warning-lines
+        slice).
+    returns: str diagnostic message (export_run_ids.txt id count, records.csv/
+        file_metadata.csv first export_run_id, relevant [WARN] lines); consumed by
+        _run_one_segment() as `failure_notes` when the patterns step exits 0 but
+        pattern_presence_file.csv was never written -- distinguishing a silent
+        zero-records-matched failure from a genuine subprocess error.
+    """
     parts = [
         f"step=patterns returncode=0 but pattern_presence_file.csv was not written.",
         f"segment={sid}",
@@ -748,6 +989,18 @@ def _active_domains_from_presence_csv(analysis_dir: Path) -> Optional[frozenset]
     Returns None (not an empty frozenset) when the file is absent or contains no
     domains, so callers fall back to unfiltered behaviour rather than writing
     empty combined files.
+
+    --- trace ---
+    reads: `analysis_dir` -- this segment's results/analysis/ dir, from
+        _run_one_segment()'s BI-merge step; reads
+        `analysis_dir/pattern_presence_file.csv`'s `domain` column.
+    calls: none (stdlib csv.DictReader).
+    thresholds: none.
+    returns: frozenset[str] of domain names, or None if the file is absent or has no
+        domain rows; consumed by _run_one_segment() as `active_domains`, passed to
+        merge_bi_outputs() to restrict the config-leg BI merge to genuinely active
+        domains (excluding stale per-domain folders from an earlier, larger-population
+        run).
     """
     presence_csv = analysis_dir / "pattern_presence_file.csv"
     if not presence_csv.is_file():
@@ -774,6 +1027,19 @@ def _active_domains_from_name_patterns(name_patterns_dir: Path) -> Optional[froz
     and resurrecting stale per-domain output left over from a previous run of this segment
     under a different (larger) population. `None` is reserved for "the file is missing" --
     a genuinely different condition (the name-patterns step never ran or failed).
+
+    --- trace ---
+    reads: `name_patterns_dir` -- this segment's results/name_key/patterns/name/ dir,
+        from _run_one_segment()'s name-leg BI-merge step; reads
+        `name_patterns_dir/domain_patterns.csv`'s `domain` column
+        (tools/generate_name_key_patterns.py's output schema).
+    calls: none (stdlib csv.DictReader).
+    thresholds: none.
+    returns: frozenset[str] (possibly empty) if the file exists, or None if it's
+        missing; consumed by _run_one_segment() as `active_domains_name`, passed to
+        merge_bi_outputs() for the name-leg BI merge. The empty-vs-None distinction
+        (see the docstring above) is load-bearing: empty means "exclude every domain
+        folder", None means "file missing, treat as unfiltered".
     """
     patterns_csv = name_patterns_dir / "domain_patterns.csv"
     if not patterns_csv.is_file():
@@ -797,7 +1063,18 @@ def _segment_has_name_leg_output(out_root: Path) -> bool:
 
     bundle_provenance.csv lives at bundle_analysis/name_all/ (the flat, single-path-segment
     BI-facing output location -- see run_bundle_analysis_for_target()'s docstring), not
-    under the internal bundle_analysis/name/ staging path."""
+    under the internal bundle_analysis/name/ staging path.
+
+    --- trace ---
+    reads: `out_root` -- this segment's output root; checks
+        `out_root/results/bundle_analysis/name_all/bundle_provenance.csv` for
+        existence.
+    calls: none (Path.is_file()).
+    thresholds: none.
+    returns: bool; consumed by run_orchestrator() (dry-run and live-run skip-check
+        loops) to decide `already_satisfied` for a segment whose registry status is
+        already "complete" but comparison_target requests the name leg.
+    """
     return (out_root / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv").is_file()
 
 
@@ -814,6 +1091,24 @@ def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozens
     nothing (e.g. a segment whose active domain set has genuinely gone from non-empty to
     empty) would leave Power BI reading stale bundle data as if it were current (PR #390
     review).
+
+    --- trace ---
+    reads: `bundle_analysis_dir` -- this segment's results/bundle_analysis/all/ (config
+        leg) or results/bundle_analysis/name_all/ (name leg), from _run_one_segment();
+        `active_domains` -- Optional[frozenset], from
+        _active_domains_from_presence_csv()/_active_domains_from_name_patterns();
+        globs `bundle_analysis_dir/*/<filename>` for each name in BI_MERGE_FILES.
+    calls: none (stdlib csv.DictReader/atomic_write_csv() from
+        tools/bundle_analysis/common.py, imported at module top).
+    thresholds: BI_MERGE_FILES (module constant, l.53-64: the 10 per-domain filenames
+        merged into `{stem}_combined.csv`); the "_population_discovery"/
+        "_population_runs" substring exclusions (hardcoded literals) filtering out
+        non-domain subfolders from the glob.
+    returns: dict[filename, {"files_merged": int, "rows_written": int}]; consumed by
+        _run_one_segment() only to log totals. Deletes a stale `{stem}_combined.csv`
+        when no current candidates exist (rather than leaving it in place), and skips
+        (with a WARN print) any candidate file whose header doesn't match the first
+        file's header.
     """
     if not bundle_analysis_dir.is_dir():
         return {}
@@ -883,10 +1178,40 @@ def build_run_plan(
     Return ordered list of (registry_row, manifest_row) pairs for bundle segments,
     sorted by segment_level asc then segment_id asc.
     Segments to skip are excluded; dry-run callers handle skip annotation separately.
+
+    --- trace ---
+    reads: `manifest` -- load_manifest()'s return value; `registry` --
+        load_registry()'s return value, reads each row's run_type/segment_id;
+        `segment_filter` -- unused by this function's own body (the --segment CLI
+        filter is applied later, by run_orchestrator() itself, not here); `force` --
+        also unused by this function's own body (also applied later by
+        run_orchestrator()).
+    calls: nested sort_key() (via list.sort()).
+    thresholds: `{"bundle", "reference"}` (hardcoded literal set: which run_type
+        values are even eligible to appear in the plan).
+    returns: List[(registry_row, manifest_row)] tuples, ordered by (segment_level asc,
+        segment_id asc); consumed by run_orchestrator() as `plan`, then filtered again
+        by --segment/--force/status before being split into `plan_to_run` vs. skipped.
+    notes: `segment_filter`/`force` are accepted parameters this function's own body
+        never reads -- both are applied later downstream (run_orchestrator()'s
+        per-row loop), so a reader relying only on this function's signature would
+        wrongly assume filtering happens here.
     """
     run_rows = [r for r in registry if r.get("run_type", "").strip() in {"bundle", "reference"}]
 
     def sort_key(row: dict) -> tuple:
+        """Sort key: (segment_level from the manifest, segment_id), defaulting level
+        to 0 on a missing/malformed value.
+
+        --- trace ---
+        reads: `row` -- one registry row; closes over `manifest` (the enclosing
+            build_run_plan()'s parameter) to look up the matching manifest row's
+            segment_level.
+        calls: none.
+        thresholds: `0` -- the fallback segment_level on ValueError/TypeError
+            (hardcoded literal).
+        returns: (int, str) tuple; consumed by `run_rows.sort(key=sort_key)`.
+        """
         sid = row.get("segment_id", "")
         mrow = manifest.get(sid, {})
         try:
@@ -919,6 +1244,19 @@ def validate_membership_against_manifest(
     the wrong sidecar. A mismatch here means population_hash/file_count on the
     manifest row describe a different population than the membership rows
     actually loaded, which could mark a segment complete for the wrong file set.
+
+    --- trace ---
+    reads: `plan` -- build_run_plan()'s return value, from run_orchestrator(); reads
+        each manifest_row's file_count/population_hash; `membership` --
+        load_membership()'s return value, reads each segment_id's export_run_id list.
+    calls: hashlib.sha1() (stdlib, to recompute population_hash for comparison).
+    thresholds: none named -- the comparison is a direct equality check against the
+        manifest row's own file_count/population_hash values (not a separate constant
+        table).
+    returns: list[str] error messages (empty if everything agrees); consumed by
+        run_orchestrator(), which aborts the entire run (prints to stderr, returns 1)
+        before any segment is processed if this list is non-empty -- refusing to run
+        against a stale/mismatched segment_membership.csv.
     """
     errors: List[str] = []
     for reg_row, mrow in plan:
@@ -957,6 +1295,22 @@ def _clear_stale_name_all_before_run(out_root: Path, run_type: str, comparison_t
     Only fires for segments this call actually intends to (re)run with name-leg work --
     already-complete segments are filtered out of plan_to_run before _run_one_segment()
     is ever invoked, so their still-current name_all/ is never touched by this function.
+
+    --- trace ---
+    reads: `out_root` -- this segment's output root; `run_type` -- from the registry
+        row ("bundle"/"reference"/etc.); `comparison_target` -- from
+        run_orchestrator()'s args.comparison_target ("config"/"name"/"both"); `log` --
+        the per-segment log closure from _run_one_segment().
+    calls: retry_fs_op() (tools/bundle_analysis/common.py, imported at module top),
+        wrapping shutil.rmtree().
+    thresholds: `run_type == "bundle" and comparison_target in ("name", "both")` --
+        inline condition, not a named constant; the target path
+        `out_root/results/bundle_analysis/name_all` is a hardcoded relative path.
+    returns: None; deletes `name_all/` if present and the condition holds. Called once
+        at the very start of _run_one_segment(), before Step 1, specifically so a
+        failure in step 2b or step 3 (which would otherwise skip step 3b's own
+        upfront clear entirely) still leaves this segment's stale name-leg BI output
+        removed rather than silently stale.
     """
     if run_type == "bundle" and comparison_target in ("name", "both"):
         stale_name_all = out_root / "results" / "bundle_analysis" / "name_all"
@@ -1002,6 +1356,54 @@ def _run_one_segment(
     needed), then bundle-mine it into results/bundle_analysis/name_all/, mirroring
     results/bundle_analysis/all/ for the config leg but using join_key_name_identity as the
     join instead of join_hash.
+
+    --- trace ---
+    reads: `reg_row` -- one run_registry.csv row (segment_id/output_folder/run_type),
+        from build_run_plan()'s plan; `mrow` -- the matching segment_manifest.csv row
+        (segment_level); `membership` -- load_membership()'s Dict, indexed by sid for
+        export_run_ids; `records_dir`/`exports_dir`/`segments_root`/`repo_root`/
+        `join_policy` -- Paths, from run_orchestrator()'s args, passed through
+        unchanged; `skip_bi_merge` -- from args.skip_bi_merge; `registry`/`reg_index`/
+        `registry_file`/`manifest_file`/`results_registry_file` -- shared state for
+        the registry-update block; `registry_lock`/`counters`/`counters_lock` --
+        threading.Lock/dict shared across every worker in the ThreadPoolExecutor;
+        `worker_id`/`bundle_workers` -- for logging and the bundle subprocess's
+        --workers flag; `comparison_target`/`name_key_results_csv` -- from
+        args.comparison_target/args.name_key_results_csv.
+    calls: _clear_stale_name_all_before_run(); _write_segment_records();
+        run_step_log() (x4: patterns, bundle, and -- gated on comparison_target --
+        name patterns, name bundle); _filter_name_key_csv_to_segment();
+        _build_patterns_missing_notes(); _active_domains_from_presence_csv();
+        _active_domains_from_name_patterns(); merge_bi_outputs();
+        annotate_name_target_combined_files()
+        (tools/bundle_analysis/name_projection_adapter.py); retry_fs_op() (via
+        shutil.rmtree, for the name-bundle stale-output clear); utc_now_iso();
+        write_registry_atomic(); write_results_registry()
+        (tools/build_results_registry.py, imported at module top); nested log().
+    thresholds: none named beyond the module-level VALID_COMPARISON_TARGETS check
+        (enforced earlier, in main()) -- this function's own step gating is
+        `run_type == "bundle"` / `comparison_target in ("name", "both")` inline
+        conditions, not named constants.
+    returns: dict (segment_id/status/files/level/prepare_s/patterns_s/bundle_s/
+        bi_merge_s/total_s/worker_id/patterns_top5/failure_note); consumed by
+        run_orchestrator()'s ThreadPoolExecutor future-collection loop, appended to
+        `segment_results` (feeds _write_run_summary()) and used to update `counters`.
+        Also has the side effect (under registry_lock) of mutating the shared
+        `registry` list in place and persisting it via write_registry_atomic()/
+        write_results_registry() before returning -- so run_registry.csv/
+        results_registry.csv reflect this segment's outcome immediately, not only
+        after the whole run completes.
+    notes: (mechanical-extraction risk) `step_failed`/`failure_notes` accumulate
+        through 7 sequential try/except-guarded steps (clear_stale_name_all, prepare,
+        patterns, patterns_name, bundle, bundle_name, bi_merge/bi_merge_name), each
+        gated on `step_failed is None` from the previous step --
+        sequential-control-flow-as-policy: which steps actually execute for a given
+        segment depends on run_type and comparison_target, evaluated fresh at each
+        gate, not declared as a single up-front plan. `registry` (the list) and
+        `counters` (the dict) are both caller-owned mutable state shared across every
+        concurrent worker thread and mutated in place under their respective locks --
+        a per-function reader would need to also read run_orchestrator() to know
+        these mutations are thread-safe only because of that locking discipline.
     """
     sid = reg_row.get("segment_id", "").strip()
     output_folder = reg_row.get("output_folder", "").strip()
@@ -1040,6 +1442,16 @@ def _run_one_segment(
 
     with log_path.open("w", encoding="utf-8", errors="replace") as log_f:
         def log(msg: str) -> None:
+            """Write one line to this segment's run.log and flush immediately.
+
+            --- trace ---
+            reads: `msg` -- caller-supplied string; closes over `log_f` (the
+                enclosing _run_one_segment()'s open file handle for out_root/run.log).
+            calls: none (file write + flush).
+            thresholds: none.
+            returns: None; used throughout _run_one_segment() as the per-step logging
+                call (separate from the `print()` calls that go to console).
+            """
             log_f.write(msg + "\n")
             log_f.flush()
 
@@ -1395,6 +1807,35 @@ def _run_one_segment(
 
 
 def run_orchestrator(args: argparse.Namespace) -> int:
+    """Load the manifest/registry/membership, build and validate the run plan, then
+    execute (or, in --dry-run, print) the patterns+bundle pipeline for every eligible
+    segment in level order, writing run_registry.csv/results_registry.csv/
+    run_summary.txt.
+
+    --- trace ---
+    reads: `args` -- argparse.Namespace from main() (--manifest-file, --registry-file,
+        --results-registry-file, --membership-file, --records-dir, --exports-dir,
+        --segments-root, --repo-root, --join-policy, --segment, --force, --dry-run,
+        --skip-bi-merge, --workers/--bundle-workers/--workers-auto, --no-preshard,
+        --force-preshard, --comparison-target, --name-key-results-csv).
+    calls: load_manifest(); load_registry(); load_membership(); build_run_plan();
+        validate_membership_against_manifest(); _segment_has_name_leg_output()
+        (skip-check, dry-run and live); _preshard_corpus_records() (gated on
+        marker/force state); ThreadPoolExecutor/_run_one_segment() (live run, once per
+        segment in plan_to_run); write_results_registry(); _write_run_summary().
+    thresholds: `_CORPUS_PRESHARD_MARKER = ".preshard_complete_corpus"` (module
+        constant, l.51: gates whether preshard re-runs); the preshard skip condition
+        itself (`preshard_marker.is_file() and not _has_pending`) is inline control
+        flow built from that marker plus a freshly-computed `_has_pending` flag, not a
+        single named constant.
+    returns: int exit code (1 if segment_membership.csv disagrees with
+        segment_manifest.csv -- via validate_membership_against_manifest() -- or if
+        any segment failed or results_registry write failed; 0 otherwise). In
+        --dry-run mode, returns 0 unconditionally after printing the full plan without
+        executing anything. Writes run_registry.csv (incrementally, per segment, and
+        once more at the end via write_results_registry()) and
+        segments_root/run_summary.txt. Called by main() as `run_orchestrator(args)`.
+    """
     manifest_file = Path(args.manifest_file).resolve()
     registry_file = Path(args.registry_file).resolve()
     results_registry_file = Path(args.results_registry_file).resolve()
@@ -1771,6 +2212,29 @@ def run_orchestrator(args: argparse.Namespace) -> int:
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main() -> None:
+    """CLI entry point: parse arguments, resolve --workers/auto worker split and
+    --results-registry-file/--membership-file defaults, then hand off to
+    run_orchestrator().
+
+    --- trace ---
+    reads: CLI args (see the module-level argparse block for the full list:
+        --manifest-file, --registry-file, --results-registry-file, --membership-file,
+        --records-dir, --exports-dir, --segments-root, --repo-root, --join-policy,
+        --segment, --force, --dry-run, --skip-bi-merge, --workers, --no-preshard,
+        --force-preshard, --comparison-target, --name-key-results-csv).
+    calls: compute_worker_split() (when --workers is "auto", or to derive
+        bundle_workers from an explicit --workers N); run_orchestrator().
+    thresholds: VALID_COMPARISON_TARGETS = {"config", "name", "both"} (module
+        constant, l.44, enforced via argparse choices); default --workers=4; the
+        --name-key-results-csv-required-when-name/both check (ap.error(), inline, not
+        a named constant).
+    returns: None; calls sys.exit(run_orchestrator(args)) -- this is **Run C2**
+        (l.245 of tools/corpus_update_runbook.ps1), invoked per segment_manifest.csv/
+        run_registry.csv (Run C1's output) after the mandatory file_metadata.csv
+        human-edit pause, and its own output (run_registry.csv, updated in place;
+        results_registry.csv) is consumed by **Run C2.5**
+        (tools/build_results_registry.py).
+    """
     ap = argparse.ArgumentParser(
         description="Segment orchestrator: run patterns + bundle stages per segment in level order."
     )

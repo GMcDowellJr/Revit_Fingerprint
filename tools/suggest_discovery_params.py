@@ -49,8 +49,8 @@ trail / conversation history this tool was built from):
     when sample_size >= population size).
 
   --max-candidate-fields / --max-k (discover mode): solved JOINTLY against a
-    subset-count compute budget, since tools/pareto_joinkey_search.py's cost
-    is combinatorial (sum of C(n, i) for i=1..max_k) over the data-observed
+    records-times-evaluations work budget, since tools/pareto_joinkey_search.py's cost
+    scales with both sample size and combinatorial evaluations (sum of C(n, i) for i=1..max_k) over the data-observed
     candidate pool alone (no required/optional baseline involved in discover
     mode). Given the domain's actual candidate-field count, this finds the
     largest max_k that fits the budget without trimming fields; only trims
@@ -86,9 +86,11 @@ from typing import Dict, List, Optional, Sequence
 
 try:
     from tools.discover_join_policy import _pick_candidate_fields, _read_csv, _write_csv
+    from tools.discovery_candidate_eligibility import filter_and_cap_candidates
     from tools.join_key_discovery.eval import normalize_policy_block
 except ModuleNotFoundError:
     from discover_join_policy import _pick_candidate_fields, _read_csv, _write_csv
+    from discovery_candidate_eligibility import filter_and_cap_candidates
     from join_key_discovery.eval import normalize_policy_block
 
 
@@ -140,7 +142,9 @@ def compute_domain_stats(
     # validate pool size as a true deduplicated union against required/
     # optional field names, instead of a pessimistic arithmetic sum.
     dom_items = [it for it in items if it.get("domain", "") == domain]
-    candidate_field_names_ranked = _pick_candidate_fields(dom_items, 0)
+    candidate_field_names_ranked = filter_and_cap_candidates(
+        domain, _pick_candidate_fields(dom_items, 0), 0
+    )["eligible"]
     return {
         "records_total_domain": n,
         "distinct_sig_hash_groups": g,
@@ -190,8 +194,13 @@ def _cumulative_subset_count_from_zero(n: int, k: int) -> int:
     return 1 + _cumulative_subset_count(n, k)
 
 
-def solve_candidate_fields_and_k(n_candidates: int, budget: int = 20000, min_k: int = 2):
-    """Jointly size --max-candidate-fields/--max-k against a subset-count budget.
+def estimate_search_work(sample_size: int, candidate_evaluations: int) -> int:
+    """Deterministic scoring work: records inspected across all candidates."""
+    return max(0, int(sample_size)) * max(0, int(candidate_evaluations))
+
+
+def solve_candidate_fields_and_k(n_candidates: int, budget: int = 20000, min_k: int = 2, sample_size: int = 1):
+    """Jointly size --max-candidate-fields/--max-k against a deterministic records-times-evaluations budget.
 
     Prefers keeping every candidate field (n_candidates) and growing max_k as
     large as the budget allows; only trims the candidate pool -- keeping the
@@ -205,7 +214,7 @@ def solve_candidate_fields_and_k(n_candidates: int, budget: int = 20000, min_k: 
     max_possible_k = min(n_candidates, 64)
     best_k = 0
     for k in range(1, max_possible_k + 1):
-        if _cumulative_subset_count(n_candidates, k) <= budget:
+        if estimate_search_work(sample_size, _cumulative_subset_count(n_candidates, k)) <= budget:
             best_k = k
         else:
             break
@@ -219,7 +228,7 @@ def solve_candidate_fields_and_k(n_candidates: int, budget: int = 20000, min_k: 
     best_m = 1
     while lo <= hi:
         mid = (lo + hi) // 2
-        if _cumulative_subset_count(mid, min_k) <= budget:
+        if estimate_search_work(sample_size, _cumulative_subset_count(mid, min_k)) <= budget:
             best_m = mid
             lo = mid + 1
         else:
@@ -237,6 +246,7 @@ def suggest_params_for_domain(
     k_per_group: int = 15,
     sample_floor: int = 500,
     subset_budget: int = 20000,
+    work_budget: int | None = None,
     min_k: int = 2,
     concentration_ratio_threshold: float = 0.5,
 ) -> Dict[str, object]:
@@ -248,10 +258,22 @@ def suggest_params_for_domain(
     n_candidates = int(stats["candidate_field_count"])
     candidate_field_names_ranked = list(stats.get("candidate_field_names_ranked") or [])
 
-    sample_size = suggest_sample_size(n, g, k_per_group=k_per_group, floor=sample_floor)
+    ideal_sample_size = suggest_sample_size(n, g, k_per_group=k_per_group, floor=sample_floor)
+    legacy_subset_mode = work_budget is None
+    effective_work_budget = int(work_budget if work_budget is not None else subset_budget)
+    # Preserve the complete eligible field surface and first make the search
+    # sample affordable at k=1. Progressive Pareto will only pay for deeper
+    # levels if no fully verified simple finalist exists.
+    min_evaluations = max(1, n_candidates)
+    affordable_sample = effective_work_budget // min_evaluations if effective_work_budget > 0 else 0
+    sample_size = ideal_sample_size if legacy_subset_mode else (min(ideal_sample_size, max(1, affordable_sample)) if n else 0)
+    sample_compute_bounded = sample_size < ideal_sample_size
     max_candidate_fields, discover_max_k = solve_candidate_fields_and_k(
-        n_candidates, budget=subset_budget, min_k=min_k,
+        n_candidates, budget=effective_work_budget, min_k=(min_k if legacy_subset_mode else 1), sample_size=(1 if legacy_subset_mode else max(1, sample_size)),
     )
+    discover_max_k = max(1, discover_max_k) if n_candidates else 0
+    discover_evaluations = _cumulative_subset_count(max_candidate_fields, discover_max_k)
+    discover_work = estimate_search_work(sample_size, discover_evaluations)
 
     # harsh/validate work_candidates fold in the existing required AND optional
     # baseline UNCONDITIONALLY (req + opt + scoped_candidates for harsh, req +
@@ -294,20 +316,31 @@ def suggest_params_for_domain(
     else:
         extra_pool_size = max_candidate_fields + optional_count
 
+    validate_extra_pool_size = len(set(optional_field_names) - set(required_field_names)) if optional_field_names else optional_count
+
     # Largest extra_k (>=0) affordable at extra_pool_size within budget --
     # always succeeds at extra_k=0 (cost exactly 1) except the degenerate
-    # subset_budget < 1 case, so this is structurally always feasible, unlike
+    # work_budget smaller than one sample pass case, so this is structurally always feasible, unlike
     # the old required-count-as-combinatorial-floor model where a large
     # enough required baseline really could make every k unaffordable.
     max_extra_k = 0
-    if subset_budget >= 1:
+    if effective_work_budget >= max(1, sample_size):
         for k in range(1, min(extra_pool_size, 64) + 1):
-            if _cumulative_subset_count_from_zero(extra_pool_size, k) <= subset_budget:
+            if estimate_search_work(1 if legacy_subset_mode else max(1, sample_size), _cumulative_subset_count_from_zero(extra_pool_size, k)) <= effective_work_budget:
                 max_extra_k = k
             else:
                 break
     harsh_max_k = required_count + max_extra_k
-    harsh_pareto_feasible = subset_budget >= 1
+    harsh_pareto_feasible = effective_work_budget >= (1 if legacy_subset_mode else max(1, sample_size))
+
+    validate_extra_k = 0
+    if harsh_pareto_feasible:
+        for k in range(1, min(validate_extra_pool_size, 64) + 1):
+            if estimate_search_work(1 if legacy_subset_mode else max(1, sample_size), _cumulative_subset_count_from_zero(validate_extra_pool_size, k)) <= effective_work_budget:
+                validate_extra_k = k
+            else:
+                break
+    validate_max_k = required_count + validate_extra_k
 
     # Concentration, not just N/F average: file_effective_cluster_count (1/HHI
     # over per-file record-count shares) meaningfully below the actual distinct
@@ -326,19 +359,24 @@ def suggest_params_for_domain(
     )
 
     notes: List[str] = []
+    if sample_compute_bounded:
+        notes.append(
+            f"ideal evidence sample ({ideal_sample_size}) was compute-bounded to {sample_size}; "
+            "finalists must be verified on the full population"
+        )
     if not harsh_pareto_feasible:
         notes.append(
-            f"--subset-budget ({subset_budget}) is too small to evaluate even the required-only "
-            "baseline candidate; check --subset-budget is a positive value."
+            f"--work-budget ({subset_budget}) is too small to evaluate even the required-only "
+            "baseline candidate; check --work-budget is a positive value."
         )
     elif required_count and max_extra_k == 0 and extra_pool_size > 0:
         notes.append(
             f"required_items count ({required_count}) plus the harsh/validate extra-field pool "
             f"({extra_pool_size}: --max-candidate-fields {max_candidate_fields} + {optional_count} optional, "
-            "deduplicated against required) leaves no room within --subset-budget "
+            "deduplicated against required) leaves no room within --work-budget "
             f"({subset_budget}) to explore any field beyond the required baseline -- harsh/validate "
             f"will only ever evaluate the required-only candidate (--max-k {harsh_max_k}). Raise "
-            "--subset-budget or lower --max-candidate-fields/optional_items to allow exploration."
+            "--work-budget or lower --max-candidate-fields/optional_items to allow exploration."
         )
     elif optional_count and extra_pool_size > max_candidate_fields:
         notes.append(
@@ -346,7 +384,7 @@ def suggest_params_for_domain(
             f"pool to {extra_pool_size} (--max-candidate-fields {max_candidate_fields} + {optional_count} "
             "optional, deduplicated against required); harsh/validate can add up to "
             f"{max_extra_k} extra field(s) on top of the {required_count} required field(s) "
-            f"(--max-k {harsh_max_k}) within --subset-budget ({subset_budget})."
+            f"(--max-k {harsh_max_k}) within --work-budget ({subset_budget})."
         )
     if stratify_recommended:
         notes.append(
@@ -365,8 +403,16 @@ def suggest_params_for_domain(
         "required_items_count": required_count,
         "optional_items_count": optional_count,
         "suggested_sample_size": sample_size,
+        "ideal_sample_size": ideal_sample_size,
+        "suggested_search_sample_size": sample_size,
+        "sample_compute_bounded": sample_compute_bounded,
+        "estimated_subset_evaluations": discover_evaluations,
+        "estimated_search_work": discover_work,
+        "work_budget": effective_work_budget,
         "suggested_max_candidate_fields": max_candidate_fields,
         "suggested_max_k_discover": discover_max_k,
+        "suggested_max_k_validate": validate_max_k,
+        "suggested_max_k_harsh": harsh_max_k,
         "suggested_max_k_harsh_validate": harsh_max_k,
         "harsh_pareto_feasible": harsh_pareto_feasible,
         "stratify_by_recommended": "file_id" if stratify_recommended else "",
@@ -418,7 +464,7 @@ def _load_policy_fields(policy_json: Optional[Path]) -> Dict[str, Dict[str, obje
     required baseline). Both mismatches meant a policy could be sized as
     budget-safe here while the emitted command's actual required baseline --
     and therefore its real Pareto search space -- was larger than what was
-    ever checked against --subset-budget.
+    ever checked against --work-budget.
     """
     if not policy_json or not policy_json.exists():
         return {}
@@ -455,7 +501,7 @@ def _emit_command(domain: str, suggestion: Dict[str, object], phase0_dir: str, p
     unrelated to discover mode's own data-only field pool. A single combined
     command at the discover value would under-size harsh/validate's search
     space relative to what it can actually represent. harsh_pareto_feasible
-    is only False in the degenerate --subset-budget < 1 case; in that (rare)
+    is only False in the degenerate --work-budget < 1 case; in that (rare)
     case only the harsh/validate command is forced to --search-modes greedy
     instead of the CLI default greedy,pareto -- discover/validate's own
     candidate pools stay small and cheap regardless.
@@ -474,6 +520,8 @@ def _emit_command(domain: str, suggestion: Dict[str, object], phase0_dir: str, p
             f"--max-candidate-fields {suggestion['suggested_max_candidate_fields']}",
             f"--max-k {max_k}",
         ]
+        if suggestion.get("work_budget") is not None:
+            parts.append(f"--work-budget {suggestion['work_budget']}")
         if suggestion.get("stratify_by_recommended"):
             parts.append(f"--stratify-by {shlex.quote(str(suggestion['stratify_by_recommended']))}")
         if policy_json:
@@ -492,7 +540,7 @@ def _emit_command(domain: str, suggestion: Dict[str, object], phase0_dir: str, p
     # they commonly differ whenever a domain has any required baseline at all --
     # a single combined command at the smaller value would under-size harsh
     # mode's search space. harsh_pareto_feasible is only False in the
-    # degenerate --subset-budget < 1 case (pareto_search()'s structural
+    # degenerate --work-budget < 1 case (pareto_search()'s structural
     # required-field guarantee means representing the baseline itself never
     # blows the budget), but is still checked so the (rare) infeasible case
     # forces --search-modes greedy on just the harsh/validate command, not
@@ -522,7 +570,8 @@ def main() -> None:
     ap.add_argument("--policy-json", default=None, help="Optional current join-key policy JSON, used to size harsh/validate max_k against each domain's existing required_items count.")
     ap.add_argument("--sample-k-per-group", type=int, default=15, help="Target sampled records per distinct sig_hash group (default 15).")
     ap.add_argument("--sample-floor", type=int, default=500, help="Minimum suggested sample size (default 500).")
-    ap.add_argument("--subset-budget", type=int, default=20000, help="Target Pareto subset-evaluation budget per domain/policy-mode/search-mode run (default 20000).")
+    ap.add_argument("--work-budget", type=int, default=20000000, help="Target deterministic Pareto work budget (sample records x candidate evaluations; default 20000000).")
+    ap.add_argument("--subset-budget", type=int, default=None, help="Deprecated alias for --work-budget, retained for compatible automation.")
     ap.add_argument("--min-k", type=int, default=2, help="Minimum acceptable max_k when solving the candidate-fields/max-k tradeoff (default 2).")
     ap.add_argument("--out", default=None, help="Optional CSV output path (default: <phase0-dir>/../diagnostics/discovery_param_suggestions.csv).")
     ap.add_argument("--emit-commands", action="store_true", help="Also print ready-to-run discover_join_policy.py commands per domain.")
@@ -592,7 +641,8 @@ def main() -> None:
             optional_field_names=domain_fields.get("optional_fields", []),
             k_per_group=int(args.sample_k_per_group),
             sample_floor=int(args.sample_floor),
-            subset_budget=int(args.subset_budget),
+            subset_budget=int(args.subset_budget if args.subset_budget is not None else args.work_budget),
+            work_budget=int(args.subset_budget if args.subset_budget is not None else args.work_budget),
             min_k=int(args.min_k),
         )
         row = {"domain": domain, **suggestion}
@@ -605,6 +655,8 @@ def main() -> None:
             f"max-candidate-fields={suggestion['suggested_max_candidate_fields']} "
             f"max-k(discover)={suggestion['suggested_max_k_discover']} "
             f"max-k(harsh/validate)={suggestion['suggested_max_k_harsh_validate']} "
+            f"work={suggestion['estimated_search_work']}/{suggestion['work_budget']} "
+            f"compute-bounded={str(suggestion['sample_compute_bounded']).lower()} "
             f"stratify-by={suggestion['stratify_by_recommended'] or '(none)'}",
             flush=True,
         )
@@ -613,8 +665,9 @@ def main() -> None:
     fields = [
         "domain", "records_total_domain", "distinct_sig_hash_groups", "distinct_file_count",
         "candidate_field_count", "required_items_count", "optional_items_count",
-        "suggested_sample_size", "suggested_max_candidate_fields",
-        "suggested_max_k_discover", "suggested_max_k_harsh_validate",
+        "ideal_sample_size", "suggested_sample_size", "suggested_search_sample_size", "sample_compute_bounded",
+        "estimated_subset_evaluations", "estimated_search_work", "work_budget", "suggested_max_candidate_fields",
+        "suggested_max_k_discover", "suggested_max_k_validate", "suggested_max_k_harsh", "suggested_max_k_harsh_validate",
         "stratify_by_recommended", "notes",
     ]
     _write_csv(out_path, fields, rows)

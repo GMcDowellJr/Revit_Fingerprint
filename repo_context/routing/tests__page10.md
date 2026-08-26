@@ -1,0 +1,332 @@
+# Routing catalog: `tests (page 10)`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 15
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests` partition): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tests/test_name_key_policy.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for the Canonical Name Identity Projection (PR1).
+  - filename/path terms: test name key policy
+- Important symbols (10 total):
+  - `name_key_policies` (function) — line 71
+  - `test_policy_file_loads_and_validates` (function) — line 75
+  - `test_eligibility_allow_list_matches_exactly` (function) — line 80
+  - `test_excluded_domains_have_no_policy_entry` (function) — line 85
+  - `test_every_eligible_entry_has_exactly_one_required_item` (function) — line 95
+  - `test_phases_carries_explicit_redundancy_marker` (function) — line 102
+  - `test_non_phases_entries_use_bare_schema` (function) — line 109
+  - `TestStatusVocabulary` (class) — line 116
+  - `TestDimensionConfigNonInclusion` (class) — line 132
+  - `TestAnalysisSideReconstruction` (class) — line 156
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/name_key_builder.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`4c34a6e3727815b1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_name_key_policy.py`)
+
+### `tests/test_no_direct_filtered_element_collector_in_domains.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test no direct filtered element collector in domains
+- Important symbols (2 total):
+  - `_repo_root` (function) — line 6
+  - `test_domains_do_not_reference_filtered_element_collector` (function) — line 10
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_domains_do_not_reference_filtered_element_collector (tests/test_no_direct_filtered_element_collector_in_domains.py:16)`
+- Related tests:
+  - `tests/test_no_direct_filtered_element_collector_in_domains.py`
+- Retrieval identity: sha256=`39495a3db54154f9…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_no_direct_filtered_element_collector_in_domains.py`)
+
+### `tests/test_object_styles_canonical_selectors.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test object styles canonical selectors
+- Important symbols (6 total):
+  - `_object_styles_model_policy` (function) — line 12
+  - `test_object_styles_model_canonical_evidence_selectors_and_hashing` (function) — line 17
+  - `_domain_identity_registry_v2` (function) — line 58
+  - `_area9_identity_items` (function) — line 63
+  - `test_object_styles_model_area9_fields_pass_contract_validation_for_subcategory` (function) — line 83
+  - `test_object_styles_model_parent_name_missing_and_none_for_top_level_category` (function) — line 99
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+  - imports `validators/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `test_object_styles_model_area9_fields_pass_contract_validation_for_subcategory (tests/test_object_styles_canonical_selectors.py:84)`
+  - `test_object_styles_model_area9_fields_pass_contract_validation_for_subcategory (tests/test_object_styles_canonical_selectors.py:85)`
+  - `test_object_styles_model_canonical_evidence_selectors_and_hashing (tests/test_object_styles_canonical_selectors.py:30)`
+  - `test_object_styles_model_parent_name_missing_and_none_for_top_level_category (tests/test_object_styles_canonical_selectors.py:106)`
+  - `test_object_styles_model_parent_name_missing_and_none_for_top_level_category (tests/test_object_styles_canonical_selectors.py:107)`
+- Related tests:
+  - `tests/test_object_styles_canonical_selectors.py`
+- Retrieval identity: sha256=`303bd2c02e93f096…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_object_styles_canonical_selectors.py`)
+
+### `tests/test_pareto_shape_gating.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test pareto shape gating
+- Important symbols (2 total):
+  - `_write_csv` (function) — line 16
+  - `test_pareto_shape_gating_per_shape` (function) — line 35
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/pareto_joinkey_search.py`
+- Called by (high/medium-confidence static callers):
+  - `test_pareto_shape_gating_per_shape (tests/test_pareto_shape_gating.py:41)`
+  - `test_pareto_shape_gating_per_shape (tests/test_pareto_shape_gating.py:50)`
+- Related tests:
+  - `tests/test_pareto_shape_gating.py`
+- Retrieval identity: sha256=`63a2de016554fd33…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_pareto_shape_gating.py`)
+
+### `tests/test_phase_filters_canonical_selectors.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test phase filters canonical selectors
+- Important symbols (1 total):
+  - `test_phase_filters_selectors_and_hashing_use_policy_required_presentation_ids` (function) — line 9
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`ad21a31ce4e19e92…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_phase_filters_canonical_selectors.py`)
+
+### `tests/test_phases_canonical_selectors.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test phases canonical selectors
+- Important symbols (2 total):
+  - `_phases_policy` (function) — line 10
+  - `test_phases_join_hash_uses_policy_required_only_and_semantic_selector_is_separate` (function) — line 15
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+  - imports `domains/phases.py`
+- Called by (high/medium-confidence static callers):
+  - `test_phases_join_hash_uses_policy_required_only_and_semantic_selector_is_separate (tests/test_phases_canonical_selectors.py:23)`
+- Related tests:
+  - `tests/test_phases_canonical_selectors.py`
+- Retrieval identity: sha256=`8720bd6a779a0c20…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_phases_canonical_selectors.py`)
+
+### `tests/test_placeholder_exclusions.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test placeholder exclusions
+- Important symbols (2 total):
+  - `_wcsv` (function) — line 4
+  - `test_placeholder_exclusions_smoke` (function) — line 9
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_placeholder_exclusions_smoke (tests/test_placeholder_exclusions.py:16)`
+- Related tests:
+  - `tests/test_placeholder_exclusions.py`
+- Retrieval identity: sha256=`5648c33f529af2c2…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_placeholder_exclusions.py`)
+
+### `tests/test_probe_inventory_builder.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test probe inventory builder
+- Important symbols (9 total):
+  - `_run` (function) — line 10
+  - `_read_csv_rows` (function) — line 27
+  - `test_merges_and_dedupes_across_dated_runs` (function) — line 32
+  - `test_empty_probes_dir_refuses_to_overwrite_by_default` (function) — line 138
+  - `test_all_inputs_invalid_refuses_to_overwrite_by_default` (function) — line 157
+  - `test_empty_probes_dir_with_force_writes_empty_inventory` (function) — line 181
+  - `_run_shaped_payload` (function) — line 192
+  - `test_merges_run_shaped_files_and_tracks_revit_version` (function) — line 207
+  - `test_merges_across_legacy_and_run_shapes_for_same_domain` (function) — line 270
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_all_inputs_invalid_refuses_to_overwrite_by_default (tests/test_probe_inventory_builder.py:172)`
+  - `test_all_inputs_invalid_refuses_to_overwrite_by_default (tests/test_probe_inventory_builder.py:177)`
+  - `test_empty_probes_dir_refuses_to_overwrite_by_default (tests/test_probe_inventory_builder.py:148)`
+  - `test_empty_probes_dir_refuses_to_overwrite_by_default (tests/test_probe_inventory_builder.py:153)`
+  - `test_empty_probes_dir_with_force_writes_empty_inventory (tests/test_probe_inventory_builder.py:186)`
+  - `test_empty_probes_dir_with_force_writes_empty_inventory (tests/test_probe_inventory_builder.py:187)`
+  - `test_merges_across_legacy_and_run_shapes_for_same_domain (tests/test_probe_inventory_builder.py:290)`
+  - `test_merges_across_legacy_and_run_shapes_for_same_domain (tests/test_probe_inventory_builder.py:313)`
+  - `test_merges_across_legacy_and_run_shapes_for_same_domain (tests/test_probe_inventory_builder.py:317)`
+  - `test_merges_and_dedupes_across_dated_runs (tests/test_probe_inventory_builder.py:109)`
+  - `test_merges_and_dedupes_across_dated_runs (tests/test_probe_inventory_builder.py:111)`
+  - `test_merges_run_shaped_files_and_tracks_revit_version (tests/test_probe_inventory_builder.py:211)`
+  - `test_merges_run_shaped_files_and_tracks_revit_version (tests/test_probe_inventory_builder.py:230)`
+  - `test_merges_run_shaped_files_and_tracks_revit_version (tests/test_probe_inventory_builder.py:254)`
+  - `test_merges_run_shaped_files_and_tracks_revit_version (tests/test_probe_inventory_builder.py:256)`
+- Related tests:
+  - `tests/test_probe_inventory_builder.py`
+- Retrieval identity: sha256=`6a1668fba220a7cf…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_probe_inventory_builder.py`)
+
+### `tests/test_record_contract_v2.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test record contract v2
+- Important symbols (5 total):
+  - `domain_identity_registry_v2` (function) — line 11
+  - `exported_fingerprint_json` (function) — line 17
+  - `test_all_exported_records_conform_to_record_contract_v2` (function) — line 32
+  - `test_blocked_records_have_no_sig_hash` (function) — line 59
+  - `test_exported_records_have_unique_record_id_per_file_and_domain` (function) — line 66
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `validators/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`9342d3d71b36ea3b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_record_contract_v2.py`)
+
+### `tests/test_record_id_determinism.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test record id determinism
+- Important symbols (5 total):
+  - `_make_record` (function) — line 11
+  - `test_structural_record_id_dup_index_deterministic` (function) — line 25
+  - `test_structural_record_id_duplicate_keys_blocked` (function) — line 39
+  - `test_structural_record_id_stable_across_runs` (function) — line 54
+  - `test_validate_records_duplicate_within_file_and_domain` (function) — line 73
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/record_v2.py`
+  - imports `validators/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `test_structural_record_id_dup_index_deterministic (tests/test_record_id_determinism.py:28)`
+  - `test_structural_record_id_dup_index_deterministic (tests/test_record_id_determinism.py:29)`
+  - `test_structural_record_id_duplicate_keys_blocked (tests/test_record_id_determinism.py:42)`
+  - `test_structural_record_id_duplicate_keys_blocked (tests/test_record_id_determinism.py:43)`
+  - `test_structural_record_id_stable_across_runs._build_records_in_order (tests/test_record_id_determinism.py:58)`
+- Related tests:
+  - `tests/test_record_id_determinism.py`
+- Retrieval identity: sha256=`8e9ebe9ad5601b59…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_record_id_determinism.py`)
+
+### `tests/test_record_v2_utils.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test record v2 utils
+- Important symbols (9 total):
+  - `test_canonicalize_str_rules` (function) — line 8
+  - `test_canonicalize_int_rules` (function) — line 14
+  - `test_canonicalize_float_rules` (function) — line 23
+  - `test_canonicalize_bool_rules` (function) — line 30
+  - `test_make_identity_item_banned_substring_guard` (function) — line 41
+  - `test_make_identity_item_empty_string_becomes_null_missing` (function) — line 46
+  - `test_serialize_identity_items_is_sorted_and_deterministic` (function) — line 52
+  - `test_compute_identity_quality_dominance` (function) — line 78
+  - `test_compute_identity_quality_blocked_short_circuit` (function) — line 83
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`094d2e5765027906…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_record_v2_utils.py`)
+
+### `tests/test_reference_bundle.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test reference bundle
+- Important symbols (2 total):
+  - `test_load_and_validate_allows_legacy_control_characters` (function) — line 6
+  - `test_load_and_validate_allows_raw_newline_in_string` (function) — line 26
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/bundle_analysis/reference_bundle.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`d09a8b935ca21476…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_reference_bundle.py`)
+
+### `tests/test_reformat_to_flat_items_identity_lineage.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test reformat to flat items identity lineage
+- Important symbols (1 total):
+  - `test_identity_lineage_items_are_preserved_in_canonical_conversion` (function) — line 4
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/migration/reformat_to_flat_items.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`55f8572d41cd4420…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_reformat_to_flat_items_identity_lineage.py`)
+
+### `tests/test_repository_data_remediation.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Regression checks for repository-neutral runtime and sample configuration.
+  - filename/path terms: test repository data remediation
+- Important symbols (4 total):
+  - `_read` (function) — line 10
+  - `test_runner_install_discovery_has_only_generic_defaults` (function) — line 14
+  - `test_dynamo_graphs_embed_current_runners_without_workstation_paths` (function) — line 24
+  - `test_default_client_sector_policy_uses_synthetic_labels` (function) — line 38
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_default_client_sector_policy_uses_synthetic_labels (tests/test_repository_data_remediation.py:39)`
+  - `test_dynamo_graphs_embed_current_runners_without_workstation_paths (tests/test_repository_data_remediation.py:30)`
+  - `test_dynamo_graphs_embed_current_runners_without_workstation_paths (tests/test_repository_data_remediation.py:31)`
+  - `test_dynamo_graphs_embed_current_runners_without_workstation_paths (tests/test_repository_data_remediation.py:32)`
+  - `test_runner_install_discovery_has_only_generic_defaults (tests/test_repository_data_remediation.py:16)`
+  - `test_runner_install_discovery_has_only_generic_defaults (tests/test_repository_data_remediation.py:21)`
+- Related tests:
+  - `tests/test_repository_data_remediation.py`
+- Retrieval identity: sha256=`0577cab018a4e08e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_repository_data_remediation.py`)
+
+### `tests/test_revitlookup_audit_regressions.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test revitlookup audit regressions
+- Important symbols (5 total):
+  - `_install_revit_stubs` (function) — line 10
+  - `test_vfa_phase2_payload_carries_semantic_keys` (function) — line 25
+  - `test_view_templates_signatures_capture_filter_enabled_and_workset_visibility` (function) — line 30
+  - `test_vco_category_hidden_is_semantic_for_model_and_annotation` (function) — line 38
+  - `test_object_styles_model_semantic_keys_include_material_sig_hash` (function) — line 57
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/record_v2.py`
+  - imports `domains/object_styles.py`
+  - imports `domains/view_category_overrides_annotation.py`
+  - imports `domains/view_category_overrides_model.py`
+- Called by (high/medium-confidence static callers):
+  - `test_object_styles_model_semantic_keys_include_material_sig_hash (tests/test_revitlookup_audit_regressions.py:58)`
+  - `test_vco_category_hidden_is_semantic_for_model_and_annotation (tests/test_revitlookup_audit_regressions.py:39)`
+- Related tests:
+  - `tests/test_revitlookup_audit_regressions.py`
+- Retrieval identity: sha256=`667da32e4f5bdcb2…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_revitlookup_audit_regressions.py`)
+

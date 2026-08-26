@@ -6,6 +6,7 @@ from pathlib import Path
 
 from core.deployment_config import load_deployment_config
 from core.join_key_policy import load_join_key_policies
+from core.sig_hash_policy import load_sig_hash_policies
 
 DEPLOYMENT_CONFIG_ENV = "REVIT_FINGERPRINT_DEPLOYMENT_CONFIG"
 
@@ -25,4 +26,5 @@ def build_extraction_context(repo_root, deployment_config_path=None):
     ))
     ctx["join_key_policies"] = load_join_key_policies(root / "policies" / "domain_join_key_policies.json")
     ctx["name_key_policies"] = load_join_key_policies(root / "policies" / "domain_name_key_policies.json")
+    ctx["sig_hash_policies"] = load_sig_hash_policies(root / "policies" / "domain_sig_hash_policies.json")
     return ctx

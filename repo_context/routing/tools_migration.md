@@ -1,0 +1,124 @@
+# Routing catalog: `tools/migration`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 5
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/migration` partition): `f26a653c52fdc4bc1ab31c5da9f42d11fcbf4d363db37cc6721522fa242179cd`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tools/migration/compress_fingerprint_json.py`
+- Role: `migration` (evidence: path contains migration directory segment 'migration')
+- Purpose clues:
+  - module docstring: compress_fingerprint_json.py
+  - filename/path terms: compress fingerprint json
+- Important symbols (7 total):
+  - `_load_json` (function) — line 44
+  - `_write_compact` (function) — line 49
+  - `_is_already_compact` (function) — line 61
+  - `_fmt_kb` (function) — line 80
+  - `_compress_file` (function) — line 88
+  - `_find_json_files` (function) — line 142
+  - `main` (function) — line 158
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/migration/compress_fingerprint_json.py:261)`
+  - `_compress_file (tools/migration/compress_fingerprint_json.py:104)`
+  - `_compress_file (tools/migration/compress_fingerprint_json.py:105)`
+  - `_compress_file (tools/migration/compress_fingerprint_json.py:109)`
+  - `_compress_file (tools/migration/compress_fingerprint_json.py:119)`
+  - `_compress_file (tools/migration/compress_fingerprint_json.py:126)`
+  - `_compress_file (tools/migration/compress_fingerprint_json.py:128)`
+  - `_compress_file (tools/migration/compress_fingerprint_json.py:131)`
+  - `_compress_file (tools/migration/compress_fingerprint_json.py:133)`
+  - `main (tools/migration/compress_fingerprint_json.py:201)`
+  - `main (tools/migration/compress_fingerprint_json.py:229)`
+  - `main (tools/migration/compress_fingerprint_json.py:251)`
+  - `main (tools/migration/compress_fingerprint_json.py:252)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`906a0db91a5ba996…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/migration/compress_fingerprint_json.py`)
+
+### `tools/migration/extract_first_record.py`
+- Role: `migration` (evidence: path contains migration directory segment 'migration')
+- Purpose clues:
+  - module docstring: Extract the first record from each domain in a fingerprint JSON payload.
+  - filename/path terms: extract first record
+- Important symbols (2 total):
+  - `extract_first_records` (function) — line 34
+  - `main` (function) — line 61
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/migration/extract_first_record.py:99)`
+  - `main (tools/migration/extract_first_record.py:80)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`34a854394cd648a3…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/migration/extract_first_record.py`)
+
+### `tools/migration/migrate_materials_identity_items.py`
+- Role: `migration` (evidence: path contains migration directory segment 'migration')
+- Purpose clues:
+  - module docstring: migrate_materials_identity_items.py
+  - filename/path terms: migrate materials identity items
+- Important symbols (8 total):
+  - `_load_json` (function) — line 60
+  - `_write_json` (function) — line 65
+  - `_iter_materials_records` (function) — line 77
+  - `_get_identity_items` (function) — line 106
+  - `_migrate_record` (function) — line 121
+  - `_migrate_file` (function) — line 171
+  - `_find_json_files` (function) — line 230
+  - `main` (function) — line 241
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/migration/migrate_materials_identity_items.py:334)`
+  - `_migrate_file (tools/migration/migrate_materials_identity_items.py:184)`
+  - `_migrate_file (tools/migration/migrate_materials_identity_items.py:193)`
+  - `_migrate_file (tools/migration/migrate_materials_identity_items.py:195)`
+  - `_migrate_file (tools/migration/migrate_materials_identity_items.py:216)`
+  - `_migrate_file (tools/migration/migrate_materials_identity_items.py:220)`
+  - `_migrate_record (tools/migration/migrate_materials_identity_items.py:128)`
+  - `main (tools/migration/migrate_materials_identity_items.py:276)`
+  - `main (tools/migration/migrate_materials_identity_items.py:300)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`9af9326b0c7a4349…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/migration/migrate_materials_identity_items.py`)
+
+### `tools/migration/reformat_to_flat_items.py`
+- Role: `migration` (evidence: path contains migration directory segment 'migration')
+- Purpose clues:
+  - module docstring: Reformat nested fingerprint record buckets into canonical flat item lists.
+  - filename/path terms: reformat to flat items
+- Important symbols (5 total):
+  - `parse_domains` (function) — line 22
+  - `transform_record` (function) — line 29
+  - `process_payload` (function) — line 59
+  - `iter_input_files` (function) — line 103
+  - `main` (function) — line 112
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canonical_items.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/migration/reformat_to_flat_items.py:158)`
+  - `main (tools/migration/reformat_to_flat_items.py:126)`
+  - `main (tools/migration/reformat_to_flat_items.py:127)`
+  - `main (tools/migration/reformat_to_flat_items.py:142)`
+  - `process_payload (tools/migration/reformat_to_flat_items.py:86)`
+  - `test_converted_old_and_new_records_converge (tests/test_text_types_conversion_convergence.py:43)`
+  - `test_identity_lineage_items_are_preserved_in_canonical_conversion (tests/test_reformat_to_flat_items_identity_lineage.py:30)`
+- Related tests:
+  - `tests/test_reformat_to_flat_items_identity_lineage.py`
+  - `tests/test_text_types_conversion_convergence.py`
+- Retrieval identity: sha256=`41588940f4577bb8…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/migration/reformat_to_flat_items.py`)
+
+## Other files (non-Python / boilerplate)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/migration/role_policy.json` | role policy | `migration` |
+

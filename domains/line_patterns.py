@@ -44,6 +44,7 @@ from core.record_v2 import (
     canonicalize_str,
     canonicalize_int,
     canonicalize_float,
+    canonicalize_bool,
     make_identity_item,
     serialize_identity_items,
     build_record_v2,
@@ -314,6 +315,30 @@ def extract(doc, ctx=None):
             make_identity_item("line_pattern.segments_def_hash", segments_def_hash_v, segments_def_hash_q)
         )
 
+        # lp.is_import (D-040): moved up from the coordination_items block below
+        # so it can also participate in identity_basis.items -- visible to
+        # discover_hash_policy.py's/discover_join_policy.py's pareto search --
+        # without changing sig_hash (it is deliberately not in semantic_keys below).
+        # Detection: Revit import-derived line patterns typically have names prefixed
+        # with "IMPORT-" or similar. Best-effort; q=degraded if uncertain.
+        is_import_v = None
+        is_import_q = ITEM_Q_MISSING
+        try:
+            _nm_raw = getattr(e, "Name", None) or ""
+            _nm_str = str(_nm_raw).strip().upper()
+            # Common Revit import line pattern name prefixes observed in practice
+            _import_prefixes = ("IMPORT-", "IMPORT ", "<" + "IMPORT>")
+            if any(_nm_str.startswith(p) for p in _import_prefixes):
+                is_import_v, is_import_q = ("true", ITEM_Q_OK)
+            elif _nm_str:
+                # Name is readable but doesn't match import prefix — best-effort: not import
+                is_import_v, is_import_q = ("false", ITEM_Q_OK)
+            else:
+                is_import_v, is_import_q = (None, ITEM_Q_MISSING)
+        except Exception:
+            is_import_v, is_import_q = (None, ITEM_Q_UNREADABLE)
+        identity_items.append(make_identity_item("lp.is_import", is_import_v, is_import_q))
+
         # ---- element-level finalize (once per element) ----
         identity_items_sorted = sorted(identity_items, key=lambda it: it.get("k", ""))
         semantic_keys = sorted(["line_pattern.segment_count", "line_pattern.segments_def_hash"])
@@ -456,28 +481,33 @@ def extract(doc, ctx=None):
         unknown_items.append(make_identity_item("line_pattern.source_element_id", _eid_v, _eid_q))
         unknown_items.append(make_identity_item("line_pattern.source_unique_id", _uid_v, _uid_q))
 
-        # lp.is_import coordination item for BI slicer.
-        # Detection: Revit import-derived line patterns typically have names prefixed
-        # with "IMPORT-" or similar. Best-effort; q=degraded if uncertain.
-        is_import_v = None
-        is_import_q = ITEM_Q_MISSING
-        try:
-            _nm_raw = getattr(e, "Name", None) or ""
-            _nm_str = str(_nm_raw).strip().upper()
-            # Common Revit import line pattern name prefixes observed in practice
-            _import_prefixes = ("IMPORT-", "IMPORT ", "<" + "IMPORT>")
-            if any(_nm_str.startswith(p) for p in _import_prefixes):
-                is_import_v, is_import_q = ("true", ITEM_Q_OK)
-            elif _nm_str:
-                # Name is readable but doesn't match import prefix — best-effort: not import
-                is_import_v, is_import_q = ("false", ITEM_Q_OK)
-            else:
-                is_import_v, is_import_q = (None, ITEM_Q_MISSING)
-        except Exception:
-            is_import_v, is_import_q = (None, ITEM_Q_UNREADABLE)
+        # lp.is_import is now computed above (before identity_items_sorted is
+        # finalized) so it can also live in identity_basis.items -- reuse the
+        # same is_import_v/is_import_q values here for the coordination_items
+        # explainability bucket, matching other domains' pattern of duplicating
+        # an identity item's k/q/v into a phase2 bucket for BI convenience.
+
+        # is_solid: coordination-only filter criterion (mirrors
+        # fill_patterns.py's is_solid), not identity. The true built-in Solid
+        # pattern has no LinePatternElement (see line_styles.py's
+        # GetLinePatternId handling) and so never reaches this per-instance
+        # loop at all -- this field can only describe *collected* patterns
+        # that render as solid. Per the documented segment semantics in
+        # tools/label_synthesis/domain_prompts/line_patterns.py ("a
+        # single-segment pattern is a solid line -- no actual dashes"),
+        # that means segment_count of 0 or 1, gated on seg_count_q so an
+        # unreadable segment count reports q=unreadable rather than False.
+        if seg_count_q == ITEM_Q_OK:
+            try:
+                is_solid_v, is_solid_q = canonicalize_bool(int(seg_count_v) <= 1)
+            except Exception:
+                is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
 
         lp_coordination_items = [
             make_identity_item("lp.is_import", is_import_v, is_import_q),
+            make_identity_item("lp.is_solid", is_solid_v, is_solid_q),
         ]
 
         rec_v2["phase2"] = {

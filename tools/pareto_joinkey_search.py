@@ -22,11 +22,15 @@ import argparse
 import itertools
 import math
 import json
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Tuple
 
-import pandas as pd
+try:
+    import pandas as pd
+except ModuleNotFoundError:  # Callable discovery API does not require pandas.
+    pd = None
 
 try:
     from tools.join_key_discovery.eval import score_candidate
@@ -42,7 +46,13 @@ def pareto_search(
 ) -> Dict[str, object]:
     """Callable API for v2.1 discovery orchestration."""
     cfg = cfg or {}
+    started = time.monotonic()
     max_k = int(cfg.get("max_k", 4))
+    frontier_limit = max(1, int(cfg.get("frontier_limit", 10)))
+    work_budget = max(0, int(cfg.get("work_budget", 0)))
+    progress = bool(cfg.get("progress", True))
+    domain = str(cfg.get("domain", ""))
+    verifier = cfg.get("finalist_verifier")
     gates = dict(cfg.get("gates") or {})
     fields = sorted({str(f).strip() for f in candidate_fields if str(f).strip()}, key=lambda s: s.lower())
 
@@ -62,7 +72,7 @@ def pareto_search(
     # required baseline is set (discover mode: required_fields is empty, so this
     # degrades to the original combinations-over-the-whole-pool behavior exactly).
     required_fields = sorted(
-        {str(f).strip() for f in (gates.get("required_fields") or []) if str(f).strip()},
+        {str(f).strip() for f in (cfg.get("runtime_required_fields") or gates.get("required_fields") or []) if str(f).strip()},
         key=lambda s: s.lower(),
     )
     required_set = set(required_fields)
@@ -75,29 +85,132 @@ def pareto_search(
     remaining = [f for f in fields if f not in required_set]
     max_extra_k = max(0, max_k - len(required_present))
 
-    scoring_gates = {k: v for k, v in gates.items() if k != "required_fields"}
-    scoring_cfg = {**cfg, "gates": scoring_gates}
+    scoring_cfg = dict(cfg)
+    if "evaluation_mode" not in scoring_cfg:
+        scoring_cfg["gates"] = {k: v for k, v in gates.items() if k != "required_fields"}
 
     rows: List[dict] = []
+    evaluated = 0
+    estimated_work = 0
+    max_k_attempted = 0
+    k_levels: List[int] = []
+    stop_reason = "max_k_reached"
+    chosen = None
+    full_verification = None
+    if progress:
+        print(
+            f"[pareto] domain={domain or '(unknown)'} records={len(domain_records)} "
+            f"candidates={len(fields)} max_k={max_k} work_budget={work_budget or 'unlimited'}",
+            flush=True,
+        )
     for extra_k in range(0, max_extra_k + 1):
+        depth_started = time.monotonic()
+        depth_rows: List[dict] = []
+        depth = len(required_present) + extra_k
+        if depth <= 0:
+            continue
+        planned = math.comb(len(remaining), extra_k)
+        if work_budget and estimated_work + (planned * len(domain_records)) > work_budget:
+            stop_reason = "work_budget_exhausted"
+            break
+        max_k_attempted = depth
+        k_levels.append(depth)
         for extra in itertools.combinations(remaining, extra_k):
             subset = tuple(sorted(required_present + list(extra), key=lambda s: s.lower()))
             if not subset:
                 continue
             metrics = score_candidate(domain_records, domain_identity_items, list(subset), scoring_cfg)
-            rows.append({
+            row = {
                 "keys": "|".join(subset),
                 "k_count": len(subset),
                 "collision_rate": float(metrics.get("collision_rate", 1.0)),
                 "coverage_gap": 1.0 - float(metrics.get("coverage", 0.0)),
                 "fragmentation_rate": float(metrics.get("fragmentation_rate", 1.0)),
                 "metrics": metrics,
-            })
+            }
+            rows.append(row)
+            depth_rows.append(row)
+            evaluated += 1
+            estimated_work += len(domain_records)
+
+        # Keep the non-dominated evidence bounded. Sorting first makes pruning
+        # deterministic and preserves the simplest/highest-quality candidates;
+        # the winner is always inserted before the diagnostic tail is truncated.
+        front = pareto_front(rows, ["coverage_gap", "collision_rate", "fragmentation_rate", "k_count"])
+        front = sorted(front, key=_candidate_sort_key)[:frontier_limit]
+        rows = list(front)
+        acceptable = [r for r in depth_rows if _acceptable(r["metrics"])]
+        finalist = sorted(acceptable, key=_candidate_sort_key)[0] if acceptable else None
+        if progress:
+            print(
+                f"[pareto] k={depth} subsets={planned} evaluated={len(depth_rows)} "
+                f"elapsed={time.monotonic()-depth_started:.3f}s frontier={len(front)} "
+                f"best={(front[0]['keys'] if front else '(none)')} "
+                f"accepted_sample={'true' if finalist else 'false'}",
+                flush=True,
+            )
+        if finalist is not None:
+            chosen = finalist
+            if callable(verifier):
+                if progress:
+                    print(f"[pareto] verifying finalist keys={finalist['keys']}", flush=True)
+                full_verification = verifier(finalist)
+                if bool(full_verification.get("accepted_full", False)):
+                    stop_reason = "accepted_finalist"
+                    break
+                # A sample finalist is evidence, not authority. Continue to the
+                # next depth when full-corpus verification rejects/diverges.
+                chosen = None
+            else:
+                stop_reason = "accepted_finalist"
+                break
     if not rows:
-        return {"frontier": [], "chosen": None}
-    front = pareto_front(rows, ["coverage_gap", "collision_rate", "fragmentation_rate", "k_count"])
-    front = sorted(front, key=lambda r: (r["collision_rate"], r["coverage_gap"], r["k_count"], r["keys"]))
-    return {"frontier": front, "chosen": front[0]}
+        if not fields:
+            stop_reason = "no_candidates"
+        elif stop_reason != "work_budget_exhausted":
+            stop_reason = "no_frontier"
+        result = {"frontier": [], "chosen": None}
+    else:
+        front = sorted(pareto_front(rows, ["coverage_gap", "collision_rate", "fragmentation_rate", "k_count"]), key=_candidate_sort_key)[:frontier_limit]
+        if chosen is not None and all(r.get("keys") != chosen.get("keys") for r in front):
+            front = [chosen] + front[: max(0, frontier_limit - 1)]
+        result = {"frontier": front, "chosen": chosen or front[0]}
+    result["diagnostics"] = {
+        "subsets_evaluated": evaluated,
+        "candidate_evaluations": evaluated,
+        "estimated_search_work": estimated_work,
+        "work_budget": work_budget,
+        "work_budget_exhausted": stop_reason == "work_budget_exhausted",
+        "max_k_attempted": max_k_attempted,
+        "k_levels_attempted": k_levels,
+        "stop_reason": stop_reason,
+        "frontier_retained": len(result["frontier"]),
+        "elapsed_seconds": time.monotonic() - started,
+        "full_verification": full_verification,
+    }
+    if progress:
+        print(f"[pareto] STOP reason={stop_reason} evaluated={evaluated} elapsed={result['diagnostics']['elapsed_seconds']:.3f}s", flush=True)
+    return result
+
+
+def _acceptable(metrics: dict) -> bool:
+    """Exact governance acceptance; intentionally contains no tolerances."""
+    return (
+        float(metrics.get("coverage", 0.0)) == 1.0
+        and float(metrics.get("collision_rate", 1.0)) == 0.0
+        and float(metrics.get("fragmentation_rate", 1.0)) == 0.0
+    )
+
+
+def _candidate_sort_key(row: dict) -> tuple:
+    """Simplicity first, then quality and stable field-name tie breaking."""
+    return (
+        int(row.get("k_count", 99)),
+        float(row.get("coverage_gap", 1.0)),
+        float(row.get("collision_rate", 1.0)),
+        float(row.get("fragmentation_rate", 1.0)),
+        str(row.get("keys", "")).lower(),
+    )
 
 
 def _dedupe_preserve_order(items: Sequence[str]) -> list[str]:

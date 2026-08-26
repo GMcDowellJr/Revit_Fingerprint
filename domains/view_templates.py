@@ -118,6 +118,16 @@ def _append_assigned_view_count_cosmetic_item(rec, doc, v, ctx):
     assigned_item = make_identity_item("vt.assigned_view_count", ac_v, ac_q)
     rec["phase2"]["cosmetic_items"] = list(rec["phase2"].get("cosmetic_items") or []) + [assigned_item]
 
+    # D-040: also promote into identity_basis.items so it's visible to
+    # discover_hash_policy.py's/discover_join_policy.py's pareto search --
+    # previously it only ever reached phase2.cosmetic_items, structurally
+    # invisible to policy discovery. rec["sig_hash"] is already computed by
+    # this point (build_record_v2 ran before this helper is called), so this
+    # does not change sig_hash.
+    ib = rec.get("identity_basis")
+    if isinstance(ib, dict) and isinstance(ib.get("items"), list):
+        ib["items"] = sorted(ib["items"] + [assigned_item], key=lambda it: str(it.get("k", "")))
+
 
 def _append_phase_filter_value(
     v,

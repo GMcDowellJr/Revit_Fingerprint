@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://repo_context.local/schema/packet_request.schema.json",
+  "title": "repo_context packet_request",
+  "description": "A validated request for repo_context.py's `packet --request` command. Produced by an LLM (or a human) after reading the routing catalogs under routing/, then resolved deterministically by repo_context.py -- never executed, never used to read/write anything outside the scanned repository.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "question", "selectors"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"],
+      "description": "Contract version. Only \"1.0\" is currently accepted; an unknown version is rejected rather than guessed at."
+    },
+    "question": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000,
+      "description": "The natural-language question this request is trying to answer. Carried through into packet provenance verbatim; never parsed or matched against."
+    },
+    "strict": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, any unresolved or ambiguous selector aborts packet generation entirely instead of being reported and skipped."
+    },
+    "selectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "description": "Repository-relative file paths (forward-slash, no leading '/', no '..' segments, no drive letters)."
+        },
+        "symbols": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "file": {"type": "string", "minLength": 1}
+            }
+          },
+          "description": "Symbol names (qualified or simple). An unqualified name matching more than one symbol is ambiguous unless 'file' narrows it to exactly one."
+        },
+        "search_terms": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "description": "Literal substrings to search for, unless expansion.search_as_regex is true."
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["file", "line"],
+            "properties": {
+              "file": {"type": "string", "minLength": 1},
+              "line": {"type": "integer", "minimum": 1},
+              "end_line": {"type": "integer", "minimum": 1}
+            }
+          },
+          "description": "An explicit file + line (or file + line..end_line range)."
+        }
+      }
+    },
+    "expansion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include_callers": {"type": "boolean", "default": true},
+        "include_callees": {"type": "boolean", "default": true},
+        "include_imports": {"type": "boolean", "default": true},
+        "include_related_tests": {"type": "boolean", "default": true},
+        "include_graphify": {"type": "boolean", "default": false},
+        "search_as_regex": {
+          "type": "boolean", "default": false,
+          "description": "Each term's evaluation is bounded (a few seconds) to avoid catastrophic backtracking on a pathological pattern; a term that exceeds it is reported as an invalid selector rather than hanging."
+        },
+        "max_hops": {"type": "integer", "minimum": 0, "maximum": 5, "default": 1}
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_estimated_tokens": {"type": "integer", "minimum": 1, "default": 12000},
+        "max_files": {"type": "integer", "minimum": 1, "default": 12}
+      }
+    }
+  }
+}

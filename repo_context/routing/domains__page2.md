@@ -1,0 +1,463 @@
+# Routing catalog: `domains (page 2)`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 15
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `domains` partition): `77af39c4f48ed1872bc8aee884b47866cc5896647bdbd27c8e5678467294a3cb`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `domains/object_styles.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Object Styles domain family extractor.
+  - filename/path terms: object styles
+- Important symbols (13 total):
+  - `_is_model_category_int0` (function) — line 62
+  - `_collect_categories` (function) — line 72
+  - `_is_analytical_category_type` (function) — line 120
+  - `_matches_category_type` (function) — line 127
+  - `_subcategory_purge_lookup` (function) — line 143
+  - `_rgb_sig` (function) — line 152
+  - `_material_ref_item` (function) — line 159
+  - `_build_info` (function) — line 202
+  - `_extract_object_styles` (function) — line 218
+  - `extract_model` (function) — line 558
+  - `extract_annotation` (function) — line 562
+  - `extract_analytical` (function) — line 566
+  - `extract_imported` (function) — line 570
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+  - imports `core/collect.py`
+  - imports `core/deps.py`
+  - imports `core/graphic_overrides.py`
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `_collect_categories (domains/object_styles.py:86)`
+  - `_extract_object_styles (domains/object_styles.py:219)`
+  - `_extract_object_styles (domains/object_styles.py:253)`
+  - `_extract_object_styles (domains/object_styles.py:274)`
+  - `_extract_object_styles (domains/object_styles.py:340)`
+  - `_extract_object_styles (domains/object_styles.py:411)`
+  - `_extract_object_styles (domains/object_styles.py:444)`
+  - `_matches_category_type (domains/object_styles.py:137)`
+  - `extract_analytical (domains/object_styles.py:567)`
+  - `extract_annotation (domains/object_styles.py:563)`
+  - `extract_imported (domains/object_styles.py:571)`
+  - `extract_model (domains/object_styles.py:559)`
+- Related tests:
+  - `tests/test_revitlookup_audit_regressions.py`
+- Retrieval identity: sha256=`79939ac3d502ecbb…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/object_styles.py`)
+
+### `domains/phase_filters.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Phase Filters domain extractor.
+  - filename/path terms: phase filters
+- Important symbols (1 total):
+  - `extract` (function) — line 64
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+  - imports `core/collect.py`
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`dfc2137bfef55c13…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/phase_filters.py`)
+
+### `domains/phase_graphics.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Phase Graphics domain extractor.
+  - filename/path terms: phase graphics
+- Important symbols (2 total):
+  - `_phase2_build_join_key_items` (function) — line 56
+  - `extract` (function) — line 68
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `extract (domains/phase_graphics.py:178)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`27354560693fe0ae…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/phase_graphics.py`)
+
+### `domains/phases.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Phases domain extractor.
+  - filename/path terms: phases
+- Important symbols (2 total):
+  - `_phase2_build_phase2_payload` (function) — line 65
+  - `extract` (function) — line 111
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+  - imports `core/collect.py`
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `extract (domains/phases.py:215)`
+  - `test_phases_join_hash_uses_policy_required_only_and_semantic_selector_is_separate (tests/test_phases_canonical_selectors.py:43)`
+- Related tests:
+  - `tests/test_phases_canonical_selectors.py`
+- Retrieval identity: sha256=`4247177843f7c454…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/phases.py`)
+
+### `domains/roof_types.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Roof types domain extractor (roof_types).
+  - filename/path terms: roof types
+- Important symbols (1 total):
+  - `extract_roof_types` (function) — line 55
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/collect.py`
+  - imports `core/hashing.py`
+  - imports `core/record_v2.py`
+  - imports `domains/compound_layers.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`8c776d7c48c08fb1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/roof_types.py`)
+
+### `domains/text_types.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Text Types domain extractor.
+  - filename/path terms: text types
+- Important symbols (5 total):
+  - `_phase2_item` (function) — line 76
+  - `_phase2_build_payload` (function) — line 81
+  - `_build_textnote_instance_count_map` (function) — line 154
+  - `_read_instance_and_sole_flags` (function) — line 175
+  - `extract` (function) — line 195
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+  - imports `core/canonical_items.py`
+  - imports `core/collect.py`
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+  - imports `core/rows.py`
+- Called by (high/medium-confidence static callers):
+  - `_phase2_build_payload (domains/text_types.py:103)`
+  - `_phase2_build_payload (domains/text_types.py:84)`
+  - `_phase2_build_payload (domains/text_types.py:88)`
+  - `_phase2_build_payload (domains/text_types.py:89)`
+  - `_phase2_build_payload (domains/text_types.py:90)`
+  - `_phase2_build_payload (domains/text_types.py:95)`
+  - `_phase2_build_payload (domains/text_types.py:99)`
+  - `extract (domains/text_types.py:233)`
+  - `extract (domains/text_types.py:464)`
+  - `extract (domains/text_types.py:552)`
+- Related tests:
+  - `tests/test_text_types_canonical_selectors.py`
+  - `tests/test_text_types_conversion_convergence.py`
+  - `tests/test_text_types_flat_items_export.py`
+- Retrieval identity: sha256=`0048d04fdac2458b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/text_types.py`)
+
+### `domains/units.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Units domain extractor.
+  - filename/path terms: units
+- Important symbols (2 total):
+  - `extract` (function) — line 119
+  - `extract_units_doc` (function) — line 491
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `test_extract_units_doc_emits_exactly_one_populated_record (tests/test_units_canonical_selectors.py:100)`
+  - `test_extract_units_doc_never_blocks_on_read_failure (tests/test_units_canonical_selectors.py:126)`
+- Related tests:
+  - `tests/test_units_canonical_selectors.py`
+- Retrieval identity: sha256=`28cf5f71e537b190…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/units.py`)
+
+### `domains/view_category_overrides.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Dispatcher for view category overrides domain family.
+  - filename/path terms: view category overrides
+- Important symbols (1 total):
+  - `extract` (function) — line 18
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `domains/view_category_overrides_annotation.py`
+  - imports `domains/view_category_overrides_model.py`
+  - imports `domains/view_templates.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - `tests/test_join_key_migration.py`
+- Retrieval identity: sha256=`1bdc7fcb5f1dce74…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/view_category_overrides.py`)
+
+### `domains/view_category_overrides_annotation.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Annotation partition for view category overrides.
+  - filename/path terms: view category overrides annotation
+- Important symbols (4 total):
+  - `_phase2_partition_items` (function) — line 49
+  - `_safe_bool` (function) — line 66
+  - `_category_hidden_item` (function) — line 73
+  - `extract` (function) — line 83
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/collect.py`
+  - imports `core/graphic_overrides.py`
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+  - imports `domains/view_templates.py`
+- Called by (high/medium-confidence static callers):
+  - `extract (domains/view_category_overrides_annotation.py:119)`
+  - `extract (domains/view_category_overrides_annotation.py:183)`
+  - `extract (domains/view_category_overrides_annotation.py:277)`
+- Related tests:
+  - `tests/test_revitlookup_audit_regressions.py`
+- Retrieval identity: sha256=`cff4b2857ef52542…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/view_category_overrides_annotation.py`)
+
+### `domains/view_category_overrides_model.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Model partition for view category overrides.
+  - filename/path terms: view category overrides model
+- Important symbols (5 total):
+  - `_compute_override_properties_hash` (function) — line 51
+  - `_phase2_partition_items` (function) — line 73
+  - `_safe_bool` (function) — line 90
+  - `_category_hidden_item` (function) — line 97
+  - `extract` (function) — line 107
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/collect.py`
+  - imports `core/deps.py`
+  - imports `core/graphic_overrides.py`
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+  - imports `domains/view_templates.py`
+- Called by (high/medium-confidence static callers):
+  - `extract (domains/view_category_overrides_model.py:151)`
+  - `extract (domains/view_category_overrides_model.py:226)`
+  - `extract (domains/view_category_overrides_model.py:320)`
+- Related tests:
+  - `tests/test_revitlookup_audit_regressions.py`
+- Retrieval identity: sha256=`1d1cb946116e499c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/view_category_overrides_model.py`)
+
+### `domains/view_filter_applications_view_templates.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: domains/view_filter_applications_view_templates.py
+  - filename/path terms: view filter applications view templates
+- Important symbols (3 total):
+  - `_is_schedule_view` (function) — line 54
+  - `_semantic_keys_from_identity_items` (function) — line 71
+  - `extract` (function) — line 85
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/collect.py`
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+  - imports `domains/view_templates.py`
+- Called by (high/medium-confidence static callers):
+  - `extract (domains/view_filter_applications_view_templates.py:165)`
+  - `extract (domains/view_filter_applications_view_templates.py:324)`
+  - `test_view_filter_applications_view_templates_uses_canonical_selectors_for_join_and_sig (tests/test_view_filter_applications_view_templates_canonical_selectors.py:60)`
+- Related tests:
+  - `tests/test_view_filter_applications_view_templates_canonical_selectors.py`
+- Retrieval identity: sha256=`1baaa3d307d61f3b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/view_filter_applications_view_templates.py`)
+
+### `domains/view_filter_definitions.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: domains/view_filter_definitions.py
+  - filename/path terms: view filter definitions
+- Important symbols (6 total):
+  - `_logic_root_token` (function) — line 55
+  - `_param_ref_from_param_id` (function) — line 69
+  - `_value_token_from_rule` (function) — line 117
+  - `_op_token_from_rule` (function) — line 162
+  - `_walk_rules` (function) — line 175
+  - `extract` (function) — line 235
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/collect.py`
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `_walk_rules (domains/view_filter_definitions.py:202)`
+  - `extract (domains/view_filter_definitions.py:329)`
+  - `extract (domains/view_filter_definitions.py:335)`
+  - `extract (domains/view_filter_definitions.py:352)`
+  - `extract (domains/view_filter_definitions.py:357)`
+  - `extract (domains/view_filter_definitions.py:371)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`ed48181ae6f2605b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/view_filter_definitions.py`)
+
+### `domains/view_templates.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: View Templates domain family extractor.
+  - filename/path terms: view templates
+- Important symbols (20 total):
+  - `_collect_templates` (function) — line 57
+  - `_non_ctrl_bips_from_view` (function) — line 74
+  - `_is_template_param_included` (function) — line 85
+  - `_append_assigned_view_count_cosmetic_item` (function) — line 94
+  - `_append_phase_filter_value` (function) — line 122
+  - `_append_filter_stack_signature` (function) — line 176
+  - `_append_workset_visibility` (function) — line 274
+  - `_phase2_items_from_def_signature` (function) — line 307
+  - `_canonical_identity_items_from_signature` (function) — line 343
+  - `_semantic_keys_from_identity_items` (function) — line 351
+  - `_build_floor_structural_area_viewtype_set` (function) — line 395
+  - `_build_ceiling_plan_viewtype_set` (function) — line 408
+  - `extract_floor_structural_area_plans` (function) — line 422
+  - `extract_ceiling_plans` (function) — line 847
+  - `_build_elevation_section_detail_viewtype_set` (function) — line 1264
+  - `extract_elevations_sections_detail` (function) — line 1297
+  - `_build_renderings_drafting_viewtype_set` (function) — line 1707
+  - `extract_renderings_drafting` (function) — line 1723
+  - `_is_schedule_view` (function) — line 2127
+  - `extract_schedules` (function) — line 2145
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+  - imports `core/collect.py`
+  - imports `core/deps.py`
+  - imports `core/graphic_overrides.py`
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+  - imports `core/vg_sig.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (domains/view_templates.py:1294)`
+  - `<module> (domains/view_templates.py:1720)`
+  - `<module> (domains/view_templates.py:418)`
+  - `<module> (domains/view_templates.py:419)`
+  - `_canonical_identity_items_from_signature (domains/view_templates.py:347)`
+  - `extract_ceiling_plans (domains/view_templates.py:1006)`
+  - `extract_ceiling_plans (domains/view_templates.py:1011)`
+  - `extract_ceiling_plans (domains/view_templates.py:1016)`
+  - `extract_ceiling_plans (domains/view_templates.py:1021)`
+  - `extract_ceiling_plans (domains/view_templates.py:1040)`
+  - `extract_ceiling_plans (domains/view_templates.py:1044)`
+  - `extract_ceiling_plans (domains/view_templates.py:1058)`
+  - `extract_ceiling_plans (domains/view_templates.py:1059)`
+  - `extract_ceiling_plans (domains/view_templates.py:1085)`
+  - `extract_ceiling_plans (domains/view_templates.py:1086)`
+  - ... and 46 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_view_instances_cache_key_consistency.py`
+- Retrieval identity: sha256=`ca478c676990e318…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `domains/view_templates.py`)
+
+### `domains/wall_types.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Wall types domain extractor (wall_types).
+  - filename/path terms: wall types
+- Important symbols (4 total):
+  - `_canon_non_sentinel_str` (function) — line 76
+  - `_read_wall_kind` (function) — line 85
+  - `_blocked_required_items` (function) — line 99
+  - `extract_wall_types` (function) — line 108
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canon.py`
+  - imports `core/collect.py`
+  - imports `core/hashing.py`
+  - imports `core/record_v2.py`
+  - imports `domains/compound_layers.py`
+  - imports `domains/materials.py`
+- Called by (high/medium-confidence static callers):
+  - `extract_wall_types (domains/wall_types.py:162)`
+  - `extract_wall_types (domains/wall_types.py:168)`
+  - `extract_wall_types (domains/wall_types.py:169)`
+  - `extract_wall_types (domains/wall_types.py:205)`
+  - `extract_wall_types (domains/wall_types.py:259)`
+  - `extract_wall_types (domains/wall_types.py:260)`
+  - `extract_wall_types (domains/wall_types.py:266)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`8421765e3ae8f22c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/wall_types.py`)
+
+### `domains/worksets.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'domains/')
+- Purpose clues:
+  - module docstring: Worksets domain extractor.
+  - filename/path terms: worksets
+- Important symbols (10 total):
+  - `_discover_workset_kind_names` (function) — line 141
+  - `_build_per_workset_record` (function) — line 174
+  - `_build_doc_level_record` (function) — line 328
+  - `_read_is_workshared` (function) — line 429
+  - `_resolve_active_workset_id` (function) — line 448
+  - `_collect_user_worksets` (function) — line 466
+  - `_collect_kind_counts` (function) — line 484
+  - `_resolve_active_workset_name` (function) — line 500
+  - `extract_worksets` (function) — line 512
+  - `extract_worksets_doc` (function) — line 611
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/phase2.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - `extract_worksets (domains/worksets.py:541)`
+  - `extract_worksets (domains/worksets.py:543)`
+  - `extract_worksets (domains/worksets.py:551)`
+  - `extract_worksets (domains/worksets.py:552)`
+  - `extract_worksets (domains/worksets.py:561)`
+  - `extract_worksets_doc (domains/worksets.py:651)`
+  - `extract_worksets_doc (domains/worksets.py:653)`
+  - `extract_worksets_doc (domains/worksets.py:654)`
+  - `extract_worksets_doc (domains/worksets.py:655)`
+  - `extract_worksets_doc (domains/worksets.py:656)`
+  - `extract_worksets_doc (domains/worksets.py:661)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`693956b2f98c5782…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `domains/worksets.py`)
+

@@ -1,0 +1,363 @@
+# Routing catalog: `tests`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 11
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests` partition): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tests/conftest.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: conftest
+- Important symbols (1 total):
+  - `pytest_configure` (function) — line 6
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`14b20068527cddd4…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/conftest.py`)
+
+### `tests/run_join_key_tests.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Standalone tests for join_key migration.
+  - filename/path terms: run join key tests
+- Important symbols (1 total):
+  - `_compute_override_properties_hash` (function) — line 21
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tests/run_join_key_tests.py:51)`
+  - `<module> (tests/run_join_key_tests.py:52)`
+  - `<module> (tests/run_join_key_tests.py:72)`
+  - `<module> (tests/run_join_key_tests.py:73)`
+  - `<module> (tests/run_join_key_tests.py:86)`
+  - `<module> (tests/run_join_key_tests.py:96)`
+  - `<module> (tests/run_join_key_tests.py:97)`
+- Related tests:
+  - `tests/run_join_key_tests.py`
+- Retrieval identity: sha256=`986113dc8e07a5ca…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/run_join_key_tests.py`)
+
+### `tests/synthetic_governance_fixtures.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Shared neutral identities for governance tests; never imported by production.
+  - filename/path terms: synthetic governance fixtures
+- Important symbols (0 total):
+  - (none)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - `tests/test_identity_project_info.py`
+- Retrieval identity: sha256=`09b7b470803dee74…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/synthetic_governance_fixtures.py`)
+
+### `tests/test_analyze_promotion_candidates.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Synthetic-fixture tests for tools/analyze_promotion_candidates.py.
+  - filename/path terms: test analyze promotion candidates
+- Important symbols (27 total):
+  - `_gov_row` (function) — line 28
+  - `_reuse_row` (function) — line 50
+  - `corpus_root` (function) — line 79
+  - `_read` (function) — line 249
+  - `test_enterprise_pool_flag_is_policy_driven_and_has_no_legacy_alias` (function) — line 253
+  - `test_invalid_source_schema_creates_no_output_directory` (function) — line 265
+  - `test_scope_gap_candidate_routing` (function) — line 277
+  - `test_baseline_equal_scope_excluded` (function) — line 287
+  - `test_underused_routed_separately` (function) — line 295
+  - `test_below_reuse_floor_not_classified` (function) — line 305
+  - `test_files_used_not_inflated_by_repeated_target_across_references` (function) — line 314
+  - `test_tied_client_rows_are_aggregated_not_dropped` (function) — line 325
+  - `test_pattern_label_variation_does_not_split_identity` (function) — line 340
+  - `test_unit_system_partitions_scope_evidence` (function) — line 353
+  - `test_used_view_preferred_over_all_view` (function) — line 371
+  - `test_all_view_fallback_dropped_when_used_data_exists_elsewhere` (function) — line 383
+  - `test_discipline_tied_rows_not_summed_within_client` (function) — line 398
+  - `test_domain_rollup_total_matches_bucket_sum` (function) — line 410
+  - `test_unclassified_reuse_routed_separately` (function) — line 426
+  - `test_min_enterprise_clients_downgrade` (function) — line 435
+  - `test_generic_reference_does_not_seed` (function) — line 446
+  - `test_baseline_threshold_gate_overrides_scope_gap` (function) — line 453
+  - `test_semantic_noise_filter_routes_separately` (function) — line 464
+  - `test_semantic_noise_filter_disabled_by_default` (function) — line 475
+  - `test_rank_is_ordinal_per_domain` (function) — line 482
+  - ... and 2 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:100)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:103)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:106)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:109)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:110)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:116)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:117)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:122)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:127)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:129)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:138)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:143)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:145)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:151)`
+  - `corpus_root (tests/test_analyze_promotion_candidates.py:152)`
+  - ... and 60 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_analyze_promotion_candidates.py`
+- Retrieval identity: sha256=`4ff5d38df5a9c300…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_analyze_promotion_candidates.py`)
+
+### `tests/test_arrowheads_shape_gating.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test arrowheads shape gating
+- Important symbols (7 total):
+  - `test_style_discriminator_first` (function) — line 20
+  - `test_style_specific_keys_are_omitted_when_not_applicable` (function) — line 31
+  - `test_no_missing_for_unrelated_style_properties` (function) — line 50
+  - `test_join_key_builder_additional_required_only_for_shape` (function) — line 69
+  - `test_get_arrowhead_style_fallback` (function) — line 87
+  - `test_join_key_builder_other_style` (function) — line 95
+  - `test_join_key_keys_used_and_hash_for_arrow_style` (function) — line 112
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+  - imports `domains/arrowheads.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`6e470369a2b727c0…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_arrowheads_shape_gating.py`)
+
+### `tests/test_build_segment_manifest.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for tools/build_segment_manifest.py.
+  - filename/path terms: test build segment manifest
+- Important symbols (124 total):
+  - `_meta_row` (function) — line 33
+  - `_full_row` (function) — line 44
+  - `_read_csv` (function) — line 70
+  - `_membership_ids` (function) — line 75
+  - `test_population_hash_deterministic` (function) — line 99
+  - `test_blank_unit_system_excluded` (function) — line 108
+  - `test_level1_segments_present` (function) — line 114
+  - `test_level1_run_type_skip_when_below_min_files` (function) — line 121
+  - `test_level1_run_type_bundle_at_min_files` (function) — line 129
+  - `test_level1_file_counts` (function) — line 136
+  - `test_level2_segments_present` (function) — line 143
+  - `test_level2_run_type_below_min` (function) — line 152
+  - `test_level2_run_type_at_min` (function) — line 158
+  - `test_seed_detection_level2` (function) — line 164
+  - `test_seed_detection_renown_no_seed` (function) — line 171
+  - `test_seed_detection_container_role` (function) — line 178
+  - `test_level1_parent_is_empty` (function) — line 185
+  - `test_level2_parent_is_unit_system` (function) — line 192
+  - `test_sort_order_level1_before_level2` (function) — line 199
+  - `test_sort_order_within_level_alphabetical` (function) — line 205
+  - `test_export_run_ids_sorted_pipe_delimited` (function) — line 213
+  - `test_membership_rows_no_pipe_delimited_values` (function) — line 224
+  - `test_manifest_and_registry_have_no_list_columns` (function) — line 235
+  - `test_population_hash_in_manifest` (function) — line 245
+  - `test_registry_excludes_skip_segments` (function) — line 252
+  - ... and 99 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tests/test_build_segment_manifest.py:57)`
+  - `<module> (tests/test_build_segment_manifest.py:58)`
+  - `<module> (tests/test_build_segment_manifest.py:59)`
+  - `<module> (tests/test_build_segment_manifest.py:60)`
+  - `<module> (tests/test_build_segment_manifest.py:61)`
+  - `<module> (tests/test_build_segment_manifest.py:62)`
+  - `<module> (tests/test_build_segment_manifest.py:63)`
+  - `<module> (tests/test_build_segment_manifest.py:64)`
+  - `<module> (tests/test_build_segment_manifest.py:65)`
+  - `<module> (tests/test_build_segment_manifest.py:86)`
+  - `<module> (tests/test_build_segment_manifest.py:87)`
+  - `<module> (tests/test_build_segment_manifest.py:88)`
+  - `<module> (tests/test_build_segment_manifest.py:89)`
+  - `<module> (tests/test_build_segment_manifest.py:90)`
+  - `<module> (tests/test_build_segment_manifest.py:91)`
+  - ... and 121 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_build_segment_manifest.py`
+- Retrieval identity: sha256=`9f3ece62e3859182…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tests/test_build_segment_manifest.py`)
+
+### `tests/test_bundle_analysis_name_projection.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for PR3 (Name-Projection Bundle Support).
+  - filename/path terms: test bundle analysis name projection
+- Important symbols (16 total):
+  - `_write_csv` (function) — line 49
+  - `_materials_name_key_rows` (function) — line 58
+  - `_build_pr2_name_patterns_dir` (function) — line 76
+  - `TestValidationBlocksUnsupportedFeatures` (class) — line 84
+  - `TestConfigPassthroughUnchanged` (class) — line 113
+  - `TestPurgeViewDefaultIsTargetAware` (class) — line 167
+  - `TestSplitExportFileIdNormalization` (class) — line 236
+  - `TestNormalizeExportRunIdWithKnownIds` (class) — line 278
+  - `TestStageWithKnownExportRunIds` (class) — line 306
+  - `TestNameProjectionAdapterProducesConsumableInput` (class) — line 347
+  - `TestBundleProvenance` (class) — line 382
+  - `TestRunBundleAnalysisForTargetResolvesDetailsOnlyIdsFromMetadataFile` (class) — line 428
+  - `TestNameAllOutputLocation` (class) — line 487
+  - `TestStaleNameAllClearedBeforeRegenerationEvenOnFailure` (class) — line 565
+  - `TestAnnotateNameTargetCombinedFiles` (class) — line 641
+  - `TestRetryFsOp` (class) — line 719
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/name_key_coverage.py`
+  - imports `tools/bundle_analysis/common.py`
+  - imports `tools/bundle_analysis/name_projection_adapter.py`
+  - imports `tools/bundle_analysis/run_bundle_analysis.py`
+  - imports `tools/bundle_analysis/step1_membership_matrix.py`
+  - imports `tools/bundle_analysis/step2_find_bundles.py`
+  - imports `tools/generate_name_key_patterns.py`
+  - imports `tools/run_segment_orchestrator.py`
+- Called by (high/medium-confidence static callers):
+  - `TestAnnotateNameTargetCombinedFiles.test_adds_three_columns_after_existing_header_and_looks_up_coverage_class (tests/test_bundle_analysis_name_projection.py:649)`
+  - `TestAnnotateNameTargetCombinedFiles.test_excluded_domain_row_still_annotated_with_its_own_coverage_class (tests/test_bundle_analysis_name_projection.py:701)`
+  - `TestAnnotateNameTargetCombinedFiles.test_idempotent_second_call_leaves_already_annotated_file_unchanged (tests/test_bundle_analysis_name_projection.py:685)`
+  - `TestBundleProvenance._run_pipeline (tests/test_bundle_analysis_name_projection.py:384)`
+  - `TestBundleProvenance.test_determinism_of_provenance_output (tests/test_bundle_analysis_name_projection.py:420)`
+  - `TestBundleProvenance.test_every_bundle_declares_comparison_target_and_coverage_class (tests/test_bundle_analysis_name_projection.py:393)`
+  - `TestBundleProvenance.test_excluded_domains_stated_explicitly_in_readme_and_coverage_csv (tests/test_bundle_analysis_name_projection.py:407)`
+  - `TestNameAllOutputLocation._run (tests/test_bundle_analysis_name_projection.py:495)`
+  - `TestNameAllOutputLocation.test_config_target_output_untouched_by_relocation (tests/test_bundle_analysis_name_projection.py:554)`
+  - `TestNameAllOutputLocation.test_config_target_output_untouched_by_relocation (tests/test_bundle_analysis_name_projection.py:555)`
+  - `TestNameAllOutputLocation.test_name_all_is_flat_single_segment_under_out_dir (tests/test_bundle_analysis_name_projection.py:508)`
+  - `TestNameAllOutputLocation.test_provenance_and_coverage_and_readme_relocated_alongside_bundle_output (tests/test_bundle_analysis_name_projection.py:515)`
+  - `TestNameAllOutputLocation.test_rerun_against_same_out_dir_self_clears_stale_name_all (tests/test_bundle_analysis_name_projection.py:529)`
+  - `TestNameAllOutputLocation.test_rerun_against_same_out_dir_self_clears_stale_name_all (tests/test_bundle_analysis_name_projection.py:539)`
+  - `TestNameAllOutputLocation.test_staging_input_remains_under_internal_name_dir_not_relocated (tests/test_bundle_analysis_name_projection.py:522)`
+  - ... and 16 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_bundle_analysis_name_projection.py`
+- Retrieval identity: sha256=`ef416021f1a9f09b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_bundle_analysis_name_projection.py`)
+
+### `tests/test_bundle_pattern_classification_roles.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test bundle pattern classification roles
+- Important symbols (2 total):
+  - `_write_csv` (function) — line 9
+  - `test_emit_stub_classifies_root_to_leaf_patterns_as_differentiating` (function) — line 17
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/bundle_analysis/step5_classify_patterns.py`
+- Called by (high/medium-confidence static callers):
+  - `test_emit_stub_classifies_root_to_leaf_patterns_as_differentiating (tests/test_bundle_pattern_classification_roles.py:21)`
+  - `test_emit_stub_classifies_root_to_leaf_patterns_as_differentiating (tests/test_bundle_pattern_classification_roles.py:34)`
+  - `test_emit_stub_classifies_root_to_leaf_patterns_as_differentiating (tests/test_bundle_pattern_classification_roles.py:44)`
+  - `test_emit_stub_classifies_root_to_leaf_patterns_as_differentiating (tests/test_bundle_pattern_classification_roles.py:53)`
+  - `test_emit_stub_classifies_root_to_leaf_patterns_as_differentiating (tests/test_bundle_pattern_classification_roles.py:62)`
+- Related tests:
+  - `tests/test_bundle_pattern_classification_roles.py`
+- Retrieval identity: sha256=`55d8b486ea360efd…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_bundle_pattern_classification_roles.py`)
+
+### `tests/test_canonical_items_migration.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test canonical items migration
+- Important symbols (6 total):
+  - `test_merge_legacy_buckets_to_flat_items_equivalence_and_dedupe` (function) — line 9
+  - `test_build_flat_items_preserves_counts_for_unique_keys` (function) — line 22
+  - `test_merge_legacy_buckets_preserves_existing_canonical_items` (function) — line 29
+  - `test_compile_and_resolve_roles_runtime_from_key_only` (function) — line 37
+  - `test_compile_role_policy_skips_scalar_string_for_role_keys` (function) — line 60
+  - `test_compile_role_policy_accepts_top_level_domains_wrapper` (function) — line 73
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canonical_items.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`29f266fb9bf325df…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_canonical_items_migration.py`)
+
+### `tests/test_collect.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for core/collect.py — collection context, caching, and element filtering.
+  - filename/path terms: test collect
+- Important symbols (8 total):
+  - `TestCollectCtx` (class) — line 18
+  - `TestIsInvalidElementId` (class) — line 53
+  - `TestSafeUniqueId` (class) — line 97
+  - `TestMakeQueryKey` (class) — line 134
+  - `TestCollectIdIntsNoRevit` (class) — line 187
+  - `test_build_purgeable_id_set_ok` (function) — line 211
+  - `test_build_purgeable_id_set_failure` (function) — line 230
+  - `test_build_purgeable_id_set_uses_cache` (function) — line 246
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/collect.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`3384205eabd928db…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_collect.py`)
+
+### `tests/test_compare_cross_segment_cardinality.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for explicit cardinality/status and aggregation-method semantics in
+  - filename/path terms: test compare cross segment cardinality
+- Important symbols (19 total):
+  - `_write_csv` (function) — line 34
+  - `_write_segment` (function) — line 43
+  - `_manifest_entry` (function) — line 63
+  - `_registry_entry` (function) — line 70
+  - `_clear_caches` (function) — line 74
+  - `test_one_by_one_comparison_is_ok_and_populates_union_and_pairwise` (function) — line 84
+  - `test_one_by_twenty_comparison_is_degraded_single_a` (function) — line 112
+  - `test_three_by_twenty_comparison_n_pairs_not_used_for_status` (function) — line 141
+  - `test_union_metrics_stable_pairwise_mean_shifts_under_duplication` (function) — line 168
+  - `test_directed_reference_heterogeneity_core_share_below_one` (function) — line 216
+  - `test_directed_single_file_reference_produces_normal_output` (function) — line 237
+  - `test_zero_files_on_either_side_is_blocked_not_zero_valued` (function) — line 265
+  - `test_empty_domain_and_unreadable_segment_get_different_inventory_status` (function) — line 309
+  - `test_union_containment_does_not_track_file_count_ratio_like_pairwise_mean` (function) — line 359
+  - `test_single_file_side_is_never_blocked` (function) — line 399
+  - `test_pooled_comparison_schedules_pool_only_domain_for_empty_focal` (function) — line 426
+  - `test_pooled_comparison_skips_when_lineage_filtering_empties_the_pool` (function) — line 464
+  - `test_blocked_row_preserves_populated_side_bundle_availability` (function) — line 503
+  - `test_pooled_blocked_row_preserves_pool_bundle_availability` (function) — line 543
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_write_segment (tests/test_compare_cross_segment_cardinality.py:58)`
+  - `_write_segment (tests/test_compare_cross_segment_cardinality.py:59)`
+  - `_write_segment (tests/test_compare_cross_segment_cardinality.py:60)`
+  - `test_blocked_row_preserves_populated_side_bundle_availability (tests/test_compare_cross_segment_cardinality.py:504)`
+  - `test_blocked_row_preserves_populated_side_bundle_availability (tests/test_compare_cross_segment_cardinality.py:507)`
+  - `test_blocked_row_preserves_populated_side_bundle_availability (tests/test_compare_cross_segment_cardinality.py:510)`
+  - `test_blocked_row_preserves_populated_side_bundle_availability (tests/test_compare_cross_segment_cardinality.py:514)`
+  - `test_blocked_row_preserves_populated_side_bundle_availability (tests/test_compare_cross_segment_cardinality.py:519)`
+  - `test_blocked_row_preserves_populated_side_bundle_availability (tests/test_compare_cross_segment_cardinality.py:520)`
+  - `test_blocked_row_preserves_populated_side_bundle_availability (tests/test_compare_cross_segment_cardinality.py:523)`
+  - `test_blocked_row_preserves_populated_side_bundle_availability (tests/test_compare_cross_segment_cardinality.py:524)`
+  - `test_directed_single_file_reference_produces_normal_output (tests/test_compare_cross_segment_cardinality.py:238)`
+  - `test_directed_single_file_reference_produces_normal_output (tests/test_compare_cross_segment_cardinality.py:241)`
+  - `test_directed_single_file_reference_produces_normal_output (tests/test_compare_cross_segment_cardinality.py:242)`
+  - `test_directed_single_file_reference_produces_normal_output (tests/test_compare_cross_segment_cardinality.py:243)`
+  - ... and 69 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_compare_cross_segment_cardinality.py`
+- Retrieval identity: sha256=`481122bba732560a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_compare_cross_segment_cardinality.py`)
+

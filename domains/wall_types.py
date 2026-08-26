@@ -16,6 +16,7 @@ if repo_root not in sys.path:
 from core.hashing import make_hash, safe_str
 from core.collect import collect_types, purge_lookup
 from core.canon import S_MISSING, S_UNREADABLE, S_NOT_APPLICABLE
+from core.sig_hash_policy import resolve_sig_hash_keys
 from core.record_v2 import (
     STATUS_OK,
     STATUS_BLOCKED,
@@ -71,6 +72,19 @@ _WALL_FUNCTION_NAMES = {
     0: "Interior", 1: "Exterior", 2: "Foundation",
     3: "Retaining", 4: "Soffit", 5: "Coreshaft",
 }
+
+# Fallback sig_hash preimage key set, used only when ctx["sig_hash_policies"]
+# is unavailable (e.g. a unit test building a minimal ctx by hand). Must stay
+# in sync with policies/domain_sig_hash_policies.json's wall_types.allowed_items
+# -- see core/sig_hash_policy.py's resolve_sig_hash_keys() and DECISIONS.md D-039/D-040.
+_WALL_TYPES_SIG_HASH_KEYS_FALLBACK = [
+    "wt.function",
+    "wt.layer_count",
+    "wt.total_thickness_in",
+    "wt.stack_hash_loose",
+    "wt.wraps_at_inserts",
+    "wt.wraps_at_ends",
+]
 
 
 def _canon_non_sentinel_str(v):
@@ -285,7 +299,14 @@ def extract_wall_types(doc, ctx=None):
         required_not_ok = any(q != ITEM_Q_OK for q in required_qs)
         status = STATUS_BLOCKED if required_not_ok else STATUS_OK
         status_reasons = ["required_identity_not_ok"] if required_not_ok else []
-        sig_hash = None if required_not_ok else make_hash(serialize_identity_items(semantic))
+        sig_hash_keys = set(resolve_sig_hash_keys(
+            (ctx or {}).get("sig_hash_policies"),
+            _DOMAIN_WALL,
+            [it.get("k") for it in identity_items],
+            _WALL_TYPES_SIG_HASH_KEYS_FALLBACK,
+        ))
+        sig_hash_items = [it for it in identity_items if safe_str(it.get("k", "")) in sig_hash_keys]
+        sig_hash = None if required_not_ok else make_hash(serialize_identity_items(sig_hash_items))
 
         rec = build_record_v2(
             domain=_DOMAIN_WALL,
@@ -304,14 +325,7 @@ def extract_wall_types(doc, ctx=None):
         _attach_placeholder_metadata(rec, wt, _instance_count_map, _instance_count_map_q, _total_type_count)
         rec["sig_basis"] = {
             "schema": "wall_types.sig_basis.v1",
-            "keys_used": [
-                "wt.function",
-                "wt.wraps_at_inserts",
-                "wt.wraps_at_ends",
-                "wt.layer_count",
-                "wt.total_thickness_in",
-                "wt.stack_hash_loose",
-            ],
+            "keys_used": sorted(safe_str(it.get("k", "")) for it in sig_hash_items),
         }
         rec["layer_rows"] = cs_data["layer_rows"]
         records.append(rec)

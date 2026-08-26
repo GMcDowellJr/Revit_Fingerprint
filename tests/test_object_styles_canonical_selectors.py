@@ -6,6 +6,7 @@ from core.hashing import make_hash
 from core.join_key_builder import build_join_key_from_policy
 from core.join_key_policy import get_domain_join_key_policy, load_join_key_policies
 from core.record_v2 import ITEM_Q_MISSING, ITEM_Q_OK, build_record_v2, make_identity_item, serialize_identity_items
+from domains.object_styles import _MODEL_SEMANTIC_KEYS
 from validators.record_v2 import validate_record_v2
 
 
@@ -50,8 +51,13 @@ def test_object_styles_model_canonical_evidence_selectors_and_hashing():
     join_items = [it for it in canonical_items if it.get("k") in set(join_key["keys_used"])]
     assert join_key["join_hash"] == make_hash(serialize_identity_items(join_items))
 
-    # Semantic signature (full canonical basis including optional) differs from join hash.
-    sig_hash = make_hash(serialize_identity_items(canonical_items))
+    # D-042: obj_style.row_key is name-derived (parent/subcategory Category.Name) and is
+    # excluded from the sig_hash preimage -- _MODEL_SEMANTIC_KEYS, not the full canonical
+    # basis -- matching the extractor's own inline computation. Still differs from join_hash
+    # because join_hash requires row_key + weight.cut but not material_sig_hash.
+    assert "obj_style.row_key" not in _MODEL_SEMANTIC_KEYS
+    semantic_items = [it for it in canonical_items if it.get("k") in set(_MODEL_SEMANTIC_KEYS)]
+    sig_hash = make_hash(serialize_identity_items(semantic_items))
     assert sig_hash != join_key["join_hash"]
 
 

@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import hashlib
+import json
 
 from core.hashing import make_hash
 from core.join_key_builder import build_join_key_from_policy
 from core.join_key_policy import load_join_key_policies, get_domain_join_key_policy
-from core.record_v2 import make_identity_item, serialize_identity_items
+from core.record_v2 import ITEM_Q_OK, build_record_v2, make_identity_item, serialize_identity_items
 from domains.line_patterns import _line_pattern_segments_def_hash
+from validators.record_v2 import validate_record_v2
 
 
 class _Seg(object):
@@ -64,3 +66,35 @@ def test_line_patterns_canonical_evidence_selectors_and_hashing():
     sig_hash = make_hash(serialize_identity_items(semantic_items))
 
     assert sig_hash != join_key["join_hash"]
+
+
+def test_lp_is_import_passes_contract_validation():
+    # P1 Codex review finding on the D-042 PR: lp.is_import was promoted into
+    # identity_basis.items (D-040) but never registered in
+    # contracts/domain_identity_keys_v2.json's allowed_keys, so
+    # validate_record_v2() rejected every real-export line_patterns record
+    # with identity.key.not_allowed:lp.is_import. No test caught this because
+    # no line_patterns test called validate_record_v2() against the real
+    # registry -- this closes that coverage gap.
+    with open("contracts/domain_identity_keys_v2.json", "r") as f:
+        registry = json.load(f)
+
+    identity_items = sorted(
+        [
+            make_identity_item("line_pattern.segment_count", "1", ITEM_Q_OK),
+            make_identity_item("line_pattern.segments_def_hash", "a" * 32, ITEM_Q_OK),
+            make_identity_item("lp.is_import", "false", ITEM_Q_OK),
+        ],
+        key=lambda it: it["k"],
+    )
+    rec = build_record_v2(
+        domain="line_patterns",
+        record_id="test-line-pattern",
+        status="ok",
+        status_reasons=[],
+        sig_hash=make_hash(serialize_identity_items(identity_items)),
+        identity_items=identity_items,
+        required_qs=[ITEM_Q_OK],
+        label={"display": "Test Pattern", "quality": "human", "provenance": "computed.path", "components": {}},
+    )
+    assert validate_record_v2(rec, registry) == []

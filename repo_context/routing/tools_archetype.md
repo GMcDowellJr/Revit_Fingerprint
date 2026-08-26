@@ -1,0 +1,390 @@
+# Routing catalog: `tools/archetype`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 17
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/archetype` partition): `c5dfc15c8ac63c3bd8e5c140c081e69d97eb5fb91d4f2ed43f57ac619d6f3163`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tools/archetype/_common.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - module docstring: Shared IO/logging helpers for the cross-domain archetype discovery pipeline.
+  - filename/path terms: common
+- Important symbols (10 total):
+  - `log` (function) — line 36
+  - `is_valid_item` (function) — line 40
+  - `read_csv_rows` (function) — line 49
+  - `read_json` (function) — line 59
+  - `atomic_write_csv` (function) — line 66
+  - `atomic_write_json` (function) — line 80
+  - `field_matches` (function) — line 92
+  - `strip_partition_suffix` (function) — line 108
+  - `build_edge_aliases` (function) — line 116
+  - `slugify` (function) — line 178
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `build_edge_aliases (tools/archetype/_common.py:134)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`7cb40c84ec14cdee…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/_common.py`)
+
+### `tools/archetype/assign_archetype_classifications.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Assign per-file archetype classifications based on cross-domain signals.
+  - filename/path terms: assign archetype classifications
+- Important symbols (4 total):
+  - `DomainPatternLabelCache` (class) — line 113
+  - `_evaluate_signal` (function) — line 157
+  - `_signal_fired_source` (function) — line 180
+  - `main` (function) — line 206
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/archetype/assign_archetype_classifications.py:474)`
+  - `DomainPatternLabelCache.get (tools/archetype/assign_archetype_classifications.py:125)`
+  - `main (tools/archetype/assign_archetype_classifications.py:237)`
+  - `main (tools/archetype/assign_archetype_classifications.py:386)`
+  - `main (tools/archetype/assign_archetype_classifications.py:412)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`31cf3514b50a33ff…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/assign_archetype_classifications.py`)
+
+### `tools/archetype/build_cross_domain_items.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Build cross_domain_items.csv for the cross-domain archetype discovery pipeline.
+  - filename/path terms: build cross domain items
+- Important symbols (5 total):
+  - `_load_identity_items` (function) — line 74
+  - `_parse_vf_categories` (function) — line 82
+  - `_build_structural_rows` (function) — line 113
+  - `_build_dynamic_rows` (function) — line 153
+  - `main` (function) — line 217
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/archetype/build_cross_domain_items.py:285)`
+  - `_build_dynamic_rows (tools/archetype/build_cross_domain_items.py:171)`
+  - `_build_dynamic_rows (tools/archetype/build_cross_domain_items.py:196)`
+  - `_build_structural_rows (tools/archetype/build_cross_domain_items.py:127)`
+  - `main (tools/archetype/build_cross_domain_items.py:267)`
+  - `main (tools/archetype/build_cross_domain_items.py:269)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`4c47f407fd4e1971…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/build_cross_domain_items.py`)
+
+### `tools/archetype/cluster_archetype_signals.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Cluster co-varying archetype signals into composite groups.
+  - filename/path terms: cluster archetype signals
+- Important symbols (19 total):
+  - `_utc_now_iso` (function) — line 162
+  - `_governance_question_from_archetype_id` (function) — line 166
+  - `_build_curated_gq_map` (function) — line 173
+  - `_resolve_governance_question` (function) — line 189
+  - `_bare_signal_name` (function) — line 193
+  - `_cluster_label_stub` (function) — line 199
+  - `_complete_linkage_clusters` (function) — line 209
+  - `_build_n_files_classified_lookup` (function) — line 262
+  - `_build_detail_files_lookup` (function) — line 296
+  - `_build_signal_graph` (function) — line 325
+  - `_jenks_threshold_for_values` (function) — line 440
+  - `_derive_coupling_threshold` (function) — line 460
+  - `_apply_threshold` (function) — line 486
+  - `_build_clusters` (function) — line 499
+  - `_build_signal_cluster_map` (function) — line 541
+  - `_rollup_classifications` (function) — line 554
+  - `_compute_file_universe` (function) — line 636
+  - `_build_coverage_summary` (function) — line 658
+  - `main` (function) — line 686
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/archetype/cluster_archetype_signals.py:801)`
+  - `_build_clusters (tools/archetype/cluster_archetype_signals.py:510)`
+  - `_build_clusters (tools/archetype/cluster_archetype_signals.py:523)`
+  - `_build_signal_graph (tools/archetype/cluster_archetype_signals.py:340)`
+  - `_build_signal_graph (tools/archetype/cluster_archetype_signals.py:354)`
+  - `_cluster_label_stub (tools/archetype/cluster_archetype_signals.py:200)`
+  - `_derive_coupling_threshold (tools/archetype/cluster_archetype_signals.py:471)`
+  - `_derive_coupling_threshold (tools/archetype/cluster_archetype_signals.py:481)`
+  - `_resolve_governance_question (tools/archetype/cluster_archetype_signals.py:190)`
+  - `_rollup_classifications (tools/archetype/cluster_archetype_signals.py:565)`
+  - `main (tools/archetype/cluster_archetype_signals.py:740)`
+  - `main (tools/archetype/cluster_archetype_signals.py:741)`
+  - `main (tools/archetype/cluster_archetype_signals.py:742)`
+  - `main (tools/archetype/cluster_archetype_signals.py:745)`
+  - `main (tools/archetype/cluster_archetype_signals.py:750)`
+  - ... and 8 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`305fdab32ba82f91…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/cluster_archetype_signals.py`)
+
+### `tools/archetype/compute_cross_domain_cooccurrence.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Compute cross-domain edge co-occurrence and join_hash-pair patterns.
+  - filename/path terms: compute cross domain cooccurrence
+- Important symbols (3 total):
+  - `_pattern_id` (function) — line 104
+  - `_eligibility_reason` (function) — line 110
+  - `main` (function) — line 131
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/archetype/compute_cross_domain_cooccurrence.py:305)`
+  - `main (tools/archetype/compute_cross_domain_cooccurrence.py:204)`
+  - `main (tools/archetype/compute_cross_domain_cooccurrence.py:276)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`d95def55f3cde71a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/compute_cross_domain_cooccurrence.py`)
+
+### `tools/archetype/discover_vfd_edges.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Discover View Filter Definition dynamic edges from flat identity_items CSV exports.
+  - filename/path terms: discover vfd edges
+- Important symbols (46 total):
+  - `RawObservation` (class) — line 120
+  - `ResolvedParam` (class) — line 129
+  - `DomainHint` (class) — line 137
+  - `ParsedCategories` (class) — line 144
+  - `warn` (function) — line 153
+  - `read_json_required` (function) — line 157
+  - `read_json_optional` (function) — line 167
+  - `atomic_write_csv` (function) — line 180
+  - `load_file_metadata` (function) — line 191
+  - `bool_s` (function) — line 214
+  - `find_identity_items_path` (function) — line 218
+  - `is_bad_param_id` (function) — line 232
+  - `row_quality` (function) — line 237
+  - `is_usable_identity_item_value` (function) — line 241
+  - `canonical_param_kind` (function) — line 250
+  - `flush_record` (function) — line 261
+  - `stream_observations` (function) — line 279
+  - `resolve_params` (function) — line 331
+  - `load_bip_hints` (function) — line 364
+  - `hint_target_and_verify` (function) — line 393
+  - `iter_name_contains_rules` (function) — line 402
+  - `infer_domain` (function) — line 419
+  - `parse_category_tokens` (function) — line 437
+  - `sort_category_tokens` (function) — line 468
+  - `parse_category_ints` (function) — line 472
+  - ... and 21 more (see python_symbols.csv)
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/archetype/discover_vfd_edges.py:1353)`
+  - `_candidate_category_details (tools/archetype/discover_vfd_edges.py:942)`
+  - `_category_map_domain_extracted (tools/archetype/discover_vfd_edges.py:918)`
+  - `_category_names_for_ids (tools/archetype/discover_vfd_edges.py:628)`
+  - `build_domain_gap_rows (tools/archetype/discover_vfd_edges.py:970)`
+  - `build_domain_gap_rows (tools/archetype/discover_vfd_edges.py:980)`
+  - `build_edge_rows (tools/archetype/discover_vfd_edges.py:1026)`
+  - `build_edge_rows (tools/archetype/discover_vfd_edges.py:1057)`
+  - `build_edge_rows (tools/archetype/discover_vfd_edges.py:1073)`
+  - `build_edge_rows (tools/archetype/discover_vfd_edges.py:1120)`
+  - `build_edge_rows (tools/archetype/discover_vfd_edges.py:1121)`
+  - `build_inventory_rows (tools/archetype/discover_vfd_edges.py:718)`
+  - `build_inventory_rows (tools/archetype/discover_vfd_edges.py:762)`
+  - `build_inventory_rows (tools/archetype/discover_vfd_edges.py:816)`
+  - `build_inventory_rows (tools/archetype/discover_vfd_edges.py:825)`
+  - ... and 62 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`95fe05c8009121c8…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/discover_vfd_edges.py`)
+
+### `tools/archetype/generate_archetype_candidates.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Generate candidate archetype definitions from cross-domain co-occurrence patterns.
+  - filename/path terms: generate archetype candidates
+- Important symbols (6 total):
+  - `_utc_now_iso` (function) — line 109
+  - `_is_vfd_related` (function) — line 113
+  - `_governance_question_hint` (function) — line 120
+  - `_signal_coverage_pct` (function) — line 136
+  - `_collapsed_from_for_edge` (function) — line 149
+  - `main` (function) — line 158
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/archetype/generate_archetype_candidates.py:342)`
+  - `_governance_question_hint (tools/archetype/generate_archetype_candidates.py:128)`
+  - `main (tools/archetype/generate_archetype_candidates.py:243)`
+  - `main (tools/archetype/generate_archetype_candidates.py:263)`
+  - `main (tools/archetype/generate_archetype_candidates.py:264)`
+  - `main (tools/archetype/generate_archetype_candidates.py:300)`
+  - `main (tools/archetype/generate_archetype_candidates.py:312)`
+  - `main (tools/archetype/generate_archetype_candidates.py:327)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`942721cf6e9d9376…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/generate_archetype_candidates.py`)
+
+### `tools/archetype/generate_reference_graph.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Generate reference_graph.json for the cross-domain archetype discovery pipeline.
+  - filename/path terms: generate reference graph
+- Important symbols (7 total):
+  - `_utc_now_iso` (function) — line 69
+  - `_check_static_edge_availability` (function) — line 73
+  - `_normalize_param_name` (function) — line 115
+  - `_resolve_param_name` (function) — line 128
+  - `_param_id_slug` (function) — line 136
+  - `_build_dynamic_edges` (function) — line 147
+  - `main` (function) — line 221
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/archetype/generate_reference_graph.py:299)`
+  - `_build_dynamic_edges (tools/archetype/generate_reference_graph.py:194)`
+  - `_build_dynamic_edges (tools/archetype/generate_reference_graph.py:195)`
+  - `_build_dynamic_edges (tools/archetype/generate_reference_graph.py:196)`
+  - `_param_id_slug (tools/archetype/generate_reference_graph.py:143)`
+  - `main (tools/archetype/generate_reference_graph.py:253)`
+  - `main (tools/archetype/generate_reference_graph.py:274)`
+  - `main (tools/archetype/generate_reference_graph.py:283)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`e1a7c1e03c75293c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/generate_reference_graph.py`)
+
+### `tools/archetype/prepare_archetype_review.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Build human-reviewable drill-down tables for archetype signal clusters.
+  - filename/path terms: prepare archetype review
+- Important symbols (24 total):
+  - `_find_cluster` (function) — line 181
+  - `_all_clusters` (function) — line 188
+  - `_all_cluster_ids` (function) — line 199
+  - `_resolve_param_name` (function) — line 203
+  - `_parse_category_ids` (function) — line 211
+  - `_resolve_category_name` (function) — line 241
+  - `_governance_question_from_cluster_id` (function) — line 250
+  - `_governance_question_from_archetype_id` (function) — line 261
+  - `_build_curated_gq_map` (function) — line 272
+  - `_resolve_governance_question` (function) — line 289
+  - `ClusterContext` (class) — line 293
+  - `_build_cluster_context` (function) — line 307
+  - `_load_label_lookup` (function) — line 367
+  - `_load_vfd_resolution` (function) — line 415
+  - `_load_file_path_lookup` (function) — line 469
+  - `_is_named_element` (function) — line 493
+  - `_schedule_file_sort_key` (function) — line 500
+  - `_schedule_row_sort_key` (function) — line 516
+  - `_selected_file_name_status` (function) — line 521
+  - `_select_schedule_rows_for_cluster` (function) — line 540
+  - `_write_review_schedule_outputs` (function) — line 635
+  - `_sort_key` (function) — line 702
+  - `_process_cluster` (function) — line 716
+  - `main` (function) — line 901
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/archetype/prepare_archetype_review.py:1048)`
+  - `ClusterContext.__init__ (tools/archetype/prepare_archetype_review.py:298)`
+  - `_all_cluster_ids (tools/archetype/prepare_archetype_review.py:200)`
+  - `_build_cluster_context (tools/archetype/prepare_archetype_review.py:313)`
+  - `_find_cluster (tools/archetype/prepare_archetype_review.py:182)`
+  - `_load_vfd_resolution (tools/archetype/prepare_archetype_review.py:456)`
+  - `_load_vfd_resolution (tools/archetype/prepare_archetype_review.py:460)`
+  - `_load_vfd_resolution (tools/archetype/prepare_archetype_review.py:461)`
+  - `_resolve_governance_question (tools/archetype/prepare_archetype_review.py:290)`
+  - `_schedule_row_sort_key (tools/archetype/prepare_archetype_review.py:517)`
+  - `_select_schedule_rows_for_cluster (tools/archetype/prepare_archetype_review.py:553)`
+  - `_select_schedule_rows_for_cluster (tools/archetype/prepare_archetype_review.py:565)`
+  - `_select_schedule_rows_for_cluster (tools/archetype/prepare_archetype_review.py:570)`
+  - `_select_schedule_rows_for_cluster (tools/archetype/prepare_archetype_review.py:571)`
+  - `_select_schedule_rows_for_cluster (tools/archetype/prepare_archetype_review.py:599)`
+  - ... and 14 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`03bdf22e06a40e3b…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/prepare_archetype_review.py`)
+
+### `tools/archetype/review/select_archetype_review_files.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Select the minimum set of files needed to review all archetype clusters.
+  - filename/path terms: select archetype review files
+- Important symbols (14 total):
+  - `log` (function) — line 105
+  - `read_csv_rows` (function) — line 109
+  - `read_json` (function) — line 116
+  - `atomic_write_csv` (function) — line 123
+  - `_load_file_paths` (function) — line 135
+  - `_all_cluster_pairs` (function) — line 152
+  - `_cluster_signal_ids` (function) — line 163
+  - `_build_approach_label_map` (function) — line 174
+  - `_build_file_cluster_index` (function) — line 208
+  - `_load_review_csvs` (function) — line 269
+  - `_greedy_cover` (function) — line 294
+  - `_build_output_rows` (function) — line 355
+  - `_identify_gaps` (function) — line 444
+  - `main` (function) — line 470
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/archetype/review/select_archetype_review_files.py:612)`
+  - `_load_file_paths (tools/archetype/review/select_archetype_review_files.py:136)`
+  - `_load_review_csvs (tools/archetype/review/select_archetype_review_files.py:281)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:501)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:502)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:504)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:505)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:507)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:509)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:510)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:512)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:513)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:515)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:516)`
+  - `main (tools/archetype/review/select_archetype_review_files.py:528)`
+  - ... and 16 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`8924d10205891811…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/review/select_archetype_review_files.py`)
+
+### `tools/archetype/validate_archetype_signals.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Validate archetype signal coherence at sig_hash grain.
+  - filename/path terms: validate archetype signals
+- Important symbols (2 total):
+  - `_coherence_tier` (function) — line 153
+  - `main` (function) — line 161
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/archetype/validate_archetype_signals.py:458)`
+  - `main (tools/archetype/validate_archetype_signals.py:362)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`d44e5d261376d1bc…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/archetype/validate_archetype_signals.py`)
+
+## Other files (non-Python / boilerplate)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/archetype/bip_lookup.json` | bip lookup | `unknown` |
+| `tools/archetype/README.md` | Cross-Domain Archetype Discovery Pipeline (`tools/archetype/`) | `unknown` |
+| `tools/archetype/review/archetype_dp1_prompt.md` | Archetype Decision Point 1 — Candidate Promotion | `unknown` |
+| `tools/archetype/review/archetype_dp2_label_decisions.csv.bak` | archetype dp2 label decisions.csv | `unknown` |
+| `tools/archetype/review/archetype_dp2_prompt.md` | Archetype Decision Point 2 — Approach Label Ratification | `unknown` |
+| `tools/archetype/shared_param_names.json` | shared param names | `unknown` |
+

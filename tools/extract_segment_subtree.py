@@ -21,6 +21,14 @@ This intentionally does not use pandas: the rest of tools/ (compare_cross_segmen
 in particular) reads/writes CSV with the stdlib csv module and this project has
 no pandas dependency, so this tool streams row-by-row with csv.DictReader/Writer
 to match that convention and avoid adding a new dependency.
+
+Standalone diagnostic tool, not part of the automated runbook chain: no in-repo caller
+invokes this module (confirmed by a repo-wide grep for its filename/module path). It runs
+downstream of tools/compare_cross_segment.py's output by convention (it reads
+segment_manifest.csv plus that tool's cross_segment_*.csv/comparison_registry.csv files),
+but nothing in tools/corpus_update_runbook.ps1, tools/label_refresh_runbook.ps1, or any
+other in-scope script invokes it -- an operator runs it manually, by hand, against an
+already-produced cross-segment output directory.
 """
 
 from __future__ import annotations
@@ -42,21 +50,63 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 # ---------------------------------------------------------------------
 
 def norm(value: object) -> str:
+    """Normalize an arbitrary value to a stripped string, treating None as "".
+
+    --- trace ---
+    reads: `value` -- caller-supplied (used pervasively: row field lookups, CLI args,
+        manifest values).
+    calls: none (str(), strip()).
+    thresholds: none.
+    returns: str; consumed throughout this module wherever a raw CSV/dict value needs
+        stripped-string normalization before comparison.
+    """
     if value is None:
         return ""
     return str(value).strip()
 
 
 def norm_fold(value: object) -> str:
+    """Case-fold a normalized value for case-insensitive comparison.
+
+    --- trace ---
+    reads: `value` -- caller-supplied.
+    calls: norm().
+    thresholds: none.
+    returns: str.casefold() of the normalized value; consumed by find_seeds_by_search()
+        and row_matches() for case-insensitive membership tests.
+    """
     return norm(value).casefold()
 
 
 def sanitize_label(text: str) -> str:
+    """Turn free text into a filesystem-safe label slug for the output folder name.
+
+    --- trace ---
+    reads: `text` -- caller-supplied (main() passes the first --segment-id or
+        --search-term when --label is not given).
+    calls: re.sub() (stdlib).
+    thresholds: the slug pattern `[^a-z0-9]+` -> "_" and the "segment_subtree" fallback
+        for an empty/all-punctuation input are hardcoded literals here, not named
+        constants.
+    returns: str; consumed by main() to build --out-dir's default
+        (<cross-segment-dir>/<label>_subtree_extract).
+    """
     slug = re.sub(r"[^a-z0-9]+", "_", text.strip().casefold()).strip("_")
     return slug or "segment_subtree"
 
 
 def atomic_write_csv(path: Path, fieldnames: Sequence[str], rows: Iterable[Dict[str, object]]) -> None:
+    """Write CSV rows atomically using a temp file in the destination directory.
+
+    --- trace ---
+    reads: `path`, `fieldnames`, `rows` -- caller-supplied; called by main() (for
+        selected_segments.csv and extract_manifest.csv) and by _write_summary()/
+        process_file() (for the detail/summary output files).
+    calls: none (stdlib csv.DictWriter, tempfile.NamedTemporaryFile).
+    thresholds: none.
+    returns: None; writes `path` atomically (temp file in the same directory via
+        NamedTemporaryFile, then Path.replace()).
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile(
         "w", encoding="utf-8-sig", newline="", delete=False,
@@ -88,6 +138,20 @@ SELECTED_SEGMENT_METADATA_FIELDS = [
 
 
 def load_manifest(records_dir: Path) -> Dict[str, Dict[str, str]]:
+    """Load segment_manifest.csv keyed by segment_id, validating the hierarchy columns exist.
+
+    --- trace ---
+    reads: `records_dir` -- Path, from main()'s --records-dir; opens
+        `records_dir/segment_manifest.csv` (tools/build_segment_manifest.py's output --
+        MANIFEST_FIELDNAMES columns, though this function only requires segment_id and
+        parent_segment_id per REQUIRED_HIERARCHY_COLUMNS).
+    calls: none (stdlib csv.DictReader); raises Blocked.
+    thresholds: REQUIRED_HIERARCHY_COLUMNS = {"segment_id", "parent_segment_id"} (module
+        constant, l.81) -- header-presence check only.
+    returns: Dict[segment_id, row-dict]; raises Blocked if the file is missing, the
+        required columns are absent, or two rows disagree for the same segment_id.
+        Consumed by main() to build parent_map and to resolve seed segments.
+    """
     path = records_dir / "segment_manifest.csv"
     if not path.is_file():
         raise Blocked(f"segment_manifest.csv not found at {path}")
@@ -113,6 +177,18 @@ def load_manifest(records_dir: Path) -> Dict[str, Dict[str, str]]:
 
 
 def find_seeds_by_search(manifest: Dict[str, Dict[str, str]], search_terms: Tuple[str, ...]) -> Set[str]:
+    """Return the segment_ids whose manifest row contains any of the given search terms
+    (case-insensitive substring match against every column value).
+
+    --- trace ---
+    reads: `manifest` -- load_manifest()'s return value, passed in by main();
+        `search_terms` -- tuple from main()'s --search-term (repeatable CLI flag).
+    calls: norm(), norm_fold().
+    thresholds: none named -- substring containment (`term in haystack`) against the
+        space-joined, case-folded values of every column in the row.
+    returns: Set[str] of matching segment_ids (empty if no non-blank search terms);
+        consumed by main(), unioned with find_seeds_by_id()'s result into `seed_ids`.
+    """
     normalized_terms = tuple(norm_fold(t) for t in search_terms if norm(t))
     if not normalized_terms:
         return set()
@@ -125,6 +201,16 @@ def find_seeds_by_search(manifest: Dict[str, Dict[str, str]], search_terms: Tupl
 
 
 def find_seeds_by_id(manifest: Dict[str, Dict[str, str]], segment_ids: Tuple[str, ...]) -> Set[str]:
+    """Validate and return the segment_ids passed via --segment-id.
+
+    --- trace ---
+    reads: `manifest` -- load_manifest()'s return value; `segment_ids` -- tuple from
+        main()'s --segment-id (repeatable CLI flag).
+    calls: norm(); raises Blocked.
+    thresholds: none.
+    returns: Set[str]; raises Blocked if a given --segment-id is not a key in
+        `manifest`. Consumed by main(), unioned with find_seeds_by_search()'s result.
+    """
     seeds: Set[str] = set()
     for sid in segment_ids:
         sid = norm(sid)
@@ -141,6 +227,24 @@ def expand_ancestors(
     parent_map: Dict[str, str],
     depth: int,
 ) -> Tuple[Set[str], List[Dict[str, object]]]:
+    """Walk parent_segment_id up to `depth` generations from each seed, returning the
+    full selected set plus a per-seed ancestry trail.
+
+    --- trace ---
+    reads: `seed_ids` -- Set[str], from main()'s find_seeds_by_id()/find_seeds_by_search()
+        union; `parent_map` -- Dict[segment_id, parent_segment_id], built by main() from
+        the manifest's own parent_segment_id column; `depth` -- int, from main()'s
+        --ancestor-depth (default 2).
+    calls: none; raises Blocked, ValueError.
+    thresholds: `depth` itself is the only threshold, sourced from --ancestor-depth (no
+        hardcoded default inside this function -- the argparse default of 2 lives in
+        parse_args()).
+    returns: (Set[str] selected segment_ids including ancestors, List[dict] ancestry_rows
+        with seed_segment_id/selected_segment_id/relationship/ancestor_distance) sorted
+        by (seed_segment_id, ancestor_distance, selected_segment_id); consumed by main()
+        to build selected_segments.csv and the relations_by_segment/distances_by_segment
+        lookups. Raises Blocked on a missing hierarchy entry or a cyclic parent chain.
+    """
     if depth < 0:
         raise ValueError("ancestor depth must be >= 0")
 
@@ -196,6 +300,21 @@ _SINGLETON_EXCLUDED_COLUMNS = {"parent_segment_id", "ancestor_segment_ids", "see
 
 
 def resolve_endpoint_columns(columns: Iterable[str]) -> Tuple[str, ...]:
+    """Detect which two (or one) columns in a cross_segment CSV's header identify the
+    segment_id endpoints of a comparison row.
+
+    --- trace ---
+    reads: `columns` -- an iterable of header column names, from process_file()'s peek
+        at the source file's first row.
+    calls: none (str.casefold() only).
+    thresholds: PREFERRED_ENDPOINT_PAIRS (module constant, l.187-193: the 5 known
+        left/right column-name pairs used across compare_cross_segment.py's various
+        output schemas, tried in order); _SINGLETON_EXCLUDED_COLUMNS (module constant,
+        l.195: columns containing "segment_id" that must NOT be treated as a lone
+        endpoint column, e.g. parent_segment_id).
+    returns: tuple of 0, 1, or 2 column names; consumed by process_file(), which raises
+        Blocked if this returns an empty tuple ("no usable segment endpoint columns").
+    """
     actual = [str(c) for c in columns]
     folded = {c.casefold(): c for c in actual}
 
@@ -232,6 +351,18 @@ def row_matches(
     most of the rows that actually involve the requested segment.
     Pass require_both_endpoints=True for a strict induced-subtree extract
     (both sides must be in the selected set).
+
+    --- trace ---
+    reads: `row` -- one CSV row dict, from process_file()'s per-row loop; `endpoints` --
+        resolve_endpoint_columns()'s return value; `selected_ids` --
+        expand_ancestors()'s selected-segment Set[str]; `require_both_endpoints` -- from
+        main()'s --require-both-endpoints flag (default False).
+    calls: norm().
+    thresholds: `len(endpoints) == 2` / `== 1` branch selection is inline control flow,
+        not a named constant -- process_file() already guards the 0-endpoint case before
+        calling this.
+    returns: bool; consumed by process_file() to decide whether a row is written to the
+        detail output and folded into the summary aggregate.
     """
     if len(endpoints) == 2:
         left = norm(row.get(endpoints[0])) in selected_ids
@@ -250,12 +381,35 @@ class NumericStats:
     __slots__ = ("count", "total", "minimum", "maximum")
 
     def __init__(self) -> None:
+        """Initialize an empty accumulator.
+
+        --- trace ---
+        reads: none.
+        calls: none.
+        thresholds: none.
+        returns: None; sets self.count=0, self.total=0.0, self.minimum=math.inf,
+            self.maximum=-math.inf (the inf/-inf sentinels are overwritten by the
+            first add() call and never read back unless self.count stays 0, in which
+            case emit() reports "" rather than the sentinel itself).
+        """
         self.count = 0
         self.total = 0.0
         self.minimum = math.inf
         self.maximum = -math.inf
 
     def add(self, value: object) -> None:
+        """Accumulate one numeric value into this stat, silently skipping
+        non-numeric/blank input.
+
+        --- trace ---
+        reads: `value` -- caller-supplied (via self); _update_aggregate() calls this
+            once per row per summary_numeric_fields entry.
+        calls: norm(); float(); math.isfinite().
+        thresholds: none.
+        returns: None; mutates self.count/total/minimum/maximum in place. A blank,
+            non-numeric, or non-finite (inf/nan) value is silently skipped rather than
+            raising or counted.
+        """
         text = norm(value)
         if not text:
             return
@@ -271,6 +425,18 @@ class NumericStats:
         self.maximum = max(self.maximum, number)
 
     def emit(self, prefix: str) -> Dict[str, object]:
+        """Render this accumulator's count/mean/min/max under a field-name prefix.
+
+        --- trace ---
+        reads: self (count/total/minimum/maximum, accumulated by add()); `prefix` --
+            caller-supplied field-name stem, from _write_summary()'s per-numeric-field
+            loop.
+        calls: none.
+        thresholds: `self.count == 0` gates whether mean/min/max are emitted as "" (never
+            computed from the math.inf/-math.inf sentinels) versus real numbers.
+        returns: dict with keys {prefix}_count/{prefix}_mean/{prefix}_min/{prefix}_max;
+            consumed by _write_summary() to build one summary row's numeric columns.
+        """
         if self.count == 0:
             return {f"{prefix}_count": 0, f"{prefix}_mean": "", f"{prefix}_min": "", f"{prefix}_max": ""}
         return {
@@ -296,6 +462,17 @@ class FileSpec:
 
     @property
     def supports_summary(self) -> bool:
+        """Whether this file spec defines a summary rollup shape.
+
+        --- trace ---
+        reads: self.summary_keys (set on construction, from the FILE_SPECS tuple
+            literal or a bare FileSpec(filename) for an unknown file).
+        calls: none.
+        thresholds: none.
+        returns: bool; consumed by process_file() (whether to call
+            _update_aggregate()/_write_summary()) and main() (whether to compute a
+            summary_path for this filename at all).
+        """
         return bool(self.summary_keys)
 
 
@@ -374,6 +551,25 @@ class ProcessResult:
 
 
 def _update_aggregate(aggregates: Dict[Tuple[str, ...], Dict[str, object]], row: Dict[str, str], spec: FileSpec) -> None:
+    """Fold one detail row into the in-memory per-key summary aggregate.
+
+    --- trace ---
+    reads: `aggregates` -- Dict keyed by a tuple of spec.summary_keys values, mutated in
+        place across every call within one process_file() run; `row` -- one CSV row
+        dict, from process_file()'s per-row loop; `spec` -- the FileSpec for the current
+        source file (summary_keys/summary_numeric_fields/summary_flag_fields).
+    calls: norm(); NumericStats.add() (via aggregates[key]["numeric"].setdefault(...));
+        norm_fold().
+    thresholds: `"true"` (case-folded) is the hardcoded literal a flag_field value must
+        equal to increment its count_name -- FileSpec.summary_flag_fields (e.g.
+        ("is_bundle_member_all", "bundle_member_all_count")) names which columns.
+    returns: None; mutates `aggregates` in place (row_count, per-numeric-field
+        NumericStats, per-flag-field counts). NOTE (mechanical-extraction risk):
+        `aggregates` is caller-owned mutable state threaded across every row of one
+        process_file() call -- a naive per-function static parser reading only this
+        function's own reads/returns would miss that its effect only becomes visible
+        via _write_summary()'s later read of the same dict.
+    """
     key = tuple(norm(row.get(k)) for k in spec.summary_keys)
     entry = aggregates.setdefault(key, {"row_count": 0, "numeric": {}, "flags": defaultdict(int)})
     entry["row_count"] += 1
@@ -385,6 +581,19 @@ def _update_aggregate(aggregates: Dict[Tuple[str, ...], Dict[str, object]], row:
 
 
 def _write_summary(aggregates: Dict[Tuple[str, ...], Dict[str, object]], spec: FileSpec, path: Path) -> int:
+    """Render the accumulated aggregates dict into summary CSV rows and write them.
+
+    --- trace ---
+    reads: `aggregates` -- _update_aggregate()'s accumulated dict, passed in by
+        process_file() after the full source file has been scanned; `spec` -- the
+        FileSpec defining summary_keys/summary_numeric_fields/summary_flag_fields;
+        `path` -- the summary output Path, from process_file()'s summary_path.
+    calls: NumericStats.emit(); atomic_write_csv().
+    thresholds: none beyond spec's own field lists (not named constants in this
+        function).
+    returns: int row count written; consumed by process_file() as `summary_rows_count`
+        (recorded on the ProcessResult and printed to stdout).
+    """
     rows: List[Dict[str, object]] = []
     for key in sorted(aggregates):
         entry = aggregates[key]
@@ -416,6 +625,34 @@ def process_file(
     progress_interval: int,
     require_both_endpoints: bool = False,
 ) -> ProcessResult:
+    """Stream one cross_segment/comparison_registry CSV, filtering to rows that touch a
+    selected segment, optionally writing a detail copy and a rolled-up summary, in a
+    single pass.
+
+    --- trace ---
+    reads: `source` -- Path to one cross_segment_*.csv/comparison_registry.csv file,
+        from main()'s per-filename loop (args.cross_segment_dir / filename);
+        `selected_ids` -- Set[str], expand_ancestors()'s return value; `spec` -- the
+        FileSpec for this filename (FILE_SPECS or a bare FileSpec(filename) for an
+        unknown file); `detail_path`/`summary_path` -- Optional Paths, gated by main()'s
+        --mode; `max_output_rows`/`max_output_gb` -- from main()'s
+        --max-output-rows/--max-output-gb (0 disables each); `progress_interval` -- from
+        --progress-interval; `require_both_endpoints` -- from --require-both-endpoints.
+    calls: resolve_endpoint_columns(); row_matches() (per row); _update_aggregate() (per
+        matching row, if summary requested); _write_summary() (once, at the end); raises
+        Blocked.
+    thresholds: `max_output_rows`/`max_output_gb` are caller-supplied (CLI), not
+        hardcoded here, but the check cadence is: row-count check on every matching row,
+        size check every 10,000 written rows (`rows_written % 10_000 == 0`, hardcoded
+        literal) -- so a size overage can be detected up to 10,000 rows late.
+    returns: ProcessResult dataclass (status "ok"/"degraded", rows_scanned, rows_written,
+        summary_rows, selection_mode, detail_file, summary_file, reason); consumed by
+        main(), which appends `{"source_file": filename, **vars(result)}` to
+        manifest_rows (written to extract_manifest.csv). Raises Blocked if no usable
+        endpoint columns are found or a row/size threshold is exceeded partway through --
+        in either case the partial detail temp file is deleted (never left
+        half-written) and the exception propagates to main()'s per-file try/except.
+    """
     with source.open("r", encoding="utf-8-sig", newline="") as f:
         header_reader = csv.reader(f)
         header = next(header_reader, [])
@@ -519,6 +756,16 @@ def process_file(
 # ---------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
+    """Define and parse this tool's CLI arguments.
+
+    --- trace ---
+    reads: sys.argv (via argparse).
+    calls: argparse.ArgumentParser (stdlib).
+    thresholds: argparse defaults -- --ancestor-depth=2, --mode="both",
+        --max-output-rows=0, --max-output-gb=0.0, --progress-interval=100_000 -- are all
+        hardcoded literals in the argument definitions, not named module constants.
+    returns: argparse.Namespace; consumed by main() as `args`.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Extract one segment's subtree (itself plus ancestors) from the "
@@ -552,6 +799,31 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """CLI entry point: resolve seed segments, expand ancestors, then extract each
+    target cross_segment file's detail/summary rows for the selected segment subtree.
+
+    --- trace ---
+    reads: parse_args()'s Namespace (--records-dir, --cross-segment-dir, --out-dir,
+        --label, --segment-id/--search-term, --ancestor-depth,
+        --require-both-endpoints, --mode, --file, --max-output-rows, --max-output-gb,
+        --progress-interval); DEFAULT_FILENAMES / FILE_SPECS / KNOWN_UNSUPPORTED_FILES
+        (module constants) when --file is not given.
+    calls: parse_args(); load_manifest(); find_seeds_by_id(); find_seeds_by_search();
+        expand_ancestors(); atomic_write_csv() (x2: selected_segments.csv,
+        extract_manifest.csv); process_file() (once per target filename).
+    thresholds: DEFAULT_FILENAMES (derived from FILE_SPECS, l.302-344: the 7
+        cross_segment/comparison_registry files this tool knows how to filter);
+        KNOWN_UNSUPPORTED_FILES (l.354-357: 2 files with no segment_id grain,
+        informational only, appended to extract_manifest.csv as status="unsupported"
+        rather than attempted).
+    returns: int exit code (0 if not `blocked`, else 1); writes selected_segments.csv
+        and extract_manifest.csv under --out-dir (default
+        <cross-segment-dir>/<label>_subtree_extract), plus each requested file's
+        detail/<filename> and/or summary/<stem>.summary.csv. `blocked` is set true if
+        an explicitly-requested --file is missing, if process_file() raises Blocked for
+        any file, or if none of the target filenames were found at all (treated as a
+        --cross-segment-dir misconfiguration, not a legitimately sparse run).
+    """
     args = parse_args()
 
     segment_ids = tuple(args.segment_ids or ())

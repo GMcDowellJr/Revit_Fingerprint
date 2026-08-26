@@ -1,0 +1,206 @@
+# Routing catalog: `runner`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 6
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `runner` partition): `32ef4a133eb37263d57bdb1da6d8b65de921bb7f2afffa410fdaed3717fc6e00`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `runner/extraction_context.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'runner/')
+- Purpose clues:
+  - module docstring: Importable runner context construction; deliberately free of Revit/Dynamo imports.
+  - filename/path terms: extraction context
+- Important symbols (2 total):
+  - `operator_deployment_config_path` (function) — line 13
+  - `build_extraction_context` (function) — line 19
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/deployment_config.py`
+  - imports `core/join_key_policy.py`
+- Called by (high/medium-confidence static callers):
+  - `run_fingerprint (runner/run_dynamo.py:540)`
+  - `test_operator_environment_boundary (tests/test_runner_extraction_context.py:12)`
+  - `test_operator_environment_boundary (tests/test_runner_extraction_context.py:13)`
+  - `test_runner_loaded_mapping_reaches_identity_and_signature (tests/test_runner_extraction_context.py:27)`
+  - `test_runner_loaded_mapping_reaches_identity_and_signature (tests/test_runner_extraction_context.py:41)`
+- Related tests:
+  - `tests/test_runner_extraction_context.py`
+- Retrieval identity: sha256=`8850af962b63510f…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `runner/extraction_context.py`)
+
+### `runner/probe_thin_runner.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'runner/')
+- Purpose clues:
+  - module docstring: probe_thin_runner.py
+  - filename/path terms: probe thin runner
+- Important symbols (18 total):
+  - `_looks_like_unc_path` (function) — line 97
+  - `_is_probably_sync_path` (function) — line 104
+  - `_is_probes_root` (function) — line 117
+  - `_candidate_repo_dirs` (function) — line 125
+  - `_resolve_repo_dir` (function) — line 160
+  - `_read_tool_version` (function) — line 177
+  - `_get_in` (function) — line 193
+  - `_safe` (function) — line 246
+  - `_revit_version` (function) — line 253
+  - `_document_identity` (function) — line 263
+  - `_discover_probe_files` (function) — line 290
+  - `_matches_filter` (function) — line 307
+  - `_probe_in_for` (function) — line 320
+  - `_default_output_dir` (function) — line 328
+  - `_run_one_probe` (function) — line 339
+  - `_domains_declared_in_out` (function) — line 366
+  - `_json_block` (function) — line 427
+  - `_flush_domain` (function) — line 461
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (runner/probe_thin_runner.py:202)`
+  - `<module> (runner/probe_thin_runner.py:203)`
+  - `<module> (runner/probe_thin_runner.py:204)`
+  - `<module> (runner/probe_thin_runner.py:205)`
+  - `<module> (runner/probe_thin_runner.py:206)`
+  - `<module> (runner/probe_thin_runner.py:218)`
+  - `<module> (runner/probe_thin_runner.py:276)`
+  - `<module> (runner/probe_thin_runner.py:277)`
+  - `<module> (runner/probe_thin_runner.py:279)`
+  - `<module> (runner/probe_thin_runner.py:382)`
+  - `<module> (runner/probe_thin_runner.py:383)`
+  - `<module> (runner/probe_thin_runner.py:497)`
+  - `<module> (runner/probe_thin_runner.py:502)`
+  - `<module> (runner/probe_thin_runner.py:529)`
+  - `<module> (runner/probe_thin_runner.py:537)`
+  - ... and 12 more (see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`fcdace1f39166e92…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `runner/probe_thin_runner.py`)
+
+### `runner/purge_sys_modules_standalone.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'runner/')
+- Purpose clues:
+  - module docstring: Standalone Dynamo Python-node helper to purge selected entries from sys.modules
+  - filename/path terms: purge sys modules standalone
+- Important symbols (4 total):
+  - `_to_list` (function) — line 36
+  - `_to_bool` (function) — line 47
+  - `_is_protected` (function) — line 65
+  - `purge_modules` (function) — line 70
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (runner/purge_sys_modules_standalone.py:117)`
+  - `<module> (runner/purge_sys_modules_standalone.py:118)`
+  - `<module> (runner/purge_sys_modules_standalone.py:119)`
+  - `<module> (runner/purge_sys_modules_standalone.py:124)`
+  - `purge_modules (runner/purge_sys_modules_standalone.py:76)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`e1be8682dacc9eb1…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `runner/purge_sys_modules_standalone.py`)
+
+### `runner/run_dynamo.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'runner/')
+- Purpose clues:
+  - module docstring: Dynamo runner for Revit Fingerprint extraction.
+  - filename/path terms: run dynamo
+- Important symbols (23 total):
+  - `_looks_like_unc_path` (function) — line 23
+  - `_is_probably_sync_path` (function) — line 30
+  - `_is_repo_root` (function) — line 47
+  - `_read_tool_version` (function) — line 91
+  - `_use_filename_stamp` (function) — line 171
+  - `_extract_v2_hash` (function) — line 202
+  - `_extract_legacy_quality` (function) — line 221
+  - `_extract_v2_block_reasons` (function) — line 232
+  - `_looks_like_revit_unique_id` (function) — line 274
+  - `_has_v2_surface` (function) — line 285
+  - `_domain_run` (function) — line 302
+  - `_build_workset_name_to_unique_id_ctx` (function) — line 472
+  - `_enabled` (function) — line 506
+  - `get_doc` (function) — line 520
+  - `run_fingerprint` (function) — line 524
+  - `_resolve_output_mode` (function) — line 1175
+  - `_strip_detail_surfaces` (function) — line 1184
+  - `_canonicalize_all_domain_records` (function) — line 1247
+  - `_get_output_path_from_dynamo` (function) — line 1330
+  - `_ensure_parent_dir` (function) — line 1379
+  - `_write_json_to_disk` (function) — line 1387
+  - `_write_fingerprint` (function) — line 1416
+  - `_sha256_of_file` (function) — line 1450
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/canonical_items.py`
+  - imports `core/collect.py`
+  - imports `core/context.py`
+  - imports `core/contracts.py`
+  - imports `core/deps.py`
+  - imports `core/features.py`
+  - imports `core/hashing.py`
+  - imports `core/manifest.py`
+  - imports `core/naming.py`
+  - imports `core/timing_collector.py`
+  - imports `domains/arrowheads.py`
+  - imports `domains/browser_organization.py`
+  - imports `domains/ceiling_types.py`
+  - imports `domains/dimension_types.py`
+  - imports `domains/fill_patterns.py`
+  - ... and 21 more (see python_imports.csv)
+- Called by (high/medium-confidence static callers):
+  - `<module> (runner/run_dynamo.py:102)`
+  - `<module> (runner/run_dynamo.py:1299)`
+  - `<module> (runner/run_dynamo.py:1301)`
+  - `<module> (runner/run_dynamo.py:1303)`
+  - `<module> (runner/run_dynamo.py:1469)`
+  - `<module> (runner/run_dynamo.py:1503)`
+  - `<module> (runner/run_dynamo.py:1527)`
+  - `<module> (runner/run_dynamo.py:1535)`
+  - `<module> (runner/run_dynamo.py:1538)`
+  - `<module> (runner/run_dynamo.py:69)`
+  - `<module> (runner/run_dynamo.py:84)`
+  - `<module> (runner/run_dynamo.py:88)`
+  - `_domain_run (runner/run_dynamo.py:356)`
+  - `_domain_run (runner/run_dynamo.py:359)`
+  - `_domain_run (runner/run_dynamo.py:381)`
+  - ... and 86 more (see python_calls.csv)
+- Related tests:
+  - `tests/revit/revit_test_runner_pyrevit.py`
+- Retrieval identity: sha256=`ab34a2ab032f2167…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `runner/run_dynamo.py`)
+
+### `runner/thin_runner.py`
+- Role: `library_module` (evidence: no `__main__` guard; located under 'runner/')
+- Purpose clues:
+  - filename/path terms: thin runner
+- Important symbols (8 total):
+  - `_parse_boolish` (function) — line 52
+  - `_looks_like_unc_path` (function) — line 146
+  - `_is_probably_sync_path` (function) — line 153
+  - `_is_repo_root` (function) — line 176
+  - `_iter_dyn_path_candidates` (function) — line 185
+  - `_nearest_repo_root_from_path` (function) — line 359
+  - `_candidate_repo_dirs` (function) — line 383
+  - `_purge_repo_modules` (function) — line 485
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (runner/thin_runner.py:429)`
+  - `<module> (runner/thin_runner.py:435)`
+  - `<module> (runner/thin_runner.py:436)`
+  - `<module> (runner/thin_runner.py:438)`
+  - `<module> (runner/thin_runner.py:504)`
+  - `<module> (runner/thin_runner.py:514)`
+  - `<module> (runner/thin_runner.py:82)`
+  - `_candidate_repo_dirs (runner/thin_runner.py:391)`
+  - `_candidate_repo_dirs (runner/thin_runner.py:396)`
+  - `_nearest_repo_root_from_path (runner/thin_runner.py:373)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`8493891d602d005a…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `runner/thin_runner.py`)
+
+## Other files (non-Python / boilerplate)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `runner/__init__.py` | Host-specific runners package. | `library_module` |
+

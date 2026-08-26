@@ -22,6 +22,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.sig_hash_policy import resolve_sig_hash_keys
 from core.collect import collect_types, collect_instances, purge_lookup
 from core.canon import (
     canon_str,
@@ -53,6 +54,7 @@ from core.record_v2 import (
     STATUS_OK,
     STATUS_BLOCKED,
     ITEM_Q_OK,
+    ITEM_Q_MISSING,
     ITEM_Q_UNREADABLE,
     SCHEMA_VERSION_RECORD_V2,
     canonicalize_str,
@@ -133,8 +135,16 @@ def _phase2_build_payload(rec, elem=None):
     }
 
 
-TEXT_TYPE_SEMANTIC_KEYS = sorted([
-    "text_type.name",
+# D-041: text_type.name was previously included here, causing the type's own
+# display name to drive sig_hash -- contradicting this project's "names are
+# metadata only, never in behavior hashes" rule and diverging from
+# policies/domain_sig_hash_policies.json's text_types.allowed_items, which
+# already correctly excluded it (compiled from contracts/domain_identity_keys_v2.json's
+# sig_hash_keys override). No D-0xx decision ever authorized including the name;
+# this reads as an unreviewed mistake, not a documented exception like D-010's
+# phase-name inclusion. Removed. This is the fallback used only when
+# ctx["sig_hash_policies"] is unavailable -- see resolve_sig_hash_keys() below.
+TEXT_TYPE_SEMANTIC_KEYS_FALLBACK = sorted([
     "text_type.font",
     "text_type.size_in",
     "text_type.width_factor",
@@ -323,13 +333,41 @@ def extract(doc, ctx=None):
         leader_arrow_uid = None
         leader_arrow_name = None
         leader_arrow_sig_hash = None
+        # Whether a leader-arrowhead reference actually exists on this text type
+        # (as opposed to genuinely having none) -- distinguishes "no leader
+        # arrowhead" from "has one but its sig_hash couldn't be resolved" for
+        # the identity_basis.items promotion below (D-043).
+        leader_arrow_ref_present = False
+        leader_arrow_lookup_unreadable = False
+        # Set when reading the reference itself (AsElementId()/IntegerValue) raises --
+        # distinct from both "no leader arrowhead" and "reference present but
+        # unresolved": here we couldn't even determine whether a reference exists
+        # (D-047 follow-up).
+        leader_arrow_read_failed = False
 
         try:
             p_arrow = first_param(t, bip_names=["LEADER_ARROWHEAD"], ui_names=["Leader Arrowhead"])
             if p_arrow:
-                arrow_id = p_arrow.AsElementId()
-                if arrow_id and arrow_id.IntegerValue > 0:
-                    arrow = doc.GetElement(arrow_id)
+                try:
+                    arrow_id = p_arrow.AsElementId()
+                    arrow_id_positive = bool(arrow_id and arrow_id.IntegerValue > 0)
+                except Exception:
+                    arrow_id = None
+                    arrow_id_positive = False
+                    leader_arrow_read_failed = True
+
+                if arrow_id_positive:
+                    # A positive reference ID is itself evidence a leader arrowhead
+                    # is assigned -- mark this BEFORE attempting element resolution,
+                    # so a stale/unresolvable reference (GetElement returns None or
+                    # raises) is reported as unreadable/missing, not silently
+                    # collapsed into "no leader arrowhead" (D-043 follow-up).
+                    leader_arrow_ref_present = True
+                    try:
+                        arrow = doc.GetElement(arrow_id)
+                    except Exception:
+                        arrow = None
+                        leader_arrow_lookup_unreadable = True
                     if arrow:
                         leader_arrow_uid = getattr(arrow, "UniqueId", None)
 
@@ -340,6 +378,7 @@ def extract(doc, ctx=None):
                                 leader_arrow_sig_hash = ah_map.get(k, {}).get("sig_hash", None)
                         except Exception:
                             leader_arrow_sig_hash = None
+                            leader_arrow_lookup_unreadable = True
 
                         leader_arrow_name = get_type_display_name(arrow) or getattr(arrow, "Name", None)
                         leader_arrow_name = canon_str(leader_arrow_name)
@@ -496,6 +535,37 @@ def extract(doc, ctx=None):
         identity_items_v2.append(make_identity_item("text_type.italic", italic_v2, italic_q))
         identity_items_v2.append(make_identity_item("text_type.underline", underline_v2, underline_q))
 
+        # D-040: leader_arrowhead_sig_hash was previously computed (see
+        # leader_arrow_sig_hash above) but only ever reached rec["phase2"]'s
+        # unknown_items bucket via _phase2_build_payload(), never
+        # identity_basis.items -- structurally invisible to
+        # discover_hash_policy.py's/discover_join_policy.py's pareto search.
+        # Promoted here; contracts/domain_identity_keys_v2.json's text_types
+        # allowed_keys already anticipated this field (present there before
+        # this change), it just hadn't been wired into the extractor yet.
+        # Tri-state: q=ok + v=None is the explicit "no leader arrowhead" state
+        # (genuinely no reference); but when a reference DOES exist and its
+        # sig_hash lookup still comes back None (ctx["arrowheads_by_type_id"]
+        # missing the entry, the referenced arrowhead record was blocked, or
+        # the lookup itself raised), that's an unresolved dependency, not an
+        # explicit "none" -- D-043 fixes this to emit missing/unreadable
+        # instead of silently collapsing it into q=ok per the project's
+        # fail-soft policy (distinct states must not be collapsed). A third
+        # case: leader_arrow_read_failed means reading the reference itself
+        # (AsElementId()/IntegerValue) raised, so we couldn't even determine
+        # whether a leader arrowhead is assigned -- also unreadable, not ok
+        # (D-047 follow-up).
+        leader_arrow_sig_hash_v2 = safe_str(leader_arrow_sig_hash) if leader_arrow_sig_hash else None
+        if leader_arrow_read_failed:
+            leader_arrow_sig_hash_q = ITEM_Q_UNREADABLE
+        elif leader_arrow_sig_hash_v2 is None and leader_arrow_ref_present:
+            leader_arrow_sig_hash_q = ITEM_Q_UNREADABLE if leader_arrow_lookup_unreadable else ITEM_Q_MISSING
+        else:
+            leader_arrow_sig_hash_q = ITEM_Q_OK
+        identity_items_v2.append(
+            make_identity_item("text_type.leader_arrowhead_sig_hash", leader_arrow_sig_hash_v2, leader_arrow_sig_hash_q)
+        )
+
         required_qs = [name_q, font_q, size_in_q, width_q, bg_q, lw_q, rgb_q, show_q, leader_off_q, tab_q, bold_q, italic_q, underline_q]
 
         if any(q != ITEM_Q_OK for q in required_qs):
@@ -503,9 +573,15 @@ def extract(doc, ctx=None):
             status_reasons_v2.append("required_identity_not_ok")
 
         identity_items_v2_sorted = sorted(identity_items_v2, key=lambda d: str(d.get("k","")))
+        sig_hash_keys = set(resolve_sig_hash_keys(
+            (ctx or {}).get("sig_hash_policies"),
+            "text_types",
+            [it.get("k") for it in identity_items_v2_sorted],
+            TEXT_TYPE_SEMANTIC_KEYS_FALLBACK,
+        ))
         semantic_items_v2 = [
             it for it in identity_items_v2_sorted
-            if safe_str(it.get("k", "")) in set(TEXT_TYPE_SEMANTIC_KEYS)
+            if safe_str(it.get("k", "")) in sig_hash_keys
         ]
         sig_preimage_v2 = serialize_identity_items(semantic_items_v2)
         sig_hash_v2 = None if status_v2 == STATUS_BLOCKED else make_hash(sig_preimage_v2)

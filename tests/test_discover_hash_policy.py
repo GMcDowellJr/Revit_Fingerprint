@@ -2,11 +2,27 @@ from __future__ import annotations
 import csv, subprocess, sys
 from pathlib import Path
 
+from tools.discover_join_policy import _diagnostics_domain_suffix
+
+# discover_hash_policy.py's default --policy-modes (see its argparse default);
+# every call below that omits --policy-modes gets this suffix contribution.
+_DEFAULT_POLICY_MODES = ["discover", "validate", "harsh"]
+
 
 def _write_csv(path: Path, fields, rows):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('w', encoding='utf-8', newline='') as f:
         w=csv.DictWriter(f,fieldnames=fields);w.writeheader();w.writerows(rows)
+
+
+def _exploration_csv(diag: Path, target: str, domains, policy_modes=_DEFAULT_POLICY_MODES) -> Path:
+    """Path to a hash_<target>_discovery_exploration*.csv, matching the same
+    _diagnostics_domain_suffix() a --domains-scoped run actually uses (see
+    tools/discover_join_policy.py's docstring on that function) -- these tests
+    predate that suffixing and had gone stale, silently failing on every run.
+    """
+    suffix = _diagnostics_domain_suffix(set(domains), policy_modes)
+    return diag / f"hash_{target}_discovery_exploration{suffix}.csv"
 
 
 def test_discover_hash_policy_join_and_sig(tmp_path: Path):
@@ -23,13 +39,39 @@ def test_discover_hash_policy_join_and_sig(tmp_path: Path):
     ])
     subprocess.run([sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),'--domains','loaded_family_types','--discovery-target','both'],cwd=Path(__file__).resolve().parents[1],check=True)
     diag = phase0.parent/'diagnostics'
-    assert (diag/'hash_sig_discovery_exploration.csv').exists()
-    assert (diag/'hash_join_discovery_exploration.csv').exists()
-    with (diag/'hash_sig_discovery_exploration.csv').open('r', encoding='utf-8', newline='') as f:
+    domains = ["loaded_family_types"]
+    sig_csv = _exploration_csv(diag, 'sig', domains)
+    join_csv = _exploration_csv(diag, 'join', domains)
+    assert sig_csv.exists()
+    assert join_csv.exists()
+    with sig_csv.open('r', encoding='utf-8', newline='') as f:
         rows=list(csv.DictReader(f))
     assert rows
     assert all(r['discovery_target']=='sig' for r in rows)
     assert all(r['shape_gate'] in ('Doors','Windows') for r in rows)
+
+
+def test_hash_discovery_accepts_sweep_pareto_controls_and_emits_stage_metadata(tmp_path: Path):
+    phase0=tmp_path/'results'/'records'
+    _write_csv(phase0/'records.csv',["file_id","domain","record_pk","sig_hash"],[
+        {"file_id":"f","domain":"materials","record_pk":str(i),"sig_hash":f"s{i}"} for i in range(3)
+    ])
+    _write_csv(phase0/'identity_items.csv',["domain","record_pk","item_key","item_value_type","item_value"],[
+        {"domain":"materials","record_pk":str(i),"item_key":"material.name_class_hash","item_value_type":"str","item_value":str(i)} for i in range(3)
+    ])
+    subprocess.run([
+        sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
+        '--domains','materials','--discovery-target','sig','--policy-modes','discover',
+        '--search-modes','pareto','--work-budget','100','--pareto-frontier-limit','5',
+        '--no-pareto-progress',
+    ],cwd=Path(__file__).resolve().parents[1],check=True)
+    path=_exploration_csv(phase0.parent/'diagnostics','sig',['materials'],['discover'])
+    row=next(csv.DictReader(path.open(encoding='utf-8',newline='')))
+    assert row['pareto_subsets_evaluated']=='1'
+    assert row['pareto_k_levels_attempted']=='1'
+    assert row['pareto_stop_reason']=='accepted_finalist'
+    assert row['pareto_work_budget']=='100'
+    assert row['full_verify_status']=='ok'
 
 
 def test_validate_marks_blocked_when_required_fields_missing_from_selected(tmp_path: Path):
@@ -49,7 +91,8 @@ def test_validate_marks_blocked_when_required_fields_missing_from_selected(tmp_p
         sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
         '--domains','text_types','--policy-json',str(policy),'--policy-modes','validate','--search-modes','greedy'
     ],cwd=Path(__file__).resolve().parents[1],check=True)
-    with (phase0.parent/'diagnostics'/'hash_sig_discovery_exploration.csv').open('r', encoding='utf-8', newline='') as f:
+    sig_csv = _exploration_csv(phase0.parent/'diagnostics', 'sig', ["text_types"], ["validate"])
+    with sig_csv.open('r', encoding='utf-8', newline='') as f:
         rows=list(csv.DictReader(f))
     assert rows
     assert rows[0]["status"] == "blocked_missing_required"
@@ -76,7 +119,8 @@ def test_validate_pareto_auto_bumps_max_k_to_required_count(tmp_path: Path):
         sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
         '--domains','text_types','--policy-json',str(policy),'--policy-modes','validate','--search-modes','pareto','--max-k','2'
     ],cwd=Path(__file__).resolve().parents[1],check=True)
-    with (phase0.parent/'diagnostics'/'hash_sig_discovery_exploration.csv').open('r', encoding='utf-8', newline='') as f:
+    sig_csv = _exploration_csv(phase0.parent/'diagnostics', 'sig', ["text_types"], ["validate"])
+    with sig_csv.open('r', encoding='utf-8', newline='') as f:
         rows=list(csv.DictReader(f))
     assert rows
     assert rows[0]["status"] == "ok"
@@ -95,7 +139,7 @@ def test_phase0_dir_can_be_results_root(tmp_path: Path):
         sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(results_root),
         '--domains','loaded_family_types','--discovery-target','sig'
     ],cwd=Path(__file__).resolve().parents[1],check=True)
-    out = results_root/'diagnostics'/'hash_sig_discovery_exploration.csv'
+    out = _exploration_csv(results_root/'diagnostics', 'sig', ["loaded_family_types"])
     assert out.exists()
     with out.open('r', encoding='utf-8', newline='') as f:
         rows = list(csv.DictReader(f))
@@ -116,7 +160,7 @@ def test_phase0_dir_auto_resolves_results_records(tmp_path: Path):
         sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(repo_like_root),
         '--domains','loaded_family_types','--discovery-target','sig'
     ],cwd=Path(__file__).resolve().parents[1],check=True)
-    assert (repo_like_root/'results'/'diagnostics'/'hash_sig_discovery_exploration.csv').exists()
+    assert _exploration_csv(repo_like_root/'results'/'diagnostics', 'sig', ["loaded_family_types"]).exists()
 
 
 def test_phase0_dir_auto_resolves_records_subfolder(tmp_path: Path):
@@ -132,7 +176,7 @@ def test_phase0_dir_auto_resolves_records_subfolder(tmp_path: Path):
         sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(results_root),
         '--domains','text_types','--discovery-target','sig'
     ],cwd=Path(__file__).resolve().parents[1],check=True)
-    assert (results_root/'diagnostics'/'hash_sig_discovery_exploration.csv').exists()
+    assert _exploration_csv(results_root/'diagnostics', 'sig', ["text_types"]).exists()
 
 
 def test_out_policy_creates_parent_directories(tmp_path: Path):
@@ -166,7 +210,8 @@ def test_loaded_family_types_skips_orphan_gate_buckets(tmp_path: Path):
         sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
         '--domains','loaded_family_types','--discovery-target','sig'
     ],cwd=Path(__file__).resolve().parents[1],check=True)
-    with (phase0.parent/'diagnostics'/'hash_sig_discovery_exploration.csv').open('r', encoding='utf-8', newline='') as f:
+    sig_csv = _exploration_csv(phase0.parent/'diagnostics', 'sig', ["loaded_family_types"])
+    with sig_csv.open('r', encoding='utf-8', newline='') as f:
         rows = list(csv.DictReader(f))
     assert rows
     assert all(r["shape_gate"] != "Windows" for r in rows)
@@ -187,7 +232,8 @@ def test_loaded_family_types_surfaces_missing_shape_gate_records(tmp_path: Path)
         sys.executable,'tools/discover_hash_policy.py','--phase0-dir',str(phase0),
         '--domains','loaded_family_types','--discovery-target','sig','--policy-modes','discover','--search-modes','greedy'
     ],cwd=Path(__file__).resolve().parents[1],check=True)
-    with (phase0.parent/'diagnostics'/'hash_sig_discovery_exploration.csv').open('r', encoding='utf-8', newline='') as f:
+    sig_csv = _exploration_csv(phase0.parent/'diagnostics', 'sig', ["loaded_family_types"], ["discover"])
+    with sig_csv.open('r', encoding='utf-8', newline='') as f:
         rows = list(csv.DictReader(f))
     assert rows
     assert any(r["shape_gate"] == "__missing_shape_gate__" for r in rows)
@@ -212,7 +258,8 @@ def test_stratify_by_limits_overrepresentation(tmp_path: Path):
         '--search-modes','greedy','--policy-modes','discover',
         '--sample-size','4','--stratify-by','lft.family_name',
     ],cwd=Path(__file__).resolve().parents[1],check=True)
-    with (phase0.parent/'diagnostics'/'hash_join_discovery_exploration.csv').open('r', encoding='utf-8', newline='') as f:
+    join_csv = _exploration_csv(phase0.parent/'diagnostics', 'join', ["loaded_family_types"], ["discover"])
+    with join_csv.open('r', encoding='utf-8', newline='') as f:
         rows = list(csv.DictReader(f))
     assert rows
     assert rows[0].get('stratify_by') == 'lft.family_name'

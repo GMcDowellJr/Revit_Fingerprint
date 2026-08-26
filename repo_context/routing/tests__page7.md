@@ -1,0 +1,234 @@
+# Routing catalog: `tests (page 7)`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 6
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests` partition): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tests/test_generate_governance_narrative_state_types.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for governance-state comparison_type handling in
+  - filename/path terms: test generate governance narrative state types
+- Important symbols (7 total):
+  - `_gs_row` (function) — line 26
+  - `_state_row` (function) — line 41
+  - `test_directed_governance_types_match_producer_modulo_flagged_legacy_entries` (function) — line 48
+  - `test_rendered_types_excludes_scope_level_fan_out` (function) — line 65
+  - `test_compact_summary_loop_does_not_blend_distinct_comparison_types` (function) — line 70
+  - `test_detailed_loop_no_longer_drops_new_scope_types` (function) — line 92
+  - `test_domain_with_only_group3_state_is_omitted_from_result` (function) — line 120
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_compact_summary_loop_does_not_blend_distinct_comparison_types (tests/test_generate_governance_narrative_state_types.py:74)`
+  - `test_compact_summary_loop_does_not_blend_distinct_comparison_types (tests/test_generate_governance_narrative_state_types.py:77)`
+  - `test_detailed_loop_no_longer_drops_new_scope_types (tests/test_generate_governance_narrative_state_types.py:101)`
+  - `test_detailed_loop_no_longer_drops_new_scope_types (tests/test_generate_governance_narrative_state_types.py:94)`
+  - `test_detailed_loop_no_longer_drops_new_scope_types (tests/test_generate_governance_narrative_state_types.py:95)`
+  - `test_detailed_loop_no_longer_drops_new_scope_types (tests/test_generate_governance_narrative_state_types.py:96)`
+  - `test_detailed_loop_no_longer_drops_new_scope_types (tests/test_generate_governance_narrative_state_types.py:97)`
+  - `test_domain_with_only_group3_state_is_omitted_from_result (tests/test_generate_governance_narrative_state_types.py:128)`
+  - `test_domain_with_only_group3_state_is_omitted_from_result (tests/test_generate_governance_narrative_state_types.py:129)`
+- Related tests:
+  - `tests/test_generate_governance_narrative_state_types.py`
+- Retrieval identity: sha256=`a338693ff2be9eca…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_state_types.py`)
+
+### `tests/test_generate_governance_narrative_static_docs_copy.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for D-034's static-doc copy-into-out behavior: main() copies the
+  - filename/path terms: test generate governance narrative static docs copy
+- Important symbols (17 total):
+  - `_summary_row` (function) — line 18
+  - `_pooled_row` (function) — line 24
+  - `_write_csv` (function) — line 30
+  - `_minimal_fixture` (function) — line 37
+  - `_run_main` (function) — line 64
+  - `test_render_header_points_at_out_directory_copy_when_guide_will_be_copied` (function) — line 81
+  - `test_render_header_points_at_repo_path_when_guide_will_not_be_copied` (function) — line 94
+  - `test_authority_header_points_at_out_directory_copy_when_guides_present` (function) — line 101
+  - `test_authority_header_points_at_repo_path_when_guides_absent` (function) — line 116
+  - `test_authority_header_points_at_repo_path_when_evidence_package_disabled` (function) — line 128
+  - `test_default_run_copies_all_four_static_docs_into_out` (function) — line 133
+  - `test_narrative_pointer_matches_actual_guide_presence_end_to_end` (function) — line 141
+  - `test_health_degrades_end_to_end_when_interpretation_guide_source_absent` (function) — line 155
+  - `test_no_emit_evidence_package_removes_previously_copied_docs` (function) — line 169
+  - `test_no_emit_evidence_package_does_not_delete_source_docs_when_out_is_docs_governance` (function) — line 184
+  - `test_copy_removed_when_source_doc_absent_but_stale_copy_exists` (function) — line 206
+  - `test_evidence_map_output_local_path_matches_actual_copy_end_to_end` (function) — line 221
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_minimal_fixture (tests/test_generate_governance_narrative_static_docs_copy.py:39)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_static_docs_copy.py:50)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_static_docs_copy.py:59)`
+  - `_minimal_fixture (tests/test_generate_governance_narrative_static_docs_copy.py:60)`
+  - `test_copy_removed_when_source_doc_absent_but_stale_copy_exists (tests/test_generate_governance_narrative_static_docs_copy.py:210)`
+  - `test_copy_removed_when_source_doc_absent_but_stale_copy_exists (tests/test_generate_governance_narrative_static_docs_copy.py:211)`
+  - `test_copy_removed_when_source_doc_absent_but_stale_copy_exists (tests/test_generate_governance_narrative_static_docs_copy.py:217)`
+  - `test_default_run_copies_all_four_static_docs_into_out (tests/test_generate_governance_narrative_static_docs_copy.py:134)`
+  - `test_default_run_copies_all_four_static_docs_into_out (tests/test_generate_governance_narrative_static_docs_copy.py:135)`
+  - `test_evidence_map_output_local_path_matches_actual_copy_end_to_end (tests/test_generate_governance_narrative_static_docs_copy.py:229)`
+  - `test_evidence_map_output_local_path_matches_actual_copy_end_to_end (tests/test_generate_governance_narrative_static_docs_copy.py:230)`
+  - `test_health_degrades_end_to_end_when_interpretation_guide_source_absent (tests/test_generate_governance_narrative_static_docs_copy.py:161)`
+  - `test_health_degrades_end_to_end_when_interpretation_guide_source_absent (tests/test_generate_governance_narrative_static_docs_copy.py:162)`
+  - `test_narrative_pointer_matches_actual_guide_presence_end_to_end (tests/test_generate_governance_narrative_static_docs_copy.py:142)`
+  - `test_narrative_pointer_matches_actual_guide_presence_end_to_end (tests/test_generate_governance_narrative_static_docs_copy.py:143)`
+  - ... and 6 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_generate_governance_narrative_static_docs_copy.py`
+- Retrieval identity: sha256=`02583071e30f87dc…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_static_docs_copy.py`)
+
+### `tests/test_generate_governance_narrative_union_breadth.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for D-033's union-inventory-derived domain confidence enrichment:
+  - filename/path terms: test generate governance narrative union breadth
+- Important symbols (29 total):
+  - `_reset_governance_policy` (function) — line 21
+  - `_union_row` (function) — line 26
+  - `_minimal_cascade_dict` (function) — line 36
+  - `test_union_breadth_classifies_corpus_wide_pattern` (function) — line 52
+  - `test_union_breadth_classifies_client_wide_pattern` (function) — line 60
+  - `test_union_breadth_single_client_grain_never_classifies_corpus_or_client_wide` (function) — line 68
+  - `test_union_breadth_classifies_project_wide_pattern` (function) — line 81
+  - `test_union_breadth_classifies_file_level_pattern` (function) — line 87
+  - `test_union_breadth_does_not_merge_across_discipline_grains` (function) — line 94
+  - `test_union_breadth_records_broad_scopes_for_corpus_and_client_wide_patterns` (function) — line 121
+  - `test_union_breadth_broad_scopes_empty_when_no_broad_pattern` (function) — line 139
+  - `test_union_breadth_degraded_row_vetoes_healthy_classification_for_same_pattern` (function) — line 146
+  - `test_union_breadth_degraded_source_status_classifies_unclassified` (function) — line 168
+  - `test_union_breadth_degraded_inventory_status_classifies_unclassified` (function) — line 181
+  - `test_union_breadth_blank_status_fields_are_not_treated_as_degraded` (function) — line 189
+  - `test_union_breadth_ignores_non_project_role` (function) — line 201
+  - `test_union_breadth_ignores_non_all_view_scope` (function) — line 207
+  - `test_union_breadth_empty_input_returns_empty_dict` (function) — line 213
+  - `test_union_breadth_preserves_highest_tier_across_repeated_client_rows` (function) — line 217
+  - `test_union_breadth_preserves_highest_tier_regardless_of_row_order` (function) — line 238
+  - `test_union_breadth_never_returns_raw_pattern_content` (function) — line 250
+  - `test_broad_reuse_weak_cascade_fires` (function) — line 265
+  - `test_broad_reuse_note_names_qualifying_scope_when_present` (function) — line 273
+  - `test_broad_reuse_note_omits_scope_clause_when_broad_scopes_missing` (function) — line 287
+  - `test_narrow_reuse_strong_cascade_fires` (function) — line 297
+  - ... and 4 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_broad_reuse_note_names_qualifying_scope_when_present (tests/test_generate_governance_narrative_union_breadth.py:276)`
+  - `test_broad_reuse_note_omits_scope_clause_when_broad_scopes_missing (tests/test_generate_governance_narrative_union_breadth.py:290)`
+  - `test_broad_reuse_weak_cascade_fires (tests/test_generate_governance_narrative_union_breadth.py:266)`
+  - `test_broad_reuse_with_no_primary_containment_does_not_fire (tests/test_generate_governance_narrative_union_breadth.py:326)`
+  - `test_narrow_reuse_strong_cascade_fires (tests/test_generate_governance_narrative_union_breadth.py:298)`
+  - `test_no_union_breadth_supplied_never_fires (tests/test_generate_governance_narrative_union_breadth.py:319)`
+  - `test_overriding_union_breadth_threshold_changes_detect_anomalies_text (tests/test_generate_governance_narrative_union_breadth.py:343)`
+  - `test_union_breadth_blank_status_fields_are_not_treated_as_degraded (tests/test_generate_governance_narrative_union_breadth.py:194)`
+  - `test_union_breadth_broad_scopes_empty_when_no_broad_pattern (tests/test_generate_governance_narrative_union_breadth.py:140)`
+  - `test_union_breadth_classifies_client_wide_pattern (tests/test_generate_governance_narrative_union_breadth.py:61)`
+  - `test_union_breadth_classifies_corpus_wide_pattern (tests/test_generate_governance_narrative_union_breadth.py:53)`
+  - `test_union_breadth_classifies_file_level_pattern (tests/test_generate_governance_narrative_union_breadth.py:88)`
+  - `test_union_breadth_classifies_project_wide_pattern (tests/test_generate_governance_narrative_union_breadth.py:82)`
+  - `test_union_breadth_degraded_inventory_status_classifies_unclassified (tests/test_generate_governance_narrative_union_breadth.py:182)`
+  - `test_union_breadth_degraded_row_vetoes_healthy_classification_for_same_pattern (tests/test_generate_governance_narrative_union_breadth.py:156)`
+  - ... and 15 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_generate_governance_narrative_union_breadth.py`
+- Retrieval identity: sha256=`0d28c49f1b6d23c7…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_union_breadth.py`)
+
+### `tests/test_generate_governance_narrative_unscoped_segment.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for _is_unscoped_segment() in tools/generate_governance_narrative.py.
+  - filename/path terms: test generate governance narrative unscoped segment
+- Important symbols (8 total):
+  - `_row` (function) — line 24
+  - `test_genuinely_broadest_segment_is_unscoped` (function) — line 33
+  - `test_trailing_blank_client_token_is_still_unscoped` (function) — line 37
+  - `test_bc_scoped_segment_is_rejected` (function) — line 45
+  - `test_collection_scoped_segment_is_rejected` (function) — line 49
+  - `test_blank_client_token_with_real_hidden_scope_value_is_rejected` (function) — line 53
+  - `test_client_scoped_segment_is_rejected` (function) — line 59
+  - `test_blank_role_rollup_is_rejected` (function) — line 63
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_bc_scoped_segment_is_rejected (tests/test_generate_governance_narrative_unscoped_segment.py:46)`
+  - `test_blank_client_token_with_real_hidden_scope_value_is_rejected (tests/test_generate_governance_narrative_unscoped_segment.py:56)`
+  - `test_blank_role_rollup_is_rejected (tests/test_generate_governance_narrative_unscoped_segment.py:66)`
+  - `test_client_scoped_segment_is_rejected (tests/test_generate_governance_narrative_unscoped_segment.py:60)`
+  - `test_collection_scoped_segment_is_rejected (tests/test_generate_governance_narrative_unscoped_segment.py:50)`
+  - `test_genuinely_broadest_segment_is_unscoped (tests/test_generate_governance_narrative_unscoped_segment.py:34)`
+  - `test_trailing_blank_client_token_is_still_unscoped (tests/test_generate_governance_narrative_unscoped_segment.py:41)`
+  - `test_trailing_blank_client_token_is_still_unscoped (tests/test_generate_governance_narrative_unscoped_segment.py:42)`
+- Related tests:
+  - `tests/test_generate_governance_narrative_unscoped_segment.py`
+- Retrieval identity: sha256=`91422aec38e3bb04…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_unscoped_segment.py`)
+
+### `tests/test_generate_governance_narrative_wp_reliability_resolved.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for the within_project score_reliability p10/p90 capture's
+  - filename/path terms: test generate governance narrative wp reliability resolved
+- Important symbols (7 total):
+  - `_row` (function) — line 37
+  - `_wp_row` (function) — line 43
+  - `test_no_manifest_keeps_today_behavior_unknown` (function) — line 55
+  - `test_redundant_single_child_root_resolves_to_bc_scoped_row` (function) — line 68
+  - `test_dead_end_redundant_chain_stays_unknown` (function) — line 98
+  - `test_directly_unscoped_row_still_tagged_enterprise_not_resolved` (function) — line 126
+  - `test_manifest_provided_but_no_matching_row_leaves_unknown` (function) — line 146
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_wp_row (tests/test_generate_governance_narrative_wp_reliability_resolved.py:45)`
+  - `test_dead_end_redundant_chain_stays_unknown (tests/test_generate_governance_narrative_wp_reliability_resolved.py:102)`
+  - `test_directly_unscoped_row_still_tagged_enterprise_not_resolved (tests/test_generate_governance_narrative_wp_reliability_resolved.py:130)`
+  - `test_manifest_provided_but_no_matching_row_leaves_unknown (tests/test_generate_governance_narrative_wp_reliability_resolved.py:149)`
+  - `test_no_manifest_keeps_today_behavior_unknown (tests/test_generate_governance_narrative_wp_reliability_resolved.py:58)`
+  - `test_redundant_single_child_root_resolves_to_bc_scoped_row (tests/test_generate_governance_narrative_wp_reliability_resolved.py:73)`
+- Related tests:
+  - `tests/test_generate_governance_narrative_wp_reliability_resolved.py`
+- Retrieval identity: sha256=`d819fb3fac3e5b5c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_governance_narrative_wp_reliability_resolved.py`)
+
+### `tests/test_generate_name_key_patterns.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for PR2's parameterized pattern generation (tools/generate_name_key_patterns.py).
+  - filename/path terms: test generate name key patterns
+- Important symbols (6 total):
+  - `_write_csv` (function) — line 34
+  - `_read_csv` (function) — line 43
+  - `TestConfigPathRegression` (class) — line 54
+  - `TestNamePathCoverageClassTagging` (class) — line 76
+  - `TestExcludedDomainExplicitAbsence` (class) — line 146
+  - `TestBothModeNonCollision` (class) — line 191
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/name_key_coverage.py`
+  - imports `tools/generate_name_key_patterns.py`
+  - imports `tools/pattern_id_utils.py`
+- Called by (high/medium-confidence static callers):
+  - `TestBothModeNonCollision.test_end_to_end_both_target_no_collision (tests/test_generate_name_key_patterns.py:204)`
+  - `TestBothModeNonCollision.test_end_to_end_both_target_no_collision (tests/test_generate_name_key_patterns.py:208)`
+  - `TestBothModeNonCollision.test_end_to_end_both_target_no_collision (tests/test_generate_name_key_patterns.py:220)`
+  - `TestBothModeNonCollision.test_end_to_end_both_target_no_collision (tests/test_generate_name_key_patterns.py:221)`
+  - `TestConfigPathRegression.test_config_output_is_byte_identical_to_production_source (tests/test_generate_name_key_patterns.py:59)`
+  - `TestConfigPathRegression.test_config_target_never_writes_to_the_source_path (tests/test_generate_name_key_patterns.py:70)`
+  - `TestNamePathCoverageClassTagging.test_end_to_end_emit_name_patterns (tests/test_generate_name_key_patterns.py:129)`
+  - `TestNamePathCoverageClassTagging.test_end_to_end_emit_name_patterns (tests/test_generate_name_key_patterns.py:133)`
+  - `TestNamePathCoverageClassTagging.test_end_to_end_emit_name_patterns (tests/test_generate_name_key_patterns.py:136)`
+  - `TestNamePathCoverageClassTagging.test_materials_cluster_spans_both_files (tests/test_generate_name_key_patterns.py:98)`
+  - `TestNamePathCoverageClassTagging.test_membership_rows_link_records_to_pattern_ids (tests/test_generate_name_key_patterns.py:119)`
+  - `TestNamePathCoverageClassTagging.test_non_ok_status_rows_excluded_from_patterns (tests/test_generate_name_key_patterns.py:112)`
+  - `TestNamePathCoverageClassTagging.test_pattern_rows_tagged_with_coverage_class (tests/test_generate_name_key_patterns.py:91)`
+  - `TestNamePathCoverageClassTagging.test_source_cluster_id_matches_production_convention (tests/test_generate_name_key_patterns.py:107)`
+- Related tests:
+  - `tests/test_generate_name_key_patterns.py`
+- Retrieval identity: sha256=`717341f24c718417…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_generate_name_key_patterns.py`)
+

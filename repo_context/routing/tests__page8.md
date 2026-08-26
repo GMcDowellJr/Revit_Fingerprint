@@ -1,0 +1,282 @@
+# Routing catalog: `tests (page 8)`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 8
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests` partition): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tests/test_governance_evidence_package.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Unit tests for tools/governance_evidence_package.py: build_package_manifest,
+  - filename/path terms: test governance evidence package
+- Important symbols (72 total):
+  - `test_write_json_round_trips` (function) — line 37
+  - `test_comparison_type_coverage_recognized_only` (function) — line 49
+  - `test_comparison_type_coverage_flags_unrecognized` (function) — line 58
+  - `test_comparison_type_coverage_intentionally_excluded_is_distinct_from_unrecognized` (function) — line 64
+  - `test_comparison_type_coverage_ignores_blank_values` (function) — line 75
+  - `_manifest` (function) — line 84
+  - `test_manifest_records_generator_identity_and_schema_version` (function) — line 100
+  - `test_manifest_marks_input_present_based_on_real_filesystem_state` (function) — line 107
+  - `test_manifest_does_not_claim_missing_source_identifiers` (function) — line 117
+  - `test_manifest_package_status_incomplete_when_required_input_missing` (function) — line 123
+  - `test_manifest_package_status_complete_when_required_inputs_present` (function) — line 129
+  - `test_manifest_records_output_sizes` (function) — line 138
+  - `test_manifest_records_policy_dir_as_inert_field` (function) — line 153
+  - `test_manifest_without_policy_profiles_kwarg_keeps_pr1_not_yet_implemented_note` (function) — line 158
+  - `test_manifest_records_policy_profiles_when_supplied` (function) — line 168
+  - `test_manifest_policy_profiles_note_says_five_profiles_not_four` (function) — line 178
+  - `_health` (function) — line 198
+  - `test_health_complete_when_all_required_present_and_no_warnings` (function) — line 218
+  - `test_health_invalid_when_required_input_missing` (function) — line 225
+  - `test_health_degraded_not_invalid_when_only_optional_signal_is_a_warning` (function) — line 232
+  - `test_health_reports_unrecognized_comparison_type_as_warning` (function) — line 239
+  - `test_health_reports_client_sector_default_missing` (function) — line 247
+  - `test_health_reports_client_sector_explicit_missing` (function) — line 253
+  - `test_health_omitted_policy_load_status_adds_no_warning_and_stays_complete` (function) — line 259
+  - `test_health_reports_policy_profile_defaulted_as_warning_and_degraded` (function) — line 268
+  - ... and 47 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_domain_and_client_summary_null_semantics_cite_the_actual_em_dash (tests/test_governance_evidence_package.py:754)`
+  - `test_evidence_map_authority_levels_use_only_defined_vocabulary (tests/test_governance_evidence_package.py:443)`
+  - `test_evidence_map_client_sector_is_user_provided_note (tests/test_governance_evidence_package.py:463)`
+  - `test_evidence_map_defaults_manifest_and_health_schema_version_to_package_default (tests/test_governance_evidence_package.py:564)`
+  - `test_evidence_map_excluded_sibling_scan_never_retains_sample_values (tests/test_governance_evidence_package.py:547)`
+  - `test_evidence_map_excluded_siblings_get_scanned_columns_and_row_count_when_present (tests/test_governance_evidence_package.py:521)`
+  - `test_evidence_map_excluded_siblings_have_no_scan_fields_when_absent (tests/test_governance_evidence_package.py:536)`
+  - `test_evidence_map_governance_classification_rules_present_flag_reflects_filesystem (tests/test_governance_evidence_package.py:645)`
+  - `test_evidence_map_governance_file_inventory_honors_overridden_schema_version (tests/test_governance_evidence_package.py:593)`
+  - `test_evidence_map_governance_file_inventory_is_authoritative_and_has_no_fixed_related_artifacts (tests/test_governance_evidence_package.py:585)`
+  - `test_evidence_map_governance_reading_order_present_flag_reflects_filesystem (tests/test_governance_evidence_package.py:637)`
+  - `test_evidence_map_has_thirty_seven_unique_artifacts (tests/test_governance_evidence_package.py:367)`
+  - `test_evidence_map_known_limitations_text_has_no_severity_language (tests/test_governance_evidence_package.py:571)`
+  - `test_evidence_map_narrative_is_controlled_interpretation_not_authoritative (tests/test_governance_evidence_package.py:449)`
+  - `test_evidence_map_omits_output_local_path_when_out_dir_not_supplied (tests/test_governance_evidence_package.py:404)`
+  - ... and 48 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_governance_evidence_package.py`
+- Retrieval identity: sha256=`4d750118656d7066…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_governance_evidence_package.py`)
+
+### `tests/test_governance_field_completeness_gate.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test governance field completeness gate
+- Important symbols (6 total):
+  - `_row` (function) — line 17
+  - `test_blank_client_label_fails_with_export_run_id` (function) — line 25
+  - `test_blank_business_center_label_fails_with_export_run_id` (function) — line 33
+  - `test_na_spelling_fails_same_as_blank` (function) — line 42
+  - `test_fully_populated_row_passes` (function) — line 51
+  - `test_multiple_offenders_all_reported` (function) — line 59
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/run_extract_all.py`
+- Called by (high/medium-confidence static callers):
+  - `test_blank_business_center_label_fails_with_export_run_id (tests/test_governance_field_completeness_gate.py:34)`
+  - `test_blank_client_label_fails_with_export_run_id (tests/test_governance_field_completeness_gate.py:26)`
+  - `test_fully_populated_row_passes (tests/test_governance_field_completeness_gate.py:53)`
+  - `test_fully_populated_row_passes (tests/test_governance_field_completeness_gate.py:54)`
+  - `test_multiple_offenders_all_reported (tests/test_governance_field_completeness_gate.py:61)`
+  - `test_multiple_offenders_all_reported (tests/test_governance_field_completeness_gate.py:62)`
+  - `test_multiple_offenders_all_reported (tests/test_governance_field_completeness_gate.py:63)`
+  - `test_na_spelling_fails_same_as_blank (tests/test_governance_field_completeness_gate.py:43)`
+- Related tests:
+  - `tests/test_governance_field_completeness_gate.py`
+- Retrieval identity: sha256=`3f2974d552fc136f…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_governance_field_completeness_gate.py`)
+
+### `tests/test_governance_manifest.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test governance manifest
+- Important symbols (27 total):
+  - `_row` (function) — line 25
+  - `_find` (function) — line 36
+  - `_members` (function) — line 45
+  - `test_normalize_strips_bc_prefix_case_insensitive` (function) — line 53
+  - `test_normalize_recognizes_enterprise_tokens_before_prefix_strip` (function) — line 59
+  - `test_normalize_zero_pads_short_numeric_values` (function) — line 65
+  - `test_normalize_zero_pad_recognizes_collapsed_enterprise_token` (function) — line 77
+  - `test_normalize_zero_pad_does_not_affect_bc_prefixed_values` (function) — line 83
+  - `test_scope_key_requires_both_conditions_for_enterprise` (function) — line 89
+  - `test_internalenterprise_and_0000_collapse_to_one_enterprise_population` (function) — line 108
+  - `test_legacy_bc_prefixed_and_bare_numeric_collapse_to_one_population` (function) — line 120
+  - `test_excel_collapsed_and_correctly_formatted_bc_collapse_to_one_population` (function) — line 134
+  - `test_generic_role_gets_no_scope_key` (function) — line 152
+  - `test_generic_host_role_treated_same_as_generic` (function) — line 165
+  - `test_case_variant_role_merges_into_canonical_population` (function) — line 172
+  - `test_generic_host_case_variant_folds_to_generic_role_label` (function) — line 189
+  - `test_unit_system_case_variants_merge_to_lowercase` (function) — line 201
+  - `test_client_label_case_variants_merge_to_first_seen_casing` (function) — line 214
+  - `test_discipline_label_case_variants_merge` (function) — line 228
+  - `test_business_center_label_case_variants_merge_after_prefix_strip` (function) — line 239
+  - `test_enterprise_bookkeeping_casing_still_recognized_after_normalization` (function) — line 254
+  - `test_unrecognized_role_excluded_with_loud_report` (function) — line 266
+  - `test_blank_client_label_raises_defense_in_depth` (function) — line 281
+  - `test_na_business_center_label_raises_defense_in_depth` (function) — line 287
+  - `test_fully_populated_rows_build_without_raising` (function) — line 293
+  - ... and 2 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/compare_cross_segment.py`
+  - imports `tools/enterprise_policy.py`
+  - imports `tools/governance_manifest.py`
+- Called by (high/medium-confidence static callers):
+  - `test_blank_client_label_raises_defense_in_depth (tests/test_governance_manifest.py:282)`
+  - `test_business_center_label_case_variants_merge_after_prefix_strip (tests/test_governance_manifest.py:244)`
+  - `test_business_center_label_case_variants_merge_after_prefix_strip (tests/test_governance_manifest.py:245)`
+  - `test_business_center_label_case_variants_merge_after_prefix_strip (tests/test_governance_manifest.py:246)`
+  - `test_case_variant_role_merges_into_canonical_population (tests/test_governance_manifest.py:177)`
+  - `test_case_variant_role_merges_into_canonical_population (tests/test_governance_manifest.py:178)`
+  - `test_case_variant_role_merges_into_canonical_population (tests/test_governance_manifest.py:179)`
+  - `test_case_variant_role_merges_into_canonical_population (tests/test_governance_manifest.py:186)`
+  - `test_client_label_case_variants_merge_to_first_seen_casing (tests/test_governance_manifest.py:216)`
+  - `test_client_label_case_variants_merge_to_first_seen_casing (tests/test_governance_manifest.py:217)`
+  - `test_client_label_case_variants_merge_to_first_seen_casing (tests/test_governance_manifest.py:218)`
+  - `test_client_label_case_variants_merge_to_first_seen_casing (tests/test_governance_manifest.py:225)`
+  - `test_discipline_label_case_variants_merge (tests/test_governance_manifest.py:230)`
+  - `test_discipline_label_case_variants_merge (tests/test_governance_manifest.py:231)`
+  - `test_enterprise_bookkeeping_casing_still_recognized_after_normalization (tests/test_governance_manifest.py:256)`
+  - ... and 26 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_governance_manifest.py`
+- Retrieval identity: sha256=`140b691f5b814641…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_governance_manifest.py`)
+
+### `tests/test_governance_policy.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for tools/governance_policy.py's generic JSON policy-profile loader.
+  - filename/path terms: test governance policy
+- Important symbols (7 total):
+  - `test_default_policy_dir_is_repo_policies_governance` (function) — line 38
+  - `test_none_policy_dir_uses_default_for_every_profile` (function) — line 43
+  - `test_missing_files_in_existing_dir_use_default_per_file` (function) — line 52
+  - `test_present_file_overrides_default_for_that_profile_only` (function) — line 60
+  - `test_all_five_profile_files_can_be_overridden_independently` (function) — line 74
+  - `test_present_but_malformed_json_raises_not_silently_falls_back` (function) — line 89
+  - `test_policy_dir_string_input_normalised_to_str_in_result` (function) — line 95
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`642ef41a888e1606…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_governance_policy.py`)
+
+### `tests/test_governance_relationships.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test governance relationships
+- Important symbols (17 total):
+  - `_row` (function) — line 19
+  - `_find` (function) — line 31
+  - `test_non_project_roles_excluded` (function) — line 41
+  - `test_lowercase_governance_role_still_counted_as_project` (function) — line 53
+  - `test_client_label_casing_variants_fold_to_one_project` (function) — line 63
+  - `test_bc_prefix_variant_folds_to_same_bc_identity` (function) — line 74
+  - `test_excel_collapsed_bc_folds_to_same_bc_identity` (function) — line 87
+  - `test_same_project_label_different_client_stays_distinct` (function) — line 102
+  - `test_blank_project_label_falls_back_to_export_run_id_per_file` (function) — line 122
+  - `test_multi_discipline_project_collects_sorted_discipline_list` (function) — line 139
+  - `test_enterprise_bookkeeping_bc_token_blanked_not_carried_as_fake_bc` (function) — line 151
+  - `test_enterprise_bookkeeping_project_excluded_from_bc_client_matrix` (function) — line 166
+  - `test_inconsistent_unit_system_within_one_project_warns_not_raises` (function) — line 181
+  - `_rel_row` (function) — line 197
+  - `test_percentage_of_bc_and_client_single_bc_per_client` (function) — line 206
+  - `test_percentage_of_client_sums_to_one_across_multiple_bcs` (function) — line 217
+  - `test_client_bc_matrix_never_recomputes_percentage_it_only_sums_counts` (function) — line 240
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/governance_relationships.py`
+- Called by (high/medium-confidence static callers):
+  - `test_bc_prefix_variant_folds_to_same_bc_identity (tests/test_governance_relationships.py:78)`
+  - `test_bc_prefix_variant_folds_to_same_bc_identity (tests/test_governance_relationships.py:79)`
+  - `test_blank_project_label_falls_back_to_export_run_id_per_file (tests/test_governance_relationships.py:124)`
+  - `test_blank_project_label_falls_back_to_export_run_id_per_file (tests/test_governance_relationships.py:125)`
+  - `test_client_bc_matrix_never_recomputes_percentage_it_only_sums_counts (tests/test_governance_relationships.py:241)`
+  - `test_client_label_casing_variants_fold_to_one_project (tests/test_governance_relationships.py:65)`
+  - `test_client_label_casing_variants_fold_to_one_project (tests/test_governance_relationships.py:66)`
+  - `test_enterprise_bookkeeping_bc_token_blanked_not_carried_as_fake_bc (tests/test_governance_relationships.py:156)`
+  - `test_enterprise_bookkeeping_bc_token_blanked_not_carried_as_fake_bc (tests/test_governance_relationships.py:157)`
+  - `test_enterprise_bookkeeping_project_excluded_from_bc_client_matrix (tests/test_governance_relationships.py:168)`
+  - `test_enterprise_bookkeeping_project_excluded_from_bc_client_matrix (tests/test_governance_relationships.py:169)`
+  - `test_excel_collapsed_bc_folds_to_same_bc_identity (tests/test_governance_relationships.py:93)`
+  - `test_excel_collapsed_bc_folds_to_same_bc_identity (tests/test_governance_relationships.py:94)`
+  - `test_inconsistent_unit_system_within_one_project_warns_not_raises (tests/test_governance_relationships.py:183)`
+  - `test_inconsistent_unit_system_within_one_project_warns_not_raises (tests/test_governance_relationships.py:184)`
+  - ... and 19 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_governance_relationships.py`
+- Retrieval identity: sha256=`fb05aeb0fb5b7866…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_governance_relationships.py`)
+
+### `tests/test_graphic_overrides.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for core/graphic_overrides.py — graphics extraction helpers.
+  - filename/path terms: test graphic overrides
+- Important symbols (5 total):
+  - `TestIsInvalidElementId` (class) — line 27
+  - `TestRgbFromColor` (class) — line 56
+  - `TestReadAttr` (class) — line 104
+  - `TestReadFirstAttr` (class) — line 131
+  - `TestExtractUnknownSource` (class) — line 161
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/graphic_overrides.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`1ac3a5f26a3f0e78…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_graphic_overrides.py`)
+
+### `tests/test_hashing_incremental.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test hashing incremental
+- Important symbols (9 total):
+  - `_reference_hash` (function) — line 9
+  - `test_make_hash_matches_reference_empty` (function) — line 19
+  - `test_make_hash_matches_reference_single` (function) — line 23
+  - `test_make_hash_matches_reference_multiple_and_unicode_and_pipes` (function) — line 28
+  - `test_make_hash_deterministic_repeated_calls` (function) — line 33
+  - `test_make_hash_is_order_sensitive_contract` (function) — line 40
+  - `test_make_hash_separator_off_by_one_cases` (function) — line 46
+  - `test_make_hash_handles_unrepr_values` (function) — line 60
+  - `test_make_hash_accepts_generator_large_input_sanity` (function) — line 70
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+- Called by (high/medium-confidence static callers):
+  - `test_make_hash_handles_unrepr_values (tests/test_hashing_incremental.py:67)`
+  - `test_make_hash_matches_reference_empty (tests/test_hashing_incremental.py:20)`
+  - `test_make_hash_matches_reference_multiple_and_unicode_and_pipes (tests/test_hashing_incremental.py:30)`
+  - `test_make_hash_matches_reference_single (tests/test_hashing_incremental.py:25)`
+  - `test_make_hash_separator_off_by_one_cases (tests/test_hashing_incremental.py:57)`
+- Related tests:
+  - `tests/test_hashing_incremental.py`
+- Retrieval identity: sha256=`4b7159fd1f3d4d9c…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_hashing_incremental.py`)
+
+### `tests/test_identity_canonical_selectors.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - filename/path terms: test identity canonical selectors
+- Important symbols (1 total):
+  - `test_identity_join_key_uses_required_plus_gated_required_only` (function) — line 9
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - imports `core/hashing.py`
+  - imports `core/join_key_builder.py`
+  - imports `core/join_key_policy.py`
+  - imports `core/record_v2.py`
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`39c290cd68ae049e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_identity_canonical_selectors.py`)
+

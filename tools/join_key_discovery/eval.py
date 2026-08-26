@@ -107,6 +107,7 @@ def build_candidate_join_key_with_details(
     shape_value = ""
     shape_matched = False
     additional_required: List[str] = []
+    additional_optional: List[str] = []
     if disc_key and row_items.get(disc_key):
         shape_value = row_items[disc_key][1]
         shape_requirements = gates.get("shape_requirements") if isinstance(gates.get("shape_requirements"), dict) else {}
@@ -114,6 +115,13 @@ def build_candidate_join_key_with_details(
         if isinstance(shape_cfg, dict):
             shape_matched = True
             additional_required = [str(f).strip() for f in (shape_cfg.get("additional_required") or []) if str(f).strip()]
+            # Informational only: additional_optional does not participate in required/
+            # selected/hash composition here (discovery's candidate-key model, unlike
+            # core/join_key_builder.py's production build_join_key_from_policy(), only
+            # ever searches/scores over required fields). Surfaced in `details` purely
+            # so summarize_shape_gate_usage() can report it -- previously invisible to
+            # any audit even though core/join_key_builder.py already honors it.
+            additional_optional = [str(f).strip() for f in (shape_cfg.get("additional_optional") or []) if str(f).strip()]
 
     required = sorted(set(base_required + additional_required), key=lambda s: s.lower())
     selected: List[Dict[str, str]] = []
@@ -126,12 +134,40 @@ def build_candidate_join_key_with_details(
         q, v = qv
         selected.append({"k": field, "q": q, "v": v})
 
+    # Domains configured with zero required_items (e.g. units_doc, worksets_doc --
+    # single synthetic document-level summary records; policy notes: "all fields
+    # optional... nothing blocks it") have no required fields to select from here.
+    # Previously that always fell through to selected=[] -> status="blocked",
+    # contradicting the policy's own documented intent. When the caller supplies
+    # optional_fields via gates AND zero required fields were configured (not
+    # "required fields configured but missing on this record" -- that still
+    # returns "missing_required" below, unchanged), fall back to whichever
+    # optional fields are actually present on the row. Gated behind an explicit
+    # gates["optional_fields"] key so discovery/scoring callers (greedy.py,
+    # pareto_joinkey_search.py, discover_hash_policy.py's score_candidate path),
+    # which never pass this key, keep their exact current candidate-scoring
+    # semantics -- this only activates for callers that opt in (apply_join_policy.py).
+    optional_fallback_used = False
+    optional_selected: List[str] = []
+    if not required and not selected:
+        optional_fields = [str(f) for f in (gates.get("optional_fields") or []) if str(f).strip()]
+        for field in optional_fields:
+            qv = row_items.get(field)
+            if not qv:
+                continue
+            q, v = qv
+            selected.append({"k": field, "q": q, "v": v})
+            optional_selected.append(field)
+        optional_fallback_used = bool(optional_fields)
+
     details = {
         "effective_required_fields": required,
         "missing_required_fields": sorted(missing, key=str.lower),
+        "effective_optional_fields": sorted(set(additional_optional) | set(optional_selected), key=str.lower),
         "discriminator_key": disc_key,
         "discriminator_value": shape_value,
         "shape_matched": shape_matched,
+        "optional_fallback_used": optional_fallback_used,
     }
     if missing:
         return ("missing_required", selected, ",".join(details["missing_required_fields"]), details)
@@ -151,6 +187,76 @@ def build_candidate_join_key(
     return status, selected, reason
 
 
+
+def summarize_shape_gate_usage(
+    records: Sequence[Dict[str, str]],
+    identity_items_by_record: Dict[str, Dict[str, Tuple[str, str]]],
+    selected_fields: Sequence[str],
+    gates: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Audit effective join-key fields for every observed shape-gate value."""
+    gates = gates or {}
+    discriminator_key = _norm(gates.get("discriminator_key"))
+    shape_requirements = gates.get("shape_requirements") if isinstance(gates.get("shape_requirements"), dict) else {}
+    out: Dict[str, Any] = {
+        "enabled": bool(discriminator_key),
+        "discriminator_key": discriminator_key,
+        "default_shape_behavior": _norm(gates.get("default_shape_behavior")) or "common_only",
+        "configured_shape_values": sorted((str(k) for k in shape_requirements), key=str.lower),
+        "records_total": len(records),
+        "records_missing_discriminator": 0,
+        "records_missing_required": 0,
+        "matched_records": 0,
+        "unmatched_records": 0,
+        "shapes": [],
+    }
+    if not discriminator_key:
+        return out
+    by_shape: Dict[str, Dict[str, Any]] = {}
+    for row in sorted(records, key=lambda r: (_norm(r.get("record_pk")), _norm(r.get("file_id")))):
+        record_pk = _norm(row.get("record_pk"))
+        row_items = identity_items_by_record.get(record_pk, {})
+        discriminator = row_items.get(discriminator_key)
+        shape_value = discriminator[1] if discriminator else ""
+        if not shape_value:
+            out["records_missing_discriminator"] += 1
+            shape_value = "**missing_discriminator**"
+        status, _items, _reason, details = build_candidate_join_key_with_details(
+            identity_items_by_record, record_pk, selected_fields, gates
+        )
+        matched = bool(details.get("shape_matched"))
+        out["matched_records" if matched else "unmatched_records"] += 1
+        if status == "missing_required":
+            out["records_missing_required"] += 1
+        bucket = by_shape.setdefault(shape_value, {
+            "shape_value": shape_value,
+            "shape_matched": matched,
+            "records": 0,
+            "records_missing_required": 0,
+            "effective_required_fields": set(),
+            "missing_required_fields": set(),
+            "effective_optional_fields": set(),
+        })
+        bucket["records"] += 1
+        bucket["shape_matched"] = bucket["shape_matched"] or matched
+        if status == "missing_required":
+            bucket["records_missing_required"] += 1
+        bucket["effective_required_fields"].update(str(v) for v in details.get("effective_required_fields", []) if str(v))
+        bucket["missing_required_fields"].update(str(v) for v in details.get("missing_required_fields", []) if str(v))
+        bucket["effective_optional_fields"].update(str(v) for v in details.get("effective_optional_fields", []) if str(v))
+    for shape_value in sorted(by_shape, key=str.lower):
+        bucket = by_shape[shape_value]
+        out["shapes"].append({
+            "shape_value": bucket["shape_value"],
+            "shape_matched": bool(bucket["shape_matched"]),
+            "records": int(bucket["records"]),
+            "records_missing_required": int(bucket["records_missing_required"]),
+            "effective_required_fields": sorted(bucket["effective_required_fields"], key=str.lower),
+            "missing_required_fields": sorted(bucket["missing_required_fields"], key=str.lower),
+            "effective_optional_fields": sorted(bucket["effective_optional_fields"], key=str.lower),
+        })
+    return out
+
 def score_candidate(
     records: Sequence[Dict[str, str]],
     identity_items_by_record: Dict[str, Dict[str, Tuple[str, str]]],
@@ -163,10 +269,28 @@ def score_candidate(
     by_sig: Dict[str, set[str]] = defaultdict(set)
     covered = 0
     failures: Dict[str, int] = defaultdict(int)
+    effective_fields: set[str] = set()
+
+    evaluation_mode = str(cfg.get("evaluation_mode") or "legacy")
+    gates = dict(cfg.get("gates") or {})
+    if evaluation_mode == "candidate":
+        # Discovery may retain discriminator metadata for partitioning/reporting,
+        # but neither the ratified base requirements nor per-shape requirements
+        # are part of the candidate key being tested.
+        gates.pop("required_fields", None)
+        gates.pop("shape_requirements", None)
+    elif evaluation_mode == "runtime":
+        # Search engines structurally seed selected_fields with the runtime
+        # baseline. Use the complete contender here so harsh/validate challenger
+        # metrics do not silently collapse back to the baseline alone.
+        gates["required_fields"] = list(selected_fields)
 
     for row in sorted(records, key=lambda r: (_norm(r.get("record_pk")), _norm(r.get("file_id")))):
         record_pk = _norm(row.get("record_pk"))
-        status, selected, reason = build_candidate_join_key(identity_items_by_record, record_pk, selected_fields, cfg.get("gates"))
+        status, selected, reason, details = build_candidate_join_key_with_details(
+            identity_items_by_record, record_pk, selected_fields, gates
+        )
+        effective_fields.update(str(v) for v in details.get("effective_required_fields", []) if str(v))
         if status != "ok":
             failures[status if not reason else f"{status}:{reason}"] += 1
             continue
@@ -193,6 +317,8 @@ def score_candidate(
 
     return {
         "selected_fields": list(selected_fields),
+        "effective_fields_actually_scored": sorted(effective_fields, key=str.lower),
+        "evaluation_mode": evaluation_mode,
         "records_total": total,
         "records_covered": covered,
         "coverage": (covered / total) if total else 0.0,

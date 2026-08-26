@@ -4,7 +4,7 @@ from core.hashing import make_hash
 from core.join_key_builder import build_join_key_from_policy
 from core.join_key_policy import get_domain_join_key_policy, load_join_key_policies
 from core.record_v2 import ITEM_Q_OK, make_identity_item, serialize_identity_items
-from domains.text_types import TEXT_TYPE_SEMANTIC_KEYS
+from domains.text_types import TEXT_TYPE_SEMANTIC_KEYS_FALLBACK
 
 
 def _text_types_policy():
@@ -55,8 +55,12 @@ def test_text_types_canonical_evidence_selectors_and_hashing():
     join_items = [it for it in canonical_items if it.get("k") in set(join_key["keys_used"])]
     assert join_key["join_hash"] == make_hash(serialize_identity_items(join_items))
 
-    semantic_items = [it for it in canonical_items if it.get("k") in set(TEXT_TYPE_SEMANTIC_KEYS)]
+    semantic_items = [it for it in canonical_items if it.get("k") in set(TEXT_TYPE_SEMANTIC_KEYS_FALLBACK)]
     sig_hash = make_hash(serialize_identity_items(semantic_items))
 
-    # Semantic basis includes identity-bearing name/background and should differ from join basis.
+    # D-041: text_type.name is NOT part of the semantic basis (names are metadata
+    # only, never in behavior hashes) -- the semantic basis differs from the join
+    # basis because it includes background/line_weight/etc. that join excludes,
+    # not because it includes the name.
+    assert "text_type.name" not in TEXT_TYPE_SEMANTIC_KEYS_FALLBACK
     assert sig_hash != join_key["join_hash"]

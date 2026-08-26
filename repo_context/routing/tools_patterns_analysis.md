@@ -1,0 +1,123 @@
+# Routing catalog: `tools/patterns_analysis`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 4
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tools/patterns_analysis` partition): `da0ebc1375cf4c0496273574fe01f8d7b08cd8cdde56732904e754c7dda0b07a`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tools/patterns_analysis/split_detection.py`
+- Role: `developer_utility` (evidence: no `__main__` guard; located under developer-tooling directory 'tools/')
+- Purpose clues:
+  - module docstring: Core split detection functionality.
+  - filename/path terms: split detection
+- Important symbols (11 total):
+  - `Cluster` (class) — line 20
+  - `SplitSignal` (class) — line 33
+  - `extract_metadata_patterns` (function) — line 42
+  - `find_common_path_components` (function) — line 85
+  - `infer_region_from_paths` (function) — line 105
+  - `infer_office_from_paths` (function) — line 132
+  - `extract_dates_from_paths` (function) — line 161
+  - `compute_silhouette_score` (function) — line 180
+  - `interpret_silhouette_score` (function) — line 200
+  - `cluster_assignments_to_labels` (function) — line 213
+  - `build_distance_matrix_from_similarity` (function) — line 227
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `extract_metadata_patterns (tools/patterns_analysis/split_detection.py:64)`
+  - `extract_metadata_patterns (tools/patterns_analysis/split_detection.py:67)`
+  - `extract_metadata_patterns (tools/patterns_analysis/split_detection.py:70)`
+  - `extract_metadata_patterns (tools/patterns_analysis/split_detection.py:73)`
+  - `hierarchical_cluster_files (tools/patterns_analysis/split_detection_file_level.py:225)`
+  - `hierarchical_cluster_files (tools/patterns_analysis/split_detection_file_level.py:269)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:482)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:493)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:500)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:501)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:502)`
+  - `threshold_graph_cluster_files (tools/patterns_analysis/split_detection_file_level.py:298)`
+  - `threshold_graph_cluster_files (tools/patterns_analysis/split_detection_file_level.py:352)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`9a6db0eb287fec4d…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/split_detection.py`)
+
+### `tools/patterns_analysis/split_detection_element_level.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: Element-level classification against reference standards.
+  - filename/path terms: split detection element level
+- Important symbols (7 total):
+  - `_read_csv_rows` (function) — line 21
+  - `extract_label_display` (function) — line 30
+  - `classify_file_elements` (function) — line 76
+  - `compute_element_statistics` (function) — line 187
+  - `generate_remediation_plan` (function) — line 227
+  - `run_element_level_classification` (function) — line 280
+  - `main` (function) — line 433
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/split_detection_element_level.py:487)`
+  - `classify_file_elements (tools/patterns_analysis/split_detection_element_level.py:101)`
+  - `classify_file_elements (tools/patterns_analysis/split_detection_element_level.py:135)`
+  - `classify_file_elements (tools/patterns_analysis/split_detection_element_level.py:152)`
+  - `classify_file_elements (tools/patterns_analysis/split_detection_element_level.py:177)`
+  - `main (tools/patterns_analysis/split_detection_element_level.py:475)`
+  - `run_element_level_classification (tools/patterns_analysis/split_detection_element_level.py:344)`
+  - `run_element_level_classification (tools/patterns_analysis/split_detection_element_level.py:356)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`3d9fb7b6b020b3cd…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/split_detection_element_level.py`)
+
+### `tools/patterns_analysis/split_detection_file_level.py`
+- Role: `active_pipeline` (evidence: contains `if __name__ == "__main__":` guard; no operator-facing directory or docstring hint matched, conservatively treated as an active pipeline stage rather than an operator entrypoint)
+- Purpose clues:
+  - module docstring: File-level split detection via domain profile clustering.
+  - filename/path terms: split detection file level
+- Important symbols (13 total):
+  - `compute_named_cluster_flags` (function) — line 33
+  - `build_element_profiles` (function) — line 76
+  - `compute_pairwise_similarity_candidates` (function) — line 111
+  - `_files_with_any_candidate` (function) — line 179
+  - `compute_pairwise_similarity` (function) — line 187
+  - `hierarchical_cluster_files` (function) — line 213
+  - `threshold_graph_cluster_files` (function) — line 280
+  - `compute_avg_internal_similarity` (function) — line 362
+  - `compute_avg_between_cluster_similarity` (function) — line 381
+  - `select_cluster_representative` (function) — line 403
+  - `infer_standard_name` (function) — line 428
+  - `run_file_level_clustering` (function) — line 445
+  - `main` (function) — line 616
+- Entrypoint evidence: contains `if __name__ == "__main__":` guard
+- Internal dependencies (resolved imports within this repository):
+  - imports `tools/patterns_analysis/split_detection.py`
+- Called by (high/medium-confidence static callers):
+  - `<module> (tools/patterns_analysis/split_detection_file_level.py:672)`
+  - `compute_pairwise_similarity_candidates (tools/patterns_analysis/split_detection_file_level.py:165)`
+  - `hierarchical_cluster_files (tools/patterns_analysis/split_detection_file_level.py:267)`
+  - `main (tools/patterns_analysis/split_detection_file_level.py:661)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:457)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:467)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:470)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:473)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:476)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:486)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:505)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:512)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:526)`
+  - `run_file_level_clustering (tools/patterns_analysis/split_detection_file_level.py:542)`
+  - `threshold_graph_cluster_files (tools/patterns_analysis/split_detection_file_level.py:351)`
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`c55b6950850fd915…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tools/patterns_analysis/split_detection_file_level.py`)
+
+## Other files (non-Python / boilerplate)
+
+| Path | Title/summary | Role |
+|---|---|---|
+| `tools/patterns_analysis/__init__.py` | Phase-2 (post-export) analysis helpers. | `developer_utility` |
+

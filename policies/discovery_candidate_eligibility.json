@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "global": {
+    "excluded_leaf_names": [
+      {
+        "leaf": "source_element_id",
+        "classification": "traceability_identifier",
+        "reason": "File-local Revit ElementId emitted for source traceability; not portable configuration identity"
+      },
+      {
+        "leaf": "source_unique_id",
+        "classification": "traceability_identifier",
+        "reason": "Revit UniqueId emitted for source traceability; not portable configuration identity"
+      }
+    ],
+    "excluded_candidates": [],
+    "aliases": {}
+  },
+  "domains": {
+    "arrowheads": {
+      "excluded_candidates": [
+        {
+          "item": "arrowhead.record_class",
+          "classification": "routing_metadata",
+          "reason": "Extractor-derived style bucket retained for partitioning and diagnostics, not definition identity"
+        }
+      ],
+      "aliases": {
+        "arrowhead.style": [
+          {
+            "item": "arrowhead.arrow_style_raw_int",
+            "classification": "raw_alias"
+          },
+          {
+            "item": "arrowhead.arrow_style_display",
+            "classification": "display_alias"
+          }
+        ]
+      }
+    }
+  }
+}

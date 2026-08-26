@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "question": "A file selector escaping the scanned repository must be rejected.",
+  "selectors": {
+    "files": ["../../etc/passwd"]
+  }
+}

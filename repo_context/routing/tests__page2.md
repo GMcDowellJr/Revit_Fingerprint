@@ -1,0 +1,279 @@
+# Routing catalog: `tests (page 2)`
+
+- Generated (UTC): 2026-08-22T17:32:12Z
+- Tool version: 0.1.0
+- Files covered (this page): 6
+- Catalog source hash (sha256 of sorted `path:sha256` pairs for the full `tests` partition): `ddcd11e2891dd4b8bd511ebecb705b7c31329d4844340bd6d528c0b1373a5252`
+- If this hash differs from a previous copy of this file, the underlying source changed and this catalog should be regenerated via `scan`.
+
+### `tests/test_compare_cross_segment_comparison_registry.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for comparison_registry.csv staleness tracking in tools/compare_cross_segment.py.
+  - filename/path terms: test compare cross segment comparison registry
+- Important symbols (16 total):
+  - `_reg_row` (function) — line 21
+  - `test_comparison_is_stale_when_never_computed` (function) — line 30
+  - `test_comparison_not_stale_when_both_sides_unchanged` (function) — line 35
+  - `test_comparison_stale_when_reference_side_population_changed` (function) — line 46
+  - `test_comparison_stale_when_target_side_population_changed` (function) — line 61
+  - `test_comparison_stale_when_forced_rerun_changes_last_run_utc_without_population_change` (function) — line 72
+  - `test_comparison_staleness_is_isolated_per_domain` (function) — line 85
+  - `test_build_comparison_registry_rows_stamps_completed_work_items` (function) — line 99
+  - `test_build_comparison_registry_rows_is_a_full_snapshot_no_carryover` (function) — line 117
+  - `test_build_comparison_registry_rows_domain_scoped_run_omits_other_domains` (function) — line 132
+  - `test_build_comparison_registry_rows_omits_work_items_with_no_output` (function) — line 161
+  - `test_build_comparison_registry_rows_omits_pair_when_reference_segment_is_pending` (function) — line 174
+  - `test_build_comparison_registry_rows_omits_pair_when_target_segment_is_failed` (function) — line 193
+  - `test_build_comparison_registry_rows_stamps_when_both_sides_complete` (function) — line 203
+  - `test_load_comparison_registry_roundtrip` (function) — line 213
+  - `test_load_comparison_registry_missing_file_returns_empty` (function) — line 228
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_build_comparison_registry_rows_domain_scoped_run_omits_other_domains (tests/test_compare_cross_segment_comparison_registry.py:141)`
+  - `test_build_comparison_registry_rows_domain_scoped_run_omits_other_domains (tests/test_compare_cross_segment_comparison_registry.py:142)`
+  - `test_build_comparison_registry_rows_is_a_full_snapshot_no_carryover (tests/test_compare_cross_segment_comparison_registry.py:125)`
+  - `test_build_comparison_registry_rows_omits_pair_when_reference_segment_is_pending (tests/test_compare_cross_segment_comparison_registry.py:185)`
+  - `test_build_comparison_registry_rows_omits_pair_when_reference_segment_is_pending (tests/test_compare_cross_segment_comparison_registry.py:186)`
+  - `test_build_comparison_registry_rows_omits_pair_when_target_segment_is_failed (tests/test_compare_cross_segment_comparison_registry.py:195)`
+  - `test_build_comparison_registry_rows_omits_pair_when_target_segment_is_failed (tests/test_compare_cross_segment_comparison_registry.py:196)`
+  - `test_build_comparison_registry_rows_omits_work_items_with_no_output (tests/test_compare_cross_segment_comparison_registry.py:168)`
+  - `test_build_comparison_registry_rows_stamps_completed_work_items (tests/test_compare_cross_segment_comparison_registry.py:101)`
+  - `test_build_comparison_registry_rows_stamps_completed_work_items (tests/test_compare_cross_segment_comparison_registry.py:102)`
+  - `test_build_comparison_registry_rows_stamps_when_both_sides_complete (tests/test_compare_cross_segment_comparison_registry.py:205)`
+  - `test_build_comparison_registry_rows_stamps_when_both_sides_complete (tests/test_compare_cross_segment_comparison_registry.py:206)`
+  - `test_comparison_is_stale_when_never_computed (tests/test_compare_cross_segment_comparison_registry.py:31)`
+  - `test_comparison_not_stale_when_both_sides_unchanged (tests/test_compare_cross_segment_comparison_registry.py:36)`
+  - `test_comparison_stale_when_forced_rerun_changes_last_run_utc_without_population_change (tests/test_compare_cross_segment_comparison_registry.py:75)`
+  - ... and 3 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_compare_cross_segment_comparison_registry.py`
+- Retrieval identity: sha256=`b92f02c2ce0cba03…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_compare_cross_segment_comparison_registry.py`)
+
+### `tests/test_compare_cross_segment_cross_client.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for discover_cross_client() / _is_client_only_project_segment() in
+  - filename/path terms: test compare cross segment cross client
+- Important symbols (46 total):
+  - `_summary_row` (function) — line 37
+  - `_seg` (function) — line 52
+  - `test_is_client_only_project_segment_true_for_bare_client_scope` (function) — line 82
+  - `test_is_client_only_project_segment_false_for_non_project_role` (function) — line 86
+  - `test_is_client_only_project_segment_false_when_client_blank` (function) — line 90
+  - `test_is_client_only_project_segment_true_when_further_scoped_by_discipline` (function) — line 95
+  - `test_is_client_only_project_segment_false_when_further_scoped_by_bc` (function) — line 104
+  - `test_is_client_only_project_segment_false_when_further_scoped_by_collection` (function) — line 110
+  - `test_discover_cross_client_pairs_distinct_clients_same_unit` (function) — line 120
+  - `test_discover_cross_client_no_pair_across_different_unit_systems` (function) — line 130
+  - `test_discover_cross_client_discipline_scoped_segment_does_not_mix_with_broader_grain` (function) — line 138
+  - `test_discover_cross_client_matching_discipline_peers_do_pair` (function) — line 153
+  - `test_discover_cross_client_discipline_mismatch_produces_no_pair` (function) — line 166
+  - `test_discover_cross_client_excludes_non_project_roles` (function) — line 176
+  - `test_discover_cross_client_excludes_registration_only_segments` (function) — line 184
+  - `test_discover_cross_client_three_clients_produces_all_pairs` (function) — line 192
+  - `test_discover_cross_client_no_self_pair_or_reverse_duplicate` (function) — line 202
+  - `test_drops_sibling_projects_when_same_pair_covered_by_cross_client` (function) — line 216
+  - `test_drop_legacy_sibling_projects_is_order_independent` (function) — line 231
+  - `test_drop_legacy_sibling_projects_leaves_uncovered_pairs_untouched` (function) — line 240
+  - `test_drop_legacy_sibling_projects_leaves_other_types_untouched` (function) — line 254
+  - `test_drop_legacy_sibling_projects_noop_when_no_cross_client_rows` (function) — line 266
+  - `test_segment_filter_before_drop_preserves_reversed_orientation_pair` (function) — line 271
+  - `test_drops_sibling_templates_when_same_pair_covered_by_bc_to_bc` (function) — line 310
+  - `test_drops_sibling_containers_when_same_pair_covered_by_bc_to_bc` (function) — line 325
+  - ... and 21 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `test_discover_cross_client_discipline_mismatch_produces_no_pair (tests/test_compare_cross_segment_cross_client.py:170)`
+  - `test_discover_cross_client_discipline_mismatch_produces_no_pair (tests/test_compare_cross_segment_cross_client.py:171)`
+  - `test_discover_cross_client_discipline_scoped_segment_does_not_mix_with_broader_grain (tests/test_compare_cross_segment_cross_client.py:144)`
+  - `test_discover_cross_client_discipline_scoped_segment_does_not_mix_with_broader_grain (tests/test_compare_cross_segment_cross_client.py:145)`
+  - `test_discover_cross_client_discipline_scoped_segment_does_not_mix_with_broader_grain (tests/test_compare_cross_segment_cross_client.py:146)`
+  - `test_discover_cross_client_excludes_non_project_roles (tests/test_compare_cross_segment_cross_client.py:178)`
+  - `test_discover_cross_client_excludes_non_project_roles (tests/test_compare_cross_segment_cross_client.py:179)`
+  - `test_discover_cross_client_excludes_registration_only_segments (tests/test_compare_cross_segment_cross_client.py:186)`
+  - `test_discover_cross_client_excludes_registration_only_segments (tests/test_compare_cross_segment_cross_client.py:187)`
+  - `test_discover_cross_client_matching_discipline_peers_do_pair (tests/test_compare_cross_segment_cross_client.py:158)`
+  - `test_discover_cross_client_matching_discipline_peers_do_pair (tests/test_compare_cross_segment_cross_client.py:159)`
+  - `test_discover_cross_client_no_override_when_no_resolution_needed (tests/test_compare_cross_segment_cross_client.py:575)`
+  - `test_discover_cross_client_no_override_when_no_resolution_needed (tests/test_compare_cross_segment_cross_client.py:576)`
+  - `test_discover_cross_client_no_pair_across_different_unit_systems (tests/test_compare_cross_segment_cross_client.py:132)`
+  - `test_discover_cross_client_no_pair_across_different_unit_systems (tests/test_compare_cross_segment_cross_client.py:133)`
+  - ... and 58 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_compare_cross_segment_cross_client.py`
+- Retrieval identity: sha256=`615c337b814f1e3e…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_compare_cross_segment_cross_client.py`)
+
+### `tests/test_compare_cross_segment_governance.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for governance semantics in tools/compare_cross_segment.py.
+  - filename/path terms: test compare cross segment governance
+- Important symbols (80 total):
+  - `_seg` (function) — line 41
+  - `test_discover_governance_chain_includes_generic_upstream_roles` (function) — line 51
+  - `test_discover_governance_chain_falls_back_to_collection_label_for_na_client` (function) — line 71
+  - `test_discover_governance_chain_prefers_business_center_label_over_collection_label` (function) — line 90
+  - `test_discover_governance_chain_namespaces_business_center_fallback_from_real_client` (function) — line 123
+  - `test_discover_governance_chain_preserves_collection_scope_within_business_center` (function) — line 153
+  - `test_discover_governance_chain_final_fallback_normalizes_na_spelling` (function) — line 207
+  - `test_discover_governance_chain_collection_match_is_soft_for_client_scope` (function) — line 226
+  - `test_discover_governance_chain_rollup_does_not_wildcard_match_specific_collection` (function) — line 261
+  - `test_scope_level_derivation` (function) — line 312
+  - `test_0000_flows_through_as_literal_enterprise_value` (function) — line 327
+  - `test_bc_0000_spelling_variants_canonicalize_to_0000` (function) — line 337
+  - `test_na_spelled_business_center_labels_normalize_to_blank` (function) — line 350
+  - `test_discover_governance_chain_enterprise_to_project_reaches_every_scope` (function) — line 363
+  - `test_discover_governance_chain_bc_to_project_scoped_to_matching_bc_only` (function) — line 380
+  - `test_discover_governance_chain_enterprise_to_bc_and_client_are_same_role_only` (function) — line 397
+  - `test_enterprise_to_bc_and_sibling_template_survive_with_distinct_run_ids` (function) — line 420
+  - `test_make_comparison_run_id_differs_by_comparison_type_for_same_pair_and_timestamp` (function) — line 465
+  - `test_discover_governance_chain_excludes_generic_from_scope_fanout` (function) — line 474
+  - `test_discover_governance_chain_excludes_ancestor_descendant_from_scope_fanout` (function) — line 489
+  - `test_discover_governance_chain_enterprise_to_bc_reaches_every_real_bc` (function) — line 530
+  - `test_discover_governance_chain_bc_to_bc_pairs_every_peer_business_center` (function) — line 546
+  - `test_discover_governance_chain_bc_to_bc_excludes_same_bc_and_enterprise` (function) — line 560
+  - `test_discover_governance_chain_disc_match_has_no_blank_wildcard` (function) — line 575
+  - `test_discover_client_cross_bc_multi_bc_enumeration` (function) — line 594
+  - ... and 55 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_write_reference_analysis_segment (tests/test_compare_cross_segment_governance.py:898)`
+  - `_write_reference_analysis_segment (tests/test_compare_cross_segment_governance.py:917)`
+  - `_write_segment (tests/test_compare_cross_segment_governance.py:863)`
+  - `_write_segment (tests/test_compare_cross_segment_governance.py:876)`
+  - `_write_segment (tests/test_compare_cross_segment_governance.py:877)`
+  - `_write_segment (tests/test_compare_cross_segment_governance.py:878)`
+  - `_write_within_project_segment (tests/test_compare_cross_segment_governance.py:2160)`
+  - `test_0000_flows_through_as_literal_enterprise_value (tests/test_compare_cross_segment_governance.py:333)`
+  - `test_0000_flows_through_as_literal_enterprise_value (tests/test_compare_cross_segment_governance.py:334)`
+  - `test_bc_0000_spelling_variants_canonicalize_to_0000 (tests/test_compare_cross_segment_governance.py:345)`
+  - `test_build_governance_state_rows_include_inherited_unused_and_local_active (tests/test_compare_cross_segment_governance.py:1024)`
+  - `test_build_governance_state_rows_include_inherited_unused_and_local_active (tests/test_compare_cross_segment_governance.py:1036)`
+  - `test_build_governance_state_rows_include_inherited_unused_and_local_active (tests/test_compare_cross_segment_governance.py:1057)`
+  - `test_build_governance_state_rows_include_inherited_unused_and_local_active (tests/test_compare_cross_segment_governance.py:1058)`
+  - `test_discover_client_cross_bc_and_bc_to_bc_do_not_reference_collection_label (tests/test_compare_cross_segment_governance.py:625)`
+  - ... and 157 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_compare_cross_segment_governance.py`
+- Retrieval identity: sha256=`41a98d942cef2b25…`, chunked=yes (see chunk_manifest.csv / file_inventory.csv for `tests/test_compare_cross_segment_governance.py`)
+
+### `tests/test_compare_cross_segment_lineage.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for the structural_ancestor / population_containment lineage model
+  - filename/path terms: test compare cross segment lineage
+- Important symbols (32 total):
+  - `_lattice_manifest` (function) — line 46
+  - `test_build_ancestor_map_full_lattice_closure` (function) — line 77
+  - `test_build_ancestor_map_superset_of_single_parent_chain` (function) — line 93
+  - `test_is_lineage_related_symmetric_across_full_closure` (function) — line 105
+  - `test_build_ancestor_map_cycle_detection_still_fires` (function) — line 116
+  - `_pop` (function) — line 132
+  - `_pop_hash` (function) — line 136
+  - `test_population_containment_above_and_below_materiality_bar` (function) — line 140
+  - `test_population_containment_excludes_structural_pairs_from_threshold_fit_but_still_flags_them` (function) — line 182
+  - `test_population_containment_identical_populations_always_contained` (function) — line 217
+  - `test_population_containment_boundary_value_included_not_excluded` (function) — line 237
+  - `test_compute_containment_thresholds_deterministic` (function) — line 272
+  - `test_compute_containment_thresholds_no_non_structural_pairs` (function) — line 286
+  - `test_compute_containment_thresholds_empty_membership` (function) — line 299
+  - `_sibling_row` (function) — line 311
+  - `_real_corpus_shaped_manifest` (function) — line 325
+  - `test_discover_sibling_segments_pre_fix_reproduces_violation` (function) — line 356
+  - `test_discover_sibling_segments_post_fix_excludes_violation` (function) — line 364
+  - `test_discover_sibling_segments_unrelated_siblings_still_pair` (function) — line 377
+  - `test_discover_sibling_segments_backward_compatible_without_ancestor_data` (function) — line 392
+  - `test_validate_membership_against_manifest_agreement_no_errors` (function) — line 414
+  - `test_validate_membership_against_manifest_file_count_mismatch` (function) — line 420
+  - `test_validate_membership_against_manifest_population_hash_mismatch` (function) — line 428
+  - `test_validate_membership_against_manifest_unknown_segment_ignored` (function) — line 436
+  - `test_validate_membership_against_manifest_entirely_missing_segment` (function) — line 444
+  - ... and 7 more (see python_symbols.csv)
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_real_corpus_shaped_manifest (tests/test_compare_cross_segment_lineage.py:338)`
+  - `_real_corpus_shaped_manifest (tests/test_compare_cross_segment_lineage.py:339)`
+  - `_real_corpus_shaped_manifest (tests/test_compare_cross_segment_lineage.py:343)`
+  - `_real_corpus_shaped_manifest (tests/test_compare_cross_segment_lineage.py:349)`
+  - `test_build_ancestor_map_full_lattice_closure (tests/test_compare_cross_segment_lineage.py:78)`
+  - `test_build_ancestor_map_superset_of_single_parent_chain (tests/test_compare_cross_segment_lineage.py:98)`
+  - `test_compute_containment_thresholds_deterministic (tests/test_compare_cross_segment_lineage.py:276)`
+  - `test_compute_containment_thresholds_deterministic (tests/test_compare_cross_segment_lineage.py:277)`
+  - `test_compute_containment_thresholds_deterministic (tests/test_compare_cross_segment_lineage.py:278)`
+  - `test_compute_containment_thresholds_no_non_structural_pairs (tests/test_compare_cross_segment_lineage.py:293)`
+  - `test_detect_stale_ancestor_encoding_does_not_flag_wellformed_semicolon_data (tests/test_compare_cross_segment_lineage.py:488)`
+  - `test_discover_sibling_segments_post_fix_excludes_violation (tests/test_compare_cross_segment_lineage.py:368)`
+  - `test_discover_sibling_segments_pre_fix_reproduces_violation (tests/test_compare_cross_segment_lineage.py:359)`
+  - `test_discover_sibling_segments_unrelated_siblings_still_pair (tests/test_compare_cross_segment_lineage.py:380)`
+  - `test_discover_sibling_segments_unrelated_siblings_still_pair (tests/test_compare_cross_segment_lineage.py:381)`
+  - ... and 20 more (see python_calls.csv)
+- Related tests:
+  - `tests/test_compare_cross_segment_lineage.py`
+- Retrieval identity: sha256=`06d420fb7d12a2ba…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_compare_cross_segment_lineage.py`)
+
+### `tests/test_compare_cross_segment_streamed_pairs.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Regression test for streamed (incremental) cross_segment_file_pairs.csv writes.
+  - filename/path terms: test compare cross segment streamed pairs
+- Important symbols (5 total):
+  - `_write_csv` (function) — line 21
+  - `_write_segment` (function) — line 29
+  - `test_main_streams_real_file_pair_rows_to_disk` (function) — line 52
+  - `_build_sibling_fixture` (function) — line 152
+  - `test_failure_after_streaming_leaves_previous_pairs_file_untouched` (function) — line 208
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - `_build_sibling_fixture (tests/test_compare_cross_segment_streamed_pairs.py:158)`
+  - `_build_sibling_fixture (tests/test_compare_cross_segment_streamed_pairs.py:177)`
+  - `_build_sibling_fixture (tests/test_compare_cross_segment_streamed_pairs.py:184)`
+  - `_build_sibling_fixture (tests/test_compare_cross_segment_streamed_pairs.py:191)`
+  - `_build_sibling_fixture (tests/test_compare_cross_segment_streamed_pairs.py:198)`
+  - `_write_segment (tests/test_compare_cross_segment_streamed_pairs.py:31)`
+  - `_write_segment (tests/test_compare_cross_segment_streamed_pairs.py:44)`
+  - `_write_segment (tests/test_compare_cross_segment_streamed_pairs.py:45)`
+  - `_write_segment (tests/test_compare_cross_segment_streamed_pairs.py:46)`
+  - `test_failure_after_streaming_leaves_previous_pairs_file_untouched (tests/test_compare_cross_segment_streamed_pairs.py:210)`
+  - `test_main_streams_real_file_pair_rows_to_disk (tests/test_compare_cross_segment_streamed_pairs.py:103)`
+  - `test_main_streams_real_file_pair_rows_to_disk (tests/test_compare_cross_segment_streamed_pairs.py:110)`
+  - `test_main_streams_real_file_pair_rows_to_disk (tests/test_compare_cross_segment_streamed_pairs.py:59)`
+  - `test_main_streams_real_file_pair_rows_to_disk (tests/test_compare_cross_segment_streamed_pairs.py:86)`
+  - `test_main_streams_real_file_pair_rows_to_disk (tests/test_compare_cross_segment_streamed_pairs.py:93)`
+- Related tests:
+  - `tests/test_compare_cross_segment_streamed_pairs.py`
+- Retrieval identity: sha256=`aa1bddff20d6c33b…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_compare_cross_segment_streamed_pairs.py`)
+
+### `tests/test_compare_cross_segment_worker_count.py`
+- Role: `test_harness` (evidence: file classified as 'test' (test-path/filename convention, see classify_file))
+- Purpose clues:
+  - module docstring: Tests for resolve_worker_count() in tools/compare_cross_segment.py.
+  - filename/path terms: test compare cross segment worker count
+- Important symbols (8 total):
+  - `test_auto_derives_from_cpu_count` (function) — line 11
+  - `test_auto_never_returns_zero_on_low_core_count` (function) — line 17
+  - `test_auto_with_no_cpu_count_falls_back_to_four` (function) — line 23
+  - `test_auto_is_case_insensitive_and_trims_whitespace` (function) — line 29
+  - `test_explicit_string_int_is_parsed` (function) — line 33
+  - `test_explicit_int_passthrough` (function) — line 37
+  - `test_auto_caps_at_61_on_windows` (function) — line 41
+  - `test_auto_uncapped_on_non_windows` (function) — line 48
+- Entrypoint evidence: none
+- Internal dependencies (resolved imports within this repository):
+  - (none resolved; see python_imports.csv for unresolved/external imports)
+- Called by (high/medium-confidence static callers):
+  - (none resolved statically; see python_calls.csv)
+- Related tests:
+  - (none found via resolved imports/calls)
+- Retrieval identity: sha256=`549086c2de4ed565…`, chunked=no (see chunk_manifest.csv / file_inventory.csv for `tests/test_compare_cross_segment_worker_count.py`)
+

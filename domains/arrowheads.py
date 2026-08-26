@@ -22,6 +22,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from core.hashing import make_hash, safe_str
+from core.sig_hash_policy import resolve_sig_hash_keys
 from core.canon import canon_str, fnum, S_MISSING, S_UNREADABLE
 from core.rows import (
     first_param,
@@ -196,17 +197,74 @@ def _build_tick_identity_items(
 # ---------------------------------------------------------------------------
 # Record class buckets (per arrowhead style)
 # ---------------------------------------------------------------------------
-# Arrow record class: style-specific arrow geometry fields are applicable.
-# Tick record class (Heavy end tick mark): tick-specific fields are applicable.
+# Arrow record class: style-specific arrow geometry fields are the hashed
+#   identity for this bucket.
+# Tick record class (Heavy end tick mark): tick-specific fields are the
+#   hashed identity for this bucket.
 # SizeOnly record class: all remaining styles (Dot, Diagonal, Box, Loop,
-#   Elevation Target, Datum triangle) — UI greys all style-specific fields.
-#   Only common items (style + tick_size_in) participate in identity.
+#   Elevation Target, Datum triangle) — only common items (style +
+#   tick_size_in) participate in the hash for this bucket.
+#
+# D-049: all five style-specific fields (width_angle_deg/fill_tick/
+# arrow_closed/tick_mark_centered/heavy_end_pen_weight) are read and added to
+# identity_basis.items for EVERY record regardless of style bucket (see
+# extract() below) -- the earlier "UI greys all style-specific fields for
+# size-only styles" assumption is confirmed wrong for arrowhead.fill_tick
+# (live evidence: the observed type name "Dot Filled-Small",
+# tools/probes/find_crosswalk_candidates.py:133). Which bucket a field
+# belongs to still governs whether it participates in sig_hash -- see
+# STYLE_BUCKET_*_HASH_KEYS below and how extract() filters sig_hash_items.
 
 STYLE_BUCKET_ARROW = frozenset({"Arrow"})
 STYLE_BUCKET_TICK = frozenset({"Heavy end tick mark"})
 STYLE_BUCKET_SIZE_ONLY = frozenset({
     "Dot", "Diagonal", "Box", "Loop", "Elevation Target", "Datum triangle"
 })
+
+# Per-bucket hash-participation key sets (D-049). A field in one of these
+# sets only contributes to sig_hash when the record's own style bucket owns
+# it -- e.g. arrowhead.fill_tick is always present in identity_basis.items,
+# but only feeds sig_hash for STYLE_BUCKET_ARROW records. SizeOnly/Unknown
+# records own none of these keys, so their sig_hash stays common-items-only
+# regardless of what these fields read as.
+_ARROW_BUCKET_HASH_KEYS = frozenset({
+    "arrowhead.width_angle_deg",
+    "arrowhead.fill_tick",
+    "arrowhead.arrow_closed",
+})
+_TICK_BUCKET_HASH_KEYS = frozenset({
+    "arrowhead.tick_mark_centered",
+    "arrowhead.heavy_end_pen_weight",
+})
+# Union of every style-specific (bucket-gated) key, used to identify which
+# keys need bucket-ownership filtering vs. which (common items) always
+# participate in sig_hash whenever the policy allows them.
+_GATED_STYLE_SPECIFIC_KEYS = _ARROW_BUCKET_HASH_KEYS | _TICK_BUCKET_HASH_KEYS
+
+# Fallback sig_hash preimage key set, used only when ctx["sig_hash_policies"]
+# is unavailable. Must stay in sync with policies/domain_sig_hash_policies.json's
+# arrowheads.allowed_items -- see core/sig_hash_policy.py's resolve_sig_hash_keys()
+# and DECISIONS.md D-039/D-040. This is the full union of common + per-style-bucket
+# identity keys; extract() below filters the actual hash preimage per record to
+# only the common keys plus the style-specific keys owned by that record's own
+# bucket (see _GATED_STYLE_SPECIFIC_KEYS) -- identity_basis.items itself now
+# always contains the full set (D-049), so this fallback list alone is no
+# longer a complete description of what's hashed for a given record; it is
+# the ceiling, not the per-record preimage (arrowhead.record_class is
+# deliberately NOT in this set -- it's a coordination/BI-slicer field, not
+# behavior, added to identity_items for discovery visibility per D-040
+# without widening the hash).
+_ARROWHEADS_SIG_HASH_KEYS_FALLBACK = [
+    "arrowhead.style",
+    "arrowhead.arrow_style_raw_int",
+    "arrowhead.arrow_style_display",
+    "arrowhead.tick_size_in",
+    "arrowhead.width_angle_deg",
+    "arrowhead.fill_tick",
+    "arrowhead.arrow_closed",
+    "arrowhead.tick_mark_centered",
+    "arrowhead.heavy_end_pen_weight",
+]
 
 
 def _is_arrowhead_type(doc, t):
@@ -439,50 +497,68 @@ def extract(doc, ctx=None):
         pen_raw = _as_int(p_pen)
         pen_v, pen_q = canonicalize_int(pen_raw)
 
-        # Route to record class based on style.
-        # Arrow record class: arrow-specific geometry fields applicable.
-        # Tick record class (Heavy end tick mark): tick-specific fields applicable.
-        # SizeOnly record class: common items only (UI greys all style-specific fields).
-        # Unknown styles: common items only (default_shape_behavior: common_only).
+        # D-049: extract-always / gate-hash-separately. Every style-specific
+        # field is read and added to identity_items for every record,
+        # regardless of style bucket -- the earlier "UI greys all
+        # style-specific fields for size-only styles" assumption is confirmed
+        # wrong for arrowhead.fill_tick (live evidence: a real observed type
+        # name "Dot Filled-Small"). Which bucket a record belongs to
+        # determines record_class and which of these fields participate in
+        # sig_hash (via hash_bucket_keys below), not whether they're captured.
         common_items = _build_common_identity_items(
             style_v=style_label_v,
             style_q=style_label_q,
             tick_in_v=tick_in_v,
             tick_in_q=tick_in_q,
         )
+        arrow_items = _build_arrow_identity_items(
+            width_angle_v=ang_deg_v,
+            width_angle_q=ang_deg_q,
+            fill_v=fill_v,
+            fill_q=fill_q,
+            closed_v=closed_v,
+            closed_q=closed_q,
+        )
+        tick_items = _build_tick_identity_items(
+            centered_v=center_v,
+            centered_q=center_q,
+            pen_v=pen_v,
+            pen_q=pen_q,
+        )
 
         if style_label_v in STYLE_BUCKET_ARROW:
             record_class = "Arrow"
-            class_items = _build_arrow_identity_items(
-                width_angle_v=ang_deg_v,
-                width_angle_q=ang_deg_q,
-                fill_v=fill_v,
-                fill_q=fill_q,
-                closed_v=closed_v,
-                closed_q=closed_q,
-            )
+            hash_bucket_keys = _ARROW_BUCKET_HASH_KEYS
         elif style_label_v in STYLE_BUCKET_TICK:
             record_class = "Tick"
-            class_items = _build_tick_identity_items(
-                centered_v=center_v,
-                centered_q=center_q,
-                pen_v=pen_v,
-                pen_q=pen_q,
-            )
+            hash_bucket_keys = _TICK_BUCKET_HASH_KEYS
         elif style_label_v in STYLE_BUCKET_SIZE_ONLY:
             record_class = "SizeOnly"
-            class_items = []
+            hash_bucket_keys = frozenset()
         else:
             # Unknown style — common items only per default_shape_behavior: common_only
             record_class = "Unknown"
-            class_items = []
+            hash_bucket_keys = frozenset()
 
         identity_items = [
             make_identity_item("arrowhead.arrow_style_raw_int", style_raw_v, style_raw_q),
             make_identity_item("arrowhead.arrow_style_display", style_disp_v, style_disp_q),
-        ] + common_items + class_items
+        ] + common_items + arrow_items + tick_items
 
-        semantic_keys = sorted({it.get("k") for it in identity_items if isinstance(it.get("k"), str)})
+        # D-040: record_class (Arrow/Tick/SizeOnly/Unknown) is added to
+        # identity_basis.items so it's visible to discover_hash_policy.py's/
+        # discover_join_policy.py's pareto search -- it is deliberately excluded
+        # from _ARROWHEADS_SIG_HASH_KEYS_FALLBACK / the arrowheads sig_hash
+        # policy's allowed_items, so this does not change sig_hash.
+        identity_items.append(make_identity_item("arrowhead.record_class", record_class, ITEM_Q_OK))
+        identity_items = sorted(identity_items, key=lambda it: safe_str(it.get("k", "")))
+
+        sig_hash_keys = resolve_sig_hash_keys(
+            (ctx or {}).get("sig_hash_policies"),
+            "arrowheads",
+            [it.get("k") for it in identity_items],
+            _ARROWHEADS_SIG_HASH_KEYS_FALLBACK,
+        )
 
         # Required qs: style + tick_size must be OK (classifier depends on their presence)
         required_qs = [style_label_q, tick_in_q]
@@ -506,14 +582,34 @@ def extract(doc, ctx=None):
 
         status = STATUS_OK if not any_incomplete else STATUS_DEGRADED
         sig_hash = None
+        sig_hash_items = []
 
         if v2_blocked:
             status = STATUS_BLOCKED
             status_reasons = sorted(set(status_reasons)) or ["minima.required_not_ok"]
         else:
-            preimage = serialize_identity_items(identity_items)
+            # Gate-hash-separately (D-049): a style-specific key only feeds
+            # the hash when this record's own style bucket owns it (Arrow
+            # fields for Arrow, tick fields for Tick, none for SizeOnly/
+            # Unknown) -- it is otherwise excluded even though it's now
+            # always present in identity_items above.
+            _sig_hash_keys_set = set(sig_hash_keys)
+            sig_hash_items = [
+                it for it in identity_items
+                if safe_str(it.get("k", "")) in _sig_hash_keys_set
+                and (
+                    safe_str(it.get("k", "")) not in _GATED_STYLE_SPECIFIC_KEYS
+                    or safe_str(it.get("k", "")) in hash_bucket_keys
+                )
+            ]
+            preimage = serialize_identity_items(sig_hash_items)
             sig_hash = make_hash(preimage)
             v2_sig_hashes.append(sig_hash)
+
+        # D-043 (P2 review finding): report only the keys actually present in the
+        # hash preimage, not the full cross-shape allowed_items union -- a SizeOnly
+        # record must not claim Arrow-geometry keys were used when they weren't.
+        semantic_keys = sorted(safe_str(it.get("k", "")) for it in sig_hash_items)
 
         # Label is not identity; keep human if possible.
         label_display = nm if nm else "Arrowhead"

@@ -1,0 +1,391 @@
+"""Shared constants, dataclasses, and small utilities for repo_context.
+
+Pure stdlib. No repository code is ever imported or executed by this
+module or anything it is used from.
+"""
+from __future__ import annotations
+
+import fnmatch
+import hashlib
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+TOOL_VERSION = "0.1.0"
+
+DEFAULT_EXCLUDE_DIRS = {
+    ".git", ".hg", ".svn",
+    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+    ".tox", ".nox",
+    ".venv", "venv", "env",
+    "node_modules",
+    "dist", "build",
+    "coverage", "htmlcov",
+    ".idea", ".vscode",
+}
+# Deliberately NOT here by bare name: "repo_context" / "_copilot_context".
+# The actual output directory is excluded by its exact repo-relative path
+# (see repo_context.py's _resolve_output_dir / ScanOptions.output_exclude_rel_path),
+# not by name -- a name-based entry here would silently exclude any
+# legitimately-named source directory sharing one of these names anywhere
+# in the tree (e.g. this very tool's own dev_tools/repo_context/), with no
+# way to rescue it via --include-glob.
+
+DEFAULT_EXCLUDE_FILE_GLOBS = [
+    ".env", ".env.*",
+    "*.pem", "*.key", "*.pfx", "*.p12",
+    "id_rsa", "id_ed25519",
+    "credentials.json", "secrets.*",
+]
+
+# Extensions that are essentially always binary; used as a fast path before
+# content sniffing.
+BINARY_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".webp", ".tiff",
+    ".pdf", ".zip", ".tar", ".gz", ".7z", ".rar", ".whl",
+    ".exe", ".dll", ".so", ".dylib", ".pyc", ".pyo", ".o", ".a", ".lib",
+    ".class", ".jar",
+    ".mp3", ".mp4", ".avi", ".mov", ".wav", ".flac",
+    ".db", ".sqlite", ".sqlite3",
+    ".ttf", ".otf", ".woff", ".woff2",
+    # Note: ".dyn" (Dynamo graph files) is deliberately NOT here -- it's
+    # plain JSON text, not binary. Content sniffing already classifies it
+    # correctly; hardcoding it here bypassed decoding/chunking/search
+    # entirely for a text format.
+}
+
+_SECRET_ASSIGNMENT_PATTERN = re.compile(
+    r"(?i)(?:api[_-]?key|secret|token|access[_-]?key|password|passwd)\s*[:=]\s*"
+    r"(?P<q>['\"]?)(?P<value>[A-Za-z0-9/+_\-\.]{12,})(?P=q)"
+)
+_STANDALONE_SECRET_PATTERNS = [
+    re.compile(r"AKIA[0-9A-Z]{16}"),
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+]
+REDACTION_TEXT = "[REDACTED-POSSIBLE-SECRET]"
+
+_PLAIN_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+# Substrings that mark an unquoted, underscore-containing identifier as
+# *demonstrably* a reference/provenance description rather than a secret
+# value that merely happens to look like one -- a real lowercase
+# snake_case credential (e.g. a Diceware-style password like
+# `correct_horse_battery_staple`, or a token literal like
+# `real_secret_value`) has the exact same shape (all-lowercase, no digit,
+# underscore-separated words) as a legitimate reference like
+# `user_provided_value_from_config`, so shape alone (the previous check)
+# cannot tell them apart. Requiring one of these markers narrows the
+# exemption to identifiers that name *where a value comes from*
+# (config/env/provider lookups, or an explicit placeholder), which a real
+# secret's spelling essentially never does.
+_REFERENCE_MARKERS = ("config", "provider", "environ", "_env", "env_", "placeholder", "default", "template",
+                      "example")
+
+
+def _looks_secret_shaped(value: str, quoted: bool) -> bool:
+    """Bounded false-positive guard for _SECRET_ASSIGNMENT_PATTERN.
+
+    A *quoted* value after `token =` / `password:` / etc. is redacted
+    unconditionally, as before -- a literal string in that position is
+    almost always meant to be a real secret. An *unquoted* value is only
+    left alone when it (a) is a plain identifier (letters/digits/
+    underscores only), (b) contains an underscore, (c) has no digit and no
+    mixed case, AND (d) contains one of `_REFERENCE_MARKERS` -- i.e. it
+    reads as a description of *where a value comes from*, like
+    `token = user_provided_value_from_config` or `access_token =
+    fetch_token_from_provider`, not an opaque value. Requirement (d) is
+    what keeps this exemption from also swallowing a real lowercase
+    snake_case credential like `password = correct_horse_battery_staple`
+    or `token = real_secret_value`: those have the identical shape ((a)-
+    (c)) but name no config/env/provider/placeholder origin, so they stay
+    redacted. A single-word unquoted value with no underscore (e.g.
+    `token: abcdefghijklmnopqrstuvwxyz`) is exactly the shape a real
+    lowercase credential/token takes and is still redacted, even though it
+    also happens to be a valid identifier. This does not eliminate every
+    false positive (e.g. a reference identifier that happens to omit any
+    marker word) -- closing that gap fully would need real entropy scoring
+    or an allowlist, which is a separate, broader redesign rather than a
+    bounded fix.
+    """
+    if quoted:
+        return True
+    if _PLAIN_IDENTIFIER.match(value) and "_" in value:
+        has_digit = any(c.isdigit() for c in value)
+        has_mixed_case = any(c.islower() for c in value) and any(c.isupper() for c in value)
+        looks_like_reference = any(marker in value.lower() for marker in _REFERENCE_MARKERS)
+        return (has_digit or has_mixed_case) or not looks_like_reference
+    return True  # single-word identifier, or contains '/', '+', '.', '-' -- secret-shaped
+
+
+def redact_secrets(text: str) -> str:
+    out_lines = []
+    changed = False
+    for line in text.split("\n"):
+        new_line = line
+
+        def _sub(m):
+            nonlocal changed
+            if _looks_secret_shaped(m.group("value"), bool(m.group("q"))):
+                changed = True
+                return REDACTION_TEXT
+            return m.group(0)
+
+        new_line = _SECRET_ASSIGNMENT_PATTERN.sub(_sub, new_line)
+        for pat in _STANDALONE_SECRET_PATTERNS:
+            if pat.search(new_line):
+                new_line = pat.sub(REDACTION_TEXT, new_line)
+                changed = True
+        out_lines.append(new_line)
+    return "\n".join(out_lines) if changed else text
+
+
+def to_posix_rel(path: Path, root: Path) -> str:
+    return path.resolve().relative_to(root.resolve()).as_posix()
+
+
+def sha256_file(path: Path, chunk_size: int = 1 << 20) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        while True:
+            block = fh.read(chunk_size)
+            if not block:
+                break
+            h.update(block)
+    return h.hexdigest()
+
+
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def count_lines_streaming(path: Path, chunk_size: int = 1 << 20) -> int:
+    """Count newline-terminated lines without holding the file in memory."""
+    count = 0
+    last_byte = b""
+    with open(path, "rb") as fh:
+        while True:
+            block = fh.read(chunk_size)
+            if not block:
+                break
+            count += block.count(b"\n")
+            last_byte = block[-1:]
+    if last_byte and last_byte != b"\n":
+        count += 1
+    return count
+
+
+def stable_path_id(rel_path: str, length: int = 12) -> str:
+    return hashlib.sha1(rel_path.encode("utf-8")).hexdigest()[:length]
+
+
+def sanitize_stem(name: str) -> str:
+    stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
+    return stem[:60] if stem else "file"
+
+
+def match_any_glob(name: str, patterns) -> Optional[str]:
+    for pat in patterns:
+        if fnmatch.fnmatch(name, pat):
+            return pat
+    return None
+
+
+def sniff_binary(sample: bytes) -> bool:
+    if b"\x00" in sample:
+        return True
+    if not sample:
+        return False
+    text_chars = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)) - {0x7F})
+    nontext = sum(1 for b in sample if b not in text_chars)
+    return (nontext / len(sample)) > 0.30
+
+
+@dataclass
+class FileRecord:
+    relative_path: str
+    filename: str
+    extension: str
+    category: str
+    size_bytes: int
+    is_binary: bool
+    line_count: Optional[int]
+    sha256: str
+    included: bool
+    exclusion_reason: str
+    chunked: bool = False
+    parse_status: str = "n/a"
+    generated_or_vendor: str = "no"
+    classification_reason: str = ""
+
+
+@dataclass
+class SymbolRecord:
+    relative_path: str
+    qualified_name: str
+    symbol_type: str
+    start_line: int
+    end_line: int
+    parent_symbol: str
+    decorators: str
+    parameters: str
+    base_classes: str
+    return_annotation: str
+    has_docstring: bool
+    docstring_first_line: str
+    line_count: int
+    complexity_approx: int
+    nested_symbols: str
+
+
+@dataclass
+class ImportRecord:
+    source_file: str
+    source_module: str
+    line: int
+    import_type: str
+    imported_module: str
+    imported_name: str
+    alias: str
+    level: int
+    resolved_file: str
+    resolution_status: str
+
+
+@dataclass
+class CallRecord:
+    caller_file: str
+    caller_symbol: str
+    line: int
+    call_expression: str
+    callee_simple_name: str
+    candidate_file: str
+    candidate_symbol: str
+    confidence: str
+    explanation: str
+
+
+@dataclass
+class ChunkRecord:
+    source_relative_path: str
+    chunk_relative_path: str
+    chunk_number: int
+    start_line: int
+    end_line: int
+    overlap_lines: int
+    symbols: str
+    source_sha256: str
+    chunk_sha256: str
+    char_count: int
+    estimated_tokens: int
+
+
+CSV_SCHEMAS = {
+    "file_inventory.csv": (
+        "relative_path", "filename", "extension", "category", "size_bytes",
+        "text_or_binary", "line_count", "sha256", "included",
+        "exclusion_reason", "chunked", "parse_status", "generated_or_vendor",
+    ),
+    "python_symbols.csv": (
+        "relative_path", "qualified_name", "symbol_type", "start_line",
+        "end_line", "parent_symbol", "decorators", "parameters",
+        "base_classes", "return_annotation", "has_docstring",
+        "docstring_first_line", "line_count", "complexity_approx",
+        "nested_symbols",
+    ),
+    "python_imports.csv": (
+        "source_file", "source_module", "line", "import_type",
+        "imported_module", "imported_name", "alias", "level",
+        "resolved_file", "resolution_status",
+    ),
+    "python_calls.csv": (
+        "caller_file", "caller_symbol", "line", "call_expression",
+        "callee_simple_name", "candidate_file", "candidate_symbol",
+        "confidence", "explanation",
+    ),
+    "entrypoint_candidates.csv": ("relative_path", "reason"),
+    "parse_warnings.csv": ("relative_path", "line", "column", "message"),
+    "chunk_manifest.csv": (
+        "source_relative_path", "chunk_relative_path", "chunk_number",
+        "start_line", "end_line", "overlap_lines", "symbols",
+        "source_sha256", "chunk_sha256", "char_count", "estimated_tokens",
+    ),
+}
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + f".tmp{__import__('os').getpid()}")
+    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(text)
+    tmp.replace(path)
+
+
+def atomic_write_bytes(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + f".tmp{__import__('os').getpid()}")
+    with open(tmp, "wb") as fh:
+        fh.write(data)
+    tmp.replace(path)
+
+
+def estimate_tokens(char_count: int) -> int:
+    return max(1, round(char_count / 4))
+
+
+def get_git_info(root: Path, timeout: float = 5.0, exclude_paths: Optional[list] = None) -> dict:
+    """Best-effort, read-only git metadata for the scanned root: current
+    commit hash and dirty-worktree state. Never raises -- any failure
+    (not a git repo, git not installed, timeout) yields
+    {"available": False}. Used only for provenance/freshness reporting,
+    never to gate whether a scan or packet can run.
+
+    exclude_paths: repo-relative directories to exclude from the
+    dirty-worktree determination (e.g. this tool's own --output directory,
+    or graphify-out/ -- both are routinely rewritten by this tool's own
+    normal operation, so dirtiness confined to them says nothing about
+    whether the scanned *source* changed; see generated_output_exclude_paths()).
+    """
+    import subprocess
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=str(root), capture_output=True,
+            text=True, timeout=timeout,
+        )
+        if commit.returncode != 0:
+            return {"available": False}
+        status_cmd = ["git", "status", "--porcelain"]
+        if exclude_paths:
+            status_cmd.append("--")
+            status_cmd.extend(f":(exclude){p}" for p in exclude_paths)
+        status = subprocess.run(
+            status_cmd, cwd=str(root), capture_output=True,
+            text=True, timeout=timeout,
+        )
+        dirty = bool(status.stdout.strip()) if status.returncode == 0 else None
+        return {
+            "available": True,
+            "commit": commit.stdout.strip(),
+            "dirty": dirty,
+        }
+    except (OSError, subprocess.SubprocessError):
+        return {"available": False}
+
+
+def generated_output_exclude_paths(root: Path, output_dir: Path) -> list:
+    """Repo-relative paths get_git_info()'s dirty-worktree check should
+    exclude: the configured --output directory (if it's inside root) and
+    graphify-out/ (Graphify's own generated artifacts -- see AGENTS.md's
+    "dirty graphify-out/ files are expected" note for this exact
+    repository). Both are routinely rewritten as a side effect of this
+    tool's own (or Graphify's own) normal operation; if that's the only
+    thing making the worktree look dirty, callers like the Graphify
+    revision-alignment check would otherwise withhold evidence for a
+    reason that has nothing to do with the scanned source changing."""
+    excludes = ["graphify-out"]
+    try:
+        rel = output_dir.resolve().relative_to(root.resolve())
+        excludes.append(str(rel).replace("\\", "/"))
+    except ValueError:
+        pass  # output_dir isn't inside root -- nothing to exclude for it
+    return excludes

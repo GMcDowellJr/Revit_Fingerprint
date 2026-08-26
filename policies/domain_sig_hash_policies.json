@@ -18,27 +18,66 @@
         "block_if_any_required_not_ok": true
       },
       "notes": [
-        "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "D-049: domains/arrowheads.py captures width_angle_deg/fill_tick/arrow_closed/",
+        "tick_mark_centered/heavy_end_pen_weight into identity_basis.items UNCONDITIONALLY for every",
+        "record, regardless of style bucket -- the earlier assumption that these fields are 'never",
+        "unconditionally applicable' (see policies/domain_join_key_policies.json's own arrowheads",
+        "notes, corrected in the same PR) is confirmed wrong for fill_tick, which genuinely varies on",
+        "at least one SizeOnly style (Dot). Which of a given record's fields actually feed sig_hash is",
+        "still gated by style-bucket ownership: the inline extractor applies this via its own",
+        "hardcoded _ARROW_BUCKET_HASH_KEYS/_TICK_BUCKET_HASH_KEYS, and -- as of this policy version --",
+        "shape_gating.applies_to_sig_hash (below) makes core/sig_hash_builder.py's analysis-side",
+        "reconstruction apply the identical per-record filter (see _shape_gated_hash_keys() in that",
+        "module), so the two hash computations stay consistent for every style bucket. Before",
+        "applies_to_sig_hash was added, shape_gating here was purely informational/discovery-only and",
+        "the analysis-side builder ignored it entirely -- harmless only as long as gated fields were",
+        "absent from identity_basis.items for non-owning buckets, which D-049 changed (a P1 review",
+        "finding on the D-049 PR caught the resulting divergence before it shipped).",
+        "default_shape_behavior (common_only) still also governs BLOCKING semantics",
+        "(minima.block_if_any_required_not_ok) per shape via required_items/additional_required --",
+        "unchanged by D-049, which only affects what's captured/hashed, not what's required.",
+        "Confirm with sig-target discovery before treating additional_required as final."
       ],
       "required_items": [
         "arrowhead.style",
         "arrowhead.tick_size_in"
       ],
-      "sig_hash_schema": "arrowheads.sig_hash.v1"
+      "shape_gating": {
+        "discriminator_key": "arrowhead.style",
+        "applies_to_sig_hash": true,
+        "shape_requirements": {
+          "Arrow": {
+            "additional_required": [
+              "arrowhead.width_angle_deg",
+              "arrowhead.fill_tick",
+              "arrowhead.arrow_closed"
+            ],
+            "additional_optional": [],
+            "notes": [
+              "Arrow record class: arrow-specific geometry and closure/fill flags are required for sig_hash identity."
+            ]
+          },
+          "Heavy end tick mark": {
+            "additional_required": [
+              "arrowhead.tick_mark_centered",
+              "arrowhead.heavy_end_pen_weight"
+            ],
+            "additional_optional": [],
+            "notes": [
+              "Heavy end tick mark record class: centered tick and pen weight are required for sig_hash identity."
+            ]
+          }
+        },
+        "default_shape_behavior": "common_only"
+      },
+      "sig_hash_schema": "arrowheads.sig_hash.v2"
     },
     "ceiling_types": {
       "allowed_item_prefixes": [],
       "allowed_items": [
         "ct.layer_count",
         "ct.total_thickness_in",
-        "ct.stack_hash_loose",
-        "ct.total_layer_rows",
-        "ct.stack_hash_strict",
-        "ct.stack_hash_function_only",
-        "ct.coarse_fill_pattern_sig_hash",
-        "ct.type_name",
-        "ct.coarse_fill_color_rgb"
+        "ct.stack_hash_loose"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -46,14 +85,22 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "allowed_items narrowed to contracts/domain_identity_keys_v2.json's sig_hash_keys override",
+        "(D-039): the compound_types extractor (domains/ceiling_types.py) already hashes only this",
+        "3-key 'semantic' bucket inline (ct.type_name/ct.coarse_fill_color_rgb are cosmetic,",
+        "ct.total_layer_rows/ct.stack_hash_strict/ct.stack_hash_function_only/",
+        "ct.coarse_fill_pattern_sig_hash are coordination) -- prior allowed_items mechanically",
+        "mirrored the full identity_basis.items set (no sig_hash_keys override existed yet),",
+        "which meant a post-stage sig_hash recompute would have hashed the type's own display",
+        "name into sig_hash, unlike the extractor's own inline value. See CHANGELOG.md."
       ],
       "required_items": [
         "ct.layer_count",
         "ct.total_thickness_in",
         "ct.stack_hash_loose"
       ],
-      "sig_hash_schema": "ceiling_types.sig_hash.v1"
+      "sig_hash_schema": "ceiling_types.sig_hash.v2"
     },
     "dimension_types_angular": {
       "allowed_item_prefixes": [],
@@ -489,17 +536,9 @@
     "floor_types": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "ft.function",
         "ft.layer_count",
         "ft.total_thickness_in",
-        "ft.stack_hash_loose",
-        "ft.total_layer_rows",
-        "ft.stack_hash_strict",
-        "ft.stack_hash_function_only",
-        "ft.coarse_fill_pattern_sig_hash",
-        "ft.has_embedded_sweeps",
-        "ft.type_name",
-        "ft.coarse_fill_color_rgb"
+        "ft.stack_hash_loose"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -507,14 +546,22 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "allowed_items narrowed to contracts/domain_identity_keys_v2.json's sig_hash_keys override",
+        "(D-039): the compound_types extractor (domains/floor_types.py) already hashes only this",
+        "3-key 'semantic' bucket inline (ft.type_name/ft.coarse_fill_color_rgb are cosmetic;",
+        "ft.function/ft.total_layer_rows/ft.stack_hash_strict/ft.stack_hash_function_only/",
+        "ft.coarse_fill_pattern_sig_hash/ft.has_embedded_sweeps are coordination) -- prior",
+        "allowed_items mechanically mirrored the full identity_basis.items set (no sig_hash_keys",
+        "override existed yet), which meant a post-stage sig_hash recompute would have hashed the",
+        "type's own display name into sig_hash, unlike the extractor's own inline value. See CHANGELOG.md."
       ],
       "required_items": [
         "ft.layer_count",
         "ft.total_thickness_in",
         "ft.stack_hash_loose"
       ],
-      "sig_hash_schema": "floor_types.sig_hash.v1"
+      "sig_hash_schema": "floor_types.sig_hash.v2"
     },
     "identity": {
       "allowed_item_prefixes": [],
@@ -546,12 +593,29 @@
         "sig_hash is computed post-extraction from canonical identity_basis.items.",
         "project_info.* added by D-025 (identity domain expansion); hand-patched here rather than",
         "via a full tools/generate_sig_hash_policy.py regen, which would also clobber unrelated",
-        "hand-tuned notes on other domains that have drifted from a strict mechanical regen."
+        "hand-tuned notes on other domains that have already drifted from a strict mechanical regen.",
+        "shape_gating added pending discovery evidence (see conversation log / prospective D-0xx):",
+        "not yet consumed by core/sig_hash_builder.py -- currently informational/discovery-only."
       ],
       "required_items": [
         "identity.is_workshared"
       ],
-      "sig_hash_schema": "identity.sig_hash.v2"
+      "shape_gating": {
+        "discriminator_key": "identity.is_workshared",
+        "shape_requirements": {
+          "true": {
+            "additional_required": [
+              "identity.revit_version_number"
+            ],
+            "additional_optional": [],
+            "notes": [
+              "Workshared models require version number in sig_hash identity."
+            ]
+          }
+        },
+        "default_shape_behavior": "common_only"
+      },
+      "sig_hash_schema": "identity.sig_hash.v3"
     },
     "line_patterns": {
       "allowed_item_prefixes": [],
@@ -582,10 +646,9 @@
     "line_styles": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "line_style.weight.projection",
-        "line_style.color.rgb",
-        "line_style.weight.cut",
-        "line_style.pattern_ref.sig_hash"
+        "line_style.pattern_ref.kind",
+        "line_style.pattern_ref.sig_hash",
+        "line_style.weight.projection"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -593,14 +656,23 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "D-047: allowed_items corrected to match domains/line_styles.py's actual inline",
+        "sig_hash preimage (LINE_STYLE_SEMANTIC_KEYS) -- previously included",
+        "line_style.color.rgb/weight.cut (never hashed by the extractor; weight.cut is",
+        "not even emitted -- see the commented-out identity_items.append call) and",
+        "omitted line_style.pattern_ref.kind (hashed by the extractor since this domain",
+        "was written, but missing from allowed_keys entirely, so validate_record_v2()",
+        "rejected every real line_styles record with identity.key.not_allowed --",
+        "found via automated PR review while pinning sig_hash_keys against a separate,",
+        "unrelated widening risk on pattern_ref.synopsis)."
       ],
       "required_items": [
         "line_style.weight.projection",
         "line_style.color.rgb",
         "line_style.pattern_ref.sig_hash"
       ],
-      "sig_hash_schema": "line_styles.sig_hash.v1"
+      "sig_hash_schema": "line_styles.sig_hash.v2"
     },
     "loaded_family_types": {
       "allowed_item_prefixes": [],
@@ -614,7 +686,9 @@
         "lft.family_symbol_count",
         "lft.type_count",
         "lft.structural_material_type",
-        "lft.is_active"
+        "lft.is_active",
+        "lft.can_have_structural_section",
+        "lft.has_thermal_properties"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -628,7 +702,7 @@
         "lft.shape_gate.category",
         "lft.type_parameter_schema_hash"
       ],
-      "sig_hash_schema": "loaded_family_types.sig_hash.v2"
+      "sig_hash_schema": "loaded_family_types.sig_hash.v3"
     },
     "materials": {
       "allowed_item_prefixes": [],
@@ -655,7 +729,6 @@
     "object_styles_analytical": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.color.rgb",
         "obj_style.pattern_ref.sig_hash"
@@ -670,17 +743,22 @@
         "sig_hash_keys pinned in the registry to the pre-existing allowed_keys set so the Area 9",
         "additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name) register",
         "as identity_basis.items without widening the sig_hash preimage -- open design question,",
-        "see CHANGELOG.md/PR description."
+        "see CHANGELOG.md/PR description.",
+        "obj_style.row_key removed (D-042): it is name-derived (parent/subcategory Category.Name)",
+        "and was never hashed by the extractor's own inline computation (_NON_MODEL_SEMANTIC_KEYS);",
+        "the prior inclusion here had no sig_hash_keys history and no decision authorizing it --",
+        "an automated PR review on the D-040 PR caught that wiring ctx-provided policies into the",
+        "extractor would have made this latent divergence live. row_key remains required_items",
+        "(blocking) and fully present in identity_basis.items -- only excluded from the hash."
       ],
       "required_items": [
         "obj_style.row_key"
       ],
-      "sig_hash_schema": "object_styles_analytical.sig_hash.v1"
+      "sig_hash_schema": "object_styles_analytical.sig_hash.v2"
     },
     "object_styles_annotation": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.color.rgb",
         "obj_style.pattern_ref.sig_hash"
@@ -695,17 +773,22 @@
         "sig_hash_keys pinned in the registry to the pre-existing allowed_keys set so the Area 9",
         "additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name) register",
         "as identity_basis.items without widening the sig_hash preimage -- open design question,",
-        "see CHANGELOG.md/PR description."
+        "see CHANGELOG.md/PR description.",
+        "obj_style.row_key removed (D-042): it is name-derived (parent/subcategory Category.Name)",
+        "and was never hashed by the extractor's own inline computation (_NON_MODEL_SEMANTIC_KEYS);",
+        "the prior inclusion here had no sig_hash_keys history and no decision authorizing it --",
+        "an automated PR review on the D-040 PR caught that wiring ctx-provided policies into the",
+        "extractor would have made this latent divergence live. row_key remains required_items",
+        "(blocking) and fully present in identity_basis.items -- only excluded from the hash."
       ],
       "required_items": [
         "obj_style.row_key"
       ],
-      "sig_hash_schema": "object_styles_annotation.sig_hash.v1"
+      "sig_hash_schema": "object_styles_annotation.sig_hash.v2"
     },
     "object_styles_imported": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.color.rgb",
         "obj_style.pattern_ref.sig_hash"
@@ -720,17 +803,22 @@
         "sig_hash_keys pinned in the registry to the pre-existing allowed_keys set so the Area 9",
         "additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name) register",
         "as identity_basis.items without widening the sig_hash preimage -- open design question,",
-        "see CHANGELOG.md/PR description."
+        "see CHANGELOG.md/PR description.",
+        "obj_style.row_key removed (D-042): it is name-derived (parent/subcategory Category.Name)",
+        "and was never hashed by the extractor's own inline computation (_NON_MODEL_SEMANTIC_KEYS);",
+        "the prior inclusion here had no sig_hash_keys history and no decision authorizing it --",
+        "an automated PR review on the D-040 PR caught that wiring ctx-provided policies into the",
+        "extractor would have made this latent divergence live. row_key remains required_items",
+        "(blocking) and fully present in identity_basis.items -- only excluded from the hash."
       ],
       "required_items": [
         "obj_style.row_key"
       ],
-      "sig_hash_schema": "object_styles_imported.sig_hash.v1"
+      "sig_hash_schema": "object_styles_imported.sig_hash.v2"
     },
     "object_styles_model": {
       "allowed_item_prefixes": [],
       "allowed_items": [
-        "obj_style.row_key",
         "obj_style.weight.projection",
         "obj_style.weight.cut",
         "obj_style.color.rgb",
@@ -747,12 +835,18 @@
         "sig_hash_keys pinned in the registry to the pre-existing allowed_keys set so the Area 9",
         "additions (can_add_subcategory/has_material_quantities/is_cuttable/parent_name) register",
         "as identity_basis.items without widening the sig_hash preimage -- open design question,",
-        "see CHANGELOG.md/PR description."
+        "see CHANGELOG.md/PR description.",
+        "obj_style.row_key removed (D-042): it is name-derived (parent/subcategory Category.Name)",
+        "and was never hashed by the extractor's own inline computation (_MODEL_SEMANTIC_KEYS);",
+        "the prior inclusion here had no sig_hash_keys history and no decision authorizing it --",
+        "an automated PR review on the D-040 PR caught that wiring ctx-provided policies into the",
+        "extractor would have made this latent divergence live. row_key remains required_items",
+        "(blocking) and fully present in identity_basis.items -- only excluded from the hash."
       ],
       "required_items": [
         "obj_style.row_key"
       ],
-      "sig_hash_schema": "object_styles_model.sig_hash.v1"
+      "sig_hash_schema": "object_styles_model.sig_hash.v2"
     },
     "phase_filters": {
       "allowed_item_prefixes": [],
@@ -805,13 +899,7 @@
       "allowed_items": [
         "rt.layer_count",
         "rt.total_thickness_in",
-        "rt.stack_hash_loose",
-        "rt.total_layer_rows",
-        "rt.stack_hash_strict",
-        "rt.stack_hash_function_only",
-        "rt.coarse_fill_pattern_sig_hash",
-        "rt.type_name",
-        "rt.coarse_fill_color_rgb"
+        "rt.stack_hash_loose"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -819,14 +907,22 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "allowed_items narrowed to contracts/domain_identity_keys_v2.json's sig_hash_keys override",
+        "(D-039): the compound_types extractor (domains/roof_types.py) already hashes only this",
+        "3-key 'semantic' bucket inline (rt.type_name/rt.coarse_fill_color_rgb are cosmetic,",
+        "rt.total_layer_rows/rt.stack_hash_strict/rt.stack_hash_function_only/",
+        "rt.coarse_fill_pattern_sig_hash are coordination) -- prior allowed_items mechanically",
+        "mirrored the full identity_basis.items set (no sig_hash_keys override existed yet),",
+        "which meant a post-stage sig_hash recompute would have hashed the type's own display",
+        "name into sig_hash, unlike the extractor's own inline value. See CHANGELOG.md."
       ],
       "required_items": [
         "rt.layer_count",
         "rt.total_thickness_in",
         "rt.stack_hash_loose"
       ],
-      "sig_hash_schema": "roof_types.sig_hash.v1"
+      "sig_hash_schema": "roof_types.sig_hash.v2"
     },
     "text_types": {
       "allowed_item_prefixes": [],
@@ -1138,15 +1234,7 @@
         "wt.total_thickness_in",
         "wt.stack_hash_loose",
         "wt.wraps_at_inserts",
-        "wt.wraps_at_ends",
-        "wt.kind",
-        "wt.total_layer_rows",
-        "wt.stack_hash_strict",
-        "wt.stack_hash_function_only",
-        "wt.coarse_fill_pattern_sig_hash",
-        "wt.has_embedded_sweeps",
-        "wt.type_name",
-        "wt.coarse_fill_color_rgb"
+        "wt.wraps_at_ends"
       ],
       "hash_alg": "md5_utf8_join_pipe",
       "minima": {
@@ -1154,14 +1242,22 @@
       },
       "notes": [
         "Generated from contracts/domain_identity_keys_v2.json.",
-        "sig_hash is computed post-extraction from canonical identity_basis.items."
+        "sig_hash is computed post-extraction from canonical identity_basis.items.",
+        "allowed_items narrowed to contracts/domain_identity_keys_v2.json's sig_hash_keys override",
+        "(D-039): the compound_types extractor (domains/wall_types.py) already hashes only this",
+        "6-key 'semantic' bucket inline (wt.type_name/wt.coarse_fill_color_rgb are cosmetic;",
+        "wt.kind/wt.total_layer_rows/wt.stack_hash_strict/wt.stack_hash_function_only/",
+        "wt.coarse_fill_pattern_sig_hash/wt.has_embedded_sweeps are coordination) -- prior",
+        "allowed_items mechanically mirrored the full identity_basis.items set (no sig_hash_keys",
+        "override existed yet), which meant a post-stage sig_hash recompute would have hashed the",
+        "type's own display name into sig_hash, unlike the extractor's own inline value. See CHANGELOG.md."
       ],
       "required_items": [
         "wt.layer_count",
         "wt.total_thickness_in",
         "wt.stack_hash_loose"
       ],
-      "sig_hash_schema": "wall_types.sig_hash.v1"
+      "sig_hash_schema": "wall_types.sig_hash.v2"
     },
     "worksets": {
       "allowed_item_prefixes": [],
