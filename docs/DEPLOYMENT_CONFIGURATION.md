@@ -4,8 +4,26 @@
 
 Set `REVIT_FINGERPRINT_DEPLOYMENT_CONFIG` to an absolute or operator-resolved path
 to a deployment-local JSON file. The Dynamo runner is the only environment reader;
-it passes that path to `runner.extraction_context.build_extraction_context()`. The
-checked-in, closed schema is:
+it passes that path to `runner.extraction_context.build_extraction_context()`.
+
+There is no repo-tracked entry point that launches `runner/run_dynamo.py` -- it
+runs from a pasted Dynamo CPython3 node (`runner/thin_runner.py`) invoked via a
+pyRevit "BatchExtract" button, outside any `.ps1`/`.py` script committed here.
+`tools/corpus_update_runbook.ps1` and friends only orchestrate *post-export*
+analysis (`run_extract_all.py`, `build_segment_manifest.py`, etc.) against
+already-exported JSON, so setting this env var there has no effect on
+extraction. Set it one of two ways instead:
+
+- Node input: `runner/thin_runner.py`'s `IN[5]` forwards its value straight to
+  `REVIT_FINGERPRINT_DEPLOYMENT_CONFIG` before importing `runner.run_dynamo`
+  (same pattern as `IN[0]`'s output path). Point it at the local deployment
+  config file's path -- never paste the file's *contents* into the Dynamo
+  graph itself, since that would check deployment-authored data into an
+  executable graph if the graph is ever committed.
+- Machine/user environment variable, for any other invocation context.
+
+Either way the JSON file itself stays outside this repository. The
+checked-in, closed schema it must follow is:
 
 ```json
 {

@@ -137,6 +137,47 @@ except Exception:
     # Safe default: production on any thinrunner failure
     os.environ["REVIT_FINGERPRINT_OUTPUT_MODE"] = "production"
 
+# Optional: IN[5] provides the deployment config path (an operator-owned JSON
+# file living outside this repo -- see docs/DEPLOYMENT_CONFIGURATION.md).
+# Forwarded via REVIT_FINGERPRINT_DEPLOYMENT_CONFIG, the same operator/
+# environment boundary runner.extraction_context.operator_deployment_config_path()
+# already reads, so the file's contents (deployment-authored parameter names/
+# GUIDs) never need to be hardcoded into this pasted graph node or checked
+# into source control -- only the local file path is passed through here.
+#
+# Unlike IN[0]/IN[1]/IN[2]/IN[4] (which thin_runner fully owns), this variable
+# has a second supported source: a machine/user environment variable set once
+# outside this graph (docs/DEPLOYMENT_CONFIGURATION.md). A blank/disconnected
+# IN[5] must fall back to whatever THAT was -- not to whatever a prior run of
+# this same pasted node happened to set. Revit/Dynamo keeps this CPython
+# process alive across repeated Play-button runs within one session (see the
+# sys.modules reload dance below, which exists for the same reason), so a
+# plain "set on non-blank, else leave alone" would leak one file's
+# node-supplied config into the next file's extraction once IN[5] is later
+# blanked without restarting Revit. Snapshot whatever was inherited exactly
+# once per process, in private env vars that survive re-runs the same way
+# sys.modules does, and restore -- never just leave stale -- whenever IN[5]
+# stops supplying an override.
+_DEPLOY_CFG_VAR = "REVIT_FINGERPRINT_DEPLOYMENT_CONFIG"
+_DEPLOY_CFG_INHERITED_FLAG = "_REVIT_FINGERPRINT_DEPLOYMENT_CONFIG_INHERITED_PRESENT"
+_DEPLOY_CFG_INHERITED_VALUE = "_REVIT_FINGERPRINT_DEPLOYMENT_CONFIG_INHERITED_VALUE"
+try:
+    if _DEPLOY_CFG_INHERITED_FLAG not in os.environ:
+        if _DEPLOY_CFG_VAR in os.environ:
+            os.environ[_DEPLOY_CFG_INHERITED_FLAG] = "1"
+            os.environ[_DEPLOY_CFG_INHERITED_VALUE] = os.environ[_DEPLOY_CFG_VAR]
+        else:
+            os.environ[_DEPLOY_CFG_INHERITED_FLAG] = "0"
+
+    if IN is not None and len(IN) > 5 and IN[5] is not None and str(IN[5]).strip():
+        os.environ[_DEPLOY_CFG_VAR] = str(IN[5]).strip()
+    elif os.environ.get(_DEPLOY_CFG_INHERITED_FLAG) == "1":
+        os.environ[_DEPLOY_CFG_VAR] = os.environ.get(_DEPLOY_CFG_INHERITED_VALUE, "")
+    else:
+        os.environ.pop(_DEPLOY_CFG_VAR, None)
+except Exception:
+    pass
+
 # MUST be the repo root that contains: core/, domains/, runner/
 # Dynamo-node safe behavior:
 #  - No __file__ reliance (this code is pasted into a Dynamo Python node)
