@@ -44,6 +44,7 @@ from core.record_v2 import (
     canonicalize_str,
     canonicalize_int,
     canonicalize_float,
+    canonicalize_bool,
     make_identity_item,
     serialize_identity_items,
     build_record_v2,
@@ -485,8 +486,28 @@ def extract(doc, ctx=None):
         # same is_import_v/is_import_q values here for the coordination_items
         # explainability bucket, matching other domains' pattern of duplicating
         # an identity item's k/q/v into a phase2 bucket for BI convenience.
+
+        # is_solid: coordination-only filter criterion (mirrors
+        # fill_patterns.py's is_solid), not identity. The true built-in Solid
+        # pattern has no LinePatternElement (see line_styles.py's
+        # GetLinePatternId handling) and so never reaches this per-instance
+        # loop at all -- this field can only describe *collected* patterns
+        # that render as solid. Per the documented segment semantics in
+        # tools/label_synthesis/domain_prompts/line_patterns.py ("a
+        # single-segment pattern is a solid line -- no actual dashes"),
+        # that means segment_count of 0 or 1, gated on seg_count_q so an
+        # unreadable segment count reports q=unreadable rather than False.
+        if seg_count_q == ITEM_Q_OK:
+            try:
+                is_solid_v, is_solid_q = canonicalize_bool(int(seg_count_v) <= 1)
+            except Exception:
+                is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
+        else:
+            is_solid_v, is_solid_q = (None, ITEM_Q_UNREADABLE)
+
         lp_coordination_items = [
             make_identity_item("lp.is_import", is_import_v, is_import_q),
+            make_identity_item("lp.is_solid", is_solid_v, is_solid_q),
         ]
 
         rec_v2["phase2"] = {
