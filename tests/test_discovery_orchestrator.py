@@ -2,6 +2,7 @@ import csv
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -214,6 +215,41 @@ def test_invoke_keeps_fake_runner_support_for_fast_orchestration_tests(tmp_path,
     log=tmp_path/"fake.log";orchestrator._invoke(["fake","command"],log)
     assert calls and log.read_text()=="fake output\n"
     assert "fake output" in capsys.readouterr().out
+
+
+def test_invoke_terminates_promptly_when_interrupt_event_is_set(tmp_path,monkeypatch):
+    exports,repo,_=fixture_inputs(tmp_path)
+    orchestrator=Orchestrator(Config(exports,repo,exports/"suggestions.csv"))
+    monkeypatch.setattr("tools.discovery_orchestrator.PROGRESS_HEARTBEAT_SECONDS",0.01)
+    orchestrator._interrupt_event.set()
+    log=tmp_path/"logs/invoke.log"
+    started=time.monotonic()
+    with pytest.raises(KeyboardInterrupt):
+        orchestrator._invoke([sys.executable,"-c","import time; time.sleep(5)"],log)
+    assert time.monotonic()-started<2, "interrupted worker must not wait for the subprocess to finish"
+
+
+def test_run_sweep_interrupt_propagates_and_marks_interrupt_event(tmp_path):
+    exports,repo,_=fixture_inputs(tmp_path)
+    suggestions=exports/"diagnostics/discovery_param_suggestions.csv"
+    _write(suggestions,["domain","suggested_sample_size","suggested_max_candidate_fields",
+                        "suggested_max_k_discover","suggested_max_k_harsh_validate","stratify_by_recommended"],
+           [{"domain":"walls","suggested_sample_size":"2","suggested_max_candidate_fields":"2",
+             "suggested_max_k_discover":"1","suggested_max_k_harsh_validate":"1","stratify_by_recommended":""}])
+
+    def raising_stage(self,target,domain,mode,params,run_dir,cache,manifest):
+        raise KeyboardInterrupt("user interrupt")
+
+    import tools.discovery_orchestrator as module
+    original_stage=module.Orchestrator._stage
+    module.Orchestrator._stage=raising_stage
+    try:
+        orchestrator=Orchestrator(Config(exports,repo,suggestions,domains=["walls"],run=True,workers=1))
+        with pytest.raises(KeyboardInterrupt):
+            orchestrator.run_sweep()
+        assert orchestrator._interrupt_event.is_set()
+    finally:
+        module.Orchestrator._stage=original_stage
 
 
 def test_orchestrator_scans_each_large_fingerprint_csv_only_once(tmp_path,monkeypatch):
