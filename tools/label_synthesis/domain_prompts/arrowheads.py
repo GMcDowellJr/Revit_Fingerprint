@@ -35,8 +35,13 @@ Name is excluded from the join key; fragmentation is purely a naming problem.
 # RECORD CLASSES — THREE TYPES
 
 Arrowheads fall into three record classes based on their style. The identity items
-you see depend entirely on the record class. Sparse items are NOT missing data —
-they are the complete and correct identity for that class.
+you're shown below are only the ones that read as present for THIS record (fields
+that aren't applicable to a given style's UI usually come back unset for that
+style, and are filtered out before you see them) — a sparse list is normal, not
+missing data. Occasionally a style-specific field reads as genuinely present
+outside its usual class (e.g. fill_tick has been observed to vary on some Dot
+types); when that happens it's real data and worth naming on, even though it
+still isn't part of that style's join key.
 
 CLASS 1 — Arrow
   Style: "Arrow"
@@ -52,11 +57,17 @@ CLASS 2 — Heavy end tick mark
 
 CLASS 3 — SizeOnly
   Styles: "Dot", "Diagonal", "Box", "Loop", "Elevation Target", "Datum triangle"
-  Identity items: style + tick_size_in ONLY — no other fields are applicable.
-  These styles have no fill/angle/centered properties in Revit's UI.
-  The join key for each is fully defined by style + size. Two Dots at different sizes
-  are distinct patterns; two Dots at the same size with different names are the same
-  governance pattern. Name by style + size.
+  Identity items you'll normally use: style + tick_size_in. The other fields
+  (width_angle_deg/fill_tick/arrow_closed/tick_mark_centered/heavy_end_pen_weight)
+  are always present but usually read as missing/unset for these styles — that's
+  expected, not an error. Occasionally one genuinely varies (fill_tick is
+  confirmed to vary on some Dot types, e.g. an observed "Dot Filled-Small" type) —
+  when a field shows up with a real value for a SizeOnly record, treat it as a
+  legitimate differentiator for naming, even though it is not part of this
+  style's join key. The join key for each is still fully defined by style + size.
+  Two Dots at different sizes are distinct patterns; two Dots at the same size
+  with different names are the same governance pattern. Name by style + size,
+  adding a genuinely-present differentiator (like "Filled") when it helps.
 
 # KEY PARAMETERS
 
@@ -75,23 +86,25 @@ arrowhead.tick_size_in
     1/4"  — large
   Include size in the name when multiple sizes of the same style exist in the corpus.
 
-arrowhead.width_angle_deg  [Arrow class only]
+arrowhead.width_angle_deg  [normally Arrow class]
   The opening angle of the arrowhead in degrees. Common values: 15°, 30°, 45°, 60°.
   Narrow angles (15°–20°) are slender/precise; wide angles (45°+) are bold.
   Include angle only when it differentiates patterns in the corpus.
 
-arrowhead.fill_tick  [Arrow class only]
-  true = filled (solid) arrow, false = open arrow.
-  This is a primary discriminator for arrow class: "Filled Arrow" vs "Open Arrow".
+arrowhead.fill_tick  [normally Arrow class, but confirmed to also appear on Dot]
+  true = filled (solid), false = open.
+  For Arrow class, this is a primary discriminator: "Filled Arrow" vs "Open Arrow".
+  When it appears with a real value outside Arrow class (e.g. on a Dot), treat it
+  the same way: "Filled Dot" vs plain "Dot".
 
-arrowhead.arrow_closed  [Arrow class only]
+arrowhead.arrow_closed  [normally Arrow class]
   true = closed outline, false = open sides.
   Usually secondary to fill_tick.
 
-arrowhead.tick_mark_centered  [Heavy end tick mark class only]
+arrowhead.tick_mark_centered  [normally Heavy end tick mark class]
   true = centered on element, false = offset.
 
-arrowhead.heavy_end_pen_weight  [Heavy end tick mark class only]
+arrowhead.heavy_end_pen_weight  [normally Heavy end tick mark class]
   Integer pen weight for the thick end of the tick.
 
 # NAMING CONVENTIONS AT ENGINEERING FIRMS
@@ -232,8 +245,10 @@ def build_prompt(
     if record_class == "SizeOnly":
         lines.append(
             "NOTE: This is a SizeOnly arrowhead style (Dot, Diagonal, Box, Loop, etc.).\n"
-            "Only style and size appear as identity items — this is complete and correct,\n"
-            "not missing data. No fill/angle/centered fields apply to this style."
+            "Usually only style and size appear below — that's complete and correct,\n"
+            "not missing data. Occasionally another field (e.g. Filled) shows up with a\n"
+            "real value for this style too; if it does, treat it as genuine and name on it —\n"
+            "it just isn't part of this style's join key."
         )
         lines.append("")
 
@@ -288,11 +303,11 @@ def build_prompt(
 _PARAM_LABELS = {
     "arrowhead.style":              "Style",
     "arrowhead.tick_size_in":       "Size (inches)",
-    "arrowhead.width_angle_deg":    "Arrow width angle (degrees) [Arrow class]",
-    "arrowhead.fill_tick":          "Filled [Arrow class]",
-    "arrowhead.arrow_closed":       "Closed outline [Arrow class]",
-    "arrowhead.tick_mark_centered": "Centered [Heavy tick class]",
-    "arrowhead.heavy_end_pen_weight": "Heavy end pen weight [Heavy tick class]",
+    "arrowhead.width_angle_deg":    "Arrow width angle (degrees)",
+    "arrowhead.fill_tick":          "Filled",
+    "arrowhead.arrow_closed":       "Closed outline",
+    "arrowhead.tick_mark_centered": "Centered",
+    "arrowhead.heavy_end_pen_weight": "Heavy end pen weight",
 }
 
 _SKIP_KEYS = {

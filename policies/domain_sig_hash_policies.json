@@ -20,12 +20,19 @@
       "notes": [
         "shape_gating added pending discovery evidence (see conversation log / prospective D-0xx):",
         "not yet consumed by core/sig_hash_builder.py -- currently informational/discovery-only.",
-        "Extractor (domains/arrowheads.py) already routes width_angle_deg/fill_tick/arrow_closed and",
-        "tick_mark_centered/heavy_end_pen_weight into identity_items per-style via STYLE_BUCKET_* --",
-        "these fields already participate in the actual computed sig_hash today regardless of this",
-        "policy's required_items/shape_gating declaration; what shape_gating would add here is",
+        "D-049: as of this policy version, domains/arrowheads.py captures width_angle_deg/fill_tick/",
+        "arrow_closed/tick_mark_centered/heavy_end_pen_weight into identity_basis.items",
+        "UNCONDITIONALLY for every record, regardless of style bucket -- the earlier assumption that",
+        "these fields are 'never unconditionally applicable' (see policies/domain_join_key_policies.json's",
+        "own arrowheads notes, corrected in the same PR) is confirmed wrong for fill_tick, which",
+        "genuinely varies on at least one SizeOnly style (Dot). Whether a given record's fields",
+        "actually feed sig_hash is still gated by style-bucket ownership -- via the extractor's own",
+        "hardcoded _ARROW_BUCKET_HASH_KEYS/_TICK_BUCKET_HASH_KEYS, NOT via this policy's shape_gating",
+        "block, which remains uninvolved in that decision (informational/discovery-only, as above).",
         "governed BLOCKING semantics (minima.block_if_any_required_not_ok) per shape, not new hash",
-        "coverage. Confirm with sig-target discovery before treating additional_required as final."
+        "coverage; default_shape_behavior (common_only) describes only that required-ness question --",
+        "it has no bearing on whether a style-specific field is captured, since D-049 made capture",
+        "unconditional. Confirm with sig-target discovery before treating additional_required as final."
       ],
       "required_items": [
         "arrowhead.style",
