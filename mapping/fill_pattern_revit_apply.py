@@ -117,11 +117,25 @@ _ORIGIN_KIND_XY = "xy"
 # Reading target + grids back from a live Revit FillPatternElement
 # ---------------------------------------------------------------------------
 
+_TARGET_INT_FALLBACK = {"0": "Drafting", "1": "Model"}
+
+
 def read_target_name(fp: Any) -> Optional[str]:
     """Read a live FillPattern's Target as the same "Drafting"/"Model" string
     domains/fill_patterns.py's own partitions use, mirroring
     tools/probes/probe_fill_patterns.py's enum-stringification convention
-    (prefer .ToString(), fall back to str())."""
+    (prefer .ToString(), fall back to str()).
+
+    Confirmed live (PR #443 review, real Dynamo/pythonnet run against
+    imperial_project_architectural_2014): in this environment
+    FillPatternTarget.ToString() returns the underlying integer ("0"/"1"),
+    not the enum member name ("Drafting"/"Model") -- every single
+    fill_patterns_drafting/fill_patterns_model mapping request blocked with
+    target_mismatch:0 / target_mismatch:1 until this fallback was added.
+    tools/probes/probe_fill_patterns.py already discovered and worked around
+    this exact quirk ("Some environments stringify enums as underlying
+    integers ('0'/'1'), so map those too") -- this mirrors that fix.
+    """
     try:
         tgt = fp.Target
     except Exception:
@@ -138,6 +152,8 @@ def read_target_name(fp: Any) -> Optional[str]:
         except Exception:
             return None
     name = str(name).strip()
+    if name in _TARGET_INT_FALLBACK:
+        name = _TARGET_INT_FALLBACK[name]
     return name or None
 
 

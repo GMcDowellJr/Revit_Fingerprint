@@ -230,6 +230,23 @@ could falsely pass verification, since the target string participates in the
 See `tests/test_fill_pattern_revit_apply_verification.py` for the regression
 coverage.
 
+### Real-environment quirk: `FillPatternTarget.ToString()` can return the raw integer
+
+Confirmed live against a real Dynamo/pythonnet session
+(`imperial_project_architectural_2014`): in that environment,
+`FillPattern.Target.ToString()` returns the underlying integer ("0" for
+Drafting, "1" for Model) rather than the enum member name -- every single
+`fill_patterns_drafting`/`fill_patterns_model` mapping request blocked with
+`target_mismatch:0`/`target_mismatch:1` until `read_target_name()` added a
+fallback mapping those integer strings back to `"Drafting"`/`"Model"`.
+`tools/probes/probe_fill_patterns.py` had already discovered and worked
+around this exact quirk ("Some environments stringify enums as underlying
+integers ('0'/'1'), so map those too") before this utility existed --
+`read_target_name()` now mirrors that same fallback. This is a `.ToString()`
+stringification quirk of the specific pythonnet/CLR interop environment, not
+a Revit-version-specific behavior difference; it should be assumed present
+in any Dynamo CPython3 host until proven otherwise.
+
 ## Naming
 
 Identical convention to `line_patterns` (`docs/line_pattern_mapping.md`):

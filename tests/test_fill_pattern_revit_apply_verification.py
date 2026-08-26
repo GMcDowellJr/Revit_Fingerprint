@@ -109,6 +109,19 @@ def test_read_target_name_none_when_target_missing():
     assert read_target_name(_NoTarget()) is None
 
 
+def test_read_target_name_maps_integer_stringification_to_name():
+    # Regression for PR #443 review: confirmed live against a real Dynamo/
+    # pythonnet session that FillPatternTarget.ToString() can return the
+    # underlying integer ("0"/"1") rather than the enum member name in this
+    # environment -- every single real mapping request blocked with
+    # target_mismatch:0/1 until this fallback was added (matching the same
+    # quirk tools/probes/probe_fill_patterns.py already worked around).
+    drafting_fp = _MockFillPattern("0", [])
+    model_fp = _MockFillPattern("1", [])
+    assert read_target_name(drafting_fp) == "Drafting"
+    assert read_target_name(model_fp) == "Model"
+
+
 # ---------------------------------------------------------------------------
 # read_fill_pattern_from_element
 # ---------------------------------------------------------------------------
@@ -187,6 +200,26 @@ def test_verify_element_join_hash_accepts_matching_target_and_grids():
 
     result = verify_element_join_hash(
         None, element, DOMAIN_DRAFTING, "Drafting", requested_join_hash, domain_policy=_domain_policy(DOMAIN_DRAFTING)
+    )
+    assert result.ok is True
+    assert result.verified_join_hash == requested_join_hash
+
+
+def test_verify_element_join_hash_accepts_integer_stringified_target():
+    # End-to-end regression for the real-environment "0"/"1" stringification
+    # quirk: an element whose Target.ToString() returns "1" must still verify
+    # successfully against the fill_patterns_model partition's expected
+    # "Model" target.
+    grids_def_hash = compute_grids_def_hash(2, _SAMPLE_RECONSTRUCTED_GRIDS)
+    requested_join_hash, _, _ = compute_join_hash_for_grids(
+        DOMAIN_MODEL, "Model", 2, grids_def_hash, domain_policy=_domain_policy(DOMAIN_MODEL)
+    )
+
+    fp = _MockFillPattern("1", _SAMPLE_MOCK_GRIDS)
+    element = _MockElement(fp)
+
+    result = verify_element_join_hash(
+        None, element, DOMAIN_MODEL, "Model", requested_join_hash, domain_policy=_domain_policy(DOMAIN_MODEL)
     )
     assert result.ok is True
     assert result.verified_join_hash == requested_join_hash
