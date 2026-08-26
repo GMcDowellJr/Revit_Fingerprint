@@ -137,6 +137,21 @@ except Exception:
     # Safe default: production on any thinrunner failure
     os.environ["REVIT_FINGERPRINT_OUTPUT_MODE"] = "production"
 
+# Optional: IN[5] provides the deployment config path (an operator-owned JSON
+# file living outside this repo -- see docs/DEPLOYMENT_CONFIGURATION.md).
+# Forwarded via REVIT_FINGERPRINT_DEPLOYMENT_CONFIG, the same operator/
+# environment boundary runner.extraction_context.operator_deployment_config_path()
+# already reads, so the file's contents (deployment-authored parameter names/
+# GUIDs) never need to be hardcoded into this pasted graph node or checked
+# into source control -- only the local file path is passed through here.
+try:
+    if IN is not None and len(IN) > 5 and IN[5] is not None and str(IN[5]).strip():
+        os.environ["REVIT_FINGERPRINT_DEPLOYMENT_CONFIG"] = str(IN[5]).strip()
+    else:
+        os.environ.pop("REVIT_FINGERPRINT_DEPLOYMENT_CONFIG", None)
+except Exception:
+    os.environ.pop("REVIT_FINGERPRINT_DEPLOYMENT_CONFIG", None)
+
 # MUST be the repo root that contains: core/, domains/, runner/
 # Dynamo-node safe behavior:
 #  - No __file__ reliance (this code is pasted into a Dynamo Python node)
