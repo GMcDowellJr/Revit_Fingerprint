@@ -144,14 +144,37 @@ except Exception:
 # already reads, so the file's contents (deployment-authored parameter names/
 # GUIDs) never need to be hardcoded into this pasted graph node or checked
 # into source control -- only the local file path is passed through here.
-# Unlike IN[0]/IN[1]/IN[2]/IN[4] (which thin_runner fully owns and therefore
-# resets to a default when unset), a blank/missing IN[5] deliberately leaves
-# any inherited machine/user environment variable alone -- that is the other
-# supported way to set this per docs/DEPLOYMENT_CONFIGURATION.md, and this
-# node must not silently disable it.
+#
+# Unlike IN[0]/IN[1]/IN[2]/IN[4] (which thin_runner fully owns), this variable
+# has a second supported source: a machine/user environment variable set once
+# outside this graph (docs/DEPLOYMENT_CONFIGURATION.md). A blank/disconnected
+# IN[5] must fall back to whatever THAT was -- not to whatever a prior run of
+# this same pasted node happened to set. Revit/Dynamo keeps this CPython
+# process alive across repeated Play-button runs within one session (see the
+# sys.modules reload dance below, which exists for the same reason), so a
+# plain "set on non-blank, else leave alone" would leak one file's
+# node-supplied config into the next file's extraction once IN[5] is later
+# blanked without restarting Revit. Snapshot whatever was inherited exactly
+# once per process, in private env vars that survive re-runs the same way
+# sys.modules does, and restore -- never just leave stale -- whenever IN[5]
+# stops supplying an override.
+_DEPLOY_CFG_VAR = "REVIT_FINGERPRINT_DEPLOYMENT_CONFIG"
+_DEPLOY_CFG_INHERITED_FLAG = "_REVIT_FINGERPRINT_DEPLOYMENT_CONFIG_INHERITED_PRESENT"
+_DEPLOY_CFG_INHERITED_VALUE = "_REVIT_FINGERPRINT_DEPLOYMENT_CONFIG_INHERITED_VALUE"
 try:
+    if _DEPLOY_CFG_INHERITED_FLAG not in os.environ:
+        if _DEPLOY_CFG_VAR in os.environ:
+            os.environ[_DEPLOY_CFG_INHERITED_FLAG] = "1"
+            os.environ[_DEPLOY_CFG_INHERITED_VALUE] = os.environ[_DEPLOY_CFG_VAR]
+        else:
+            os.environ[_DEPLOY_CFG_INHERITED_FLAG] = "0"
+
     if IN is not None and len(IN) > 5 and IN[5] is not None and str(IN[5]).strip():
-        os.environ["REVIT_FINGERPRINT_DEPLOYMENT_CONFIG"] = str(IN[5]).strip()
+        os.environ[_DEPLOY_CFG_VAR] = str(IN[5]).strip()
+    elif os.environ.get(_DEPLOY_CFG_INHERITED_FLAG) == "1":
+        os.environ[_DEPLOY_CFG_VAR] = os.environ.get(_DEPLOY_CFG_INHERITED_VALUE, "")
+    else:
+        os.environ.pop(_DEPLOY_CFG_VAR, None)
 except Exception:
     pass
 
