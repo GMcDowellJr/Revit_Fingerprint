@@ -144,13 +144,16 @@ except Exception:
 # already reads, so the file's contents (deployment-authored parameter names/
 # GUIDs) never need to be hardcoded into this pasted graph node or checked
 # into source control -- only the local file path is passed through here.
+# Unlike IN[0]/IN[1]/IN[2]/IN[4] (which thin_runner fully owns and therefore
+# resets to a default when unset), a blank/missing IN[5] deliberately leaves
+# any inherited machine/user environment variable alone -- that is the other
+# supported way to set this per docs/DEPLOYMENT_CONFIGURATION.md, and this
+# node must not silently disable it.
 try:
     if IN is not None and len(IN) > 5 and IN[5] is not None and str(IN[5]).strip():
         os.environ["REVIT_FINGERPRINT_DEPLOYMENT_CONFIG"] = str(IN[5]).strip()
-    else:
-        os.environ.pop("REVIT_FINGERPRINT_DEPLOYMENT_CONFIG", None)
 except Exception:
-    os.environ.pop("REVIT_FINGERPRINT_DEPLOYMENT_CONFIG", None)
+    pass
 
 # MUST be the repo root that contains: core/, domains/, runner/
 # Dynamo-node safe behavior:
