@@ -244,6 +244,89 @@ def test_resolve_sig_hash_keys_resolves_allowed_item_prefixes_against_candidate_
     assert result == sorted(["vf.category_id", "vf.rule[0].param", "vf.rule[1].op"])
 
 
+def _shape_gated_policy(applies_to_sig_hash):
+    return {
+        "sig_hash_schema": "x.sig_hash.v1",
+        "hash_alg": "md5_utf8_join_pipe",
+        "allowed_items": ["common", "gated_a", "gated_b"],
+        "allowed_item_prefixes": [],
+        "required_items": ["common"],
+        "minima": {"block_if_any_required_not_ok": True},
+        "shape_gating": {
+            "discriminator_key": "shape",
+            "applies_to_sig_hash": applies_to_sig_hash,
+            "shape_requirements": {
+                "Owner": {
+                    "additional_required": ["gated_a"],
+                    "additional_optional": [],
+                },
+                "OtherOwner": {
+                    "additional_required": ["gated_b"],
+                    "additional_optional": [],
+                },
+            },
+            "default_shape_behavior": "common_only",
+        },
+    }
+
+
+def test_sig_hash_builder_shape_gating_excludes_keys_not_owned_by_records_own_shape():
+    # D-049 P1 fix: a policy that opts in via shape_gating.applies_to_sig_hash
+    # must exclude a gated key from the hash preimage when the record's own
+    # discriminator value doesn't own it -- even though the key is present
+    # on the record and listed in allowed_items. This is what keeps the
+    # analysis-side sig_hash stage consistent with a domain extractor (e.g.
+    # domains/arrowheads.py) that now emits every style-specific field
+    # unconditionally but still hash-gates by bucket ownership.
+    policy = _shape_gated_policy(applies_to_sig_hash=True)
+    items = [
+        make_identity_item("common", "1", ITEM_Q_OK),
+        make_identity_item("shape", "NotOwner", ITEM_Q_OK),
+        make_identity_item("gated_a", "2", ITEM_Q_OK),
+        make_identity_item("gated_b", "3", ITEM_Q_OK),
+    ]
+    sig_hash, status, reasons, hash_items = build_sig_hash_from_policy(domain_policy=policy, items=items)
+    hashed_keys = [it["k"] for it in hash_items]
+    assert hashed_keys == ["common"]
+    assert status == "ok"
+    assert sig_hash == make_hash(serialize_identity_items([items[0]]))
+
+    # Same items, but the record's own shape now owns gated_a.
+    items_owner = [
+        make_identity_item("common", "1", ITEM_Q_OK),
+        make_identity_item("shape", "Owner", ITEM_Q_OK),
+        make_identity_item("gated_a", "2", ITEM_Q_OK),
+        make_identity_item("gated_b", "3", ITEM_Q_OK),
+    ]
+    sig_hash2, status2, _, hash_items2 = build_sig_hash_from_policy(domain_policy=policy, items=items_owner)
+    hashed_keys2 = [it["k"] for it in hash_items2]
+    assert hashed_keys2 == ["common", "gated_a"]
+    assert status2 == "ok"
+    assert sig_hash2 != sig_hash
+
+
+def test_sig_hash_builder_shape_gating_without_opt_in_flag_is_a_no_op():
+    # Without applies_to_sig_hash (the default/absent case -- e.g. today's
+    # `identity` domain policy), shape_gating must have zero effect: every
+    # allowed_items key hashes regardless of the record's shape. This is
+    # what keeps domains that haven't opted in (identity) byte-identical to
+    # their pre-D-049 analysis-side behavior.
+    policy = _shape_gated_policy(applies_to_sig_hash=False)
+    items = [
+        make_identity_item("common", "1", ITEM_Q_OK),
+        make_identity_item("shape", "NotOwner", ITEM_Q_OK),
+        make_identity_item("gated_a", "2", ITEM_Q_OK),
+        make_identity_item("gated_b", "3", ITEM_Q_OK),
+    ]
+    _sig_hash, _status, _reasons, hash_items = build_sig_hash_from_policy(domain_policy=policy, items=items)
+    assert [it["k"] for it in hash_items] == ["common", "gated_a", "gated_b"]
+
+    policy_no_flag = _shape_gated_policy(applies_to_sig_hash=False)
+    del policy_no_flag["shape_gating"]["applies_to_sig_hash"]
+    _sig_hash, _status, _reasons, hash_items2 = build_sig_hash_from_policy(domain_policy=policy_no_flag, items=items)
+    assert [it["k"] for it in hash_items2] == ["common", "gated_a", "gated_b"]
+
+
 def test_resolve_sig_hash_keys_real_policy_file_matches_hardcoded_fallbacks():
     """D-039/D-040/D-042 drift guard: for every domain that resolve_sig_hash_keys()
     is actually wired into (wall/floor/roof/ceiling_types, units, worksets,

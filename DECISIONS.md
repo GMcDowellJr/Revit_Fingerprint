@@ -2504,3 +2504,233 @@ ref-present/lookup-unreadable/missing logic. Added
   reference-read itself fails → unreadable; reference present but element
   unresolvable → missing/unreadable (D-046); element resolved but sig_hash
   lookup unresolved → missing/unreadable (D-044); fully resolved → ok.
+
+## D-049 — `arrowheads`: extract-always / gate-hash-separately for the five style-specific fields
+
+### Status
+Accepted (2026-08-26)
+
+### Context
+`domains/arrowheads.py` routes each arrowhead type into one of four record
+classes by style (`STYLE_BUCKET_ARROW`, `STYLE_BUCKET_TICK`,
+`STYLE_BUCKET_SIZE_ONLY`, and an `Unknown` catch-all). Before this change,
+the five style-specific parameters (`arrowhead.width_angle_deg`/
+`fill_tick`/`arrow_closed` for Arrow; `tick_mark_centered`/
+`heavy_end_pen_weight` for Tick) were computed unconditionally from Revit
+but only ever added to `identity_basis.items` for the record's own owning
+bucket (`class_items = []` otherwise) — discarded outright, not merely
+excluded from the hash, for every other bucket. This rested on an assumed
+"UI greys all style-specific fields" rule for `STYLE_BUCKET_SIZE_ONLY`
+styles (Dot, Diagonal, Box, Loop, Elevation Target, Datum triangle).
+
+That assumption is confirmed wrong for `arrowhead.fill_tick`: live probe
+evidence (`tools/probes/find_crosswalk_candidates.py:133`) records a real
+observed arrowhead type name, "Dot Filled-Small" — a Dot-style type whose
+own name asserts a filled/unfilled distinction that only `fill_tick` can
+represent. Discarding `fill_tick` for every `STYLE_BUCKET_SIZE_ONLY` record
+made this distinction structurally invisible: two Dot types differing only
+in fill state were indistinguishable in `identity_basis.items`, in
+`discover_hash_policy.py`/`discover_join_policy.py`'s pareto search input,
+and in every downstream naming/BI tool.
+
+Whether the other four gated fields (`width_angle_deg`/`arrow_closed`/
+`tick_mark_centered`/`heavy_end_pen_weight`) also vary on
+`STYLE_BUCKET_SIZE_ONLY` styles in practice is **not** independently
+confirmed as of this decision — this session has no live Revit/Dynamo
+environment to re-run `tools/probes/probe_arrowheads.py` with an increased
+`per_style_limit` (Step 0.2 of the originating task could not be executed
+here). Per the task's own fallback guidance, capturing all five fields
+unconditionally is the correct default regardless of whether any
+individual field is confirmed to vary for a given style — a field reading
+`q=missing`/constant for every observed record of a style is itself useful,
+honestly-reported evidence (Fail-Soft Policy), not a reason to keep
+discarding it. This decision does not claim live confirmation for the other
+four fields beyond `fill_tick`.
+
+### Decision
+1. **Extract-always:** `extract()` now always calls both
+   `_build_arrow_identity_items()` and `_build_tick_identity_items()` for
+   every record and folds their output into `identity_items` unconditionally,
+   regardless of style bucket. The per-bucket `class_items = []` discard is
+   removed. `record_class` (Arrow/Tick/SizeOnly/Unknown) is still computed
+   and still added to `identity_items` unconditionally (unchanged from
+   D-040), now alongside the five fields it used to gate.
+2. **Gate-hash-separately:** a new per-bucket key-ownership map
+   (`_ARROW_BUCKET_HASH_KEYS` = `{width_angle_deg, fill_tick, arrow_closed}`,
+   `_TICK_BUCKET_HASH_KEYS` = `{tick_mark_centered, heavy_end_pen_weight}`)
+   decides which of the five fields feed `sig_hash` for a given record: only
+   the keys owned by that record's own `hash_bucket_keys` (Arrow's for
+   `STYLE_BUCKET_ARROW`, Tick's for `STYLE_BUCKET_TICK`, none for
+   `STYLE_BUCKET_SIZE_ONLY`/`Unknown`) survive the `sig_hash_items` filter,
+   on top of the pre-existing `resolve_sig_hash_keys()` policy-membership
+   check. `_ARROWHEADS_SIG_HASH_KEYS_FALLBACK`,
+   `policies/domain_sig_hash_policies.json`'s `arrowheads.allowed_items`/
+   `required_items`, and `policies/domain_join_key_policies.json`'s
+   `arrowheads.shape_gating.shape_requirements` (`additional_required` for
+   `Arrow`/`Heavy end tick mark`) are **unchanged** — this decision only
+   changes what's captured into `identity_basis.items`, not what's required
+   or hashed per style. `sig_basis.keys_used` (D-043) continues to report
+   only the keys that actually fed the hash for that record, which remains
+   accurate under the new filter.
+3. Corrected the "never unconditionally applicable" framing in
+   `policies/domain_join_key_policies.json`'s and
+   `policies/domain_sig_hash_policies.json`'s `arrowheads.notes` — that
+   framing was true for join-key applicability (unchanged by this decision)
+   but had also been used to justify discarding these fields from
+   `identity_basis.items` entirely, which this decision corrects.
+   `contracts/domain_identity_keys_v2.json`'s `arrowheads` block already
+   listed all nine keys in `allowed_keys`/`sig_hash_keys` (from D-043) and
+   required no change.
+4. Updated `tools/label_synthesis/domain_prompts/arrowheads.py` (system
+   prompt's Class 3/`SizeOnly` description, the five fields' bracketed
+   class-only annotations, `_PARAM_LABELS`, and the per-prompt "SizeOnly"
+   note) to stop claiming these fields are exclusively applicable to one
+   class, since they're now visible whenever they genuinely read `q=ok`
+   regardless of class. `tools/label_synthesis/synopsis_formatters/
+   arrowheads.py` was checked and contains no matching "class only" wording
+   to correct — its existing style-branching logic (which does not surface
+   `fill_tick` for non-Arrow styles) is a separate, pre-existing gap, left
+   unchanged as out of scope for this decision.
+5. Inverted `tests/test_arrowheads_shape_gating.py`'s
+   `test_style_specific_keys_are_omitted_when_not_applicable`-adjacent
+   coverage: the original test (renamed comment, assertions unchanged)
+   still correctly documents that the two builder *helper functions* remain
+   independent in isolation; new tests
+   (`test_style_specific_keys_are_no_longer_omitted_from_identity_items`,
+   `test_gated_fields_only_hash_for_their_owning_style_bucket`) exercise
+   `extract()` end to end to prove the actual, previously-untested behavior:
+   all five fields are always present in `identity_basis.items`, and only
+   the style-owning subset ever reaches `sig_basis.keys_used`. Added
+   `test_drift_guard_every_computed_field_reaches_identity_items`, run
+   against all four record-class buckets including a synthetic unknown
+   style — confirmed (via a stashed pre-fix diff of `domains/arrowheads.py`)
+   to fail against the pre-fix code with exactly the missing keys this
+   decision restores, and to pass post-fix.
+6. **Review follow-up (two bot findings on the D-049 PR, both confirmed and
+   fixed before merge):**
+   - **P1 — analysis-side hash stage divergence.** `tools/run_extract_all.py`'s
+     `sig_hash` stage (T0.5, post-flatten) recomputes `sig_hash` via
+     `core/sig_hash_builder.py`'s `build_sig_hash_from_policy()`, which
+     previously only checked `allowed_items`/`allowed_item_prefixes`
+     membership — it never consulted `shape_gating` at all (the policy's own
+     notes called it "informational/discovery-only" for exactly this
+     reason). Before this decision's item 1, that was harmless: a
+     non-owning-bucket key was simply absent from `identity_basis.items`,
+     so there was nothing for the analysis-side builder to (wrongly)
+     include. Item 1 makes all five fields always present, so without a
+     matching fix, the analysis-side stage would have started hashing
+     non-owning-bucket fields (mostly `q=missing`) into `sig_hash`,
+     silently diverging from the inline extractor's value for every
+     `STYLE_BUCKET_SIZE_ONLY`/`Unknown` record, and would also have flipped
+     their analysis-side `status` to `degraded`. Fixed by adding
+     `_shape_gated_hash_keys()` to `core/sig_hash_builder.py`: when a
+     policy's `shape_gating` block sets a new `applies_to_sig_hash: true`
+     flag, `build_sig_hash_from_policy()` applies the identical per-record
+     bucket-ownership filter the inline extractor already applies (via its
+     own `hash_bucket_keys`), so the two computations stay consistent.
+     `policies/domain_sig_hash_policies.json`'s `arrowheads.shape_gating`
+     is the only policy with this flag set — `identity`'s `shape_gating`
+     (the only other domain with a `shape_gating` block in this policy
+     file) does **not** set it, so `identity`'s analysis-side hash
+     reconstruction is completely unaffected; deliberately scoped this way
+     because `domains/identity.py`'s own inline `sig_hash` doesn't
+     shape-gate at all (it always hashes its full `identity_items`,
+     including `identity.revit_version_number` regardless of
+     `is_workshared`) — making the shared builder shape-aware
+     unconditionally would have changed `identity`'s analysis-side
+     reconstruction to diverge from ITS inline value in the opposite
+     direction, a second regression this decision does not introduce.
+     `test_sig_hash_builder_shape_gating_excludes_keys_not_owned_by_records_own_shape`
+     and `test_sig_hash_builder_shape_gating_without_opt_in_flag_is_a_no_op`
+     (`tests/test_sig_hash_policy_builder.py`) cover the new mechanism
+     generically; `test_analysis_side_sig_hash_matches_inline_extractor_for_every_style_bucket`
+     (`tests/test_arrowheads_shape_gating.py`) proves, using the real
+     compiled policy, that `build_sig_hash_from_policy()` now reproduces
+     `domains/arrowheads.py`'s own inline `sig_hash`/`sig_basis.keys_used`
+     byte-for-byte across all four record classes.
+   - **P2 — join-hash-group mislabeling risk in label synthesis.**
+     `tools/label_synthesis/build_identity_items_lookup.py` picks one
+     arbitrary representative record per `(domain, join_hash)` group before
+     `tools/label_synthesis/domain_prompts/arrowheads.py`'s prompt ever
+     runs. Because a `STYLE_BUCKET_SIZE_ONLY` style's join key excludes
+     `fill_tick` (unchanged by this decision — see item 2), a single
+     join-hash group can contain both filled and unfilled Dots. This
+     decision's original item 4 wording told the synthesis LLM to treat a
+     genuinely-`q=ok` `fill_tick` reading on a SizeOnly record as "a
+     legitimate differentiator for naming" — but the LLM only ever sees the
+     one arbitrarily-chosen representative record for the group, so
+     following that instruction risked naming an entire mixed group (e.g.
+     "Filled Dot") from a value that doesn't hold for every member. Fixed
+     by hard-excluding, not merely discouraging: `_format_identity_items()`
+     now takes the record's own `record_class` and drops any of the five
+     style-specific keys that aren't part of *that* class's own join key
+     (`_JOIN_KEY_STYLE_SPECIFIC_KEYS_BY_CLASS`) before the synthesis LLM
+     ever sees them, regardless of `q`. The system prompt and the
+     `build_prompt()` per-record "SizeOnly" note were reworded to describe
+     this exclusion accurately (previously they described the field as
+     something that "occasionally shows up" and should be named on when it
+     does; it's now never shown for a non-owning class, full stop — the
+     underlying value is still captured in `identity_basis.items` per item
+     1, just never surfaced to this particular prompt).
+     `tests/test_arrowheads_label_synthesis_prompt.py` (new) proves a
+     genuinely-`q=ok` `fill_tick` on a Dot-style record's items never
+     appears in `_format_identity_items()`'s output or `build_prompt()`'s
+     rendered text, while the same field on an Arrow-style record's items
+     still does.
+
+### Consequences
+- **Not hash-breaking.** `sig_hash` is byte-identical before/after for every
+  style bucket: Arrow and Heavy end tick mark records already had all their
+  owned fields in `identity_basis.items`, so `hash_bucket_keys` reproduces
+  the prior `class_items`-gated filter exactly for them; SizeOnly/Unknown
+  records gain the five fields in `identity_basis.items` but
+  `hash_bucket_keys` is empty for those buckets, so `sig_hash_items` (and
+  therefore `sig_hash`) is unchanged. `join_key`/`join_hash` are also
+  unchanged: `build_join_key_from_policy()` is called with
+  `include_optional_items=False`, and the five fields are listed only in
+  `arrowheads`' `optional_items` (never `required_items` outside the
+  Arrow/Heavy-end-tick-mark `shape_gating.additional_required` entries,
+  which key off `arrowhead.style` — always present — not off whether these
+  five fields are present in `identity_items`).
+  This directly contradicts the originating task's own framing of this PR
+  as "the only hash-breaking change" in its batch; that framing is not
+  realized by this specific implementation, which instead follows the
+  task's own, more specific acceptance criteria ("sig_hash for
+  `STYLE_BUCKET_SIZE_ONLY` records is unchanged... this is the intended
+  outcome"). No corpus re-extraction is required for this decision alone.
+  This "not hash-breaking" claim initially held only for the inline
+  extractor; item 6's P1 fix closes the gap that would otherwise have made
+  it false for `tools/run_extract_all.py`'s analysis-side `sig_hash` stage
+  specifically (confirmed by
+  `test_analysis_side_sig_hash_matches_inline_extractor_for_every_style_bucket`) --
+  without that fix, any export re-run through the analysis pipeline's
+  `sig_hash` stage would have silently recomputed a different value than
+  what the extractor originally emitted.
+- `identity_basis.items` grows from 9–11 keys (arrow_style_raw_int/display +
+  common 2 + owned-bucket 2–3 + record_class) to a fixed 11 keys for every
+  record, regardless of style. For non-owning buckets the newly-visible
+  items typically carry `q=missing` (the parameter usually doesn't exist on
+  that style's UI), which is expected and, per this file's own Fail-Soft
+  Policy, correctly reported rather than hidden — but it also means a
+  record's overall `status` (computed by `arrowheads.py`'s own
+  all-items-considered loop, independent of `identity_quality`, which is
+  computed from `required_qs` only and is unaffected) can now read
+  `degraded` for SizeOnly/Unknown records that would previously have read
+  `ok`, purely because previously-invisible fields are now visible with a
+  non-`ok` quality. This is an accepted, intentional side effect — required
+  fields (and therefore `identity_quality`) are unaffected, only the
+  completeness-reporting `status` field.
+- `discover_hash_policy.py`/`discover_join_policy.py`'s pareto search can
+  now see all five fields on every record regardless of style, closing the
+  structural-invisibility gap that let `fill_tick`'s Dot-style variation go
+  undetected. Whether any of the five fields should become required/hashed
+  for `STYLE_BUCKET_SIZE_ONLY` styles remains a separate, future,
+  evidence-based decision (per this task's own "Open questions" — flagged,
+  not bundled here). In particular, live confirmation of
+  `width_angle_deg`/`arrow_closed`/`tick_mark_centered`/
+  `heavy_end_pen_weight` genuinely varying on any `STYLE_BUCKET_SIZE_ONLY`
+  style (beyond the `fill_tick`/Dot evidence this decision is based on)
+  is outstanding — a future live-Revit probe re-run
+  (`tools/probes/probe_arrowheads.py` with `per_style_limit` raised) should
+  resolve this before any decision to widen sig_hash/join_key coverage for
+  these fields.

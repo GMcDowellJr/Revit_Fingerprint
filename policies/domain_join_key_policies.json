@@ -45,8 +45,8 @@
         "Schema v2: record class routing corrected. Dot/Diagonal/Box/Loop/Elevation Target/Datum triangle are size-only (common items only).",
         "Arrow record class: arrowhead.width_angle_deg, arrowhead.fill_tick, arrowhead.arrow_closed.",
         "Heavy end tick mark record class: arrowhead.tick_mark_centered, arrowhead.heavy_end_pen_weight.",
-        "Size-only record classes (Dot/Diagonal/Box/Loop/Elevation Target/Datum triangle): common items only (arrowhead.style + arrowhead.tick_size_in).",
-        "Style-specific fields moved from optional_items to explicitly_excluded_items at common level — they are never unconditionally applicable.",
+        "Size-only record classes (Dot/Diagonal/Box/Loop/Elevation Target/Datum triangle): common items only (arrowhead.style + arrowhead.tick_size_in) participate in the join key -- unchanged by D-049.",
+        "D-049 corrects the claim previously stated here that style-specific fields 'are never unconditionally applicable': that was true, and remains true, for JOIN-KEY applicability specifically (this policy's own optional_items/shape_gating/include_optional_items=False call-site behavior still scope each field to its owning style bucket only -- unchanged by D-049) -- but the same framing had also been used to justify domains/arrowheads.py discarding these fields outright from identity_basis.items for non-owning style buckets, rather than merely excluding them from the join key. Live evidence (fill_tick genuinely varies on Dot, a size-only style) confirmed that assumption wrong at the extraction layer. As of D-049, domains/arrowheads.py captures all five style-specific fields into identity_basis.items unconditionally for every record regardless of style; this policy's required_items/optional_items/shape_gating semantics for join_key computation are unchanged.",
         "Definition-based identity only; no referential identifiers in joins."
       ]
     },

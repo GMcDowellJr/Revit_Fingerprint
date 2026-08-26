@@ -13,6 +13,69 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Fixed
+- **`arrowheads`: the five style-specific fields are no longer discarded
+  for non-owning record classes — extract-always / gate-hash-separately
+  (D-049).** `domains/arrowheads.py` previously computed
+  `arrowhead.width_angle_deg`/`fill_tick`/`arrow_closed`/
+  `tick_mark_centered`/`heavy_end_pen_weight` for every arrowhead type but
+  only added them to `identity_basis.items` for the type's own owning
+  record class (`class_items = []` for every other class, including all six
+  `STYLE_BUCKET_SIZE_ONLY` styles: Dot, Diagonal, Box, Loop, Elevation
+  Target, Datum triangle). This rested on an "UI greys all style-specific
+  fields" assumption that is confirmed wrong for `arrowhead.fill_tick`: a
+  real observed arrowhead type name, "Dot Filled-Small"
+  (`tools/probes/find_crosswalk_candidates.py:133`), asserts a filled/
+  unfilled distinction on a Dot-style type that only `fill_tick` can
+  represent — and that distinction was structurally invisible in
+  `identity_basis.items` before this fix. All five fields are now always
+  added to `identity_items` regardless of style bucket; a new per-bucket
+  key-ownership filter (`_ARROW_BUCKET_HASH_KEYS`/`_TICK_BUCKET_HASH_KEYS`)
+  keeps `sig_hash` computation scoped to the record's own owning bucket
+  exactly as before, so **`sig_hash`/`join_key`/`join_hash` are unchanged**
+  for every style (no re-extraction required for this change alone).
+  `policies/domain_sig_hash_policies.json` and
+  `policies/domain_join_key_policies.json` notes updated to correct the
+  "never unconditionally applicable" framing that had justified the
+  discard; `tools/label_synthesis/domain_prompts/arrowheads.py` updated to
+  stop describing these fields as exclusive to one record class. Whether
+  the other four fields (beyond `fill_tick`) also genuinely vary on
+  `STYLE_BUCKET_SIZE_ONLY` styles is not independently confirmed in this
+  change — see DECISIONS.md D-049's Consequences for what a future
+  live-Revit probe re-run would need to check before any decision to widen
+  `sig_hash`/`join_key` coverage for them. See DECISIONS.md D-049.
+- **`arrowheads`/analysis pipeline: analysis-side `sig_hash` stage now stays
+  consistent with the inline extractor's hash after the above fix (D-049
+  review follow-up, P1).** `core/sig_hash_builder.py`'s
+  `build_sig_hash_from_policy()` (used by `tools/run_extract_all.py`'s
+  `sig_hash` stage) only ever filtered by `allowed_items` membership, never
+  by `shape_gating` — harmless before the fix above (non-owning-bucket
+  fields simply weren't present to filter), but would have silently hashed
+  them into `sig_hash` for `STYLE_BUCKET_SIZE_ONLY`/`Unknown` arrowhead
+  records once they became unconditionally present, diverging from the
+  extractor's own value. Added an opt-in `shape_gating.applies_to_sig_hash`
+  policy flag (set only for `arrowheads`, not for `identity` — the other
+  domain with a `shape_gating` block, whose own inline hash doesn't
+  shape-gate at all and would have regressed the other direction) that
+  makes the analysis-side builder apply the identical per-record
+  bucket-ownership filter the extractor already applies. Confirmed
+  byte-identical `sig_hash`/`sig_basis.keys_used` between the two paths
+  across all four record classes. See DECISIONS.md D-049 item 6.
+- **`arrowheads` label synthesis: a style-specific field no longer risks
+  naming a whole join-hash group off one non-representative record (D-049
+  review follow-up, P2).** `tools/label_synthesis/build_identity_items_lookup.py`
+  picks one arbitrary representative record per `(domain, join_hash)`
+  group; since a `STYLE_BUCKET_SIZE_ONLY` style's join key excludes
+  `fill_tick`, a single group can contain both filled and unfilled Dots.
+  The D-049 fix's original prompt wording told the synthesis LLM to name on
+  a genuinely-present `fill_tick` reading even for such a record, risking a
+  label like "Filled Dot" applied to unfilled group members it never saw.
+  `tools/label_synthesis/domain_prompts/arrowheads.py`'s
+  `_format_identity_items()` now hard-excludes any style-specific field not
+  part of the record's own class's join key, so the LLM is never shown it
+  for a non-owning class at all — not merely told not to name on it. See
+  DECISIONS.md D-049 item 6.
+
 ### Added
 - **`loaded_family_types` domain: `can_have_structural_section`/`has_thermal_properties`
   identity fields (Audit 16 §2 / PR2, Tier 1 capability flags only).**
