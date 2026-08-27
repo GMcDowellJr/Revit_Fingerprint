@@ -1,0 +1,616 @@
+#!/usr/bin/env python3
+"""tools/compare_reference.py
+
+PR3: standalone orchestration CLI for comparing a reference fingerprint
+export against one or more target fingerprint exports (or a target corpus),
+producing a stable, deterministic package of consumable outputs.
+
+This module implements NO comparison mathematics of its own. It is a thin
+orchestration/output layer over the existing, authoritative comparison
+implementation:
+
+  - tools/run_extract_all.py (--seed) builds the reference_bundle.json
+    sidecar and the analysis-side pattern outputs (pattern_presence_file.csv,
+    domain_patterns.csv) via tools/extractor.py's emit_analysis.
+  - tools/bundle_analysis/run_bundle_analysis.py (--compare) computes the
+    symmetric shared/reference_only/target_only comparison
+    (tools/bundle_analysis/step_compare.py) and its ok/degraded/blocked
+    reliability semantics (tools/bundle_analysis/comparison_status.py).
+
+Both are invoked as subprocesses -- the same orchestration convention
+run_extract_all.py itself already uses for its own sub-stages -- so there
+remains exactly one implementation of comparison semantics.
+
+See docs/reference_comparison_tool.md for the full runbook, CLI reference,
+and output-field documentation, including the neutral-terminology note: a
+"reference" here is a comparison anchor only, not a standard, approved
+content, or a compliance requirement.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Sequence
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from bundle_analysis.common import atomic_write_csv, read_csv_rows  # noqa: E402
+from bundle_analysis.comparison_status import (  # noqa: E402
+    COMPARISON_STATUS_OK,
+    split_reason_codes,
+)
+
+MANIFEST_FILENAME = "reference_comparison_report.json"
+SUMMARY_FILENAME = "reference_comparison_summary.csv"
+DETAIL_FILENAME = "reference_comparison_detail.csv"
+DIAGNOSTICS_FILENAME = "reference_comparison_diagnostics.json"
+
+# Suffixes checked most-specific first, so `.json` (the generic fallback)
+# never masks `.details.json` / `.index.json` / `__fingerprint.json`. Mirrors
+# the "Input format priority" rule (CLAUDE.md / docs): *.details.json before
+# *.index.json before a bare *.json export; *.legacy.json is never picked up
+# implicitly.
+_EXPORT_SUFFIXES = (".details.json", ".index.json", "__fingerprint.json", ".legacy.json", ".json")
+_PRIMARY_PRIORITY = ("__fingerprint.json", ".details.json", ".json")
+
+_SUMMARY_FIELDNAMES = [
+    "reference_bundle_id",
+    "analysis_run_id",
+    "target_export_run_id",
+    "domain",
+    "population_id",
+    "comparison_status",
+    "comparison_reason_codes",
+    "reference_pattern_count",
+    "target_pattern_count",
+    "shared_count",
+    "reference_only_count",
+    "target_only_count",
+    "union_count",
+    "reference_coverage_pct",
+    "jaccard",
+]
+
+_DETAIL_FIELDNAMES = [
+    "reference_bundle_id",
+    "analysis_run_id",
+    "target_export_run_id",
+    "domain",
+    "population_id",
+    "pattern_id",
+    "comparison_class",
+]
+
+
+class CompareReferenceError(RuntimeError):
+    """Orchestration-level failure (pre-flight validation, staging, output
+    directory conflicts). Distinct from failures inside the underlying
+    comparator (tools/bundle_analysis/reference_bundle.py's typed errors,
+    surfaced as a nonzero subprocess exit) which are allowed to propagate
+    rather than being reclassified here.
+    """
+
+
+# ---------------------------------------------------------------------------
+# Export file discovery / staging
+# ---------------------------------------------------------------------------
+
+
+def _export_stem(path: Path) -> str:
+    name = path.name
+    for suffix in _EXPORT_SUFFIXES:
+        if name.lower().endswith(suffix.lower()):
+            return name[: -len(suffix)]
+    return path.stem
+
+
+def _sibling_export_files(path: Path) -> List[Path]:
+    """Every file alongside `path` that belongs to the same export -- a
+    split-export .details.json/.index.json pair, or a single
+    *__fingerprint.json/.json file. Never includes a *.legacy.json sibling
+    that wasn't the path explicitly given.
+    """
+    stem = _export_stem(path)
+    parent = path.parent
+    found: List[Path] = []
+    for suffix in _EXPORT_SUFFIXES:
+        if suffix == ".legacy.json" and not path.name.lower().endswith(".legacy.json"):
+            continue
+        candidate = parent / f"{stem}{suffix}"
+        if candidate.is_file() and candidate not in found:
+            found.append(candidate)
+    if path.is_file() and path not in found:
+        found.append(path)
+    return found
+
+
+def _pick_primary_export(paths: Sequence[Path]) -> Path:
+    """Pick the file run_extract_all.py's own file-discovery would treat as
+    the export's canonical `file_id` for a set of sibling files, per the same
+    fingerprint > details > plain priority used throughout the pipeline.
+    """
+    for suffix in _PRIMARY_PRIORITY:
+        for p in paths:
+            lname = p.name.lower()
+            if lname.endswith(suffix) and not lname.endswith(".index.json") and not lname.endswith(".legacy.json"):
+                return p
+    return paths[0]
+
+
+def _validate_export_path(label: str, path: Path) -> Path:
+    if not path.is_file():
+        raise CompareReferenceError(f"{label} not found: {path}")
+    if path.name.lower().endswith(".legacy.json"):
+        raise CompareReferenceError(
+            f"{label} is a *.legacy.json export ({path}); legacy exports are never used, even when named explicitly."
+        )
+    if not path.name.lower().endswith(".json"):
+        raise CompareReferenceError(f"{label} does not look like a fingerprint export (expected a .json file): {path}")
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            json.load(f)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CompareReferenceError(f"{label} is not valid JSON: {path} ({exc})") from exc
+    return path
+
+
+def _stage_export(src: Path, staging_dir: Path, seen: Dict[str, Path]) -> List[Path]:
+    """Hardlink-or-copy every sibling file for `src` into staging_dir.
+
+    `seen` deduplicates by destination filename so staging the same file
+    twice (e.g. the reference happening to also live inside --target-dir) is
+    a no-op rather than an error or a duplicate.
+    """
+    staged: List[Path] = []
+    for sibling in _sibling_export_files(src):
+        if sibling.name in seen:
+            staged.append(seen[sibling.name])
+            continue
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        dest = staging_dir / sibling.name
+        try:
+            os.link(sibling, dest)
+        except OSError:
+            shutil.copy2(sibling, dest)
+        seen[sibling.name] = dest
+        staged.append(dest)
+    return staged
+
+
+def _discover_primary_export_files(directory: Path) -> List[Path]:
+    """Enumerate primary export files in a target corpus directory, using the
+    same priority order as run_extract_all.py's own discovery (never
+    implicitly includes *.legacy.json or a *.index.json as its own primary --
+    an index file is only ever staged as a details file's sibling).
+    """
+    fingerprints = sorted(directory.glob("*__fingerprint.json"))
+    if fingerprints:
+        return fingerprints
+    details = sorted(directory.glob("*.details.json"))
+    if details:
+        return details
+    plain = sorted(
+        p
+        for p in directory.glob("*.json")
+        if not (p.name.lower().endswith(".legacy.json") or p.name.lower().endswith(".index.json"))
+    )
+    return plain
+
+
+def stage_comparison_inputs(
+    reference: Path,
+    targets: Sequence[Path],
+    target_dir: Optional[Path],
+    staging_dir: Path,
+) -> Dict[str, object]:
+    """Assemble a single combined exports directory containing the reference
+    export plus every requested target export, without mutating any of the
+    caller's original files. Returns provenance describing what was staged.
+    """
+    if staging_dir.exists():
+        shutil.rmtree(staging_dir)
+    staging_dir.mkdir(parents=True)
+
+    seen: Dict[str, Path] = {}
+    reference_files = _stage_export(reference, staging_dir, seen)
+    if not reference_files:
+        raise CompareReferenceError(f"Reference export not found: {reference}")
+    reference_names = {p.name for p in reference_files}
+
+    target_files: List[Path] = []
+    for t in targets:
+        staged = _stage_export(t, staging_dir, seen)
+        if not staged:
+            raise CompareReferenceError(f"Target export not found: {t}")
+        target_files.extend(staged)
+
+    if target_dir is not None:
+        if not target_dir.is_dir():
+            raise CompareReferenceError(f"--target-dir is not a directory: {target_dir}")
+        corpus_primaries = _discover_primary_export_files(target_dir)
+        if not corpus_primaries:
+            raise CompareReferenceError(f"--target-dir contains no fingerprint exports: {target_dir}")
+        for primary in corpus_primaries:
+            if primary.name in reference_names:
+                # The reference happens to also live in the target corpus
+                # directory -- excluded rather than compared against itself.
+                continue
+            target_files.extend(_stage_export(primary, staging_dir, seen))
+
+    target_names = {p.name for p in target_files} - reference_names
+    if not target_names:
+        raise CompareReferenceError("No target export files resolved (after excluding the reference) -- nothing to compare.")
+
+    return {
+        "reference_files": sorted(str(p) for p in reference_files),
+        "target_files": sorted(str(p) for p in target_files if p.name in target_names),
+        "target_file_count": len(target_names),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Output directory ownership / overwrite semantics
+# ---------------------------------------------------------------------------
+
+
+def prepare_out_dir(out_dir: Path, overwrite: bool) -> None:
+    """Deterministic overwrite policy: each invocation cleanly REPLACES
+    --out-dir rather than merging into it, so a prior run's rows can never be
+    confused with the current run's. --out-dir is treated as owned
+    exclusively by this tool -- if it already exists and does not carry this
+    tool's own manifest from a prior run, refuse to clear it unless
+    --overwrite is passed explicitly, to avoid silently deleting unrelated
+    directory contents.
+    """
+    if out_dir.exists():
+        if any(out_dir.iterdir()):
+            manifest_path = out_dir / MANIFEST_FILENAME
+            if not manifest_path.is_file() and not overwrite:
+                raise CompareReferenceError(
+                    f"--out-dir already exists and was not produced by a prior run of this tool: {out_dir}. "
+                    "This tool always cleanly replaces its output directory rather than merging across runs "
+                    "(so a stale prior comparison can never be confused with the current one). "
+                    "Pass --overwrite to replace it anyway, or choose an empty directory."
+                )
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True)
+
+
+# ---------------------------------------------------------------------------
+# Sub-tool invocation (the one place this module shells out)
+# ---------------------------------------------------------------------------
+
+
+def _execute(cmd: Sequence[str]) -> None:
+    print(f"[compare_reference] RUN: {' '.join(cmd)}", flush=True)
+    subprocess.run(list(cmd), check=True)
+
+
+def build_run_extract_all_cmd(exports_dir: Path, out_root: Path, reference_file: Path, args: argparse.Namespace) -> List[str]:
+    # Recommended usage is an already-established, corpus-discovered
+    # --join-policy: discovering a meaningful join-key policy from just a
+    # reference plus a handful of targets is not meaningful (see
+    # docs/reference_comparison_tool.md). Skip the `discover` stage whenever
+    # an existing policy is supplied.
+    stages = "flatten,sig_hash,apply,patterns" if args.join_policy else "flatten,sig_hash,discover,apply,patterns"
+    cmd = [
+        sys.executable,
+        str(SCRIPT_DIR / "run_extract_all.py"),
+        str(exports_dir),
+        "--out-root",
+        str(out_root),
+        "--seed",
+        str(reference_file),
+        "--stages",
+        stages,
+        "--emit-analysis-workers",
+        str(args.emit_analysis_workers),
+    ]
+    if args.domains:
+        cmd += ["--domains", args.domains]
+    if args.join_policy:
+        cmd += ["--join-policy", str(args.join_policy)]
+    if args.sig_hash_policy:
+        cmd += ["--sig-hash-policy", str(args.sig_hash_policy)]
+    if args.skip_sig_hash_missing_policy:
+        cmd += ["--skip-sig-hash-missing-policy"]
+    if args.allow_sig_hash_join_key:
+        cmd += ["--allow-sig-hash-join-key"]
+    return cmd
+
+
+def build_run_bundle_analysis_cmd(analysis_dir: Path, bundle_out_dir: Path, records_dir: Path, args: argparse.Namespace) -> List[str]:
+    cmd = [
+        sys.executable,
+        str(SCRIPT_DIR / "bundle_analysis" / "run_bundle_analysis.py"),
+        "--analysis-dir",
+        str(analysis_dir),
+        "--out-dir",
+        str(bundle_out_dir),
+        "--compare",
+        "--purge-view",
+        args.purge_view,
+        "--min-support-count",
+        str(args.min_support_count),
+        "--min-support-pct",
+        str(args.min_support_pct),
+        "--workers",
+        str(args.workers),
+    ]
+    if args.discover_populations:
+        cmd += [
+            "--min-population-size",
+            str(args.min_population_size),
+            "--max-population-overlap",
+            str(args.max_population_overlap),
+            "--min-population-jaccard",
+            str(args.min_population_jaccard),
+            "--discovery-support-pct",
+            str(args.discovery_support_pct),
+        ]
+    else:
+        cmd += ["--no-discover-populations"]
+    if args.roles:
+        metadata_file = args.metadata_file or (records_dir / "file_metadata.csv")
+        cmd += ["--metadata-file", str(metadata_file), "--roles", *args.roles]
+    return cmd
+
+
+# ---------------------------------------------------------------------------
+# Output assembly (pure function over already-produced compare_<view>/ output)
+# ---------------------------------------------------------------------------
+
+
+def assemble_outputs(
+    bundle_out_dir: Path,
+    purge_view: str,
+    out_dir: Path,
+    reference_file: Path,
+    stage_info: Dict[str, object],
+    extract_cmd: Sequence[str],
+    bundle_cmd: Sequence[str],
+) -> Dict[str, object]:
+    """Reshape run_bundle_analysis.py's compare_<view>/ outputs into the PR3
+    consumable package. Every field here is a rename/passthrough/rollup of an
+    existing field from file_gap_report.csv / file_gap_detail.csv /
+    compare_run_summary.csv / compare_run_status.csv
+    (tools/bundle_analysis/step_compare.py) -- no comparison result is
+    computed or altered here.
+    """
+    compare_dir = bundle_out_dir / f"compare_{purge_view}"
+    gap_rows = read_csv_rows(compare_dir / "file_gap_report.csv") if (compare_dir / "file_gap_report.csv").is_file() else []
+    detail_rows = read_csv_rows(compare_dir / "file_gap_detail.csv") if (compare_dir / "file_gap_detail.csv").is_file() else []
+    run_summary_rows = read_csv_rows(compare_dir / "compare_run_summary.csv") if (compare_dir / "compare_run_summary.csv").is_file() else []
+    run_status_rows = read_csv_rows(compare_dir / "compare_run_status.csv") if (compare_dir / "compare_run_status.csv").is_file() else []
+
+    summary_rows = [
+        {
+            "reference_bundle_id": row.get("reference_bundle_id", ""),
+            "analysis_run_id": row.get("analysis_run_id", ""),
+            "target_export_run_id": row.get("export_run_id", ""),
+            "domain": row.get("domain", ""),
+            "population_id": row.get("population_id", ""),
+            "comparison_status": row.get("comparison_status", ""),
+            "comparison_reason_codes": row.get("comparison_reason_codes", ""),
+            "reference_pattern_count": row.get("reference_pattern_count", ""),
+            "target_pattern_count": row.get("target_pattern_count", ""),
+            "shared_count": row.get("shared_count", ""),
+            "reference_only_count": row.get("reference_only_count", ""),
+            "target_only_count": row.get("target_only_count", ""),
+            "union_count": row.get("union_count", ""),
+            "reference_coverage_pct": row.get("reference_coverage_pct", ""),
+            "jaccard": row.get("jaccard", ""),
+        }
+        for row in gap_rows
+    ]
+    summary_rows.sort(key=lambda r: (r["domain"], r["population_id"], r["target_export_run_id"]))
+    atomic_write_csv(out_dir / SUMMARY_FILENAME, _SUMMARY_FIELDNAMES, summary_rows)
+
+    detail_out_rows = [
+        {
+            "reference_bundle_id": row.get("reference_bundle_id", ""),
+            "analysis_run_id": row.get("analysis_run_id", ""),
+            "target_export_run_id": row.get("export_run_id", ""),
+            "domain": row.get("domain", ""),
+            "population_id": row.get("population_id", ""),
+            "pattern_id": row.get("pattern_id", ""),
+            "comparison_class": row.get("comparison_class", ""),
+        }
+        for row in detail_rows
+    ]
+    detail_out_rows.sort(key=lambda r: (r["domain"], r["population_id"], r["target_export_run_id"], r["pattern_id"]))
+    atomic_write_csv(out_dir / DETAIL_FILENAME, _DETAIL_FIELDNAMES, detail_out_rows)
+
+    run_status = (
+        run_status_rows[0]
+        if run_status_rows
+        else {
+            "analysis_run_id": "",
+            "comparison_status": COMPARISON_STATUS_OK,
+            "comparison_reason_codes": "",
+            "comparison_detail": "",
+            "domains_total": "0",
+            "domains_ok": "0",
+            "domains_degraded": "0",
+            "domains_blocked": "0",
+        }
+    )
+
+    non_ok_targets = [
+        {
+            "target_export_run_id": row.get("export_run_id", ""),
+            "domain": row.get("domain", ""),
+            "population_id": row.get("population_id", ""),
+            "comparison_status": row.get("comparison_status", ""),
+            "comparison_reason_codes": split_reason_codes(row.get("comparison_reason_codes", "")),
+            "comparison_detail": row.get("comparison_detail", ""),
+        }
+        for row in gap_rows
+        if row.get("comparison_status", COMPARISON_STATUS_OK) != COMPARISON_STATUS_OK
+    ]
+    non_ok_targets.sort(key=lambda r: (r["domain"], r["population_id"], r["target_export_run_id"]))
+
+    domain_summaries = [
+        {
+            "domain": row.get("domain", ""),
+            "population_id": row.get("population_id", ""),
+            "comparison_status": row.get("comparison_status", ""),
+            "comparison_reason_codes": split_reason_codes(row.get("comparison_reason_codes", "")),
+            "files_scored": row.get("files_scored", ""),
+            "comparison_ok_count": row.get("comparison_ok_count", ""),
+            "comparison_degraded_count": row.get("comparison_degraded_count", ""),
+            "comparison_blocked_count": row.get("comparison_blocked_count", ""),
+        }
+        for row in run_summary_rows
+    ]
+    domain_summaries.sort(key=lambda r: (r["domain"], r["population_id"]))
+
+    reference_bundle_id = ""
+    if gap_rows:
+        reference_bundle_id = gap_rows[0].get("reference_bundle_id", "")
+    elif run_summary_rows:
+        reference_bundle_id = run_summary_rows[0].get("reference_bundle_id", "")
+
+    diagnostics = {
+        "reference_bundle_id": reference_bundle_id,
+        "analysis_run_id": run_status.get("analysis_run_id", ""),
+        "run_comparison_status": run_status.get("comparison_status", COMPARISON_STATUS_OK),
+        "run_comparison_reason_codes": split_reason_codes(run_status.get("comparison_reason_codes", "")),
+        "run_comparison_detail": run_status.get("comparison_detail", ""),
+        "domains_total": run_status.get("domains_total", "0"),
+        "domains_ok": run_status.get("domains_ok", "0"),
+        "domains_degraded": run_status.get("domains_degraded", "0"),
+        "domains_blocked": run_status.get("domains_blocked", "0"),
+        "domain_summaries": domain_summaries,
+        "target_diagnostics": non_ok_targets,
+    }
+    (out_dir / DIAGNOSTICS_FILENAME).write_text(json.dumps(diagnostics, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    manifest = {
+        "tool": "tools/compare_reference.py",
+        "reference_export": str(reference_file),
+        "reference_bundle_id": reference_bundle_id,
+        "target_scope": stage_info,
+        "analysis_run_id": diagnostics["analysis_run_id"],
+        "purge_view": purge_view,
+        "commands": [list(extract_cmd), list(bundle_cmd)],
+        "output_files": [SUMMARY_FILENAME, DETAIL_FILENAME, DIAGNOSTICS_FILENAME],
+        "aggregate_comparison_status": diagnostics["run_comparison_status"],
+    }
+    (out_dir / MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return manifest
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(
+        prog="compare_reference.py",
+        description=(
+            "Compare a reference fingerprint export against one or more target fingerprint "
+            "exports (or a target corpus). Reuses the existing reference-vs-target comparison "
+            "implementation (tools/run_extract_all.py --seed + "
+            "tools/bundle_analysis/run_bundle_analysis.py --compare) -- no comparison "
+            "mathematics is implemented here. A reference is a comparison anchor only: not a "
+            "standard, approved content, or a compliance requirement. "
+            "See docs/reference_comparison_tool.md."
+        ),
+    )
+    ap.add_argument("--reference", required=True, type=Path, help="Path to the reference fingerprint export file.")
+    target_group = ap.add_mutually_exclusive_group(required=True)
+    target_group.add_argument("--target", type=Path, nargs="+", default=None, help="One or more target fingerprint export files.")
+    target_group.add_argument("--target-dir", type=Path, default=None, help="Directory containing a target corpus of fingerprint exports.")
+    ap.add_argument("--out-dir", required=True, type=Path, help="Output directory for this tool's own artifacts (owned exclusively by this tool -- see --overwrite).")
+    ap.add_argument("--overwrite", action="store_true", help="Allow clearing --out-dir even if it wasn't produced by a prior run of this tool.")
+    ap.add_argument("--domains", default=None, help="Comma-separated domain list, passed through to run_extract_all.py --domains. Default: infer from the staged exports.")
+    ap.add_argument("--join-policy", default=None, type=Path, help="Existing join-key policy JSON (recommended: point at your corpus's already-discovered domain_join_key_policies.v21.json). Skips the discover stage when given.")
+    ap.add_argument("--sig-hash-policy", default=None, type=Path, help="sig_hash policy JSON, passed through to run_extract_all.py --sig-hash-policy.")
+    ap.add_argument("--skip-sig-hash-missing-policy", action="store_true")
+    ap.add_argument("--allow-sig-hash-join-key", action="store_true", help="Allow degraded identity-mode join keys for exploratory comparisons not intended for governance conclusions.")
+    ap.add_argument("--metadata-file", default=None, type=Path, help="file_metadata.csv for --roles filtering. Default: the staged run's own records/file_metadata.csv.")
+    ap.add_argument("--roles", nargs="+", default=None, help="Restrict target scope to these governance roles (see run_bundle_analysis.py --roles).")
+    ap.add_argument("--purge-view", choices=["all", "used"], default="all")
+    ap.add_argument("--discover-populations", action="store_true", help="Opt into population-aware mode (see run_bundle_analysis.py --discover-populations). Default: single-pass mode.")
+    ap.add_argument("--min-population-size", type=int, default=0)
+    ap.add_argument("--max-population-overlap", type=float, default=0.20)
+    ap.add_argument("--min-population-jaccard", type=float, default=0.30)
+    ap.add_argument("--discovery-support-pct", type=float, default=0.10)
+    ap.add_argument("--min-support-count", type=int, default=3)
+    ap.add_argument("--min-support-pct", type=float, default=0.0)
+    ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--emit-analysis-workers", type=int, default=4)
+    return ap
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = build_arg_parser().parse_args(argv)
+
+    try:
+        reference = _validate_export_path("--reference", Path(args.reference).resolve())
+        targets: List[Path] = []
+        if args.target:
+            targets = [_validate_export_path("--target", Path(t).resolve()) for t in args.target]
+        target_dir = Path(args.target_dir).resolve() if args.target_dir else None
+
+        out_dir = Path(args.out_dir).resolve()
+        prepare_out_dir(out_dir, overwrite=args.overwrite)
+
+        staging_dir = out_dir / "staged_exports"
+        stage_info = stage_comparison_inputs(reference, targets, target_dir, staging_dir)
+        reference_primary = _pick_primary_export([Path(p) for p in stage_info["reference_files"]])
+    except CompareReferenceError as exc:
+        print(f"[compare_reference][error] {exc}", file=sys.stderr)
+        return 2
+
+    extraction_out_root = out_dir / "extraction"
+    bundle_out_dir = out_dir / "bundle_analysis"
+    records_dir = extraction_out_root / "results" / "records"
+    analysis_dir = extraction_out_root / "results" / "analysis"
+
+    extract_cmd = build_run_extract_all_cmd(staging_dir, extraction_out_root, reference_primary, args)
+    try:
+        _execute(extract_cmd)
+    except subprocess.CalledProcessError as exc:
+        print(f"[compare_reference][error] run_extract_all.py failed (exit {exc.returncode})", file=sys.stderr)
+        return exc.returncode or 1
+
+    bundle_cmd = build_run_bundle_analysis_cmd(analysis_dir, bundle_out_dir, records_dir, args)
+    try:
+        _execute(bundle_cmd)
+    except subprocess.CalledProcessError as exc:
+        # run_bundle_analysis.py records a blocked compare_run_status.csv
+        # before re-raising on a totally invalid/schema-incompatible
+        # reference sidecar (see tools/bundle_analysis/README.md) -- assemble
+        # outputs from whatever it managed to write before surfacing the
+        # failure, so "comparison was requested but blocked" is never
+        # console-only, then still propagate the nonzero exit.
+        try:
+            manifest = assemble_outputs(bundle_out_dir, args.purge_view, out_dir, reference, stage_info, extract_cmd, bundle_cmd)
+            print(f"[compare_reference] comparison_status={manifest['aggregate_comparison_status']} (from blocked run)")
+        except Exception:
+            pass
+        print(f"[compare_reference][error] run_bundle_analysis.py failed (exit {exc.returncode})", file=sys.stderr)
+        return exc.returncode or 1
+
+    manifest = assemble_outputs(bundle_out_dir, args.purge_view, out_dir, reference, stage_info, extract_cmd, bundle_cmd)
+    print(f"[compare_reference] comparison_status={manifest['aggregate_comparison_status']}")
+    print(f"[compare_reference] wrote outputs to {out_dir}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
