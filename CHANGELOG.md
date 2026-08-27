@@ -13,6 +13,47 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 
 ## [Unreleased]
 
+### Changed (behavior-changing)
+- **`tools/compare_reference.py` rewritten to compare against
+  already-materialized segments instead of rematerializing fingerprint JSON
+  exports.** The tool previously staged `--reference`/`--target` JSON
+  exports into a combined directory and shelled out to
+  `tools/run_extract_all.py` (flatten/sig_hash/discover/apply/patterns) and
+  `tools/bundle_analysis/run_bundle_analysis.py --compare` as subprocesses —
+  repeating work `tools/run_segment_orchestrator.py` had often already done,
+  and potentially comparing under a different materialization context (a
+  fresh, ad hoc join-key/sig-hash policy pass) than the one governing the
+  rest of a corpus. It now takes `--segments-root`/`--registry-file`/
+  `--segment` and resolves `--reference`/`--target` filename selectors
+  against that segment's own `results/records/file_metadata.csv`, then
+  calls `tools/bundle_analysis/step_compare.py::run_compare_for_domain`
+  **in-process** against the segment's own already-built
+  `results/analysis/pattern_presence_file.csv` and
+  `results/bundle_analysis/{all,used}/<domain>/membership_matrix.csv` — no
+  JSON is parsed, no export is staged, and `run_extract_all.py` is never
+  invoked. `--target` is now optional: omitting it compares the reference
+  against every other materialized file in the segment in one pass (no
+  `--target-dir`/corpus re-scan). Comparison mathematics are unchanged —
+  `run_compare_for_domain` is reused directly, not reimplemented — but this
+  is still a behavior change: filename resolution, segment scope, and the
+  compatibility/completeness pre-flight are new, and the CLI/output schema
+  changed (new `--segments-root`/`--registry-file`/`--segment` flags in
+  place of `--target-dir`/`--join-policy`/etc.; `reference_comparison_summary.csv`/
+  `_detail.csv` gain `segment_id`/`purge_view` columns since one run can now
+  cover both `all` and `used` views at once). New pre-flight reason codes
+  (`SEGMENT_NOT_FOUND`, `SEGMENT_MATERIALIZATION_INCOMPLETE`,
+  `REQUIRED_ANALYSIS_ARTIFACT_MISSING`, `REFERENCE_NOT_MATERIALIZED`/
+  `TARGET_NOT_MATERIALIZED`, `REFERENCE_AMBIGUOUS`/`TARGET_AMBIGUOUS`,
+  `MATERIALIZATION_VERSION_INCOMPATIBLE`/`MATERIALIZATION_COMPATIBILITY_UNPROVEN`)
+  block explicitly rather than falling back to any JSON-driven path; a
+  domain the caller requested that this segment never observed at all still
+  surfaces via the comparator's own existing `COMPARISON_INPUT_INVALID`,
+  not a new code. Downstream: reference comparisons now require the
+  requested reference/target to exist in a compatible, completed segment
+  materialization — missing, ambiguous, incomplete, or incompatible
+  evidence blocks rather than triggering extraction or fallback processing.
+  See `docs/reference_comparison_tool.md` and `tests/test_compare_reference.py`.
+
 ### Fixed
 - **`arrowheads`: the five style-specific fields are no longer discarded
   for non-owning record classes — extract-always / gate-hash-separately
