@@ -171,6 +171,17 @@ it can never be misread as a real `0`.
 Full semantics (including exact classification rules) live in
 `tools/bundle_analysis/README.md`, "Comparison reliability semantics".
 
+**A staged target that produced zero evidence for a domain** (the domain
+was never extracted for that file, or genuinely has no elements) is
+reported as `blocked` / `TARGET_DOMAIN_UNAVAILABLE` for that
+target/domain, using the same classification the underlying comparator
+already defines for this exact condition — it is never silently absent
+from `reference_comparison_summary.csv`. This tool determines the full set
+of staged targets itself (from the staged run's own `file_metadata.csv`)
+specifically to guarantee this, since the underlying `--compare` step only
+widens its own notion of "eligible targets" as a side effect of `--roles`
+filtering.
+
 ## Overwrite / resume behavior
 
 Each invocation of this tool **cleanly replaces** the contents of

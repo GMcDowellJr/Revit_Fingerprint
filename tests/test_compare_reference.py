@@ -527,6 +527,147 @@ def test_main_refuses_to_run_when_out_dir_would_destroy_reference(tmp_path, monk
     assert target.is_file()
 
 
+def test_check_out_dir_rejects_ancestor_of_join_policy_auxiliary_input(tmp_path):
+    # --join-policy / --sig-hash-policy / --metadata-file are also input
+    # files this tool must never destroy (Codex review, PR #466 -- the
+    # first overlap fix only covered reference/target/target-dir).
+    reference = tmp_path / "ref.details.json"
+    target = tmp_path / "t1.details.json"
+    _write_json(reference, {"a": 1})
+    _write_json(target, {"a": 2})
+    policy_dir = tmp_path / "corpus_policies"
+    join_policy = policy_dir / "domain_join_key_policies.v21.json"
+    _write_json(join_policy, {})
+
+    with pytest.raises(cr.CompareReferenceError, match="ancestor"):
+        cr.check_out_dir_does_not_contain_inputs(policy_dir, reference, [target], None, [join_policy])
+
+
+def test_main_refuses_to_run_when_out_dir_would_destroy_join_policy(tmp_path, monkeypatch):
+    reference = tmp_path / "src" / "ref.details.json"
+    target = tmp_path / "src" / "t1.details.json"
+    _write_json(reference, {"a": 1})
+    _write_json(target, {"a": 2})
+    policy_dir = tmp_path / "policies"
+    join_policy = policy_dir / "domain_join_key_policies.v21.json"
+    _write_json(join_policy, {})
+
+    calls = []
+    monkeypatch.setattr(cr, "_execute", lambda cmd: calls.append(cmd))
+
+    rc = cr.main(
+        [
+            "--reference", str(reference), "--target", str(target),
+            "--join-policy", str(join_policy),
+            "--out-dir", str(policy_dir), "--overwrite",
+        ]
+    )
+
+    assert rc != 0
+    assert calls == []
+    assert join_policy.is_file()  # the policy file survived
+
+
+# ---------------------------------------------------------------------------
+# Regression: a target with zero presence rows for a domain (e.g. the
+# domain has no elements, or was never extracted for that file) must not be
+# silently omitted from the comparison -- it is reported using the existing
+# blocked/TARGET_DOMAIN_UNAVAILABLE classification instead (Codex review,
+# PR #466).
+# ---------------------------------------------------------------------------
+
+
+def test_synthesize_missing_target_rows_flags_target_with_no_presence_for_a_domain():
+    domain = "object_styles_model"
+    gap_rows = [
+        {
+            "reference_bundle_id": "ref-1", "effective_date": "2026-08-27", "analysis_run_id": "run1",
+            "domain": domain, "population_id": "", "export_run_id": "t1",
+            "reference_pattern_count": "2", "target_pattern_count": "2", "shared_count": "2",
+            "reference_only_count": "0", "target_only_count": "0", "union_count": "2",
+            "reference_coverage_pct": "1.000000", "jaccard": "1.000000",
+            "comparison_status": "ok", "comparison_reason_codes": "", "comparison_detail": "",
+        }
+    ]
+    run_summary_rows = [{"domain": domain, "population_id": ""}]
+    reference_bundle = {"reference_bundle_id": "ref-1", "domains": {domain: ["A", "B"]}}
+
+    synthesized = cr._synthesize_missing_target_rows(gap_rows, run_summary_rows, ["t1", "t2"], reference_bundle)
+
+    assert len(synthesized) == 1
+    row = synthesized[0]
+    assert row["export_run_id"] == "t2"
+    assert row["domain"] == domain
+    assert row["comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
+    assert row["comparison_reason_codes"] == "TARGET_DOMAIN_UNAVAILABLE"
+    assert row["reference_pattern_count"] == "2"  # cribbed from the existing row for this domain
+    assert row["target_pattern_count"] == ""  # never a fabricated value
+
+
+def test_synthesize_missing_target_rows_uses_reference_bundle_when_no_existing_row_for_domain():
+    # Every known target is missing for this domain -- no existing gap_row
+    # to crib reference_pattern_count from, so fall back to the sidecar.
+    domain = "object_styles_model"
+    run_summary_rows = [{"domain": domain, "population_id": ""}]
+    reference_bundle = {"reference_bundle_id": "ref-1", "effective_date": "2026-08-27", "domains": {domain: ["A", "B", "C"]}}
+
+    synthesized = cr._synthesize_missing_target_rows([], run_summary_rows, ["t1"], reference_bundle)
+
+    assert len(synthesized) == 1
+    assert synthesized[0]["reference_pattern_count"] == "3"
+    assert synthesized[0]["reference_bundle_id"] == "ref-1"
+
+
+def test_synthesize_missing_target_rows_no_op_without_known_targets():
+    assert cr._synthesize_missing_target_rows([], [{"domain": "d1", "population_id": ""}], [], {}) == []
+
+
+def test_assemble_outputs_surfaces_target_missing_from_a_domain_entirely(tmp_path):
+    domain = "object_styles_model"
+    bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A", "B"}}, ["A", "B"])
+    # t2 was staged (part of the known target universe) but produced zero
+    # presence rows for this domain -- invisible to run_compare_for_domain's
+    # default derivation, which is exactly the gap this closes.
+    analysis_dir = tmp_path / "analysis"
+    reference_bundle_payload = {
+        "reference_bundle_id": "ref-2026-08-27", "effective_date": "2026-08-27",
+        "seed_export_run_id": "seed_file", "domains": {domain: ["A", "B"]},
+    }
+    (analysis_dir / "reference_bundle.json").write_text(json.dumps(reference_bundle_payload), encoding="utf-8")
+
+    out_dir = tmp_path / "final_out"
+    out_dir.mkdir()
+    manifest = cr.assemble_outputs(
+        bundle_out_dir, "all", out_dir, tmp_path / "ref.json",
+        {"reference_files": [], "target_files": [], "target_file_count": 2}, ["cmd"], ["cmd"],
+        analysis_dir=analysis_dir, known_target_export_run_ids=["t1", "t2"],
+    )
+
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert {r["target_export_run_id"] for r in summary} == {"t1", "t2"}
+    t2_row = next(r for r in summary if r["target_export_run_id"] == "t2")
+    assert t2_row["comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
+    assert "TARGET_DOMAIN_UNAVAILABLE" in t2_row["comparison_reason_codes"]
+    assert t2_row["target_pattern_count"] == ""
+
+    # The run-level rollup must reflect the synthesized blocked target too,
+    # not report a stale "ok" from before this tool discovered the gap.
+    assert manifest["aggregate_comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
+    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diagnostics["run_comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
+    assert any(d["target_export_run_id"] == "t2" for d in diagnostics["target_diagnostics"])
+
+
+def test_assemble_outputs_without_known_targets_preserves_prior_behavior(tmp_path):
+    # Backward compatible: omitting known_target_export_run_ids (the
+    # default) must not change any existing behavior.
+    domain = "object_styles_model"
+    bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A", "B"}}, ["A", "B"])
+    out_dir = _assemble(tmp_path, bundle_out_dir)
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert {r["target_export_run_id"] for r in summary} == {"t1"}
+
+
 # ---------------------------------------------------------------------------
 # 12. Filenames / output locations are deterministic.
 # ---------------------------------------------------------------------------

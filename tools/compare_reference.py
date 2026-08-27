@@ -46,10 +46,15 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from bundle_analysis.common import atomic_write_csv, read_csv_rows  # noqa: E402
+from collections import Counter  # noqa: E402
 from bundle_analysis.comparison_status import (  # noqa: E402
     COMPARISON_STATUS_OK,
+    COMPARISON_STATUS_DEGRADED,
     COMPARISON_STATUS_BLOCKED,
     REASON_COMPARISON_INPUT_INVALID,
+    REASON_TARGET_DOMAIN_UNAVAILABLE,
+    aggregate_comparison_status,
+    join_reason_codes,
     split_reason_codes,
 )
 
@@ -347,18 +352,23 @@ def check_out_dir_does_not_contain_inputs(
     reference: Path,
     targets: Sequence[Path],
     target_dir: Optional[Path],
+    auxiliary_inputs: Sequence[Path] = (),
 ) -> None:
     """--out-dir is unconditionally cleared on every run (see
-    prepare_out_dir). If it were the same as, or an ancestor of, the
-    reference, a --target, or --target-dir, that clearing would destroy the
-    user's source exports before staging ever ran -- reachable via
-    --overwrite, or even without it whenever the directory happens to
-    already carry this tool's own manifest from an unrelated prior run
-    (Codex review, PR #466). Must be checked before prepare_out_dir is ever
-    called, once all input paths are already known to exist.
+    prepare_out_dir). If it were the same as, or an ancestor of, ANY input
+    path -- the reference, a --target, --target-dir, or an auxiliary input
+    file such as --join-policy/--sig-hash-policy/--metadata-file -- that
+    clearing would destroy the user's data before either subprocess ever
+    reads it -- reachable via --overwrite, or even without it whenever the
+    directory happens to already carry this tool's own manifest from an
+    unrelated prior run (Codex review, PR #466; auxiliary_inputs added in a
+    follow-up finding on the same issue -- the first fix only covered the
+    reference/target/target-dir paths). Must be checked before
+    prepare_out_dir is ever called, once all input paths are already known
+    to exist.
     """
     resolved_out = out_dir.resolve()
-    candidates: List[Path] = [reference, *targets]
+    candidates: List[Path] = [reference, *targets, *auxiliary_inputs]
     if target_dir is not None:
         candidates.append(target_dir)
     for candidate in candidates:
@@ -367,8 +377,8 @@ def check_out_dir_does_not_contain_inputs(
             raise CompareReferenceError(
                 f"--out-dir ({resolved_out}) is the same as, or an ancestor of, an input path "
                 f"({resolved_candidate}). This tool clears --out-dir on every run, which would "
-                "destroy your source exports. Choose a --out-dir that does not contain any "
-                "--reference/--target/--target-dir path."
+                "destroy your source data. Choose a --out-dir that does not contain any input "
+                "(--reference/--target/--target-dir/--join-policy/--sig-hash-policy/--metadata-file) path."
             )
 
 
@@ -480,6 +490,91 @@ def build_run_bundle_analysis_cmd(analysis_dir: Path, bundle_out_dir: Path, reco
 # ---------------------------------------------------------------------------
 
 
+def _read_reference_bundle_domains(analysis_dir: Optional[Path]) -> Dict[str, object]:
+    if analysis_dir is None:
+        return {}
+    path = analysis_dir / "reference_bundle.json"
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return {}
+
+
+def _synthesize_missing_target_rows(
+    gap_rows: List[Dict[str, str]],
+    run_summary_rows: List[Dict[str, str]],
+    known_target_export_run_ids: Sequence[str],
+    reference_bundle: Dict[str, object],
+) -> List[Dict[str, str]]:
+    """A target with zero presence rows for a domain (e.g. the domain was
+    never observed for that file at all) is invisible to
+    run_compare_for_domain's default derivation of "which export_run_ids are
+    eligible for this domain" -- it silently produces no row at all, rather
+    than a blocked one, unless the caller supplies the full eligible target
+    universe up front (see tools/bundle_analysis/step_compare.py's own
+    docstring on this). run_bundle_analysis.py's CLI only ever populates
+    that eligible-universe parameter as a side effect of --roles filtering,
+    which this tool cannot rely on for an ad hoc comparison (governance_role
+    is frequently unpopulated for files outside the normal governed corpus).
+    So: for every domain this compare run touched, treat any known target
+    export_run_id with no row at all as the same TARGET_DOMAIN_UNAVAILABLE
+    condition run_compare_for_domain already uses for a widened-eligibility
+    "no presence evidence" case (Codex review, PR #466) -- not a new
+    classification, the existing one applied where the CLI wiring doesn't
+    reach it.
+    """
+    known = {str(t).strip() for t in known_target_export_run_ids if str(t).strip()}
+    if not known:
+        return []
+    domains = {row.get("domain", "") for row in run_summary_rows if row.get("domain", "")}
+    domains |= {row.get("domain", "") for row in gap_rows if row.get("domain", "")}
+    reference_domains = reference_bundle.get("domains", {}) if isinstance(reference_bundle.get("domains"), dict) else {}
+    reference_bundle_id_fallback = str(reference_bundle.get("reference_bundle_id", ""))
+
+    synthesized: List[Dict[str, str]] = []
+    for domain in sorted(domains):
+        present = {row.get("export_run_id", "") for row in gap_rows if row.get("domain", "") == domain}
+        missing = sorted(known - present)
+        if not missing:
+            continue
+        existing_row = next((r for r in gap_rows if r.get("domain", "") == domain), None)
+        if existing_row is not None:
+            reference_bundle_id = existing_row.get("reference_bundle_id", "")
+            effective_date = existing_row.get("effective_date", "")
+            analysis_run_id = existing_row.get("analysis_run_id", "")
+            reference_pattern_count = existing_row.get("reference_pattern_count", "")
+        else:
+            reference_bundle_id = reference_bundle_id_fallback
+            effective_date = str(reference_bundle.get("effective_date", ""))
+            analysis_run_id = ""
+            reference_pattern_count = str(len(reference_domains.get(domain, []))) if reference_domains else ""
+        for target_id in missing:
+            synthesized.append(
+                {
+                    "reference_bundle_id": reference_bundle_id,
+                    "effective_date": effective_date,
+                    "analysis_run_id": analysis_run_id,
+                    "domain": domain,
+                    "population_id": "",
+                    "export_run_id": target_id,
+                    "reference_pattern_count": reference_pattern_count,
+                    "target_pattern_count": "",
+                    "shared_count": "",
+                    "reference_only_count": "",
+                    "target_only_count": "",
+                    "union_count": "",
+                    "reference_coverage_pct": "",
+                    "jaccard": "",
+                    "comparison_status": COMPARISON_STATUS_BLOCKED,
+                    "comparison_reason_codes": REASON_TARGET_DOMAIN_UNAVAILABLE,
+                    "comparison_detail": "no presence evidence for this domain/target in this comparison run",
+                }
+            )
+    return synthesized
+
+
 def assemble_outputs(
     bundle_out_dir: Path,
     purge_view: str,
@@ -488,19 +583,31 @@ def assemble_outputs(
     stage_info: Dict[str, object],
     extract_cmd: Sequence[str],
     bundle_cmd: Sequence[str],
+    analysis_dir: Optional[Path] = None,
+    known_target_export_run_ids: Optional[Sequence[str]] = None,
 ) -> Dict[str, object]:
     """Reshape run_bundle_analysis.py's compare_<view>/ outputs into the PR3
     consumable package. Every field here is a rename/passthrough/rollup of an
     existing field from file_gap_report.csv / file_gap_detail.csv /
     compare_run_summary.csv / compare_run_status.csv
     (tools/bundle_analysis/step_compare.py) -- no comparison result is
-    computed or altered here.
+    computed or altered here, EXCEPT for one gap-closing addition: a target
+    entirely missing from a domain's rows (see
+    _synthesize_missing_target_rows) is surfaced as the existing
+    blocked/TARGET_DOMAIN_UNAVAILABLE classification rather than silently
+    omitted, when `known_target_export_run_ids` is supplied.
     """
     compare_dir = bundle_out_dir / f"compare_{purge_view}"
     gap_rows = read_csv_rows(compare_dir / "file_gap_report.csv") if (compare_dir / "file_gap_report.csv").is_file() else []
     detail_rows = read_csv_rows(compare_dir / "file_gap_detail.csv") if (compare_dir / "file_gap_detail.csv").is_file() else []
     run_summary_rows = read_csv_rows(compare_dir / "compare_run_summary.csv") if (compare_dir / "compare_run_summary.csv").is_file() else []
     run_status_rows = read_csv_rows(compare_dir / "compare_run_status.csv") if (compare_dir / "compare_run_status.csv").is_file() else []
+
+    synthesized_rows: List[Dict[str, str]] = []
+    if known_target_export_run_ids is not None:
+        reference_bundle = _read_reference_bundle_domains(analysis_dir)
+        synthesized_rows = _synthesize_missing_target_rows(gap_rows, run_summary_rows, known_target_export_run_ids, reference_bundle)
+        gap_rows = gap_rows + synthesized_rows
 
     summary_rows = [
         {
@@ -560,6 +667,33 @@ def assemble_outputs(
             "domains_blocked": "0",
         }
     )
+    run_status = dict(run_status)
+
+    if synthesized_rows:
+        # run_bundle_analysis.py's own compare_run_status.csv rollup can't
+        # know about a target this tool discovered was silently missing
+        # (see _synthesize_missing_target_rows) -- recompute the run-level
+        # rollup from the merged row set using the same "blocked beats
+        # degraded beats ok, rolled up per domain first" algorithm
+        # tools/bundle_analysis/run_bundle_analysis.py's own
+        # _write_compare_run_outputs uses, so a synthesized blocked target
+        # is never masked by a stale "ok" run status.
+        statuses_by_domain: Dict[str, List[str]] = {}
+        reasons_by_domain: Dict[str, List[str]] = {}
+        for row in gap_rows:
+            dom = row.get("domain", "")
+            statuses_by_domain.setdefault(dom, []).append(row.get("comparison_status", COMPARISON_STATUS_OK))
+            reasons_by_domain.setdefault(dom, []).extend(str(row.get("comparison_reason_codes", "") or "").split("|"))
+        domain_level_status = {dom: aggregate_comparison_status(sts) for dom, sts in statuses_by_domain.items()}
+        status_counts = Counter(domain_level_status.values())
+        run_status["comparison_status"] = aggregate_comparison_status(domain_level_status.values())
+        run_status["comparison_reason_codes"] = join_reason_codes(
+            code for codes in reasons_by_domain.values() for code in codes
+        )
+        run_status["domains_total"] = str(len(domain_level_status))
+        run_status["domains_ok"] = str(status_counts.get(COMPARISON_STATUS_OK, 0))
+        run_status["domains_degraded"] = str(status_counts.get(COMPARISON_STATUS_DEGRADED, 0))
+        run_status["domains_blocked"] = str(status_counts.get(COMPARISON_STATUS_BLOCKED, 0))
 
     non_ok_targets = [
         {
@@ -670,6 +804,32 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return ap
 
 
+def _load_known_target_export_run_ids(records_dir: Path, reference_file_id: str) -> Optional[List[str]]:
+    """Read the just-produced file_metadata.csv to determine the full staged
+    export_run_id universe, minus the reference's own export_run_id -- see
+    _synthesize_missing_target_rows for why this tool needs to know this
+    independently of run_bundle_analysis.py's own (--roles-filter-only)
+    eligible-target derivation. Returns None (meaning "don't synthesize") if
+    file_metadata.csv is missing or unreadable, rather than failing the
+    whole run over a best-effort enhancement.
+    """
+    path = records_dir / "file_metadata.csv"
+    if not path.is_file():
+        return None
+    try:
+        rows = read_csv_rows(path)
+    except (OSError, UnicodeDecodeError):
+        return None
+    reference_export_run_id = next(
+        (row.get("export_run_id", "") for row in rows if row.get("file_id", "") == reference_file_id),
+        None,
+    )
+    all_ids = {row.get("export_run_id", "") for row in rows if row.get("export_run_id", "")}
+    if reference_export_run_id:
+        all_ids.discard(reference_export_run_id)
+    return sorted(all_ids)
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_arg_parser().parse_args(argv)
 
@@ -681,7 +841,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         target_dir = Path(args.target_dir).resolve() if args.target_dir else None
 
         out_dir = Path(args.out_dir).resolve()
-        check_out_dir_does_not_contain_inputs(out_dir, reference, targets, target_dir)
+        auxiliary_inputs = [
+            Path(p).resolve()
+            for p in (args.join_policy, args.sig_hash_policy, args.metadata_file)
+            if p is not None
+        ]
+        check_out_dir_does_not_contain_inputs(out_dir, reference, targets, target_dir, auxiliary_inputs)
         prepare_out_dir(out_dir, overwrite=args.overwrite)
 
         staging_dir = out_dir / "staged_exports"
@@ -703,6 +868,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"[compare_reference][error] run_extract_all.py failed (exit {exc.returncode})", file=sys.stderr)
         return exc.returncode or 1
 
+    known_target_export_run_ids = _load_known_target_export_run_ids(records_dir, reference_primary.name)
+
     bundle_cmd = build_run_bundle_analysis_cmd(analysis_dir, bundle_out_dir, records_dir, args)
     try:
         _execute(bundle_cmd)
@@ -714,14 +881,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         # failure, so "comparison was requested but blocked" is never
         # console-only, then still propagate the nonzero exit.
         try:
-            manifest = assemble_outputs(bundle_out_dir, args.purge_view, out_dir, reference, stage_info, extract_cmd, bundle_cmd)
+            manifest = assemble_outputs(
+                bundle_out_dir, args.purge_view, out_dir, reference, stage_info, extract_cmd, bundle_cmd,
+                analysis_dir=analysis_dir, known_target_export_run_ids=known_target_export_run_ids,
+            )
             print(f"[compare_reference] comparison_status={manifest['aggregate_comparison_status']} (from blocked run)")
         except Exception:
             pass
         print(f"[compare_reference][error] run_bundle_analysis.py failed (exit {exc.returncode})", file=sys.stderr)
         return exc.returncode or 1
 
-    manifest = assemble_outputs(bundle_out_dir, args.purge_view, out_dir, reference, stage_info, extract_cmd, bundle_cmd)
+    manifest = assemble_outputs(
+        bundle_out_dir, args.purge_view, out_dir, reference, stage_info, extract_cmd, bundle_cmd,
+        analysis_dir=analysis_dir, known_target_export_run_ids=known_target_export_run_ids,
+    )
     print(f"[compare_reference] comparison_status={manifest['aggregate_comparison_status']}")
     print(f"[compare_reference] wrote outputs to {out_dir}")
     return 0
