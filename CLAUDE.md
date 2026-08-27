@@ -179,6 +179,13 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                             `pattern_id_utils.stable_pattern_id()`, never `extractor._stable_pattern_id()` —
                             so a future change to only one would go uncaught; a real regression test is TODO.
   run_config.json        Phase-1 configuration (domains_in_scope, thresholds, seed_baseline_id)
+  compare_reference.py   PR3: standalone reference-vs-target comparison workflow. Orchestration/output layer
+                            only (no comparison mathematics of its own) -- stages a reference export plus one
+                            or more target exports (or a target corpus via --target-dir) into a combined
+                            exports dir, shells out to run_extract_all.py (--seed) then
+                            bundle_analysis/run_bundle_analysis.py (--compare), and reshapes their output into
+                            a stable consumable package (reference_comparison_summary.csv/_detail.csv/
+                            _diagnostics.json/_report.json). See docs/reference_comparison_tool.md.
 
   export_to_flat_tables.py   Phase-0: Flatten record.v2 details → CSV tables (records, identity_items, etc.)
   discover_join_policy.py / apply_join_policy.py   Join-key policy discovery/apply (T1/T2 stages). Sampling
@@ -704,6 +711,7 @@ Phase-1 behavior is entirely governed by `tools/run_config.json`. If `domains_in
 - `docs/governance/governance_reading_order.md` — cold-start reading sequence for a governance evidence package (D-030)
 - `docs/governance/governance_classification_rules.md` — classification-logic branch order/exception conditions by threshold-key name (D-029)
 - `docs/tools_PHASE0_1_2_MAP.md` / `docs/tools_DEPRECATED.md` — useful for deprecation *reasoning*, but dated 2026-01-29 and reference a `tools/phase2_analysis/` package path that no longer exists on disk; don't treat their command examples as current without checking the actual file first
+- `docs/reference_comparison_tool.md` — PR3's standalone `tools/compare_reference.py` reference-vs-target comparison workflow: CLI reference, output schema, and ok/degraded/blocked interpretation
 
 ## Files to Read First
 
