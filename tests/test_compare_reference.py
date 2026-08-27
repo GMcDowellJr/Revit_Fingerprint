@@ -456,6 +456,78 @@ def test_prepare_out_dir_allows_reuse_of_its_own_prior_output(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Regression: --out-dir must never be allowed to destroy the user's source
+# exports (Codex review, PR #466). prepare_out_dir unconditionally clears
+# --out-dir; check_out_dir_does_not_contain_inputs must catch an overlapping
+# --out-dir BEFORE that clearing ever runs.
+# ---------------------------------------------------------------------------
+
+
+def test_check_out_dir_rejects_out_dir_equal_to_reference_parent(tmp_path):
+    exports_dir = tmp_path / "exports"
+    reference = exports_dir / "ref.details.json"
+    _write_json(reference, {"a": 1})
+    target = exports_dir / "t1.details.json"
+    _write_json(target, {"a": 2})
+
+    with pytest.raises(cr.CompareReferenceError, match="ancestor"):
+        cr.check_out_dir_does_not_contain_inputs(exports_dir, reference, [target], None)
+
+
+def test_check_out_dir_rejects_out_dir_equal_to_target_dir(tmp_path):
+    reference = tmp_path / "ref.details.json"
+    _write_json(reference, {"a": 1})
+    corpus_dir = tmp_path / "corpus"
+    _write_json(corpus_dir / "t1.details.json", {"a": 2})
+
+    with pytest.raises(cr.CompareReferenceError, match="ancestor"):
+        cr.check_out_dir_does_not_contain_inputs(corpus_dir, reference, [], corpus_dir)
+
+
+def test_check_out_dir_rejects_out_dir_that_is_an_ancestor_of_an_input(tmp_path):
+    exports_dir = tmp_path / "a" / "b" / "exports"
+    reference = exports_dir / "ref.details.json"
+    _write_json(reference, {"a": 1})
+    target = exports_dir / "t1.details.json"
+    _write_json(target, {"a": 2})
+
+    with pytest.raises(cr.CompareReferenceError, match="ancestor"):
+        cr.check_out_dir_does_not_contain_inputs(tmp_path / "a", reference, [target], None)
+
+
+def test_check_out_dir_allows_unrelated_or_descendant_out_dir(tmp_path):
+    exports_dir = tmp_path / "exports"
+    reference = exports_dir / "ref.details.json"
+    _write_json(reference, {"a": 1})
+    target = exports_dir / "t1.details.json"
+    _write_json(target, {"a": 2})
+
+    # Unrelated directory: fine.
+    cr.check_out_dir_does_not_contain_inputs(tmp_path / "out", reference, [target], None)
+    # A subdirectory nested inside the exports dir doesn't threaten the
+    # exports files living alongside it: fine.
+    cr.check_out_dir_does_not_contain_inputs(exports_dir / "out", reference, [target], None)
+
+
+def test_main_refuses_to_run_when_out_dir_would_destroy_reference(tmp_path, monkeypatch):
+    exports_dir = tmp_path / "exports"
+    reference = exports_dir / "ref.details.json"
+    target = exports_dir / "t1.details.json"
+    _write_json(reference, {"a": 1})
+    _write_json(target, {"a": 2})
+
+    calls = []
+    monkeypatch.setattr(cr, "_execute", lambda cmd: calls.append(cmd))
+
+    rc = cr.main(["--reference", str(reference), "--target", str(target), "--out-dir", str(exports_dir), "--overwrite"])
+
+    assert rc != 0
+    assert calls == []  # no subprocess ever ran
+    assert reference.is_file()  # the source export survived
+    assert target.is_file()
+
+
+# ---------------------------------------------------------------------------
 # 12. Filenames / output locations are deterministic.
 # ---------------------------------------------------------------------------
 
@@ -772,6 +844,38 @@ def test_discover_primary_export_files_covers_mixed_formats_in_one_corpus(tmp_pa
     stems = {cr._export_stem(p) for p in found}
     assert stems == {"a", "b", "c"}
     assert "d" not in stems
+
+
+def test_discover_primary_export_files_includes_standalone_index_export(tmp_path):
+    # tools/extractor.py::_iter_export_files registers a *standalone* index
+    # file (no details mate) as its own primary export -- discovery must
+    # surface it too, not silently drop every *.index.json unconditionally
+    # (Codex review, PR #466).
+    directory = tmp_path / "corpus"
+    _write_json(directory / "a.details.json", {"a": 1})
+    _write_json(directory / "a.index.json", {"a": "index, has a details mate"})
+    _write_json(directory / "b.index.json", {"b": "index-only, no details mate"})
+
+    found = cr._discover_primary_export_files(directory)
+    stems = {cr._export_stem(p) for p in found}
+    names = {p.name for p in found}
+    assert stems == {"a", "b"}
+    assert "a.details.json" in names  # a's details mate wins, per stem priority
+    assert "b.index.json" in names  # b has no details mate -- its index is primary
+
+
+def test_stage_comparison_inputs_target_dir_includes_standalone_index_export(tmp_path):
+    src_dir = tmp_path / "src"
+    reference = src_dir / "ref.details.json"
+    _write_json(reference, {"a": 1})
+    corpus_dir = tmp_path / "corpus"
+    _write_json(corpus_dir / "t1.index.json", {"t": "index-only target"})
+
+    staging_dir = tmp_path / "staged"
+    info = cr.stage_comparison_inputs(reference, [], corpus_dir, staging_dir)
+
+    assert info["target_file_count"] == 1
+    assert (staging_dir / "t1.index.json").is_file()
 
 
 def test_stage_comparison_inputs_target_dir_stages_every_mixed_format_export(tmp_path):

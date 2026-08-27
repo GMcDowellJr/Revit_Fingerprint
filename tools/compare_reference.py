@@ -237,10 +237,17 @@ def _discover_primary_export_files(directory: Path) -> List[Path]:
     whichever single format happens to be present anywhere in the directory
     (Codex review, PR #466 -- the earlier whole-directory-priority version
     silently dropped every non-fingerprint export the moment even one
-    *__fingerprint.json file existed). Within one stem, fingerprint > index >
-    details > plain still applies (mirrors tools/extractor.py); a
-    *.index.json is only ever included via its details sibling, never as its
-    own primary. *.legacy.json is never picked up implicitly.
+    *__fingerprint.json file existed). Within one stem, fingerprint > details
+    > plain still applies for discovery's representative-file choice (mirrors
+    tools/extractor.py, though the exact file chosen here doesn't need to
+    match extractor.py's own file_id -- see _pick_primary_export for where
+    that distinction actually matters, for --seed). A *.index.json is only
+    skipped when its stem was already claimed by a *.details.json mate --
+    tools/extractor.py::_iter_export_files registers a *standalone* index
+    file (no details mate) as its own primary export, so this must too
+    (Codex review, PR #466 second finding -- the earlier version
+    unconditionally skipped every *.index.json, silently losing index-only
+    targets). *.legacy.json is never picked up implicitly.
     """
     seen_stems: Dict[str, Path] = {}
     result: List[Path] = []
@@ -255,6 +262,8 @@ def _discover_primary_export_files(directory: Path) -> List[Path]:
         _consider(p)
     for p in sorted(directory.glob("*.details.json")):
         _consider(p)
+    for p in sorted(directory.glob("*.index.json")):
+        _consider(p)  # no-op if a details mate already claimed this stem
     for p in sorted(directory.glob("*.json")):
         lname = p.name.lower()
         if lname.endswith(".legacy.json") or lname.endswith(".index.json"):
@@ -331,6 +340,36 @@ def stage_comparison_inputs(
 # ---------------------------------------------------------------------------
 # Output directory ownership / overwrite semantics
 # ---------------------------------------------------------------------------
+
+
+def check_out_dir_does_not_contain_inputs(
+    out_dir: Path,
+    reference: Path,
+    targets: Sequence[Path],
+    target_dir: Optional[Path],
+) -> None:
+    """--out-dir is unconditionally cleared on every run (see
+    prepare_out_dir). If it were the same as, or an ancestor of, the
+    reference, a --target, or --target-dir, that clearing would destroy the
+    user's source exports before staging ever ran -- reachable via
+    --overwrite, or even without it whenever the directory happens to
+    already carry this tool's own manifest from an unrelated prior run
+    (Codex review, PR #466). Must be checked before prepare_out_dir is ever
+    called, once all input paths are already known to exist.
+    """
+    resolved_out = out_dir.resolve()
+    candidates: List[Path] = [reference, *targets]
+    if target_dir is not None:
+        candidates.append(target_dir)
+    for candidate in candidates:
+        resolved_candidate = candidate.resolve()
+        if resolved_out == resolved_candidate or resolved_out in resolved_candidate.parents:
+            raise CompareReferenceError(
+                f"--out-dir ({resolved_out}) is the same as, or an ancestor of, an input path "
+                f"({resolved_candidate}). This tool clears --out-dir on every run, which would "
+                "destroy your source exports. Choose a --out-dir that does not contain any "
+                "--reference/--target/--target-dir path."
+            )
 
 
 def prepare_out_dir(out_dir: Path, overwrite: bool) -> None:
@@ -642,6 +681,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         target_dir = Path(args.target_dir).resolve() if args.target_dir else None
 
         out_dir = Path(args.out_dir).resolve()
+        check_out_dir_does_not_contain_inputs(out_dir, reference, targets, target_dir)
         prepare_out_dir(out_dir, overwrite=args.overwrite)
 
         staging_dir = out_dir / "staged_exports"
