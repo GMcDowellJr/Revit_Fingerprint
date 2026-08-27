@@ -184,6 +184,7 @@ def test_no_reference_defined_for_domain(tmp_path):
     assert row["reference_coverage_pct"] == ""
     assert row["jaccard"] == ""
     assert row["reference_pattern_count"] == "0"
+    assert row["target_pattern_count"] == "0"
     assert row["shared_count"] == "0"
     assert row["target_only_count"] == "0"
 

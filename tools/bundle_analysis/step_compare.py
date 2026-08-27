@@ -134,7 +134,7 @@ def _compute_comparison_rows(
                 "coverage_pct": "",
                 "coverage_status": "NO_REFERENCE_DEFINED",
                 "reference_pattern_count": "0",
-                "target_pattern_count": "",
+                "target_pattern_count": "0",
                 "shared_count": "0",
                 "reference_only_count": "0",
                 "target_only_count": "0",
