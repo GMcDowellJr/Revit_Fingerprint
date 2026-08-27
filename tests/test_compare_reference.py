@@ -90,6 +90,9 @@ def _build_segment(
     partial_join_key_provenance: bool = False,
     other_registry_rows: Optional[List[Dict[str, str]]] = None,
     schema_version: str = "2.1.0",
+    unit_system: str = "imperial",
+    write_domain_patterns: bool = True,
+    domain_patterns_rows_override: Optional[List[Dict[str, str]]] = None,
 ) -> Dict[str, Path]:
     """Build a corpus-level run_registry.csv plus one segment's
     results/{records,analysis,bundle_analysis} tree.
@@ -119,8 +122,11 @@ def _build_segment(
     if write_file_metadata:
         _write_csv(
             seg_records / "file_metadata.csv",
-            ["export_run_id", "central_path", "governance_role"],
-            [{"export_run_id": eid, "central_path": f"/x/{eid}", "governance_role": "Project"} for eid in all_ids],
+            ["export_run_id", "central_path", "governance_role", "unit_system"],
+            [
+                {"export_run_id": eid, "central_path": f"/x/{eid}", "governance_role": "Project", "unit_system": unit_system}
+                for eid in all_ids
+            ],
         )
 
     if write_records:
@@ -164,6 +170,32 @@ def _build_segment(
             presence_rows,
         )
         _write_csv(seg_analysis / "corpus_manifest.csv", ["schema_version"], [{"schema_version": schema_version}])
+        # domain_patterns.csv: join_hash = source_cluster_id.split("|")[-1].
+        # Using f"{DOMAIN}|{pid}" makes join_hash == pid for these fixtures --
+        # a deliberately trivial (identity) resolution so existing same-
+        # pattern_id-space test assertions keep working unchanged, while
+        # still exercising the real pattern_id -> join_hash lookup path that
+        # cross-segment mode requires (resolve_cross_segment_pattern_identity).
+        if write_domain_patterns:
+            if domain_patterns_rows_override is not None:
+                domain_patterns_rows = domain_patterns_rows_override
+            else:
+                distinct_pattern_ids = sorted({pid for pattern_ids in presence.values() for pid in pattern_ids})
+                domain_patterns_rows = [
+                    {
+                        "schema_version": schema_version,
+                        "analysis_run_id": RUN_ID,
+                        "domain": DOMAIN,
+                        "pattern_id": pid,
+                        "source_cluster_id": f"{DOMAIN}|{pid}",
+                    }
+                    for pid in distinct_pattern_ids
+                ]
+            _write_csv(
+                seg_analysis / "domain_patterns.csv",
+                ["schema_version", "analysis_run_id", "domain", "pattern_id", "source_cluster_id"],
+                domain_patterns_rows,
+            )
         if write_bundle_dirs:
             for view in views:
                 _write_csv(
@@ -214,6 +246,8 @@ def _build_multidomain_segment(
     status: str = "complete",
     views: Sequence[str] = ("all", "used"),
     other_registry_rows: Optional[List[Dict[str, str]]] = None,
+    schema_version: str = "2.1.0",
+    unit_system: str = "imperial",
 ) -> Dict[str, Path]:
     """Build one segment spanning multiple domains, for cross-segment
     join-policy compatibility-gate tests where one domain's join-key
@@ -239,8 +273,11 @@ def _build_multidomain_segment(
     all_export_ids = sorted({eid for presence in domain_presence.values() for eid in presence.keys()})
     _write_csv(
         seg_records / "file_metadata.csv",
-        ["export_run_id", "central_path", "governance_role"],
-        [{"export_run_id": eid, "central_path": f"/x/{eid}", "governance_role": "Project"} for eid in all_export_ids],
+        ["export_run_id", "central_path", "governance_role", "unit_system"],
+        [
+            {"export_run_id": eid, "central_path": f"/x/{eid}", "governance_role": "Project", "unit_system": unit_system}
+            for eid in all_export_ids
+        ],
     )
 
     records_rows: List[Dict[str, str]] = []
@@ -277,7 +314,25 @@ def _build_multidomain_segment(
         ["analysis_run_id", "domain", "export_run_id", "pattern_id", "pattern_share_pct"],
         presence_rows,
     )
-    _write_csv(seg_analysis / "corpus_manifest.csv", ["schema_version"], [{"schema_version": "2.1.0"}])
+    _write_csv(seg_analysis / "corpus_manifest.csv", ["schema_version"], [{"schema_version": schema_version}])
+    domain_patterns_rows: List[Dict[str, str]] = []
+    for domain, presence in domain_presence.items():
+        distinct_pattern_ids = sorted({pid for pattern_ids in presence.values() for pid in pattern_ids})
+        for pid in distinct_pattern_ids:
+            domain_patterns_rows.append(
+                {
+                    "schema_version": schema_version,
+                    "analysis_run_id": RUN_ID,
+                    "domain": domain,
+                    "pattern_id": pid,
+                    "source_cluster_id": f"{domain}|{pid}",
+                }
+            )
+    _write_csv(
+        seg_analysis / "domain_patterns.csv",
+        ["schema_version", "analysis_run_id", "domain", "pattern_id", "source_cluster_id"],
+        domain_patterns_rows,
+    )
     for view in views:
         for domain, membership_rows in membership_rows_by_domain.items():
             _write_csv(
@@ -894,6 +949,161 @@ def test_cross_segment_differing_extractor_schema_version_blocks_whole_run(tmp_p
     assert diag["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
     assert diag["run_comparison_reason_codes"] == [cr.REASON_CROSS_SEGMENT_SCHEMA_MISMATCH]
     assert _read_csv(out_dir / cr.SUMMARY_FILENAME) == []
+
+
+def test_cross_segment_pattern_id_translated_to_join_hash(tmp_path):
+    # Reference segment and target segment assign completely different LOCAL
+    # pattern_id strings to the same logical pattern (same join_hash via
+    # source_cluster_id) -- and, deliberately, target's local id ("P1")
+    # collides textually with one of reference's local ids without meaning
+    # the same thing (different join_hash). Comparing raw pattern_id (the
+    # pre-fix bug, Codex review PR #471) would get this exactly backwards:
+    # it would call the textually-matching-but-unrelated "P1" pair "shared"
+    # and the true match ("P2"/"Q_MATCH") "reference_only"/"target_only".
+    # Only join_hash-based comparison gets both classifications right.
+    ctx_a = _build_segment(
+        tmp_path,
+        {"ref.json": ["P1", "P2"]},
+        segment_id="seg_a",
+        domain_patterns_rows_override=[
+            {"schema_version": "2.1.0", "analysis_run_id": RUN_ID, "domain": DOMAIN, "pattern_id": "P1", "source_cluster_id": f"{DOMAIN}|JH_UNRELATED_A"},
+            {"schema_version": "2.1.0", "analysis_run_id": RUN_ID, "domain": DOMAIN, "pattern_id": "P2", "source_cluster_id": f"{DOMAIN}|JH_SHARED"},
+        ],
+    )
+    ctx_b = _build_segment(
+        tmp_path,
+        {"target.json": ["P1", "Q_MATCH"]},
+        segment_id="seg_b",
+        other_registry_rows=[ctx_a["registry_row"]],
+        domain_patterns_rows_override=[
+            {"schema_version": "2.1.0", "analysis_run_id": RUN_ID, "domain": DOMAIN, "pattern_id": "P1", "source_cluster_id": f"{DOMAIN}|JH_UNRELATED_B"},
+            {"schema_version": "2.1.0", "analysis_run_id": RUN_ID, "domain": DOMAIN, "pattern_id": "Q_MATCH", "source_cluster_id": f"{DOMAIN}|JH_SHARED"},
+        ],
+    )
+    ctx = {"registry_file": ctx_b["registry_file"], "segments_root": ctx_b["segments_root"]}
+
+    rc, out_dir = _run(
+        tmp_path,
+        ctx,
+        reference_segment="seg_a",
+        target_segment="seg_b",
+        reference="ref.json",
+        target="target.json",
+        purge_view="all",
+    )
+    assert rc == 0
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert len(summary) == 1
+    row = summary[0]
+    assert row["comparison_status"] == COMPARISON_STATUS_OK
+    # JH_SHARED is genuinely shared (reference's P2 == target's Q_MATCH);
+    # JH_UNRELATED_A/_B are each other's reference_only/target_only despite
+    # both segments' unrelated pattern happening to be spelled "P1".
+    assert row["shared_count"] == "1"
+    assert row["reference_only_count"] == "1"
+    assert row["target_only_count"] == "1"
+
+    detail = {r["pattern_id"]: r["comparison_class"] for r in _read_csv(out_dir / cr.DETAIL_FILENAME)}
+    assert detail["JH_SHARED"] == "shared"
+    assert detail["JH_UNRELATED_A"] == "reference_only"
+    assert detail["JH_UNRELATED_B"] == "target_only"
+    assert "P1" not in detail  # raw local pattern_id must never leak into output
+
+
+def test_cross_segment_unit_system_mismatch_blocks_whole_run(tmp_path):
+    ctx_a = _build_segment(tmp_path, {"ref.json": ["A", "B"]}, segment_id="seg_a", unit_system="imperial")
+    ctx_b = _build_segment(
+        tmp_path,
+        {"target.json": ["A"]},
+        segment_id="seg_b",
+        other_registry_rows=[ctx_a["registry_row"]],
+        unit_system="metric",
+    )
+    ctx = {"registry_file": ctx_b["registry_file"], "segments_root": ctx_b["segments_root"]}
+
+    rc, out_dir = _run(
+        tmp_path,
+        ctx,
+        reference_segment="seg_a",
+        target_segment="seg_b",
+        reference="ref.json",
+        target="target.json",
+        purge_view="all",
+    )
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH]
+    assert _read_csv(out_dir / cr.SUMMARY_FILENAME) == []
+
+
+def test_cross_segment_missing_domain_patterns_blocks_whole_run(tmp_path):
+    # Cross-segment mode requires domain_patterns.csv (needed for join_hash
+    # resolution) on both sides; same-segment mode never requires it.
+    ctx_a = _build_segment(tmp_path, {"ref.json": ["A", "B"]}, segment_id="seg_a", write_domain_patterns=False)
+    ctx_b = _build_segment(
+        tmp_path, {"target.json": ["A"]}, segment_id="seg_b", other_registry_rows=[ctx_a["registry_row"]]
+    )
+    ctx = {"registry_file": ctx_b["registry_file"], "segments_root": ctx_b["segments_root"]}
+
+    rc, out_dir = _run(
+        tmp_path,
+        ctx,
+        reference_segment="seg_a",
+        target_segment="seg_b",
+        reference="ref.json",
+        target="target.json",
+        purge_view="all",
+    )
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_REQUIRED_ANALYSIS_ARTIFACT_MISSING]
+
+
+def test_same_segment_never_requires_domain_patterns(tmp_path):
+    ctx = _build_segment(
+        tmp_path, {"ref.json": ["A", "B"], "target.json": ["A"]}, write_domain_patterns=False
+    )
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
+    assert rc == 0
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert summary[0]["comparison_status"] == COMPARISON_STATUS_OK
+
+
+def test_cross_segment_unresolved_pattern_identity_blocks_only_that_domain(tmp_path):
+    # Reference's pattern "B" has a blank source_cluster_id in its own
+    # segment's domain_patterns.csv -- it cannot be resolved to a join_hash,
+    # so this domain must block rather than silently omitting "B" from the
+    # reference set (which would understate reference_pattern_count).
+    ctx_a = _build_segment(
+        tmp_path,
+        {"ref.json": ["A", "B"]},
+        segment_id="seg_a",
+        domain_patterns_rows_override=[
+            {"schema_version": "2.1.0", "analysis_run_id": RUN_ID, "domain": DOMAIN, "pattern_id": "A", "source_cluster_id": f"{DOMAIN}|JH_A"},
+            {"schema_version": "2.1.0", "analysis_run_id": RUN_ID, "domain": DOMAIN, "pattern_id": "B", "source_cluster_id": ""},
+        ],
+    )
+    ctx_b = _build_segment(
+        tmp_path, {"target.json": ["A"]}, segment_id="seg_b", other_registry_rows=[ctx_a["registry_row"]]
+    )
+    ctx = {"registry_file": ctx_b["registry_file"], "segments_root": ctx_b["segments_root"]}
+
+    rc, out_dir = _run(
+        tmp_path,
+        ctx,
+        reference_segment="seg_a",
+        target_segment="seg_b",
+        reference="ref.json",
+        target="target.json",
+        purge_view="all",
+    )
+    assert rc == 0  # domain-level block, not a process failure
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert len(summary) == 1
+    assert summary[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert summary[0]["comparison_reason_codes"] == cr.REASON_CROSS_SEGMENT_PATTERN_IDENTITY_UNRESOLVED
+    assert summary[0]["shared_count"] == ""
 
 
 def test_same_segment_schema_mismatch_check_never_runs(tmp_path):

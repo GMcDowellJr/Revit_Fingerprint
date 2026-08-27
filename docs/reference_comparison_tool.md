@@ -31,9 +31,36 @@ Instead, it consumes the **already-materialized, segment-local** outputs
 `tools/run_segment_orchestrator.py` produced for one segment:
 `results/records/{records.csv,file_metadata.csv}`,
 `results/analysis/pattern_presence_file.csv`, and
-`results/bundle_analysis/{all,used}/<domain>/membership_matrix.csv`. If that
-materialization is missing, incomplete, or internally inconsistent, the
-comparison blocks explicitly rather than regenerating anything.
+`results/bundle_analysis/{all,used}/<domain>/membership_matrix.csv`. Cross-segment
+mode (`--reference-segment` != `--target-segment`) additionally requires
+`results/analysis/domain_patterns.csv` on both segments (see **Cross-segment
+pattern identity** below). If that materialization is missing, incomplete,
+or internally inconsistent, the comparison blocks explicitly rather than
+regenerating anything.
+
+## Cross-segment pattern identity (`join_hash`)
+
+`pattern_id` values are **segment-local**: each segment's own patterns stage
+assigns them independently, so the same string in two different segments'
+`membership_matrix.csv` files carries no shared meaning (see
+`docs/cross_segment_comparison.md` section 4, "join_hash Resolution"). Within
+one segment (same-segment mode), comparing raw `pattern_id` is correct --
+reference and target share the same single patterns-stage run by
+construction. Across two *different* segments, this tool resolves both
+sides to the cross-segment-stable `join_hash` identity before any
+shared/reference_only/target_only classification, via each segment's own
+`domain_patterns.csv` (`join_hash = source_cluster_id.split("|")[-1]`) --
+the same resolution `tools/compare_cross_segment.py::resolve_join_hashes`
+already performs for the corpus-wide cross-segment tool. A domain whose
+resolution can't be completed for every pattern actually in play (missing
+`domain_patterns.csv` rows, or a blank `source_cluster_id`) blocks with
+`CROSS_SEGMENT_PATTERN_IDENTITY_UNRESOLVED` rather than silently comparing
+an understated set. Cross-segment mode also requires both segments' own
+`unit_system` (from `file_metadata.csv`) to agree, and to each be uniform
+and non-blank -- `CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH` otherwise, mirroring
+`docs/cross_segment_comparison.md`'s "No cross-unit-system pairs" rule
+(`join_hash` values for the same logical pattern differ between unit
+systems because behavioral hashes include unit-bearing values).
 
 ## What a "reference" is (and is not)
 
@@ -128,15 +155,21 @@ python tools/compare_reference.py \
     --out-dir /data/comparisons/client_acme_vs_enterprise_template_v3
 ```
 
-Domains whose `(join_key_schema, join_key_policy_id, join_key_policy_version)`
-tuple doesn't agree between `enterprise_all` and `client_acme` block with
+Before any domain is evaluated, the entire run blocks if `enterprise_all`
+and `client_acme` don't share the same `unit_system`
+(`CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH`) or the same `extractor_schema_version`
+(`CROSS_SEGMENT_SCHEMA_MISMATCH`) — join-key agreement alone doesn't prove
+the underlying pattern evidence is comparable across unit systems or
+extractor versions. Past those whole-run gates, domains whose
+`(join_key_schema, join_key_policy_id, join_key_policy_version)` tuple
+doesn't agree between the two segments block with
 `CROSS_SEGMENT_JOIN_POLICY_MISMATCH` rather than comparing pattern_id sets
-produced under different join policies; other, agreeing domains still
-compare normally in the same run. If the two segments' own
-`extractor_schema_version` don't agree (or either is absent), the entire run
-blocks with `CROSS_SEGMENT_SCHEMA_MISMATCH` before any domain is evaluated —
-join-key agreement alone doesn't prove the underlying pattern evidence is
-comparable across extractor versions.
+produced under different join policies. For domains that pass both gates,
+each segment's `pattern_id` values are translated to the cross-segment
+`join_hash` identity (via each segment's own `domain_patterns.csv`) before
+comparison; a domain whose translation can't be completed blocks with
+`CROSS_SEGMENT_PATTERN_IDENTITY_UNRESOLVED`. Domains passing every gate
+still compare normally in the same run.
 
 ## Outputs
 
@@ -189,28 +222,31 @@ comparator's)
 |---|---|
 | `SEGMENT_NOT_FOUND` | `--reference-segment`/`--target-segment` has no matching row in `--registry-file` |
 | `SEGMENT_MATERIALIZATION_INCOMPLETE` | that segment's `run_registry.csv` status is not `complete` |
-| `REQUIRED_ANALYSIS_ARTIFACT_MISSING` | `records.csv`/`file_metadata.csv`/`pattern_presence_file.csv`, or a requested `--purge-view` directory, is missing despite `status=complete` |
+| `REQUIRED_ANALYSIS_ARTIFACT_MISSING` | `records.csv`/`file_metadata.csv`/`pattern_presence_file.csv`, or a requested `--purge-view` directory, is missing despite `status=complete`; in cross-segment mode, `domain_patterns.csv` (needed for `join_hash` resolution) missing on either segment also fires this code |
 | `REFERENCE_NOT_MATERIALIZED` / `TARGET_NOT_MATERIALIZED` | the selector resolves to zero export_run_ids in its segment |
 | `REFERENCE_AMBIGUOUS` / `TARGET_AMBIGUOUS` | the selector resolves to more than one export_run_id |
 | `NO_COMPARISON_TARGETS` | after excluding the reference itself, no comparison target remains (an explicit `--target` resolved to the same export_run_id as `--reference`, or the target segment has no other materialized file at all) |
 | `REFERENCE_HAS_NO_PATTERNS` | the resolved reference has zero `pattern_id` evidence across every domain in its segment's `pattern_presence_file.csv` — mirrors `reference_bundle.py::write_sidecar`'s own rejection of a globally empty reference |
+| `CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH` | only possible when `--reference-segment` != `--target-segment`: the reference segment's and target segment's `unit_system` (from each segment's own `file_metadata.csv`) don't agree, either is absent, or either isn't uniform across that segment's own files — mirrors `docs/cross_segment_comparison.md`'s "No cross-unit-system pairs" rule; `join_hash` values for the same logical pattern differ between unit systems because behavioral hashes include unit-bearing values |
 | `CROSS_SEGMENT_SCHEMA_MISMATCH` | only possible when `--reference-segment` != `--target-segment`: the reference segment's and target segment's `extractor_schema_version` (from each segment's own `corpus_manifest.csv`) don't agree, or either is absent — mirrors `reference_bundle.py::load_and_validate`'s own sidecar-vs-current `extractor_schema_version` rejection; without it, two segments materialized under different extractor schema versions that happen to share the same join-key tuple would pass the join-policy gate and report `ok` metrics across pattern evidence that isn't actually comparable |
 | `MATERIALIZATION_VERSION_INCOMPATIBLE` | the target segment's `records.csv` shows more than one distinct **complete** (all three fields populated) `(join_key_schema, join_key_policy_id, join_key_policy_version)` tuple for a requested domain -- an internal-consistency check within one segment's own materialization |
 | `MATERIALIZATION_COMPATIBILITY_UNPROVEN` | no complete tuple is populated for that domain at all in the target segment's `records.csv`, or at least one record has an incomplete tuple (any of the three fields blank) even alongside an otherwise-consistent complete one — a partially-populated tuple is never treated as proof of compatibility, and an incomplete record is never simply discarded |
 | `CROSS_SEGMENT_JOIN_POLICY_MISMATCH` | only possible when `--reference-segment` != `--target-segment`: the reference segment's and target segment's `(join_key_schema, join_key_policy_id, join_key_policy_version)` tuples for a requested domain don't agree, or either segment's own tuple for that domain isn't independently `ok` (see `MATERIALIZATION_VERSION_INCOMPATIBLE`/`_UNPROVEN` above) — distinct from those two codes, which check consistency *within* one segment; this checks agreement *between* two segments, since comparing pattern_id sets produced under different join policies is meaningless |
+| `CROSS_SEGMENT_PATTERN_IDENTITY_UNRESOLVED` | only possible when `--reference-segment` != `--target-segment`, and only for a domain that already passed `CROSS_SEGMENT_JOIN_POLICY_MISMATCH`: at least one pattern actually in play for that domain has no resolvable `join_hash` in its segment's own `domain_patterns.csv` (the domain is entirely absent from that file, or a relevant `pattern_id` row has a blank `source_cluster_id`) — see **Cross-segment pattern identity** above |
 | `STALE_MEMBERSHIP_MATRIX` | a requested domain/view's `membership_matrix.csv` has rows, but none for the target segment's current `analysis_run_id` — comparing against it would silently look like "target has none of the reference's patterns" |
 
 A `SEGMENT_NOT_FOUND`/`SEGMENT_MATERIALIZATION_INCOMPLETE`/
 `REQUIRED_ANALYSIS_ARTIFACT_MISSING`/`*_NOT_MATERIALIZED`/`*_AMBIGUOUS`/
-`NO_COMPARISON_TARGETS`/`REFERENCE_HAS_NO_PATTERNS`/`CROSS_SEGMENT_SCHEMA_MISMATCH`
+`NO_COMPARISON_TARGETS`/`REFERENCE_HAS_NO_PATTERNS`/
+`CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH`/`CROSS_SEGMENT_SCHEMA_MISMATCH`
 condition blocks the **entire run** (nonzero exit; still writes the 4-file
 output contract, header-only summary/detail, so the failure is never
 console-only). A
 `MATERIALIZATION_VERSION_INCOMPATIBLE`/`MATERIALIZATION_COMPATIBILITY_UNPROVEN`/
-`CROSS_SEGMENT_JOIN_POLICY_MISMATCH`/`STALE_MEMBERSHIP_MATRIX` condition
-blocks only the affected **domain** (exit `0`; check `comparison_status` per
-row) — matching the existing convention that a row/domain-level blocked
-outcome is not a process failure.
+`CROSS_SEGMENT_JOIN_POLICY_MISMATCH`/`CROSS_SEGMENT_PATTERN_IDENTITY_UNRESOLVED`/
+`STALE_MEMBERSHIP_MATRIX` condition blocks only the affected **domain** (exit
+`0`; check `comparison_status` per row) — matching the existing convention
+that a row/domain-level blocked outcome is not a process failure.
 
 A domain the caller explicitly requested via `--domains` that this segment
 never observed at all is not a new reason code: it surfaces as the

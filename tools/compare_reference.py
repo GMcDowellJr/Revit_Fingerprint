@@ -28,10 +28,20 @@ already-produced results/records/file_metadata.csv -- the JSON files
 themselves are never opened. If either requested segment's materialization
 is missing, incomplete, or a filename cannot be resolved unambiguously, the
 comparison blocks explicitly rather than falling back to any JSON-driven
-path. When the two segments differ, an additional cross-segment join-policy
-compatibility gate (CROSS_SEGMENT_JOIN_POLICY_MISMATCH) blocks any domain
-whose join-key provenance doesn't agree between the two segments -- see
-resolve_cross_segment_compatibility().
+path. When the two segments differ, several additional cross-segment gates
+apply before any domain is compared: a whole-run unit_system check
+(CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH) and extractor_schema_version check
+(CROSS_SEGMENT_SCHEMA_MISMATCH), then a per-domain join-key-provenance gate
+(CROSS_SEGMENT_JOIN_POLICY_MISMATCH, see resolve_cross_segment_compatibility())
+and a per-domain pattern-identity resolution gate
+(CROSS_SEGMENT_PATTERN_IDENTITY_UNRESOLVED, see
+resolve_cross_segment_pattern_identity()). That last gate matters because
+`pattern_id` values are segment-local (assigned independently by each
+segment's own patterns stage) -- cross-segment mode translates both sides to
+the cross-segment-stable `join_hash` identity (via each segment's own
+domain_patterns.csv, the same resolution tools/compare_cross_segment.py
+already uses) before any shared/reference_only/target_only classification,
+rather than comparing raw pattern_id values that happen to look alike.
 
 See docs/reference_comparison_tool.md for the full runbook, CLI reference,
 and output-field documentation, including the neutral-terminology note: a
@@ -107,6 +117,30 @@ REASON_REFERENCE_HAS_NO_PATTERNS = "REFERENCE_HAS_NO_PATTERNS"
 # CROSS_SEGMENT_JOIN_POLICY_MISMATCH gate and report "ok" comparison metrics
 # across pattern evidence that isn't actually comparable (Codex review, PR #471).
 REASON_CROSS_SEGMENT_SCHEMA_MISMATCH = "CROSS_SEGMENT_SCHEMA_MISMATCH"
+# Only checked/reachable in cross-segment mode. docs/cross_segment_comparison.md
+# ("No cross-unit-system pairs"): join_hashes for the same logical pattern
+# differ between unit systems because behavioral hashes include unit-bearing
+# values, so imperial/metric segments are never compared by the existing
+# authoritative cross-segment tool (tools/compare_cross_segment.py) either
+# (Codex review, PR #471).
+REASON_CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH = "CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH"
+# Only checked/reachable in cross-segment mode, and only for a domain that
+# already passed the CROSS_SEGMENT_JOIN_POLICY_MISMATCH gate above. pattern_id
+# values are segment-local identifiers assigned independently by each
+# segment's own patterns stage -- they are NOT stable across segments and
+# must never be compared directly (docs/cross_segment_comparison.md section 4,
+# "join_hash Resolution"). The authoritative cross-segment tool
+# (tools/compare_cross_segment.py::resolve_join_hashes) resolves pattern_id ->
+# join_hash per (segment, domain) via that segment's own domain_patterns.csv
+# (join_hash = source_cluster_id.split("|")[-1]) before any set operation;
+# resolve_cross_segment_pattern_identity() below does the same translation
+# here. This reason code fires when that translation cannot be completed for
+# every pattern_id actually in play for a domain -- domain_patterns.csv is
+# missing/has zero rows for the domain, or at least one relevant pattern_id
+# has a blank source_cluster_id -- rather than silently dropping the
+# unresolvable pattern_id(s) and comparing an understated set (Codex review,
+# PR #471).
+REASON_CROSS_SEGMENT_PATTERN_IDENTITY_UNRESOLVED = "CROSS_SEGMENT_PATTERN_IDENTITY_UNRESOLVED"
 REASON_STALE_MEMBERSHIP_MATRIX = "STALE_MEMBERSHIP_MATRIX"
 # Pure pre-flight/out-dir-safety failures -- raised before --out-dir can be
 # safely prepared at all, so no diagnostics file is ever written for these.
@@ -259,11 +293,20 @@ def resolve_segment(registry_file: Path, segments_root: Path, segment_id: str) -
     return segments_root / output_folder, status
 
 
-def require_segment_artifacts(segment_root: Path, views: Sequence[str]) -> Dict[str, Path]:
+def require_segment_artifacts(
+    segment_root: Path, views: Sequence[str], require_domain_patterns: bool = False
+) -> Dict[str, Path]:
     """Confirm the segment-wide artifacts every comparison needs are actually
     present on disk, despite run_registry.csv reporting status=complete
     (internal-consistency check, not a substitute for that status check).
     Never silently regenerates a missing artifact.
+
+    `require_domain_patterns=True` (cross-segment mode only) additionally
+    requires `results/analysis/domain_patterns.csv` -- needed to resolve
+    segment-local pattern_id values to the cross-segment-stable join_hash
+    identity (see resolve_cross_segment_pattern_identity()). Same-segment
+    mode never sets this, since raw pattern_id is already directly comparable
+    within one segment and this file isn't otherwise required.
     """
     records_dir = segment_root / "results" / "records"
     analysis_dir = segment_root / "results" / "analysis"
@@ -274,6 +317,8 @@ def require_segment_artifacts(segment_root: Path, views: Sequence[str]) -> Dict[
         "file_metadata.csv": records_dir / "file_metadata.csv",
         "pattern_presence_file.csv": analysis_dir / "pattern_presence_file.csv",
     }
+    if require_domain_patterns:
+        required_files["domain_patterns.csv"] = analysis_dir / "domain_patterns.csv"
     missing = [str(p) for p in required_files.values() if not p.is_file()]
     for view in views:
         view_dir = bundle_dir / view
@@ -341,6 +386,17 @@ def read_extractor_schema_version(analysis_dir: Path) -> str:
     rows = read_csv_rows(path)
     versions = {(r.get("schema_version", "") or "").strip() for r in rows if (r.get("schema_version", "") or "").strip()}
     return next(iter(versions)) if len(versions) == 1 else ""
+
+
+def read_segment_unit_system(file_metadata_rows: Sequence[Dict[str, str]]) -> str:
+    """Mirrors read_extractor_schema_version's single-value-or-blank pattern:
+    returns the segment's unit_system only if exactly one distinct non-blank
+    value is present across its own file_metadata.csv rows, else "" (not
+    provably uniform). Only consulted in cross-segment mode -- see
+    REASON_CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH.
+    """
+    values = {(r.get("unit_system", "") or "").strip() for r in file_metadata_rows if (r.get("unit_system", "") or "").strip()}
+    return next(iter(values)) if len(values) == 1 else ""
 
 
 # ---------------------------------------------------------------------------
@@ -466,6 +522,117 @@ def resolve_cross_segment_compatibility(
 
 
 # ---------------------------------------------------------------------------
+# Cross-segment pattern-identity resolution (pattern_id -> join_hash).
+#
+# pattern_id values are segment-local: each segment's own patterns stage
+# assigns them independently, so the same integer/label in two different
+# segments' membership_matrix.csv files carries no shared meaning. The
+# cross-segment-stable identity is join_hash, resolved from each segment's
+# own results/analysis/domain_patterns.csv (join_hash =
+# source_cluster_id.split("|")[-1]) -- the same resolution
+# tools/compare_cross_segment.py::resolve_join_hashes already performs for
+# the corpus-wide cross-segment tool. Only relevant/called in cross-segment
+# mode; same-segment mode compares raw pattern_id directly (as before),
+# since within one segment's own single patterns-stage run pattern_id
+# already is the stable identity (Codex review, PR #471).
+# ---------------------------------------------------------------------------
+
+
+def load_domain_pattern_join_hash_map(segment_root: Path, domain: str) -> Tuple[Dict[str, str], bool]:
+    """Return ({pattern_id: join_hash}, fully_resolved) for one segment's
+    results/analysis/domain_patterns.csv, scoped to `domain`. `fully_resolved`
+    is False when the domain has zero rows at all in that file, or when at
+    least one row for the domain has a blank source_cluster_id (cannot be
+    resolved to a join_hash) -- mirroring
+    tools/compare_cross_segment.py::resolve_join_hashes's own blank-
+    source_cluster_id case, but treated as a hard block here (via the caller)
+    rather than a silent warn-and-skip: an undetected partial resolution
+    could silently understate a reference or target pattern set without any
+    visible signal.
+    """
+    path = segment_root / "results" / "analysis" / "domain_patterns.csv"
+    if not path.is_file():
+        return {}, False
+    jh_map: Dict[str, str] = {}
+    saw_row = False
+    fully_resolved = True
+    for row in read_csv_rows(path):
+        if (row.get("domain", "") or "").strip() != domain:
+            continue
+        saw_row = True
+        pid = (row.get("pattern_id", "") or "").strip()
+        scid = (row.get("source_cluster_id", "") or "").strip()
+        if not pid:
+            continue
+        if not scid:
+            fully_resolved = False
+            continue
+        jh_map[pid] = scid.split("|")[-1]
+    return jh_map, (fully_resolved and saw_row)
+
+
+def resolve_cross_segment_pattern_identity(
+    reference_segment_root: Path,
+    target_segment_root: Path,
+    domains: Sequence[str],
+    reference_domains: Dict[str, List[str]],
+) -> Tuple[Dict[str, Dict[str, object]], Dict[str, Dict[str, str]]]:
+    """For each domain, resolve both segments' pattern_id -> join_hash maps
+    and determine whether cross-segment comparison can proceed for it.
+    Mutates `reference_domains` (the `reference["domains"]` dict already
+    built by build_reference()) IN PLACE, replacing each resolvable domain's
+    raw reference pattern_id list with the resolved, deduplicated, sorted
+    join_hash list -- so the rest of the pipeline (run_compare_for_domain via
+    the translated target membership below) compares join_hash to join_hash.
+
+    Returns (identity_status, target_jh_maps): identity_status[domain] is
+    {"status": "ok"} or {"status": "unresolved", "detail": ...};
+    target_jh_maps[domain] is the target segment's own {pattern_id:
+    join_hash} map, needed later to translate each requested view's real
+    membership_matrix.csv before it reaches run_compare_for_domain (see
+    _write_translated_membership_matrix()).
+    """
+    identity_status: Dict[str, Dict[str, object]] = {}
+    target_jh_maps: Dict[str, Dict[str, str]] = {}
+    for dom in domains:
+        reference_jh_map, reference_resolved = load_domain_pattern_join_hash_map(reference_segment_root, dom)
+        target_jh_map, target_resolved = load_domain_pattern_join_hash_map(target_segment_root, dom)
+        target_jh_maps[dom] = target_jh_map
+        if not reference_resolved or not target_resolved:
+            identity_status[dom] = {
+                "status": "unresolved",
+                "detail": (
+                    f"domain={dom!r}: domain_patterns.csv join_hash resolution incomplete or missing "
+                    f"(reference_resolvable={reference_resolved}, target_resolvable={target_resolved})"
+                ),
+            }
+            continue
+
+        raw_pattern_ids = reference_domains.get(dom, [])
+        translated: Set[str] = set()
+        all_resolved = True
+        for pid in raw_pattern_ids:
+            jh = reference_jh_map.get(pid)
+            if not jh:
+                all_resolved = False
+                continue
+            translated.add(jh)
+        if not all_resolved:
+            identity_status[dom] = {
+                "status": "unresolved",
+                "detail": (
+                    f"domain={dom!r}: at least one reference pattern_id has no join_hash in the "
+                    "reference segment's own domain_patterns.csv"
+                ),
+            }
+            continue
+
+        identity_status[dom] = {"status": "ok"}
+        reference_domains[dom] = sorted(translated)
+    return identity_status, target_jh_maps
+
+
+# ---------------------------------------------------------------------------
 # Comparison execution (per domain, per purge_view) -- reuses
 # run_compare_for_domain directly against this segment's own already-built
 # bundle_analysis/<view>/<domain>/membership_matrix.csv; no step1 recompute.
@@ -526,6 +693,46 @@ def _membership_matrix_is_current(bundle_dir: Path, view: str, domain: str, run_
     return any(row.get("analysis_run_id", "") == run_id for row in rows)
 
 
+def _write_translated_membership_matrix(src_path: Path, dest_path: Path, jh_map: Dict[str, str]) -> bool:
+    """Materialize a translated copy of one (view, domain)'s real
+    membership_matrix.csv, with each non-blank `pattern_id` value replaced by
+    its resolved join_hash from `jh_map` (a target segment's own {pattern_id:
+    join_hash} map, from load_domain_pattern_join_hash_map()). Written into
+    this tool's own --out-dir (never the real segment materialization, which
+    this tool only ever reads) so run_compare_for_domain -- unmodified, and
+    unaware any translation happened -- can be pointed at it in place of the
+    real target bundle_dir for cross-segment mode.
+
+    Returns True if every non-blank pattern_id row resolved. A blank
+    pattern_id row (the existing "unknown identity" bucket -- see
+    tools/extractor.py's own "Unknown join_hash rows still get membership
+    rows with blank pattern_id" comment) passes through unchanged; it isn't a
+    translation failure. A row whose pattern_id has no entry in `jh_map`
+    despite the domain's overall resolution having been proven complete by
+    resolve_cross_segment_pattern_identity() would be an unexpected
+    inconsistency between this segment's own membership_matrix.csv and
+    domain_patterns.csv -- returning False here lets the caller block that
+    (domain, view) explicitly rather than silently dropping the row.
+    """
+    rows = read_csv_rows(src_path) if src_path.is_file() else []
+    out_rows: List[Dict[str, str]] = []
+    fully_resolved = True
+    for row in rows:
+        pid = (row.get("pattern_id", "") or "").strip()
+        if not pid:
+            out_rows.append(row)
+            continue
+        jh = jh_map.get(pid)
+        if not jh:
+            fully_resolved = False
+            continue
+        translated = dict(row)
+        translated["pattern_id"] = jh
+        out_rows.append(translated)
+    atomic_write_csv(dest_path, ["analysis_run_id", "export_run_id", "pattern_id"], out_rows)
+    return fully_resolved
+
+
 def run_comparisons(
     run_id: str,
     analysis_dir: Path,
@@ -537,9 +744,18 @@ def run_comparisons(
     target_export_run_id: Optional[str],
     all_export_run_ids: Sequence[str],
     out_dir: Path,
+    pattern_identity_status: Optional[Dict[str, Dict[str, object]]] = None,
+    target_jh_maps: Optional[Dict[str, Dict[str, str]]] = None,
 ) -> Dict[str, List[Dict[str, str]]]:
+    """`pattern_identity_status`/`target_jh_maps` are only ever passed
+    (non-None) in cross-segment mode, from resolve_cross_segment_pattern_identity().
+    Same-segment invocations pass neither, so the cross-segment identity gate
+    and membership-matrix translation below are entirely skipped -- byte-
+    identical to this function's pre-cross-segment-support behavior.
+    """
     per_view_summaries: Dict[str, List[Dict[str, str]]] = {}
     eligible = {target_export_run_id} if target_export_run_id else set(all_export_run_ids)
+    cross_segment = pattern_identity_status is not None
 
     for view in views:
         compare_out_dir = out_dir / f"compare_{view}"
@@ -564,6 +780,14 @@ def run_comparisons(
                 )
                 view_summaries.append(_synthesized_blocked_summary(reference, run_id, dom, reason_code, detail))
                 continue
+            if cross_segment and pattern_identity_status[dom]["status"] != "ok":
+                reason_code = REASON_CROSS_SEGMENT_PATTERN_IDENTITY_UNRESOLVED
+                detail = str(pattern_identity_status[dom]["detail"])
+                write_blocked_gap_placeholder(
+                    compare_out_dir, reference, run_id, dom, "", reason_code, detail, match_any_population=True
+                )
+                view_summaries.append(_synthesized_blocked_summary(reference, run_id, dom, reason_code, detail))
+                continue
             if not _membership_matrix_is_current(bundle_dir, view, dom, run_id):
                 detail = f"membership_matrix.csv for domain={dom!r} view={view!r} has no rows for analysis_run_id={run_id!r}"
                 write_blocked_gap_placeholder(
@@ -571,14 +795,51 @@ def run_comparisons(
                 )
                 view_summaries.append(_synthesized_blocked_summary(reference, run_id, dom, REASON_STALE_MEMBERSHIP_MATRIX, detail))
                 continue
-            summary = run_compare_for_domain(
-                analysis_dir,
-                bundle_dir / view,
-                reference,
-                dom,
-                compare_out_dir=compare_out_dir,
-                eligible_export_run_ids=eligible,
-            )
+            if cross_segment:
+                translated_dir = out_dir / "_xseg_translated_membership" / view
+                real_path = bundle_dir / view / dom / "membership_matrix.csv"
+                translated_path = translated_dir / dom / "membership_matrix.csv"
+                fully_resolved = _write_translated_membership_matrix(real_path, translated_path, target_jh_maps[dom])
+                if not fully_resolved:
+                    detail = (
+                        f"domain={dom!r} view={view!r}: at least one target pattern_id in membership_matrix.csv "
+                        "has no join_hash in the target segment's own domain_patterns.csv, despite this domain's "
+                        "overall resolution having been proven complete -- unexpected inconsistency, blocking "
+                        "rather than silently dropping the row"
+                    )
+                    write_blocked_gap_placeholder(
+                        compare_out_dir,
+                        reference,
+                        run_id,
+                        dom,
+                        "",
+                        REASON_CROSS_SEGMENT_PATTERN_IDENTITY_UNRESOLVED,
+                        detail,
+                        match_any_population=True,
+                    )
+                    view_summaries.append(
+                        _synthesized_blocked_summary(
+                            reference, run_id, dom, REASON_CROSS_SEGMENT_PATTERN_IDENTITY_UNRESOLVED, detail
+                        )
+                    )
+                    continue
+                summary = run_compare_for_domain(
+                    analysis_dir,
+                    translated_dir,
+                    reference,
+                    dom,
+                    compare_out_dir=compare_out_dir,
+                    eligible_export_run_ids=eligible,
+                )
+            else:
+                summary = run_compare_for_domain(
+                    analysis_dir,
+                    bundle_dir / view,
+                    reference,
+                    dom,
+                    compare_out_dir=compare_out_dir,
+                    eligible_export_run_ids=eligible,
+                )
             view_summaries.append(summary)
         per_view_summaries[view] = view_summaries
     return per_view_summaries
@@ -892,7 +1153,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         reference_segment_root, _ref_status = resolve_segment(registry_file, segments_root, reference_segment_id)
-        reference_paths = require_segment_artifacts(reference_segment_root, views)
+        reference_paths = require_segment_artifacts(
+            reference_segment_root, views, require_domain_patterns=not same_segment
+        )
         reference_file_metadata_rows = read_csv_rows(reference_paths["records_dir"] / "file_metadata.csv")
 
         if same_segment:
@@ -901,8 +1164,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             target_file_metadata_rows = reference_file_metadata_rows
         else:
             target_segment_root, _tgt_status = resolve_segment(registry_file, segments_root, target_segment_id)
-            target_paths = require_segment_artifacts(target_segment_root, views)
+            target_paths = require_segment_artifacts(target_segment_root, views, require_domain_patterns=True)
             target_file_metadata_rows = read_csv_rows(target_paths["records_dir"] / "file_metadata.csv")
+
+        if not same_segment:
+            reference_unit_system = read_segment_unit_system(reference_file_metadata_rows)
+            target_unit_system = read_segment_unit_system(target_file_metadata_rows)
+            if not reference_unit_system or not target_unit_system or reference_unit_system != target_unit_system:
+                raise CompareReferenceError(
+                    REASON_CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH,
+                    f"reference segment {reference_segment_id!r} unit_system={reference_unit_system!r} does not "
+                    f"match (or either is absent/non-uniform in) target segment {target_segment_id!r} "
+                    f"unit_system={target_unit_system!r} -- join_hashes for the same logical pattern differ "
+                    "between unit systems because behavioral hashes include unit-bearing values.",
+                )
 
         reference_export_run_id = resolve_export_run_id(
             "--reference", args.reference, reference_file_metadata_rows, REASON_REFERENCE_NOT_MATERIALIZED, REASON_REFERENCE_AMBIGUOUS
@@ -956,11 +1231,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             )
 
         target_compatibility = check_domain_compatibility(target_paths["records_dir"] / "records.csv", domains)
+        pattern_identity_status: Optional[Dict[str, Dict[str, object]]] = None
+        target_jh_maps: Optional[Dict[str, Dict[str, str]]] = None
         if same_segment:
             compatibility = target_compatibility
         else:
             reference_compatibility = check_domain_compatibility(reference_paths["records_dir"] / "records.csv", domains)
             compatibility = resolve_cross_segment_compatibility(target_compatibility, reference_compatibility, domains)
+            # pattern_id is segment-local; translate both sides to the
+            # cross-segment-stable join_hash identity before any domain is
+            # compared. Mutates reference["domains"] in place for every
+            # domain that resolves.
+            pattern_identity_status, target_jh_maps = resolve_cross_segment_pattern_identity(
+                reference_segment_root, target_segment_root, domains, reference["domains"]
+            )
 
         all_export_run_ids = sorted(
             {
@@ -1000,6 +1284,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         target_export_run_id,
         all_export_run_ids,
         out_dir,
+        pattern_identity_status=pattern_identity_status,
+        target_jh_maps=target_jh_maps,
     )
 
     manifest = assemble_final_outputs(
