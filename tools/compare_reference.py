@@ -153,11 +153,26 @@ def _sibling_export_files(path: Path) -> List[Path]:
     else:
         candidate_suffixes = (".json",)
 
+    # Matched by scanning actual directory entries case-insensitively, not
+    # by constructing an exact-case candidate path -- tools/extractor.py
+    # classifies the .details./.index./__fingerprint. infix case-
+    # insensitively (only its outer *.json glob is case-sensitive), so an
+    # oddly-cased explicit input like "model.DETAILS.json" would still be
+    # merged with a "model.INDEX.json" sibling by the extractor even though
+    # neither matches an all-lowercase constructed candidate path on a
+    # case-sensitive filesystem (Codex review, PR #466).
+    try:
+        entries = list(parent.iterdir())
+    except OSError:
+        entries = []
+    stem_lower = stem.lower()
     found: List[Path] = []
     for suffix in candidate_suffixes:
-        candidate = parent / f"{stem}{suffix}"
-        if candidate.is_file() and candidate not in found:
-            found.append(candidate)
+        expected_lower = f"{stem_lower}{suffix.lower()}"
+        for entry in entries:
+            if entry.name.lower() == expected_lower and entry.is_file() and entry not in found:
+                found.append(entry)
+                break
     if path.is_file() and path not in found:
         found.append(path)
     return found
@@ -539,9 +554,17 @@ def _synthesize_missing_target_rows(
     known = {str(t).strip() for t in known_target_export_run_ids if str(t).strip()}
     if not known:
         return []
+    reference_domains = reference_bundle.get("domains", {}) if isinstance(reference_bundle.get("domains"), dict) else {}
     domains = {row.get("domain", "") for row in run_summary_rows if row.get("domain", "")}
     domains |= {row.get("domain", "") for row in gap_rows if row.get("domain", "")}
-    reference_domains = reference_bundle.get("domains", {}) if isinstance(reference_bundle.get("domains"), dict) else {}
+    # A domain the reference defines but that NO staged target has any
+    # presence evidence for at all never appears in run_bundle_analysis.py's
+    # own domain list either -- pattern_presence_file.csv's domain column
+    # (which that list is derived from) only ever contains domains actually
+    # observed in the target corpus. Without unioning the reference's own
+    # domain set in, such a domain would be silently absent from every
+    # output entirely, for every target (Codex review, PR #466).
+    domains |= {d for d in reference_domains.keys() if d}
     reference_bundle_id_fallback = str(reference_bundle.get("reference_bundle_id", ""))
 
     synthesized: List[Dict[str, str]] = []
@@ -862,6 +885,31 @@ def _load_known_target_export_run_ids(records_dir: Path, reference_file_id: str)
     return sorted(all_ids)
 
 
+def _write_staged_only_metadata_file(user_metadata_file: Path, records_dir: Path, out_path: Path) -> Path:
+    """--metadata-file may point at a corpus-wide file listing far more
+    export_run_ids than this run actually staged -- e.g. supplied purely to
+    get real governance_role values for ad hoc reference/target exports
+    that don't carry the field themselves, since a normal governed-corpus
+    file_metadata.csv is otherwise the only source of that field.
+    run_bundle_analysis.py's --roles filter treats every matching
+    export_run_id in that file as eligible for this comparison; an
+    export_run_id that was never actually staged here would then be
+    scored as an eligible-but-evidence-missing target and reported as
+    blocked/TARGET_DOMAIN_UNAVAILABLE, even though it was never part of
+    this comparison at all (Codex review, PR #466). Filter to only the
+    export_run_ids this run actually staged (this run's own
+    file_metadata.csv) before handing the file to run_bundle_analysis.py.
+    A no-op when --metadata-file already IS this run's own file.
+    """
+    staged_rows = read_csv_rows(records_dir / "file_metadata.csv")
+    staged_ids = {row.get("export_run_id", "") for row in staged_rows if row.get("export_run_id", "")}
+    user_rows = read_csv_rows(user_metadata_file)
+    filtered = [row for row in user_rows if row.get("export_run_id", "") in staged_ids]
+    fieldnames = list(user_rows[0].keys()) if user_rows else (list(staged_rows[0].keys()) if staged_rows else ["export_run_id", "governance_role"])
+    atomic_write_csv(out_path, fieldnames, filtered)
+    return out_path
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_arg_parser().parse_args(argv)
 
@@ -916,6 +964,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if (args.roles or args.discover_populations)
         else _load_known_target_export_run_ids(records_dir, reference_primary.name)
     )
+
+    if args.roles:
+        user_metadata_file = Path(args.metadata_file).resolve() if args.metadata_file else (records_dir / "file_metadata.csv")
+        filtered_metadata_path = records_dir / "_roles_metadata_filtered.csv"
+        _write_staged_only_metadata_file(user_metadata_file, records_dir, filtered_metadata_path)
+        args.metadata_file = filtered_metadata_path
 
     bundle_cmd = build_run_bundle_analysis_cmd(analysis_dir, bundle_out_dir, records_dir, args)
     try:

@@ -622,6 +622,36 @@ def test_synthesize_missing_target_rows_no_op_without_known_targets():
     assert cr._synthesize_missing_target_rows([], [{"domain": "d1", "population_id": ""}], [], {}) == []
 
 
+def test_synthesize_missing_target_rows_includes_domain_absent_from_every_target():
+    # Every staged target lacks a domain the reference defines -- that
+    # domain never even reaches run_summary_rows/gap_rows (they're derived
+    # from the target corpus's own presence data), so it must be pulled in
+    # from the reference sidecar's own domain list, not just from rows the
+    # comparator happened to produce (Codex review, PR #466).
+    reference_bundle = {
+        "reference_bundle_id": "ref-1", "effective_date": "2026-08-27",
+        "domains": {"object_styles_model": ["A", "B"], "line_styles": ["X"]},
+    }
+    # Only object_styles_model appears in the comparator's own output --
+    # line_styles was never observed for ANY target at all.
+    run_summary_rows = [{"domain": "object_styles_model", "population_id": ""}]
+    gap_rows = [
+        {
+            "reference_bundle_id": "ref-1", "analysis_run_id": "run1", "domain": "object_styles_model",
+            "population_id": "", "export_run_id": "t1", "reference_pattern_count": "2",
+            "comparison_status": "ok", "comparison_reason_codes": "",
+        }
+    ]
+
+    synthesized = cr._synthesize_missing_target_rows(gap_rows, run_summary_rows, ["t1", "t2"], reference_bundle)
+
+    line_styles_rows = [r for r in synthesized if r["domain"] == "line_styles"]
+    assert {r["export_run_id"] for r in line_styles_rows} == {"t1", "t2"}
+    for row in line_styles_rows:
+        assert row["comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
+        assert row["reference_pattern_count"] == "1"  # len(["X"])
+
+
 def test_assemble_outputs_surfaces_target_missing_from_a_domain_entirely(tmp_path):
     domain = "object_styles_model"
     bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A", "B"}}, ["A", "B"])
@@ -803,6 +833,96 @@ def test_main_skips_missing_target_synthesis_when_discover_populations_is_used(t
 
     assert rc == 0
     assert captured_kwargs.get("known_target_export_run_ids") is None
+
+
+# ---------------------------------------------------------------------------
+# Regression: a --metadata-file pointing at a corpus-wide file (not this
+# run's own staged file_metadata.csv) must not leak unrelated,
+# never-staged export_run_ids into the role-filtered comparison, where
+# they'd be reported as blocked/TARGET_DOMAIN_UNAVAILABLE despite never
+# being part of this comparison at all (Codex review, PR #466).
+# ---------------------------------------------------------------------------
+
+
+def test_write_staged_only_metadata_file_filters_to_staged_ids(tmp_path):
+    records_dir = tmp_path / "records"
+    _write_csv(
+        records_dir / "file_metadata.csv",
+        ["export_run_id", "file_id"],
+        [{"export_run_id": "seed_file", "file_id": "ref.details.json"}, {"export_run_id": "t1", "file_id": "t1.details.json"}],
+    )
+    corpus_wide_metadata = tmp_path / "corpus_metadata.csv"
+    _write_csv(
+        corpus_wide_metadata,
+        ["export_run_id", "governance_role"],
+        [
+            {"export_run_id": "t1", "governance_role": "Project"},
+            {"export_run_id": "unrelated_file_42", "governance_role": "Project"},  # never staged in this run
+        ],
+    )
+
+    out_path = tmp_path / "filtered.csv"
+    cr._write_staged_only_metadata_file(corpus_wide_metadata, records_dir, out_path)
+
+    filtered_rows = _read_csv(out_path)
+    assert {r["export_run_id"] for r in filtered_rows} == {"t1"}
+
+
+def test_main_filters_explicit_metadata_file_to_staged_ids_before_role_filtering(tmp_path, monkeypatch):
+    domain = "object_styles_model"
+    reference = tmp_path / "ref.details.json"
+    target = tmp_path / "t1.details.json"
+    _write_json(reference, {"ok": True})
+    _write_json(target, {"ok": True})
+    out_dir = tmp_path / "out"
+
+    corpus_wide_metadata = tmp_path / "corpus_metadata.csv"
+    _write_csv(
+        corpus_wide_metadata,
+        ["export_run_id", "governance_role"],
+        [
+            {"export_run_id": "t1", "governance_role": "Project"},
+            {"export_run_id": "unrelated_file_42", "governance_role": "Project"},
+        ],
+    )
+
+    captured_bundle_cmd = []
+
+    def fake_execute(cmd):
+        cmd = list(cmd)
+        if "run_extract_all.py" in cmd[1]:
+            records_dir = Path(cmd[cmd.index("--out-root") + 1]) / "results" / "records"
+            records_dir.mkdir(parents=True, exist_ok=True)
+            _write_csv(
+                records_dir / "file_metadata.csv",
+                ["export_run_id", "file_id"],
+                [{"export_run_id": "seed_file", "file_id": "ref.details.json"}, {"export_run_id": "t1", "file_id": "t1.details.json"}],
+            )
+        elif "run_bundle_analysis.py" in cmd[1]:
+            captured_bundle_cmd.extend(cmd)
+            bundle_out_dir = Path(cmd[cmd.index("--out-dir") + 1])
+            fixture_bundle_out_dir = _setup_compare_all(tmp_path / "fixture", domain, {"t1": {"A"}}, ["A"])
+            import shutil as _sh
+            if bundle_out_dir.exists():
+                _sh.rmtree(bundle_out_dir)
+            _sh.copytree(fixture_bundle_out_dir, bundle_out_dir)
+        return None
+
+    monkeypatch.setattr(cr, "_execute", fake_execute)
+
+    rc = cr.main(
+        [
+            "--reference", str(reference), "--target", str(target),
+            "--roles", "Project", "--metadata-file", str(corpus_wide_metadata),
+            "--out-dir", str(out_dir),
+        ]
+    )
+
+    assert rc == 0
+    metadata_arg = captured_bundle_cmd[captured_bundle_cmd.index("--metadata-file") + 1]
+    filtered_rows = _read_csv(Path(metadata_arg))
+    assert {r["export_run_id"] for r in filtered_rows} == {"t1"}
+    assert "unrelated_file_42" not in {r["export_run_id"] for r in filtered_rows}
 
 
 # ---------------------------------------------------------------------------
@@ -998,6 +1118,36 @@ def test_stage_comparison_inputs_stages_split_export_siblings(tmp_path):
 
     assert (staging_dir / "ref.index.json").is_file()
     assert (staging_dir / "t1.index.json").is_file()
+
+
+def test_sibling_export_files_finds_mate_regardless_of_internal_suffix_case(tmp_path):
+    # tools/extractor.py classifies the .details./.index. infix case-
+    # insensitively (only its outer *.json glob is case-sensitive), so an
+    # oddly-cased pair like "model.DETAILS.json" + "model.INDEX.json" is
+    # still merged by the extractor -- staging must find that mate too,
+    # not just an exact-case "model.index.json" (Codex review, PR #466).
+    details = tmp_path / "model.DETAILS.json"
+    index = tmp_path / "model.INDEX.json"
+    _write_json(details, {"a": "details"})
+    _write_json(index, {"a": "index"})
+
+    found = set(cr._sibling_export_files(details))
+    assert found == {details, index}
+
+
+def test_stage_comparison_inputs_stages_mixed_case_split_export_sibling(tmp_path):
+    src_dir = tmp_path / "src"
+    reference = src_dir / "ref.DETAILS.json"
+    _write_json(reference, {"a": 1})
+    _write_json(src_dir / "ref.INDEX.json", {"a": "index"})
+    target = src_dir / "t1.details.json"
+    _write_json(target, {"a": 2})
+
+    staging_dir = tmp_path / "staged"
+    info = cr.stage_comparison_inputs(reference, [target], None, staging_dir)
+
+    assert (staging_dir / "ref.INDEX.json").is_file()
+    assert len(info["reference_files"]) == 2
 
 
 def test_stage_comparison_inputs_never_pulls_in_legacy_sibling(tmp_path):
