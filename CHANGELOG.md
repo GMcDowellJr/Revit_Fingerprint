@@ -182,6 +182,32 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   cases this PR *can* detect from already-flattened evidence (identity-
   invalid/unassignable records, and eligibility-widened targets with zero
   presence rows at all) are handled per above.
+  **Follow-up hardening (same PR, automated-review findings):** the
+  `expected_domains` safety net in `_write_compare_run_outputs` could itself
+  under-report — a domain's own pipeline stage crashing before
+  `run_compare_for_domain` ever ran was silently absent from
+  `compare_rows`, aggregating an all-failed run to `comparison_status=ok`.
+  `run_bundle_analysis.py` now appends a precisely-scoped blocked/
+  `COMPARISON_INPUT_INVALID` row (`_blocked_compare_summary`) at each actual
+  per-domain/per-(domain, population_id) failure site, with the coarser
+  `expected_domains` check remaining only as a backstop for failures with no
+  scoped row at all (e.g. `discover_populations` failing before any
+  population is known). `domains_total`/`domains_ok`/`domains_degraded`/
+  `domains_blocked` in `compare_run_status.csv` now roll each domain's rows
+  up to one status before counting, so a domain with several population
+  rows is counted once, not once per population. A missing/invalid/
+  schema-incompatible reference sidecar now writes its blocked status under
+  each requested view's own `compare_<view>/` directory (matching where a
+  successful run writes, and overwriting any stale prior-run status there)
+  instead of a one-off top-level path. `reference_bundle.load_and_validate`
+  also classifies non-UTF-8 sidecar bytes as `ReferenceBundleInvalidError`
+  (previously an uncaught `UnicodeDecodeError` that bypassed the blocked-
+  status recording entirely). `run_compare_for_domain`'s own
+  `COMPARISON_INPUT_INVALID` early return now clears any stale per-file rows
+  a prior successful run left in `file_gap_report.csv`/`file_gap_detail.csv`
+  for the same `(analysis_run_id, domain, population_id)` and replaces them
+  with a single blocked placeholder row, rather than leaving stale
+  `ok`-looking metrics standing next to a blocked summary.
 
 ### Added
 - **`loaded_family_types` domain: `can_have_structural_section`/`has_thermal_properties`

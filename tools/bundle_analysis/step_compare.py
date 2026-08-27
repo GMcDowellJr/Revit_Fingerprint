@@ -421,6 +421,58 @@ def run_compare_for_domain(
             fallback_run_id = resolve_analysis_run_id(read_csv_rows(analysis_dir / "pattern_presence_file.csv"), "")
         except (FileNotFoundError, ValueError):
             fallback_run_id = ""
+
+        if fallback_run_id:
+            # An output directory can be reused across invocations (retries,
+            # re-runs after fixing a prior problem). If this exact
+            # (analysis_run_id, domain, population_id) previously wrote
+            # successful per-file rows and inputs are now broken, those stale
+            # "ok"-looking rows must not be left standing -- a downstream
+            # reader of file_gap_report.csv would see old, no-longer-true
+            # metrics with no indication the current run couldn't reproduce
+            # them. Replace them with a single domain-level blocked
+            # placeholder (export_run_id="" marks "no per-file breakdown
+            # available") instead of silently leaving stale data or silently
+            # deleting it with no trace.
+            placeholder_row = {name: "" for name in _GAP_FIELDNAMES}
+            placeholder_row.update(
+                {
+                    "reference_bundle_id": str(reference.get("reference_bundle_id", "")),
+                    "effective_date": str(reference.get("effective_date", "")),
+                    "analysis_run_id": fallback_run_id,
+                    "domain": domain,
+                    "population_id": population_id,
+                    "export_run_id": "",
+                    "comparison_status": COMPARISON_STATUS_BLOCKED,
+                    "comparison_reason_codes": REASON_COMPARISON_INPUT_INVALID,
+                    "comparison_detail": str(exc),
+                }
+            )
+            def _is_stale(r: Dict[str, str]) -> bool:
+                return (
+                    r.get("analysis_run_id", "") == fallback_run_id
+                    and r.get("domain", "") == domain
+                    and r.get("population_id", "") == population_id
+                )
+
+            with _GAP_REPORT_LOCK:
+                existing = read_csv_rows(gap_path) if gap_path.is_file() else []
+                existing_detail = read_csv_rows(detail_path) if detail_path.is_file() else []
+                merged = [r for r in existing if not _is_stale(r)] + [placeholder_row]
+                merged_detail = [r for r in existing_detail if not _is_stale(r)]
+                merged.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("export_run_id", "")))
+                merged_detail.sort(
+                    key=lambda r: (
+                        r.get("analysis_run_id", ""),
+                        r.get("domain", ""),
+                        r.get("population_id", ""),
+                        r.get("export_run_id", ""),
+                        r.get("pattern_id", ""),
+                    )
+                )
+                atomic_write_csv(gap_path, _GAP_FIELDNAMES, merged)
+                atomic_write_csv(detail_path, _DETAIL_FIELDNAMES, merged_detail)
+
         return {
             "reference_bundle_id": str(reference.get("reference_bundle_id", "")),
             "effective_date": str(reference.get("effective_date", "")),

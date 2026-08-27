@@ -34,7 +34,7 @@ from tools.bundle_analysis.reference_bundle import (
     ReferenceBundleInvalidError,
     ReferenceBundleSchemaMismatchError,
 )
-from tools.bundle_analysis.run_bundle_analysis import _write_compare_run_outputs, run_bundle_analysis
+from tools.bundle_analysis.run_bundle_analysis import _write_compare_run_outputs, _blocked_compare_summary, run_bundle_analysis
 from tools.bundle_analysis.step_compare import run_compare_for_domain
 
 
@@ -458,8 +458,14 @@ def test_missing_membership_matrix_is_recorded_as_blocked_not_raised(tmp_path):
     assert summary["comparison_status"] == COMPARISON_STATUS_BLOCKED
     assert REASON_COMPARISON_INPUT_INVALID in summary["comparison_reason_codes"].split("|")
     assert summary["analysis_run_id"] == "run1"
-    # No file_gap_report.csv was fabricated from a failed read.
-    assert not (out_dir.parent / "compare" / "file_gap_report.csv").exists()
+    # A single domain-level blocked placeholder is recorded (export_run_id=""
+    # marks "no per-file breakdown available") -- not fabricated per-file
+    # metrics, and not silence that would let a stale prior-run row stand.
+    gap_rows = _read_csv(out_dir.parent / "compare" / "file_gap_report.csv")
+    assert len(gap_rows) == 1
+    assert gap_rows[0]["export_run_id"] == ""
+    assert gap_rows[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert gap_rows[0]["coverage_status"] == ""
 
 
 # ---------------------------------------------------------------------------
@@ -530,8 +536,86 @@ def test_run_bundle_analysis_blocked_reference_status_preserves_run_id(tmp_path)
     with pytest.raises(ReferenceBundleMissingError):
         run_bundle_analysis(analysis_dir, out_dir, compare=True, discover_populations_flag=False, purge_view="all")
 
-    status_rows = _read_csv(out_dir / "compare_run_status.csv")
+    # Written under the same compare_<view>/ path a successful run would use
+    # (out_dir/compare_all/), not a one-off top-level location a consumer
+    # monitoring the normal per-view outputs would never check.
+    status_rows = _read_csv(out_dir / "compare_all" / "compare_run_status.csv")
     assert len(status_rows) == 1
     assert status_rows[0]["analysis_run_id"] == "run1"
     assert status_rows[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
     assert status_rows[0]["comparison_reason_codes"] == REASON_REFERENCE_INVALID
+    assert status_rows[0]["domains_total"] == "1"
+    assert status_rows[0]["domains_blocked"] == "1"
+
+    summary_rows = _read_csv(out_dir / "compare_all" / "compare_run_summary.csv")
+    assert len(summary_rows) == 1
+    assert summary_rows[0]["domain"] == "d1"
+    assert summary_rows[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert summary_rows[0]["comparison_reason_codes"] == REASON_REFERENCE_INVALID
+
+
+def test_run_compare_for_domain_replaces_stale_ok_rows_on_later_input_failure(tmp_path):
+    # First run: inputs are valid, comparison succeeds and writes an "ok" row.
+    domain = "object_styles_model"
+    analysis_dir, out_dir = _setup_run_v2(tmp_path, domain, {"f1": {"A"}})
+    reference = _reference(domain, ["A"])
+    run_compare_for_domain(analysis_dir, out_dir, reference, domain)
+    ok_rows = _read_csv(out_dir.parent / "compare" / "file_gap_report.csv")
+    assert _row_for(ok_rows, "f1")["comparison_status"] == COMPARISON_STATUS_OK
+
+    # Second run reuses the same compare output directory, but step1's output
+    # is now missing (e.g. deleted between runs). The stale "ok" row for f1
+    # must not be left standing next to a blocked summary -- a downstream
+    # reader of file_gap_report.csv would otherwise see old, no-longer-true
+    # metrics with no indication this run couldn't reproduce them.
+    (out_dir / domain / "membership_matrix.csv").unlink()
+    summary = run_compare_for_domain(analysis_dir, out_dir, reference, domain)
+    assert summary["comparison_status"] == COMPARISON_STATUS_BLOCKED
+
+    gap_rows = _read_csv(out_dir.parent / "compare" / "file_gap_report.csv")
+    assert len(gap_rows) == 1
+    assert gap_rows[0]["export_run_id"] == ""
+    assert gap_rows[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert not any(r.get("export_run_id") == "f1" for r in gap_rows)
+
+
+def test_write_compare_run_outputs_counts_distinct_domains_not_population_rows(tmp_path):
+    # Population-aware mode: compare_rows has one row per (domain,
+    # population_id). A domain with several successful population rows must
+    # still count as ONE domain in domains_total/domains_ok, not one per row.
+    compare_out_dir = tmp_path / "compare_all"
+    compare_rows = [
+        {"analysis_run_id": "run1", "domain": "d1", "population_id": "p1", "comparison_status": COMPARISON_STATUS_OK, "comparison_reason_codes": ""},
+        {"analysis_run_id": "run1", "domain": "d1", "population_id": "p2", "comparison_status": COMPARISON_STATUS_OK, "comparison_reason_codes": ""},
+        {"analysis_run_id": "run1", "domain": "d1", "population_id": "p3", "comparison_status": COMPARISON_STATUS_DEGRADED, "comparison_reason_codes": REASON_TARGET_DOMAIN_DEGRADED},
+        {"analysis_run_id": "run1", "domain": "d2", "population_id": "p1", "comparison_status": COMPARISON_STATUS_OK, "comparison_reason_codes": ""},
+    ]
+    _write_compare_run_outputs(compare_out_dir, "run1", compare_rows)
+
+    status_rows = _read_csv(compare_out_dir / "compare_run_status.csv")
+    assert status_rows[0]["domains_total"] == "2"
+    # d1's three populations roll up to one domain-level status: degraded
+    # beats ok, so d1 counts as degraded, not ok.
+    assert status_rows[0]["domains_ok"] == "1"
+    assert status_rows[0]["domains_degraded"] == "1"
+    assert status_rows[0]["comparison_status"] == COMPARISON_STATUS_DEGRADED
+
+    # The underlying per-population rows are untouched (4 rows, not collapsed).
+    summary_rows = _read_csv(compare_out_dir / "compare_run_summary.csv")
+    assert len(summary_rows) == 4
+
+
+def test_blocked_compare_summary_shape_matches_run_compare_for_domain_contract(tmp_path):
+    reference = _reference("d1", ["A"])
+    row = _blocked_compare_summary(reference, "run1", "d1", "p1", REASON_COMPARISON_INPUT_INVALID, "boom")
+    assert row["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert row["comparison_reason_codes"] == REASON_COMPARISON_INPUT_INVALID
+    assert row["domain"] == "d1"
+    assert row["population_id"] == "p1"
+    assert row["analysis_run_id"] == "run1"
+    assert set(row.keys()) == {
+        "reference_bundle_id", "effective_date", "analysis_run_id", "domain", "population_id",
+        "files_scored", "full_count", "partial_count", "none_count", "no_reference_count",
+        "comparison_status", "comparison_reason_codes",
+        "comparison_ok_count", "comparison_degraded_count", "comparison_blocked_count",
+    }

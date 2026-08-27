@@ -274,19 +274,34 @@ that `export_run_id`/domain). `patterns_required`/`reference_pattern_count`
 stay populated — they describe the reference side only, which target-evidence
 reliability doesn't affect.
 
-**Reference sidecar failures** (missing file, malformed JSON, or
+**Reference sidecar failures** (missing file, malformed/non-UTF-8 JSON, or
 `extractor_schema_version` mismatch) raise `ReferenceBundleMissingError` /
 `ReferenceBundleInvalidError` / `ReferenceBundleSchemaMismatchError`
 (`tools/bundle_analysis/reference_bundle.py`, all `ValueError` subclasses)
 before any per-domain comparison begins. `run_bundle_analysis.py` writes a
-run-scoped `blocked` `compare_run_status.csv` row (reason
-`REFERENCE_INVALID` or `SCHEMA_INCOMPATIBLE`) and then re-raises — comparison
-is never silently skipped, but the failure is machine-readable rather than
-console-only. Separately, if `run_compare_for_domain`'s own inputs
-(`pattern_presence_file.csv` / `membership_matrix.csv`) are missing or
-internally inconsistent, it returns a `blocked` / `COMPARISON_INPUT_INVALID`
-domain summary instead of raising into the caller's bare
-`except Exception: print(...)` domain-pipeline handler.
+`blocked` row (reason `REFERENCE_INVALID` or `SCHEMA_INCOMPATIBLE`) for
+every requested domain into each requested view's own
+`compare_<view>/compare_run_summary.csv` / `compare_run_status.csv` — the
+same paths a successful run writes, so a consumer watching the normal
+per-view outputs sees the failure, and any stale `ok` status left there by
+an earlier successful run into a reused `out_dir` is overwritten — then
+re-raises: comparison is never silently skipped, but the failure is
+machine-readable rather than console-only. Separately, if
+`run_compare_for_domain`'s own inputs (`pattern_presence_file.csv` /
+`membership_matrix.csv`) are missing or internally inconsistent, it returns
+a `blocked` / `COMPARISON_INPUT_INVALID` domain summary instead of raising
+into the caller's bare `except Exception: print(...)` domain-pipeline
+handler, and replaces any stale per-file rows a prior successful run left in
+`file_gap_report.csv`/`file_gap_detail.csv` for that same
+`(analysis_run_id, domain, population_id)` with a single blocked placeholder
+row (`export_run_id=""`) rather than leaving them standing. And within
+`run_bundle_analysis.py`'s own per-domain/per-population loops, a pipeline
+stage failing *before* `run_compare_for_domain` is ever called (step0/step1/
+discovery raising) appends a precisely-scoped blocked/
+`COMPARISON_INPUT_INVALID` row for that exact `(domain, population_id)`
+right at the failure site, rather than letting it vanish into the
+surrounding `except Exception: print(...)` handler with no comparison
+record at all.
 
 **Run-level aggregation**: `compare_run_summary.csv` gains
 `comparison_status`/`comparison_reason_codes`/`comparison_ok_count`/
@@ -294,7 +309,11 @@ domain summary instead of raising into the caller's bare
 row. A separate `compare_run_status.csv` gives one row per analysis run with
 the overall rollup — any `blocked` domain → `blocked`, else any `degraded` →
 `degraded`, else `ok` — so a degraded or blocked comparison run is visible
-without reading console output.
+without reading console output. In population-aware mode, a domain's
+several `(domain, population_id)` rows are first rolled up to one status per
+domain before counting `domains_total`/`domains_ok`/`domains_degraded`/
+`domains_blocked`, so a domain with three population rows is counted once,
+not three times.
 
 **Known gap, not addressed by this contract:** a domain that is entirely
 blocked at extraction time (e.g. a hard dependency failure in
