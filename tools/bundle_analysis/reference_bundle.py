@@ -139,8 +139,11 @@ def load_and_validate(analysis_out_dir: Path, current_schema_version: str) -> Di
     path = analysis_out_dir / "reference_bundle.json"
     if not path.is_file():
         raise ReferenceBundleMissingError(f"Missing reference bundle sidecar: {path}")
-    with path.open("r", encoding="utf-8") as f:
-        payload_raw = f.read()
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            payload_raw = f.read()
+    except UnicodeDecodeError as exc:
+        raise ReferenceBundleInvalidError(f"Invalid reference bundle encoding in {path}: {exc}") from exc
     try:
         payload = json.loads(payload_raw)
     except json.JSONDecodeError as exc:

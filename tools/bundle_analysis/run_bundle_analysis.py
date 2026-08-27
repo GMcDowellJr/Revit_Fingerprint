@@ -33,6 +33,7 @@ if __package__ in (None, ""):
         COMPARISON_STATUS_OK,
         COMPARISON_STATUS_DEGRADED,
         COMPARISON_STATUS_BLOCKED,
+        REASON_COMPARISON_INPUT_INVALID,
         aggregate_comparison_status,
         join_reason_codes,
     )
@@ -60,6 +61,7 @@ else:
         COMPARISON_STATUS_OK,
         COMPARISON_STATUS_DEGRADED,
         COMPARISON_STATUS_BLOCKED,
+        REASON_COMPARISON_INPUT_INVALID,
         aggregate_comparison_status,
         join_reason_codes,
     )
@@ -195,14 +197,58 @@ _COMPARE_RUN_STATUS_FIELDNAMES = [
 ]
 
 
-def _write_compare_run_outputs(compare_out_dir: Path, run_id: str, compare_rows: List[Dict[str, str]]) -> None:
+def _write_compare_run_outputs(
+    compare_out_dir: Path,
+    run_id: str,
+    compare_rows: List[Dict[str, str]],
+    expected_domains: Optional[List[str]] = None,
+) -> None:
     """Write compare_run_summary.csv (per domain/population) and
     compare_run_status.csv (a single deterministic run-level rollup: blocked
     beats degraded beats ok -- see comparison_status.aggregate_comparison_status)
     so a blocked/degraded comparison run is observable without console-log
     inspection, per the "every comparison run declares ok/degraded/blocked"
     invariant.
+
+    `expected_domains`, when given, is the full set of domains --compare was
+    asked to run for this view. A domain whose own pipeline stage (step0/
+    step1/discovery) raised before run_compare_for_domain ever appended a
+    summary is silently absent from `compare_rows` -- caught only by the
+    surrounding per-domain `except Exception: print(...)` handlers, which are
+    out of scope for this PR to rework. Without this check, an entirely
+    empty `compare_rows` (every requested domain failed upstream of
+    comparison) would aggregate to comparison_status=ok/domains_total=0,
+    falsely certifying a comparison run where nothing was actually compared.
+    A synthesized blocked/COMPARISON_INPUT_INVALID row is added per missing
+    domain so both compare_run_summary.csv and the run-level rollup reflect
+    it.
     """
+    compare_rows = list(compare_rows)
+    if expected_domains:
+        domains_with_summary = {r.get("domain", "") for r in compare_rows}
+        missing_domains = sorted({d for d in expected_domains if d} - domains_with_summary)
+        for dom in missing_domains:
+            compare_rows.append(
+                {
+                    "reference_bundle_id": "",
+                    "effective_date": "",
+                    "analysis_run_id": run_id,
+                    "domain": dom,
+                    "population_id": "",
+                    "files_scored": "0",
+                    "full_count": "0",
+                    "partial_count": "0",
+                    "none_count": "0",
+                    "no_reference_count": "0",
+                    "comparison_status": COMPARISON_STATUS_BLOCKED,
+                    "comparison_reason_codes": REASON_COMPARISON_INPUT_INVALID,
+                    "comparison_ok_count": "0",
+                    "comparison_degraded_count": "0",
+                    "comparison_blocked_count": "0",
+                }
+            )
+        compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
+
     atomic_write_csv(compare_out_dir / "compare_run_summary.csv", _COMPARE_RUN_SUMMARY_FIELDNAMES, compare_rows)
 
     domain_statuses = [r.get("comparison_status", COMPARISON_STATUS_OK) for r in compare_rows]
@@ -524,7 +570,7 @@ def run_bundle_analysis(
                 ],
                 [
                     {
-                        "analysis_run_id": "",
+                        "analysis_run_id": run_id,
                         "comparison_status": COMPARISON_STATUS_BLOCKED,
                         "comparison_reason_codes": exc.reason_code,
                         "comparison_detail": str(exc),
@@ -718,7 +764,7 @@ def run_bundle_analysis(
             if compare and compare_out is not None:
                 compare_rows = [r for r in view_compare_summary_rows if r.get("analysis_run_id", "") == run_id]
                 compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
-                _write_compare_run_outputs(compare_out, run_id, compare_rows)
+                _write_compare_run_outputs(compare_out, run_id, compare_rows, expected_domains=domains)
 
             _emit_meta_scatter_thresholds(view_out, run_id, domain)
 
@@ -968,7 +1014,7 @@ def run_bundle_analysis(
             compare_out_dir = view_out.parent / f"compare_{view}"
             compare_rows = [r for r in view_compare_summary_rows[view] if r.get("analysis_run_id", "") == run_id]
             compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
-            _write_compare_run_outputs(compare_out_dir, run_id, compare_rows)
+            _write_compare_run_outputs(compare_out_dir, run_id, compare_rows, expected_domains=domains)
 
         _emit_meta_scatter_thresholds(view_out, run_id, domain)
 

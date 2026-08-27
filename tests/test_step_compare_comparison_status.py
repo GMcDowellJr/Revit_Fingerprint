@@ -34,7 +34,7 @@ from tools.bundle_analysis.reference_bundle import (
     ReferenceBundleInvalidError,
     ReferenceBundleSchemaMismatchError,
 )
-from tools.bundle_analysis.run_bundle_analysis import _write_compare_run_outputs
+from tools.bundle_analysis.run_bundle_analysis import _write_compare_run_outputs, run_bundle_analysis
 from tools.bundle_analysis.step_compare import run_compare_for_domain
 
 
@@ -460,3 +460,78 @@ def test_missing_membership_matrix_is_recorded_as_blocked_not_raised(tmp_path):
     assert summary["analysis_run_id"] == "run1"
     # No file_gap_report.csv was fabricated from a failed read.
     assert not (out_dir.parent / "compare" / "file_gap_report.csv").exists()
+
+
+# ---------------------------------------------------------------------------
+# Regressions from automated review (Codex) on the PR2 implementation itself.
+# ---------------------------------------------------------------------------
+
+def test_write_compare_run_outputs_blocks_when_a_requested_domain_produced_no_summary(tmp_path):
+    # A domain's own pipeline (step0/step1/discovery) can raise before
+    # run_compare_for_domain ever appends a summary -- caught only by
+    # run_bundle_analysis.py's pre-existing per-domain `except Exception:
+    # print(...)` handlers. An entirely empty compare_rows must not
+    # aggregate to "ok": that would falsely certify a comparison run where
+    # every requested domain silently failed upstream of comparison.
+    compare_out_dir = tmp_path / "compare_all"
+    _write_compare_run_outputs(compare_out_dir, "run1", [], expected_domains=["d1", "d2"])
+
+    status_rows = _read_csv(compare_out_dir / "compare_run_status.csv")
+    assert status_rows[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert status_rows[0]["comparison_reason_codes"] == REASON_COMPARISON_INPUT_INVALID
+    assert status_rows[0]["domains_total"] == "2"
+    assert status_rows[0]["domains_blocked"] == "2"
+
+    summary_rows = _read_csv(compare_out_dir / "compare_run_summary.csv")
+    assert {r["domain"] for r in summary_rows} == {"d1", "d2"}
+    for row in summary_rows:
+        assert row["comparison_status"] == COMPARISON_STATUS_BLOCKED
+        assert row["comparison_reason_codes"] == REASON_COMPARISON_INPUT_INVALID
+
+
+def test_write_compare_run_outputs_only_synthesizes_rows_for_domains_missing_entirely(tmp_path):
+    # A domain that DID produce a summary (even a blocked one, or one for
+    # only some of its populations) is left alone -- only domains with zero
+    # rows at all get a synthesized placeholder.
+    compare_out_dir = tmp_path / "compare_all"
+    compare_rows = [
+        {"analysis_run_id": "run1", "domain": "d1", "population_id": "", "comparison_status": COMPARISON_STATUS_OK, "comparison_reason_codes": ""},
+    ]
+    _write_compare_run_outputs(compare_out_dir, "run1", compare_rows, expected_domains=["d1", "d2"])
+
+    summary_rows = _read_csv(compare_out_dir / "compare_run_summary.csv")
+    assert len(summary_rows) == 2
+    d1_row = next(r for r in summary_rows if r["domain"] == "d1")
+    d2_row = next(r for r in summary_rows if r["domain"] == "d2")
+    assert d1_row["comparison_status"] == COMPARISON_STATUS_OK
+    assert d2_row["comparison_status"] == COMPARISON_STATUS_BLOCKED
+
+
+def test_reference_sidecar_non_utf8_bytes_raises_invalid_error(tmp_path):
+    # Raw non-UTF-8 bytes raise UnicodeDecodeError on read, before json.loads
+    # ever runs -- must still be classified REFERENCE_INVALID, not escape as
+    # an unclassified exception.
+    (tmp_path / "reference_bundle.json").write_bytes(b"\xff\xfe\x00{not even close to json")
+    with pytest.raises(ReferenceBundleInvalidError) as exc_info:
+        load_and_validate(tmp_path, "v21")
+    assert exc_info.value.reason_code == REASON_REFERENCE_INVALID
+
+
+def test_run_bundle_analysis_blocked_reference_status_preserves_run_id(tmp_path):
+    analysis_dir = tmp_path / "analysis"
+    out_dir = tmp_path / "out"
+    _write_csv(
+        analysis_dir / "pattern_presence_file.csv",
+        ["analysis_run_id", "domain", "export_run_id"],
+        [{"analysis_run_id": "run1", "domain": "d1", "export_run_id": "f1"}],
+    )
+    # No reference_bundle.json written -- load_and_validate raises Missing.
+
+    with pytest.raises(ReferenceBundleMissingError):
+        run_bundle_analysis(analysis_dir, out_dir, compare=True, discover_populations_flag=False, purge_view="all")
+
+    status_rows = _read_csv(out_dir / "compare_run_status.csv")
+    assert len(status_rows) == 1
+    assert status_rows[0]["analysis_run_id"] == "run1"
+    assert status_rows[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert status_rows[0]["comparison_reason_codes"] == REASON_REFERENCE_INVALID
