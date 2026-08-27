@@ -77,6 +77,7 @@ REASON_SEGMENT_MATERIALIZATION_INCOMPLETE = "SEGMENT_MATERIALIZATION_INCOMPLETE"
 REASON_REQUIRED_ANALYSIS_ARTIFACT_MISSING = "REQUIRED_ANALYSIS_ARTIFACT_MISSING"
 REASON_MATERIALIZATION_VERSION_INCOMPATIBLE = "MATERIALIZATION_VERSION_INCOMPATIBLE"
 REASON_MATERIALIZATION_COMPATIBILITY_UNPROVEN = "MATERIALIZATION_COMPATIBILITY_UNPROVEN"
+REASON_NO_COMPARISON_TARGETS = "NO_COMPARISON_TARGETS"
 # Pure pre-flight/out-dir-safety failures -- raised before --out-dir can be
 # safely prepared at all, so no diagnostics file is ever written for these.
 REASON_OUT_DIR_UNSAFE = "OUT_DIR_UNSAFE"
@@ -336,13 +337,18 @@ def check_domain_compatibility(records_csv: Path, domains: Sequence[str]) -> Dic
     each requested domain's (join_key_schema, join_key_policy_id,
     join_key_policy_version) tuple(s). Every record in one segment was
     produced by one patterns-stage invocation under one --join-policy, so a
-    domain with more than one distinct non-blank tuple indicates an
-    internally-inconsistent materialization (block); a domain with none
-    populated at all means compatibility cannot be established from what is
-    persisted today (block, distinctly). A single, consistent, non-blank
-    tuple is the only "ok" case. Structured as a per-domain tuple set so a
-    future artifact-SHA field can be folded into the same tuple without
-    changing this function's shape or callers.
+    domain with more than one distinct *complete* (all three fields
+    populated) tuple indicates an internally-inconsistent materialization
+    (block); a domain where every field isn't populated for every record --
+    zero complete tuples at all, or even one record with any blank field
+    coexisting with an otherwise-consistent complete tuple -- means
+    compatibility cannot be established for the *whole* domain from what is
+    persisted today (block, distinctly: a partially-populated tuple such as
+    `(schema, "", "")` is never treated as proof of anything, and a blank
+    record is never simply discarded in the presence of a populated one).
+    Structured as a per-domain tuple set so a future artifact-SHA field can
+    be folded into the same tuple without changing this function's shape or
+    callers.
     """
     domain_set = set(domains)
     seen: Dict[str, Set[Tuple[str, str, str]]] = {d: set() for d in domain_set}
@@ -361,13 +367,15 @@ def check_domain_compatibility(records_csv: Path, domains: Sequence[str]) -> Dic
 
     result: Dict[str, Dict[str, object]] = {}
     for dom in domain_set:
-        non_blank = sorted(k for k in seen[dom] if any(k))
-        if len(non_blank) > 1:
-            result[dom] = {"status": "incompatible", "values": non_blank}
-        elif not non_blank:
-            result[dom] = {"status": "unproven", "values": []}
+        tuples = seen[dom]
+        complete = sorted(k for k in tuples if all(k))
+        has_incomplete = any(not all(k) for k in tuples)
+        if len(complete) > 1:
+            result[dom] = {"status": "incompatible", "values": complete}
+        elif has_incomplete or not complete:
+            result[dom] = {"status": "unproven", "values": complete}
         else:
-            result[dom] = {"status": "ok", "values": non_blank}
+            result[dom] = {"status": "ok", "values": complete}
     return result
 
 
@@ -753,6 +761,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         all_export_run_ids = sorted(
             {(r.get("export_run_id", "") or "").strip() for r in file_metadata_rows if (r.get("export_run_id", "") or "").strip()}
         )
+
+        requested_targets = {target_export_run_id} if target_export_run_id else set(all_export_run_ids)
+        if not (requested_targets - {reference_export_run_id}):
+            # Either --target resolved to the reference itself, or the
+            # segment (after excluding the reference) has no other
+            # materialized files at all. The comparator's own
+            # seed_export_run_id exclusion would silently produce zero gap
+            # rows for every domain in this case -- which must never
+            # roll up to an unearned "ok" (Codex review, PR #467): there is
+            # nothing to compare, so the run blocks explicitly instead.
+            raise CompareReferenceError(
+                REASON_NO_COMPARISON_TARGETS,
+                "no comparison target remains after excluding the reference itself "
+                f"(reference={reference_export_run_id!r}, requested targets={sorted(requested_targets)!r}).",
+            )
     except CompareReferenceError as exc:
         write_top_level_blocked(out_dir, exc.reason_code, str(exc), args.segment, args.target or "")
         print(f"[compare_reference][error] {exc.reason_code}: {exc}", file=sys.stderr)

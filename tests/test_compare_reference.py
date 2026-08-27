@@ -72,6 +72,7 @@ def _build_segment(
     join_key_schema: Optional[str] = "object_styles_model.join_key.v1",
     inconsistent_join_key_schema: bool = False,
     blank_join_key_schema: bool = False,
+    partial_join_key_provenance: bool = False,
 ) -> Dict[str, Path]:
     """Build a corpus-level run_registry.csv plus one segment's
     results/{records,analysis,bundle_analysis} tree.
@@ -121,6 +122,8 @@ def _build_segment(
                 schema = "object_styles_model.join_key.v2"
             if blank_join_key_schema:
                 schema, policy_id, policy_version = "", "", ""
+            if partial_join_key_provenance:
+                policy_id, policy_version = "", ""
             records_rows.append(
                 {
                     "export_run_id": eid, "domain": DOMAIN,
@@ -352,6 +355,65 @@ def test_unproven_join_key_schema_blocks_domain(tmp_path):
     assert rc == 0
     summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
     assert summary[0]["comparison_reason_codes"] == cr.REASON_MATERIALIZATION_COMPATIBILITY_UNPROVEN
+
+
+def test_partially_populated_tuple_is_unproven_not_ok(tmp_path):
+    # join_key_schema is populated but join_key_policy_id/version are blank
+    # for every record -- no *complete* tuple exists, so this must not be
+    # accepted as a legitimate compatibility signal (Codex review, PR #467).
+    ctx = _build_segment(
+        tmp_path,
+        {"ref.json": ["A"], "target.json": ["A"]},
+        partial_join_key_provenance=True,
+    )
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
+    assert rc == 0
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert summary[0]["comparison_reason_codes"] == cr.REASON_MATERIALIZATION_COMPATIBILITY_UNPROVEN
+
+
+def test_incomplete_record_alongside_complete_one_is_unproven(tmp_path):
+    # One record has a fully-populated (join_key_schema, policy_id, version)
+    # tuple; another record for the same domain has an entirely blank one.
+    # The blank record must not be silently discarded in favor of the
+    # populated one -- the domain as a whole is not provably compatible
+    # (Codex review, PR #467).
+    ctx = _build_segment(
+        tmp_path,
+        {"ref.json": ["A"], "target.json": ["A"]},
+        extra_records_rows=[
+            {"export_run_id": "target.json", "domain": DOMAIN, "join_key_schema": "", "join_key_policy_id": "", "join_key_policy_version": ""}
+        ],
+    )
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
+    assert rc == 0
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert summary[0]["comparison_reason_codes"] == cr.REASON_MATERIALIZATION_COMPATIBILITY_UNPROVEN
+
+
+# ---------------------------------------------------------------------------
+# Empty comparison target set (after excluding the reference) must block,
+# never silently roll up to "ok" (Codex review, PR #467).
+# ---------------------------------------------------------------------------
+
+
+def test_target_resolving_to_reference_itself_is_blocked(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, reference="ref.json", target="ref.json")
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_NO_COMPARISON_TARGETS]
+    assert _read_csv(out_dir / cr.SUMMARY_FILENAME) == []
+
+
+def test_whole_segment_with_only_reference_file_is_blocked(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, reference="ref.json")  # no --target: whole-segment mode
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_NO_COMPARISON_TARGETS]
 
 
 # ---------------------------------------------------------------------------

@@ -44,7 +44,8 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   (`SEGMENT_NOT_FOUND`, `SEGMENT_MATERIALIZATION_INCOMPLETE`,
   `REQUIRED_ANALYSIS_ARTIFACT_MISSING`, `REFERENCE_NOT_MATERIALIZED`/
   `TARGET_NOT_MATERIALIZED`, `REFERENCE_AMBIGUOUS`/`TARGET_AMBIGUOUS`,
-  `MATERIALIZATION_VERSION_INCOMPATIBLE`/`MATERIALIZATION_COMPATIBILITY_UNPROVEN`)
+  `MATERIALIZATION_VERSION_INCOMPATIBLE`/`MATERIALIZATION_COMPATIBILITY_UNPROVEN`/
+  `NO_COMPARISON_TARGETS`)
   block explicitly rather than falling back to any JSON-driven path; a
   domain the caller requested that this segment never observed at all still
   surfaces via the comparator's own existing `COMPARISON_INPUT_INVALID`,

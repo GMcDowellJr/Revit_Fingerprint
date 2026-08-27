@@ -162,14 +162,15 @@ comparator's)
 | `REQUIRED_ANALYSIS_ARTIFACT_MISSING` | `records.csv`/`file_metadata.csv`/`pattern_presence_file.csv`, or a requested `--purge-view` directory, is missing despite `status=complete` |
 | `REFERENCE_NOT_MATERIALIZED` / `TARGET_NOT_MATERIALIZED` | the selector resolves to zero export_run_ids in this segment |
 | `REFERENCE_AMBIGUOUS` / `TARGET_AMBIGUOUS` | the selector resolves to more than one export_run_id |
-| `MATERIALIZATION_VERSION_INCOMPATIBLE` | this segment's `records.csv` shows more than one distinct `(join_key_schema, join_key_policy_id, join_key_policy_version)` for a requested domain |
-| `MATERIALIZATION_COMPATIBILITY_UNPROVEN` | no such tuple is populated at all for that domain, so compatibility cannot be established from what is persisted today |
+| `NO_COMPARISON_TARGETS` | after excluding the reference itself, no comparison target remains (an explicit `--target` resolved to the same export_run_id as `--reference`, or the segment has no other materialized file at all) |
+| `MATERIALIZATION_VERSION_INCOMPATIBLE` | this segment's `records.csv` shows more than one distinct **complete** (all three fields populated) `(join_key_schema, join_key_policy_id, join_key_policy_version)` tuple for a requested domain |
+| `MATERIALIZATION_COMPATIBILITY_UNPROVEN` | no complete tuple is populated for that domain at all, or at least one record has an incomplete tuple (any of the three fields blank) even alongside an otherwise-consistent complete one — a partially-populated tuple is never treated as proof of compatibility, and an incomplete record is never simply discarded |
 
 A `SEGMENT_NOT_FOUND`/`SEGMENT_MATERIALIZATION_INCOMPLETE`/
-`REQUIRED_ANALYSIS_ARTIFACT_MISSING`/`*_NOT_MATERIALIZED`/`*_AMBIGUOUS`
-condition blocks the **entire run** (nonzero exit; still writes the 4-file
-output contract, header-only summary/detail, so the failure is never
-console-only). A `MATERIALIZATION_VERSION_INCOMPATIBLE`/
+`REQUIRED_ANALYSIS_ARTIFACT_MISSING`/`*_NOT_MATERIALIZED`/`*_AMBIGUOUS`/
+`NO_COMPARISON_TARGETS` condition blocks the **entire run** (nonzero exit;
+still writes the 4-file output contract, header-only summary/detail, so the
+failure is never console-only). A `MATERIALIZATION_VERSION_INCOMPATIBLE`/
 `MATERIALIZATION_COMPATIBILITY_UNPROVEN` condition blocks only the affected
 **domain** (exit `0`; check `comparison_status` per row) — matching the
 existing convention that a row/domain-level blocked outcome is not a
