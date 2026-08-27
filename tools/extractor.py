@@ -666,7 +666,6 @@ def _process_one_domain(
     file_domain_rows_local: List[Dict[str, str]] = []
     rec_membership_local: List[Dict[str, str]] = []
     diag_rows_local: List[Dict[str, str]] = []
-    domain_metrics_local: List[Dict[str, str]] = []
 
     sorted_clusters = sorted(
         cluster_rows,
@@ -688,25 +687,7 @@ def _process_one_domain(
         files_present = int(cluster["files_present"])
         cluster_id = f"{dom}|{schema}|{join_hash}"
         presence_pct = (files_present / files_total) if files_total else 0.0
-        coverage_pct = (len(rows) / total_dom_records) if total_dom_records else 0.0
         cluster_size = len(rows)
-        domain_metrics_local.append({
-            "schema_version": SCHEMA_VERSION,
-            "analysis_run_id": analysis_run_id,
-            "domain": dom,
-            "group_type": "CORPUS",
-            "group_id": "CORPUS",
-            "join_key_schema": schema,
-            "join_hash": join_hash,
-            "cluster_id": cluster_id,
-            "cluster_size": str(cluster_size),
-            "files_present": str(files_present),
-            "files_total": str(files_total),
-            "presence_pct": f"{presence_pct:.6f}",
-            "coverage_pct": f"{coverage_pct:.6f}",
-            "collision_pct": "0.000000",
-            "stability_pct": f"{presence_pct:.6f}",
-        })
 
         pid = str(cluster["pid"])
         generic_label = f"{schema} — Variant {rank} of {n}"
@@ -961,7 +942,6 @@ def _process_one_domain(
         "file_domain_rows": file_domain_rows_local,
         "rec_membership": rec_membership_local,
         "diag_rows": diag_rows_local,
-        "domain_metrics": domain_metrics_local,
         "pattern_id_by_cluster": {k: v for k, v in pattern_id_by_cluster.items() if k[0] == dom},
         "timing": {
             "domain": dom,
@@ -1410,7 +1390,6 @@ def emit_analysis(
         key = (r["domain"], r.get("join_key_schema", ""), jh)
         by_dom_cluster[key].append(r)
 
-    domain_metrics: List[Dict[str, str]] = []
     domain_patterns: List[Dict[str, str]] = []
     rec_membership: List[Dict[str, str]] = []
     authority_rows: List[Dict[str, str]] = []
@@ -1438,7 +1417,6 @@ def emit_analysis(
         file_domain_rows.extend(result["file_domain_rows"])
         rec_membership.extend(result["rec_membership"])
         diag_rows.extend(result["diag_rows"])
-        domain_metrics.extend(result["domain_metrics"])
         _pattern_id_by_cluster.update(result["pattern_id_by_cluster"])
         _domain_timings.append(result["timing"])
 
@@ -1536,11 +1514,12 @@ def emit_analysis(
             "membership_reason_code": "missing_join_hash",
         })
 
-    _write_csv(out_dir / "authority_metrics.csv", [
-        "schema_version", "analysis_run_id", "domain", "group_type", "group_id",
-        "join_key_schema", "join_hash", "cluster_id", "cluster_size",
-        "files_present", "files_total", "presence_pct", "coverage_pct", "collision_pct", "stability_pct",
-    ], _sort_rows(domain_metrics, ["domain", "join_key_schema", "join_hash"]))
+    # Remove any stale authority_metrics.csv left behind by an older extractor.py
+    # version rerun into this same out_dir -- this function no longer writes it
+    # (zero readers anywhere in the codebase), so a leftover copy would otherwise
+    # survive indefinitely with a stale analysis_run_id/population, misleading ad
+    # hoc inspection alongside the freshly-written outputs below.
+    (out_dir / "authority_metrics.csv").unlink(missing_ok=True)
 
     _write_csv(out_dir / "domain_patterns.csv", [
         # Keep legacy first 11 columns in the original order for Power BI queries

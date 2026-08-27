@@ -54,6 +54,25 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   materialization — missing, ambiguous, incomplete, or incompatible
   evidence blocks rather than triggering extraction or fallback processing.
   See `docs/reference_comparison_tool.md` and `tests/test_compare_reference.py`.
+- **`corpus_update_runbook.ps1` and its Python port `corpus_update_runbook.py`:
+  Run B's `authority,patterns` stage and its
+  `patch_all_domain_patterns.py` follow-up are now opt-in (`-RunAuthorityPatterns`,
+  default OFF) instead of unconditional.** Investigation
+  (`audit_results/audit_17_abc_reprocessing_scope_investigation.md`) confirmed
+  zero unguarded downstream reads of Run B's corpus-scoped
+  `domain_patterns.csv`/`authority_patterns.csv`/`pattern_presence_file.csv`/
+  `file_domain_concentration.csv`/`pattern_diagnostics.csv`/
+  `element_dominance.csv`/`element_characterization_thresholds.csv` — every
+  governance consumer reads exclusively from the segment-scoped copies Run C
+  generates independently via the same code path. B2 (`patch_all_domain_patterns.py`)
+  is gated on the same flag rather than run unconditionally: it has no
+  freshness/staleness check of its own, so an unconditional B2 would silently
+  patch a stale corpus `domain_patterns.csv` left over from a prior Run B
+  invocation — harmless (nothing reads it) but pointless when B1 didn't just
+  refresh it. `-NameKey`'s Run A/B/C sub-paths are unaffected (independent
+  input dependency). Also removed the `authority_metrics.csv` emission
+  (`tools/extractor.py`'s `emit_analysis`) — confirmed zero readers anywhere
+  in the codebase at either corpus or segment scope.
 
 ### Fixed
 - **`arrowheads`: the five style-specific fields are no longer discarded

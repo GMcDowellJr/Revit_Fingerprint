@@ -14,6 +14,14 @@ param(
     [string]$Run = "",
     [switch]$ForceAll,
     [switch]$NameKey,
+    # Opt-in (default OFF): run Run B's authority,patterns stage plus its
+    # patch_all_domain_patterns.py follow-up. Confirmed (audit_results/
+    # audit_17_abc_reprocessing_scope_investigation.md) that no governance
+    # consumer reads Run B's corpus-scoped output -- Run C independently
+    # recomputes the same statistics at correct segment scope via the same
+    # code path. Pass this switch only if you specifically need the
+    # corpus-wide (unsegmented) authority/patterns CSVs for ad hoc inspection.
+    [switch]$RunAuthorityPatterns,
     # Root containing the raw *.json exports plus the results\/segments\ folders nested
     # under it (previously hardcoded as .../Fingerprint_Out/exports; moved to OneDrive as
     # of 2026-07 -- exposed as a param so a future move is a CLI override, not a script edit).
@@ -82,6 +90,14 @@ if ($Run -eq "") {
     Write-Host "    complete run. Pass -ForceAll after a sig_hash/join_hash policy change"
     Write-Host "    (population_hash is membership-only and cannot detect those) to force a"
     Write-Host "    full-corpus rebuild."
+    Write-Host ""
+    Write-Host "  -RunAuthorityPatterns (Run B, opt-in, default OFF): run the corpus-wide"
+    Write-Host "    (unsegmented) authority,patterns stage and its patch_all_domain_patterns.py"
+    Write-Host "    follow-up. OFF by default because no governance consumer reads this"
+    Write-Host "    corpus-scoped output -- Run C independently recomputes the same statistics"
+    Write-Host "    at correct segment scope via the same code path (see"
+    Write-Host "    audit_results/audit_17_abc_reprocessing_scope_investigation.md). Pass this"
+    Write-Host "    switch only for ad hoc corpus-wide inspection; Run C does not require it."
     Write-Host ""
     Write-Host "  -NameKey (Run A/B/C, opt-in, additive): also produce the Canonical Name"
     Write-Host "    Identity Projection (join_key_name_identity) alongside the default"
@@ -160,18 +176,30 @@ if ($Run -eq "A") {
 if ($Run -eq "B") {
     Write-Host "=== RUN B: Authority / Patterns / Patch ===" -ForegroundColor Green
 
-    Write-Host "--- B1: authority + patterns ---" -ForegroundColor Cyan
-    python tools/run_extract_all.py $EXPORTS `
-        --out-root $RESULTS `
-        --out-root-is-results-root `
-        --stages authority,patterns
-    Invoke-Checked -StepName "Run B1: authority/patterns"
+    if ($RunAuthorityPatterns) {
+        Write-Host "--- B1: authority + patterns ---" -ForegroundColor Cyan
+        python tools/run_extract_all.py $EXPORTS `
+            --out-root $RESULTS `
+            --out-root-is-results-root `
+            --stages authority,patterns
+        Invoke-Checked -StepName "Run B1: authority/patterns"
 
-    Write-Host "--- B2: patch corpus domain_patterns ---" -ForegroundColor Cyan
-    python tools\label_synthesis\patch_all_domain_patterns.py `
-        --results-root $RESULTS `
-        --segments-root $SEGMENTS
-    Invoke-Checked -StepName "Run B2: patch_all_domain_patterns.py"
+        # B2 is gated on B1 having just run, not just on the flag: patching
+        # a stale corpus domain_patterns.csv left over from a prior Run B
+        # invocation is harmless (nothing downstream reads corpus-scoped
+        # output -- see audit_results/audit_17_abc_reprocessing_scope_
+        # investigation.md), but pointless when B1 didn't just refresh it.
+        Write-Host "--- B2: patch corpus domain_patterns ---" -ForegroundColor Cyan
+        python tools\label_synthesis\patch_all_domain_patterns.py `
+            --results-root $RESULTS `
+            --segments-root $SEGMENTS
+        Invoke-Checked -StepName "Run B2: patch_all_domain_patterns.py"
+    } else {
+        Write-Host "--- B1/B2: SKIPPED (pass -RunAuthorityPatterns to run corpus-wide authority/patterns/patch) ---" -ForegroundColor Cyan
+        Write-Host "    Not required before Run C -- Run C recomputes authority/patterns at correct" -ForegroundColor Cyan
+        Write-Host "    segment scope independently. See CLAUDE.md / audit_results/audit_17_abc_" -ForegroundColor Cyan
+        Write-Host "    reprocessing_scope_investigation.md." -ForegroundColor Cyan
+    }
 
     if ($NameKey) {
         Write-Host "--- B-NameKey (OPTIONAL; not required before Run C -- Run C re-clusters per segment) ---" -ForegroundColor Cyan
