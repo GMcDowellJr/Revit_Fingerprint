@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import csv
 import shutil
@@ -24,10 +25,17 @@ if __package__ in (None, ""):
     from step5_classify_patterns import emit_stub as emit_step5
     from step6_classify_files import emit_stub as emit_step6
     from step7_overlap_report import emit_stub as emit_step7
-    from reference_bundle import load_and_validate
+    from reference_bundle import load_and_validate, ReferenceBundleError
     from step_compare import run_compare_for_domain
     from placeholder_exclusions import compute_placeholder_exclusions
     from jenks_utils import jenks_breaks
+    from comparison_status import (
+        COMPARISON_STATUS_OK,
+        COMPARISON_STATUS_DEGRADED,
+        COMPARISON_STATUS_BLOCKED,
+        aggregate_comparison_status,
+        join_reason_codes,
+    )
     from name_projection_adapter import (
         DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID,
         emit_name_target_provenance,
@@ -44,10 +52,17 @@ else:
     from .step5_classify_patterns import emit_stub as emit_step5
     from .step6_classify_files import emit_stub as emit_step6
     from .step7_overlap_report import emit_stub as emit_step7
-    from .reference_bundle import load_and_validate
+    from .reference_bundle import load_and_validate, ReferenceBundleError
     from .step_compare import run_compare_for_domain
     from .placeholder_exclusions import compute_placeholder_exclusions
     from ..jenks_utils import jenks_breaks
+    from .comparison_status import (
+        COMPARISON_STATUS_OK,
+        COMPARISON_STATUS_DEGRADED,
+        COMPARISON_STATUS_BLOCKED,
+        aggregate_comparison_status,
+        join_reason_codes,
+    )
     from .name_projection_adapter import (
         DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID,
         emit_name_target_provenance,
@@ -147,6 +162,70 @@ def _emit_meta_scatter_thresholds(out_dir: Path, run_id: str, domain_filter: str
         out_dir / "meta_scatter_thresholds.csv",
         ["analysis_run_id", "axis", "break_value", "n_domains", "input_min", "input_max"],
         out_rows,
+    )
+
+
+_COMPARE_RUN_SUMMARY_FIELDNAMES = [
+    "reference_bundle_id",
+    "effective_date",
+    "analysis_run_id",
+    "domain",
+    "population_id",
+    "files_scored",
+    "full_count",
+    "partial_count",
+    "none_count",
+    "no_reference_count",
+    "comparison_status",
+    "comparison_reason_codes",
+    "comparison_ok_count",
+    "comparison_degraded_count",
+    "comparison_blocked_count",
+]
+
+_COMPARE_RUN_STATUS_FIELDNAMES = [
+    "analysis_run_id",
+    "comparison_status",
+    "comparison_reason_codes",
+    "comparison_detail",
+    "domains_total",
+    "domains_ok",
+    "domains_degraded",
+    "domains_blocked",
+]
+
+
+def _write_compare_run_outputs(compare_out_dir: Path, run_id: str, compare_rows: List[Dict[str, str]]) -> None:
+    """Write compare_run_summary.csv (per domain/population) and
+    compare_run_status.csv (a single deterministic run-level rollup: blocked
+    beats degraded beats ok -- see comparison_status.aggregate_comparison_status)
+    so a blocked/degraded comparison run is observable without console-log
+    inspection, per the "every comparison run declares ok/degraded/blocked"
+    invariant.
+    """
+    atomic_write_csv(compare_out_dir / "compare_run_summary.csv", _COMPARE_RUN_SUMMARY_FIELDNAMES, compare_rows)
+
+    domain_statuses = [r.get("comparison_status", COMPARISON_STATUS_OK) for r in compare_rows]
+    run_status = aggregate_comparison_status(domain_statuses)
+    run_reason_codes = join_reason_codes(
+        code for r in compare_rows for code in str(r.get("comparison_reason_codes", "") or "").split("|")
+    )
+    status_counts = Counter(domain_statuses)
+    atomic_write_csv(
+        compare_out_dir / "compare_run_status.csv",
+        _COMPARE_RUN_STATUS_FIELDNAMES,
+        [
+            {
+                "analysis_run_id": run_id,
+                "comparison_status": run_status,
+                "comparison_reason_codes": run_reason_codes,
+                "comparison_detail": "",
+                "domains_total": str(len(compare_rows)),
+                "domains_ok": str(status_counts.get(COMPARISON_STATUS_OK, 0)),
+                "domains_degraded": str(status_counts.get(COMPARISON_STATUS_DEGRADED, 0)),
+                "domains_blocked": str(status_counts.get(COMPARISON_STATUS_BLOCKED, 0)),
+            }
+        ],
     )
 
 
@@ -421,7 +500,43 @@ def run_bundle_analysis(
 
     reference: Optional[Dict[str, object]] = None
     if compare:
-        reference = load_and_validate(analysis_dir, SCHEMA_VERSION)
+        try:
+            reference = load_and_validate(analysis_dir, SCHEMA_VERSION)
+        except ReferenceBundleError as exc:
+            # The reference sidecar is missing, malformed, or schema-incompatible.
+            # Comparison cannot truthfully proceed at all -- there is no domain
+            # loop to enter, so this blocks at run scope. Recorded to a
+            # machine-readable CSV (not console output alone) before re-raising,
+            # so "comparison was requested but blocked" survives even though the
+            # process exits with a hard failure per "do not silently skip
+            # comparison".
+            atomic_write_csv(
+                out_dir / "compare_run_status.csv",
+                [
+                    "analysis_run_id",
+                    "comparison_status",
+                    "comparison_reason_codes",
+                    "comparison_detail",
+                    "domains_total",
+                    "domains_ok",
+                    "domains_degraded",
+                    "domains_blocked",
+                ],
+                [
+                    {
+                        "analysis_run_id": "",
+                        "comparison_status": COMPARISON_STATUS_BLOCKED,
+                        "comparison_reason_codes": exc.reason_code,
+                        "comparison_detail": str(exc),
+                        "domains_total": "0",
+                        "domains_ok": "0",
+                        "domains_degraded": "0",
+                        "domains_blocked": "0",
+                    }
+                ],
+            )
+            print(f"[run][blocked] comparison blocked: reason={exc.reason_code} detail={exc}")
+            raise
 
     if not discover_populations_flag:
         for view in views_to_run:
@@ -603,22 +718,7 @@ def run_bundle_analysis(
             if compare and compare_out is not None:
                 compare_rows = [r for r in view_compare_summary_rows if r.get("analysis_run_id", "") == run_id]
                 compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
-                atomic_write_csv(
-                    compare_out / "compare_run_summary.csv",
-                    [
-                        "reference_bundle_id",
-                        "effective_date",
-                        "analysis_run_id",
-                        "domain",
-                        "population_id",
-                        "files_scored",
-                        "full_count",
-                        "partial_count",
-                        "none_count",
-                        "no_reference_count",
-                    ],
-                    compare_rows,
-                )
+                _write_compare_run_outputs(compare_out, run_id, compare_rows)
 
             _emit_meta_scatter_thresholds(view_out, run_id, domain)
 
@@ -868,22 +968,7 @@ def run_bundle_analysis(
             compare_out_dir = view_out.parent / f"compare_{view}"
             compare_rows = [r for r in view_compare_summary_rows[view] if r.get("analysis_run_id", "") == run_id]
             compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
-            atomic_write_csv(
-                compare_out_dir / "compare_run_summary.csv",
-                [
-                    "reference_bundle_id",
-                    "effective_date",
-                    "analysis_run_id",
-                    "domain",
-                    "population_id",
-                    "files_scored",
-                    "full_count",
-                    "partial_count",
-                    "none_count",
-                    "no_reference_count",
-                ],
-                compare_rows,
-            )
+            _write_compare_run_outputs(compare_out_dir, run_id, compare_rows)
 
         _emit_meta_scatter_thresholds(view_out, run_id, domain)
 

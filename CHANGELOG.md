@@ -106,6 +106,82 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   compliance meaning is assigned to `target_only`/`reference_only` — this is
   descriptive set comparison only. See `tools/bundle_analysis/README.md`
   and `tests/test_step_compare.py`.
+- **Reference-bundle comparison: explicit `comparison_status`/
+  `comparison_reason_codes` reliability semantics (PR2), hardening PR1's
+  symmetric comparison against insufficient/unreliable evidence.** Absence of
+  a `membership_matrix.csv` row for a pattern cannot, by itself, distinguish
+  "target genuinely does not have this configuration" from "target domain
+  could not be observed reliably" (extraction failure, missing/invalid join
+  identity). `tools/bundle_analysis/step_compare.py` now classifies each
+  `(export_run_id, domain)` comparison row using `pattern_presence_file.csv`'s
+  existing UNKNOWN bucket (`pattern_id=""`, already emitted by
+  `tools/extractor.py::_process_one_domain` for records with no assignable
+  join_hash) and presence-row existence itself: **no presence evidence at all**
+  for a file that was explicitly proposed as an eligible comparison target
+  (via `--roles` or population-membership filtering) is `blocked`
+  (`TARGET_DOMAIN_UNAVAILABLE`) rather than a false `reference_only` gap;
+  **100% unknown-bucket evidence** is `blocked` (`TARGET_IDENTITY_INVALID`);
+  **partial unknown-bucket evidence** is `degraded`
+  (`TARGET_DOMAIN_DEGRADED`, with `identity_unknown_share` in
+  `comparison_detail`) while still reporting the reliable partial
+  shared/reference_only/target_only split over the assignable subset; an
+  export with zero presence rows in the pre-existing (non-eligibility-widened)
+  default derivation path, or a presence schema without per-pattern
+  granularity at all, is unaffected (`ok`) — this preserves every PR1 test
+  unchanged. `NO_REFERENCE_DEFINED` remains its own distinct condition
+  (`comparison_status=ok`, `comparison_reason_codes=REFERENCE_DOMAIN_UNDEFINED`)
+  and is not reinterpreted as a target-evidence failure. Reference-sidecar
+  load failures (missing/malformed JSON, schema-version mismatch) now raise
+  distinguishable `ReferenceBundleMissingError`/`ReferenceBundleInvalidError`/
+  `ReferenceBundleSchemaMismatchError` (all still `ValueError` subclasses,
+  so existing catch sites are unaffected) instead of a single generic
+  `ValueError`, each carrying a stable `reason_code`
+  (`REFERENCE_INVALID`/`SCHEMA_INCOMPATIBLE`); `run_bundle_analysis.py`
+  records this as a run-scoped `blocked` `compare_run_status.csv` row before
+  re-raising, so the failure is machine-readable rather than console-only,
+  without changing that it still fails the run. `run_compare_for_domain` also
+  now catches its own missing/inconsistent input CSVs
+  (`FileNotFoundError`/`ValueError` reading `pattern_presence_file.csv` or
+  `membership_matrix.csv`) and returns a `blocked`
+  (`COMPARISON_INPUT_INVALID`) domain summary instead of letting the
+  exception disappear into `run_bundle_analysis.py`'s pre-existing
+  `except Exception: print(...)` domain-pipeline handler — this is scoped
+  to the comparison call itself, not a repo-wide exception-handling change.
+  `comparison_status`/`comparison_reason_codes`/`comparison_detail` are new
+  `file_gap_report.csv` columns, distinct from and never overloading
+  `coverage_status` (which still means "how much of the reference the target
+  covers", not "was there enough evidence to trust that number"). On a
+  `blocked` row, every target-derived field (`coverage_status`,
+  `coverage_pct`/`reference_coverage_pct`/`jaccard`,
+  `target_pattern_count`/`shared_count`/`reference_only_count`/
+  `target_only_count`/`union_count`, and the `*_pattern_ids` lists) is blanked
+  to `""` rather than a plausible-looking `"0"`/count; `patterns_required`/
+  `reference_pattern_count` (reference-side facts, unaffected by target
+  reliability) are left populated. `compare_run_summary.csv` gains
+  `comparison_status`/`comparison_reason_codes`/`comparison_ok_count`/
+  `comparison_degraded_count`/`comparison_blocked_count` per domain; a new
+  `compare_run_status.csv` gives one deterministic run-level rollup
+  (`comparison_status.aggregate_comparison_status`: any blocked domain →
+  blocked, else any degraded → degraded, else ok — reusing
+  `core/contracts.py`'s existing `DOMAIN_STATUS_OK`/`DEGRADED`/`BLOCKED`
+  vocabulary verbatim rather than inventing a second one). No sig_hash/
+  join_hash/canonicalization/extraction change. See
+  `tools/bundle_analysis/comparison_status.py` and
+  `tests/test_step_compare_comparison_status.py`.
+  **Known upstream gap (not fixed by this PR):** a domain that is entirely
+  blocked at extraction time (e.g. a hard dependency failure) can emit zero
+  individual item records for a file, which is indistinguishable — using only
+  `pattern_presence_file.csv`/`membership_matrix.csv`/`records.csv` — from a
+  domain that was genuinely observed and legitimately has zero elements,
+  because `_contract.domains[domain].status` (the actual authoritative
+  ok/degraded/blocked/failed signal computed by `runner/run_dynamo.py`) is
+  never propagated into any analysis-side CSV by the flatten stage
+  (`tools/extractor.py::emit_records`). This PR does not extend flatten to
+  carry that signal through (out of scope: "do not alter extraction logic",
+  and flatten is heavily-relied-upon and shared far beyond comparison); the
+  cases this PR *can* detect from already-flattened evidence (identity-
+  invalid/unassignable records, and eligibility-widened targets with zero
+  presence rows at all) are handled per above.
 
 ### Added
 - **`loaded_family_types` domain: `can_have_structural_section`/`has_thermal_properties`

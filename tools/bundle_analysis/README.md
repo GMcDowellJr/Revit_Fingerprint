@@ -219,3 +219,91 @@ order for deterministic output.
 No governance, compliance, or "correctness" meaning is assigned to
 `reference_only`/`target_only` — these are descriptive set differences
 only. Whether a difference matters is left to a downstream consumer.
+
+### Comparison reliability semantics (`comparison_status`, PR2)
+
+The fields above describe *what* differs. They say nothing about whether
+there was enough trustworthy evidence to compute that difference at all —
+absence of a `membership_matrix.csv` row for a pattern can mean either
+"the target genuinely doesn't have this configuration" or "the target
+domain couldn't be observed reliably" (extraction failure, missing/invalid
+join identity). `file_gap_report.csv` and `compare_run_summary.csv` add
+three fields to make that distinction explicit and machine-readable:
+
+| Field | Meaning |
+|---|---|
+| `comparison_status` | `ok` / `degraded` / `blocked` (see `tools/bundle_analysis/comparison_status.py`; reuses `core/contracts.py`'s domain-status vocabulary verbatim) |
+| `comparison_reason_codes` | `\|`-joined, sorted, stable reason codes; `""` when `ok` with no notable condition |
+| `comparison_detail` | optional human-readable elaboration (e.g. `identity_unknown_share=0.500000`); never authoritative, `comparison_reason_codes` is |
+
+Classification per `(export_run_id, domain)`, using `pattern_presence_file.csv`'s
+existing `pattern_id=""` "UNKNOWN" bucket row (already emitted by
+`tools/extractor.py::_process_one_domain` whenever a record has no
+assignable `join_hash` — e.g. missing/invalid join identity) plus presence-row
+existence itself:
+
+- **No presence evidence at all** for an `export_run_id` that was explicitly
+  proposed as an eligible comparison target (via `--roles` or
+  population-membership filtering) → `blocked` / `TARGET_DOMAIN_UNAVAILABLE`.
+  Not reachable via the default (non-eligibility-widened) derivation path,
+  which only ever proposes `export_run_id`s that already have ≥1 presence row.
+- **100% of a file's presence rows are the UNKNOWN bucket** (every record
+  present had unassignable identity) → `blocked` / `TARGET_IDENTITY_INVALID`.
+- **Some but not all of a file's presence rows are the UNKNOWN bucket** →
+  `degraded` / `TARGET_DOMAIN_DEGRADED`, `comparison_detail` carries
+  `identity_unknown_share=<pct>`. The ordinary `shared`/`reference_only`/
+  `target_only` fields are still computed and populated from the reliable
+  (assignable) subset — a degraded row is a real partial result, not blanked.
+- **A presence schema without the `pattern_id` column at all** (older/minimal
+  exports) carries no per-pattern granularity to classify from; presence
+  alone is treated as sufficient evidence of a genuine observation (`ok`) —
+  this is the pre-PR2 behavior, preserved exactly.
+- Otherwise → `ok`.
+
+`NO_REFERENCE_DEFINED` (see above) is a distinct condition from a
+target-evidence failure — nothing about the target's evidence is unreliable
+there, there is simply no reference to compare against — so it reports
+`comparison_status=ok`, `comparison_reason_codes=REFERENCE_DOMAIN_UNDEFINED`.
+
+**On a `blocked` row**, every target-derived field is blanked to `""` rather
+than a plausible-looking `"0"`/count/ratio: `coverage_status`, `coverage_pct`,
+`reference_coverage_pct`, `jaccard`, `target_pattern_count`, `shared_count`,
+`reference_only_count`, `target_only_count`, `union_count`, and all three
+`*_pattern_ids` list fields (and no `file_gap_detail.csv` rows are emitted for
+that `export_run_id`/domain). `patterns_required`/`reference_pattern_count`
+stay populated — they describe the reference side only, which target-evidence
+reliability doesn't affect.
+
+**Reference sidecar failures** (missing file, malformed JSON, or
+`extractor_schema_version` mismatch) raise `ReferenceBundleMissingError` /
+`ReferenceBundleInvalidError` / `ReferenceBundleSchemaMismatchError`
+(`tools/bundle_analysis/reference_bundle.py`, all `ValueError` subclasses)
+before any per-domain comparison begins. `run_bundle_analysis.py` writes a
+run-scoped `blocked` `compare_run_status.csv` row (reason
+`REFERENCE_INVALID` or `SCHEMA_INCOMPATIBLE`) and then re-raises — comparison
+is never silently skipped, but the failure is machine-readable rather than
+console-only. Separately, if `run_compare_for_domain`'s own inputs
+(`pattern_presence_file.csv` / `membership_matrix.csv`) are missing or
+internally inconsistent, it returns a `blocked` / `COMPARISON_INPUT_INVALID`
+domain summary instead of raising into the caller's bare
+`except Exception: print(...)` domain-pipeline handler.
+
+**Run-level aggregation**: `compare_run_summary.csv` gains
+`comparison_status`/`comparison_reason_codes`/`comparison_ok_count`/
+`comparison_degraded_count`/`comparison_blocked_count` per domain/population
+row. A separate `compare_run_status.csv` gives one row per analysis run with
+the overall rollup — any `blocked` domain → `blocked`, else any `degraded` →
+`degraded`, else `ok` — so a degraded or blocked comparison run is visible
+without reading console output.
+
+**Known gap, not addressed by this contract:** a domain that is entirely
+blocked at extraction time (e.g. a hard dependency failure in
+`runner/run_dynamo.py`) can produce zero individual item records for a file,
+which — using only `pattern_presence_file.csv`/`membership_matrix.csv`/
+`records.csv` — is indistinguishable from a domain that was genuinely
+observed and legitimately has zero elements. The authoritative signal for
+that distinction (`_contract.domains[domain].status` in the raw per-file
+export JSON) is never propagated into any analysis-side CSV by
+`tools/extractor.py::emit_records`. Closing this gap would require extending
+the flatten stage; it is out of scope here (extraction/flatten logic is not
+touched by this contract).
