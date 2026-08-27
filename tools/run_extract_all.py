@@ -38,6 +38,101 @@ _LP_SEGMENT_KEY_RE = re.compile(r"^line_pattern\.(?:seg|segment)\[(\d{3})\]\.(ki
 _LP_SEGMENT_COUNT_KEY = "line_pattern.segment_count"
 
 
+def _line_pattern_synthetic_norm_hash_row(
+    record_pk: str,
+    group: List[Dict[str, str]],
+    key_col: str,
+    quality_col: str,
+    value_col: str,
+    item_index_col: str,
+) -> Tuple[Dict[str, str], bool]:
+    """Compute the synthetic `line_pattern.segments_norm_hash` row for one
+    line_patterns record's own item rows (`group`).
+
+    Pure function of one record's own items -- no cross-record dependency
+    (confirmed: grouping is strictly by `record_pk`) -- so this is safe to call
+    per-file, per-record from Run A's incremental cache path
+    (tools/run_a_incremental.py) as well as from
+    `_append_line_pattern_synthetic_norm_hash`'s corpus-wide shard rewrite
+    below, without changing either's output. Returns (row, is_ok).
+    """
+    seg_rows = [r for r in group if _LP_SEGMENT_KEY_RE.match(str(r.get(key_col, "")))]
+    status = "ok"
+    hash_v = ""
+    is_ok = False
+
+    if not seg_rows:
+        seg_count_rows = [r for r in group if str(r.get(key_col, "")) == _LP_SEGMENT_COUNT_KEY]
+        seg_count_v = str(seg_count_rows[0].get(value_col, "")).strip() if seg_count_rows else ""
+        seg_count_q = str(seg_count_rows[0].get(quality_col, "")).strip() if seg_count_rows else ""
+        try:
+            seg_count_is_zero = int(seg_count_v) == 0
+        except Exception:
+            seg_count_is_zero = False
+
+        if seg_count_q == "ok" and seg_count_is_zero:
+            hash_v = hashlib.md5("segment_count=0".encode("utf-8")).hexdigest()
+            is_ok = True
+        else:
+            status = "missing"
+    elif any(str(r.get(quality_col, "")) != "ok" for r in seg_rows):
+        status = "missing"
+    else:
+        segments: Dict[int, Dict[str, float]] = {}
+        parse_error = False
+        for r in seg_rows:
+            m = _LP_SEGMENT_KEY_RE.match(str(r.get(key_col, "")))
+            if not m:
+                continue
+            idx = int(m.group(1))
+            key = m.group(2)
+            segments.setdefault(idx, {})
+            try:
+                if key == "kind":
+                    segments[idx]["kind"] = int(str(r.get(value_col, "")))
+                else:
+                    segments[idx]["length"] = float(str(r.get(value_col, "")))
+            except Exception:
+                parse_error = True
+                break
+
+        if parse_error or any("kind" not in d or "length" not in d for d in segments.values()):
+            status = "missing"
+        else:
+            ordered = [(idx, int(v["kind"]), float(v["length"])) for idx, v in sorted(segments.items())]
+            non_dot_total = sum(length for _, kind, length in ordered if kind != 2)
+            has_non_dot = any(kind != 2 for _, kind, _ in ordered)
+            dot_count = sum(1 for _, kind, _ in ordered if kind == 2)
+            eff_total = non_dot_total if has_non_dot else float(dot_count)
+            tokens: List[str] = []
+            for idx, kind, length in ordered:
+                if kind == 2:
+                    eff_length = 0.0 if has_non_dot else 1.0
+                else:
+                    eff_length = length
+                norm = (eff_length / eff_total) if eff_total > 0 else 0.0
+                tokens.append(f"seg[{idx:03d}].kind={kind}")
+                tokens.append(f"seg[{idx:03d}].norm_length={norm:.6f}")
+            hash_v = hashlib.md5("|".join(tokens).encode("utf-8")).hexdigest()
+            is_ok = True
+
+    base = group[0]
+    row = {
+        "schema_version": str(base.get("schema_version", "")),
+        "export_run_id": str(base.get("export_run_id", "")),
+        "file_id": str(base.get("file_id", "")),
+        "domain": "line_patterns",
+        "record_id": str(base.get("record_id", "")),
+        "record_ordinal": str(base.get("record_ordinal", "")),
+        "record_pk": record_pk,
+        item_index_col: "synthetic",
+        key_col: "line_pattern.segments_norm_hash",
+        quality_col: status,
+        value_col: hash_v,
+    }
+    return row, is_ok
+
+
 def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
     """Append synthetic line_pattern.segments_norm_hash rows to the line_patterns shard
     (or, for a legacy monolithic-only phase0 dir with no shards, to identity_items.csv)."""
@@ -82,82 +177,12 @@ def _append_line_pattern_synthetic_norm_hash(items_csv: Path) -> Dict[str, int]:
     for record_pk, group in grouped.items():
         if record_pk in already_augmented:
             continue
-        seg_rows = [r for r in group if _LP_SEGMENT_KEY_RE.match(str(r.get(key_col, "")))]
-        status = "ok"
-        hash_v = ""
-
-        if not seg_rows:
-            seg_count_rows = [r for r in group if str(r.get(key_col, "")) == _LP_SEGMENT_COUNT_KEY]
-            seg_count_v = str(seg_count_rows[0].get(value_col, "")).strip() if seg_count_rows else ""
-            seg_count_q = str(seg_count_rows[0].get(quality_col, "")).strip() if seg_count_rows else ""
-            try:
-                seg_count_is_zero = int(seg_count_v) == 0
-            except Exception:
-                seg_count_is_zero = False
-
-            if seg_count_q == "ok" and seg_count_is_zero:
-                hash_v = hashlib.md5("segment_count=0".encode("utf-8")).hexdigest()
-                ok += 1
-            else:
-                status = "missing"
-                missing += 1
-        elif any(str(r.get(quality_col, "")) != "ok" for r in seg_rows):
-            status = "missing"
-            missing += 1
+        row, is_ok = _line_pattern_synthetic_norm_hash_row(record_pk, group, key_col, quality_col, value_col, item_index_col)
+        if is_ok:
+            ok += 1
         else:
-            segments: Dict[int, Dict[str, float]] = {}
-            parse_error = False
-            for r in seg_rows:
-                m = _LP_SEGMENT_KEY_RE.match(str(r.get(key_col, "")))
-                if not m:
-                    continue
-                idx = int(m.group(1))
-                key = m.group(2)
-                segments.setdefault(idx, {})
-                try:
-                    if key == "kind":
-                        segments[idx]["kind"] = int(str(r.get(value_col, "")))
-                    else:
-                        segments[idx]["length"] = float(str(r.get(value_col, "")))
-                except Exception:
-                    parse_error = True
-                    break
-
-            if parse_error or any("kind" not in d or "length" not in d for d in segments.values()):
-                status = "missing"
-                missing += 1
-            else:
-                ordered = [(idx, int(v["kind"]), float(v["length"])) for idx, v in sorted(segments.items())]
-                non_dot_total = sum(length for _, kind, length in ordered if kind != 2)
-                has_non_dot = any(kind != 2 for _, kind, _ in ordered)
-                dot_count = sum(1 for _, kind, _ in ordered if kind == 2)
-                eff_total = non_dot_total if has_non_dot else float(dot_count)
-                tokens: List[str] = []
-                for idx, kind, length in ordered:
-                    if kind == 2:
-                        eff_length = 0.0 if has_non_dot else 1.0
-                    else:
-                        eff_length = length
-                    norm = (eff_length / eff_total) if eff_total > 0 else 0.0
-                    tokens.append(f"seg[{idx:03d}].kind={kind}")
-                    tokens.append(f"seg[{idx:03d}].norm_length={norm:.6f}")
-                hash_v = hashlib.md5("|".join(tokens).encode("utf-8")).hexdigest()
-                ok += 1
-
-        base = group[0]
-        out_rows.append({
-            "schema_version": str(base.get("schema_version", "")),
-            "export_run_id": str(base.get("export_run_id", "")),
-            "file_id": str(base.get("file_id", "")),
-            "domain": "line_patterns",
-            "record_id": str(base.get("record_id", "")),
-            "record_ordinal": str(base.get("record_ordinal", "")),
-            "record_pk": record_pk,
-            item_index_col: "synthetic",
-            key_col: "line_pattern.segments_norm_hash",
-            quality_col: status,
-            value_col: hash_v,
-        })
+            missing += 1
+        out_rows.append(row)
 
     if out_rows:
         rows.extend(out_rows)
@@ -803,6 +828,23 @@ def main() -> None:
         help="Number of worker processes for the emit_analysis domain loop. Default: 4. "
              "Use 1 to run sequentially (same behaviour as before parallelism was added).",
     )
+    ap.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Run A only: skip re-parsing export files whose content and both policy "
+             "files are unchanged since the last successful --incremental run, reusing "
+             "cached flatten/sig_hash/apply output for those files instead. Requires "
+             "flatten, sig_hash, and apply to all be selected (Run A's stage set); a "
+             "no-op with a warning otherwise. See tools/run_a_cache.py and "
+             "tools/run_a_incremental.py. Cache lives under {results-root}/.run_a_cache/.",
+    )
+    ap.add_argument(
+        "--force-full-cache",
+        action="store_true",
+        help="With --incremental: ignore any existing Run A cache and reprocess every "
+             "export file, then rebuild the cache fresh. Use after a change the cache "
+             "can't detect on its own, or to recover from a suspected stale/corrupt cache.",
+    )
     args = ap.parse_args()
 
     allow_sig_hash_join_key = args.allow_sig_hash_join_key
@@ -875,55 +917,142 @@ def main() -> None:
     meta_rows: List[Dict[str, str]] = []
     record_rows: List[Dict[str, str]] = []
 
-    if "flatten" in selected_stages:
-        print("[extract_all] Stage flatten (T0): emitting flatten outputs...", flush=True)
+    # --incremental replaces flatten+sig_hash+apply's three independent stage bodies
+    # with one per-export-file cache-aware pass (tools/run_a_incremental.py) --
+    # see that module's docstring for why this is safe to do as a single unit.
+    # Scoped to exactly Run A's stage combination (flatten, sig_hash, apply all
+    # selected, discover not selected -- discover's read-only policy exploration
+    # runs between sig_hash and apply in the non-incremental stage order below,
+    # and collapsing all three into one pass would silently reorder it after apply
+    # instead; Run A never selects discover, so this is not a real restriction).
+    incremental_active = False
+    if args.incremental:
+        selected_set = set(selected_stages)
+        if {"flatten", "sig_hash", "apply"}.issubset(selected_set) and "discover" not in selected_set:
+            incremental_active = True
+        else:
+            sys.stderr.write(
+                "[WARN extract_all] --incremental requires flatten, sig_hash, and apply "
+                "all selected (and discover not selected); ignoring --incremental for "
+                f"this invocation (stages={','.join(selected_stages)}).\n"
+            )
+
+    if incremental_active:
+        import run_a_cache
+        import run_a_incremental
+
+        sig_pol = _resolve_sig_hash_policy_path(args.sig_hash_policy, v21_root)
+        if sig_pol is None:
+            if not args.skip_sig_hash_missing_policy:
+                raise SystemExit("sig_hash stage requested but no policy file found. Use --sig-hash-policy or --skip-sig-hash-missing-policy.")
+            sys.stderr.write(
+                "[WARN extract_all] sig_hash stage: no policy file found. sig_hash/join_hash "
+                "for records in policy-less domains stay at flatten's bootstrap values.\n"
+            )
+            report["notes"].append("sig_hash stage skipped: no policy found")
+        join_policy_path = Path(args.join_policy).resolve() if args.join_policy else (v21_root / "policies" / "domain_join_key_policies.v21.json").resolve()
+        if not join_policy_path.is_file():
+            raise SystemExit(f"apply stage requires a join policy file: {join_policy_path}")
+
         _ensure_dir(v21_phase0_dir)
-        report["commands"].append({"stage": "flatten", "out": str(v21_phase0_dir)})
-        file_count, record_count = emit_records(exports_dir, v21_phase0_dir, file_id_mode="basename")
-        print(f"[extract_all] Stage flatten complete: rows={record_count} files={file_count} out={v21_phase0_dir}", flush=True)
-        items_csv = v21_phase0_dir / "identity_items.csv"
-        stats = _append_line_pattern_synthetic_norm_hash(items_csv)
+        cache_dir = run_a_cache.cache_root(v21_root)
+        print("[extract_all] Stage flatten+sig_hash+apply (T0/T0.5/T2, incremental): ...", flush=True)
+        inc_report = run_a_incremental.run_incremental(
+            exports_dir,
+            v21_phase0_dir,
+            cache_dir=cache_dir,
+            sig_hash_policy_path=sig_pol,
+            join_policy_path=join_policy_path,
+            file_id_mode="basename",
+            force_full=args.force_full_cache,
+        )
+        print(
+            f"[extract_all] incremental flatten+sig_hash+apply complete: "
+            f"files_total={inc_report['files_total']} files_reused={inc_report['files_reused']} "
+            f"files_recomputed={inc_report['files_recomputed']} rows={inc_report['record_count']} "
+            f"cache_was_valid={inc_report['cache_was_valid']} "
+            f"invalidation_reason={inc_report['cache_invalidation_reason'] or '<none>'}",
+            flush=True,
+        )
+        stats = inc_report["line_pattern_stats"]
         print(
             f"[extract_all] line_patterns segments_norm_hash: "
             f"total={stats['total']} ok={stats['ok']} missing={stats['missing']}",
             flush=True,
         )
-    if "sig_hash" in selected_stages:
-        _records_csv = effective_phase0_dir / "records.csv"
-        _items_csv = effective_phase0_dir / "identity_items.csv"
-        _native_shard_complete = effective_phase0_dir / "identity_items_by_domain" / ".complete"
-        if not _records_csv.is_file() or not (_native_shard_complete.is_file() or _items_csv.is_file()):
-            raise SystemExit(
-                "sig_hash stage requires records.csv and identity_items (shards or "
-                "identity_items.csv) to exist. Run the flatten stage first, or include "
-                "flatten in --stages."
-            )
-        sig_pol = _resolve_sig_hash_policy_path(args.sig_hash_policy, v21_root)
-        if sig_pol is None:
-            if args.skip_sig_hash_missing_policy:
-                sys.stderr.write(
-                    "[WARN extract_all] sig_hash stage skipped: no policy file found. "
-                    "sig_hash and join_hash will be empty for all records.\n"
-                )
-                report["notes"].append("sig_hash stage skipped: no policy found")
-            else:
-                raise SystemExit("sig_hash stage requested but no policy file found. Use --sig-hash-policy or --skip-sig-hash-missing-policy.")
-        else:
-            print(f"[extract_all] Stage sig_hash (T0.5): applying policy {sig_pol.name} ...", flush=True)
-            diag = _apply_sig_hash_to_phase0(effective_phase0_dir, sig_pol, active_domains or domains)
-            diag_dir = v21_root / "diagnostics"
-            _ensure_dir(diag_dir)
-            diag_path = diag_dir / "sig_hash_policy_diagnostics.json"
-            diag_path.write_text(json.dumps(diag, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        diag = inc_report["sig_hash_diag"]
+        diag_dir = v21_root / "diagnostics"
+        _ensure_dir(diag_dir)
+        diag_path = diag_dir / "sig_hash_policy_diagnostics.json"
+        diag_path.write_text(json.dumps(diag, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(
+            f"[extract_all] Stage sig_hash complete: "
+            f"processed={diag['records_processed']} hashed={diag['records_hashed']} "
+            f"blocked={diag['records_blocked']} degraded={diag['records_degraded']} "
+            f"basis_items={diag.get('sig_basis_items_written', 0)} "
+            f"domains_without_policy={len(diag['domains_without_policy'])}",
+            flush=True,
+        )
+        # Manifest is only committed here, after flatten+sig_hash+apply have all
+        # written successfully -- a mid-run failure above raises before this point,
+        # so a partially-written cache entry never gets treated as reusable on the
+        # next invocation (tools/run_a_cache.py's finalize_manifest docstring).
+        run_a_cache.finalize_manifest(inc_report["run_state"])
+        report["commands"].append({
+            "stage": "flatten+sig_hash+apply", "incremental": True, "out": str(v21_phase0_dir),
+            "diagnostics": str(diag_path), "files_reused": inc_report["files_reused"],
+            "files_recomputed": inc_report["files_recomputed"],
+        })
+    else:
+        if "flatten" in selected_stages:
+            print("[extract_all] Stage flatten (T0): emitting flatten outputs...", flush=True)
+            _ensure_dir(v21_phase0_dir)
+            report["commands"].append({"stage": "flatten", "out": str(v21_phase0_dir)})
+            file_count, record_count = emit_records(exports_dir, v21_phase0_dir, file_id_mode="basename")
+            print(f"[extract_all] Stage flatten complete: rows={record_count} files={file_count} out={v21_phase0_dir}", flush=True)
+            items_csv = v21_phase0_dir / "identity_items.csv"
+            stats = _append_line_pattern_synthetic_norm_hash(items_csv)
             print(
-                f"[extract_all] Stage sig_hash complete: "
-                f"processed={diag['records_processed']} hashed={diag['records_hashed']} "
-                f"blocked={diag['records_blocked']} degraded={diag['records_degraded']} "
-                f"basis_items={diag.get('sig_basis_items_written', 0)} "
-                f"domains_without_policy={len(diag['domains_without_policy'])}",
+                f"[extract_all] line_patterns segments_norm_hash: "
+                f"total={stats['total']} ok={stats['ok']} missing={stats['missing']}",
                 flush=True,
             )
-            report["commands"].append({"stage": "sig_hash", "policy": str(sig_pol), "out": str(effective_phase0_dir), "diagnostics": str(diag_path)})
+        if "sig_hash" in selected_stages:
+            _records_csv = effective_phase0_dir / "records.csv"
+            _items_csv = effective_phase0_dir / "identity_items.csv"
+            _native_shard_complete = effective_phase0_dir / "identity_items_by_domain" / ".complete"
+            if not _records_csv.is_file() or not (_native_shard_complete.is_file() or _items_csv.is_file()):
+                raise SystemExit(
+                    "sig_hash stage requires records.csv and identity_items (shards or "
+                    "identity_items.csv) to exist. Run the flatten stage first, or include "
+                    "flatten in --stages."
+                )
+            sig_pol = _resolve_sig_hash_policy_path(args.sig_hash_policy, v21_root)
+            if sig_pol is None:
+                if args.skip_sig_hash_missing_policy:
+                    sys.stderr.write(
+                        "[WARN extract_all] sig_hash stage skipped: no policy file found. "
+                        "sig_hash and join_hash will be empty for all records.\n"
+                    )
+                    report["notes"].append("sig_hash stage skipped: no policy found")
+                else:
+                    raise SystemExit("sig_hash stage requested but no policy file found. Use --sig-hash-policy or --skip-sig-hash-missing-policy.")
+            else:
+                print(f"[extract_all] Stage sig_hash (T0.5): applying policy {sig_pol.name} ...", flush=True)
+                diag = _apply_sig_hash_to_phase0(effective_phase0_dir, sig_pol, active_domains or domains)
+                diag_dir = v21_root / "diagnostics"
+                _ensure_dir(diag_dir)
+                diag_path = diag_dir / "sig_hash_policy_diagnostics.json"
+                diag_path.write_text(json.dumps(diag, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+                print(
+                    f"[extract_all] Stage sig_hash complete: "
+                    f"processed={diag['records_processed']} hashed={diag['records_hashed']} "
+                    f"blocked={diag['records_blocked']} degraded={diag['records_degraded']} "
+                    f"basis_items={diag.get('sig_basis_items_written', 0)} "
+                    f"domains_without_policy={len(diag['domains_without_policy'])}",
+                    flush=True,
+                )
+                report["commands"].append({"stage": "sig_hash", "policy": str(sig_pol), "out": str(effective_phase0_dir), "diagnostics": str(diag_path)})
 
     if "discover" in selected_stages:
         print("[extract_all] Stage discover (T1): exploring join/sig hash policy candidates...", flush=True)
@@ -944,7 +1073,7 @@ def main() -> None:
         report["commands"].append({"stage": "discover", "cmd": cmd_discover})
         _run(cmd_discover, env=env)
 
-    if "apply" in selected_stages:
+    if "apply" in selected_stages and not incremental_active:
         print("[extract_all] Stage apply (T2): applying join policy to flatten outputs...", flush=True)
         items_csv = effective_phase0_dir / "identity_items.csv"
         stats = _append_line_pattern_synthetic_norm_hash(items_csv)

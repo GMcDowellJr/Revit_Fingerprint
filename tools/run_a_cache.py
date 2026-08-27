@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+"""Per-export-file change-detection cache for Run A (corpus_update_runbook.ps1's
+``sig_hash,flatten,apply,placeholders`` stage set).
+
+Scope and rationale (see audit_results/audit_17_abc_reprocessing_scope_investigation.md
+section 7 for the confirmed investigation this cache is built on): Run A's flatten
+stage (`tools/extractor.py::_iter_export_files`) has always been a plain
+`exports_dir.glob("*.json")` with zero mtime/hash/existing-output gating -- every
+export file is fully re-parsed on every invocation, even when nothing changed.
+This module is the "did this file actually change" oracle that `tools/extractor.py`
+(flatten), `tools/run_extract_all.py` (sig_hash stage), and `tools/apply_join_policy.py`
+(apply stage) all consult so that unchanged files' rows can be reused verbatim
+instead of recomputed.
+
+Cache-validity contract (deliberately coarse, not per-stage): this module treats
+the *entire* cache as valid or stale as a single unit, keyed by
+(cache schema version, sig_hash policy file content hash, join policy file content
+hash). If either policy file's content changes, or this module's own schema
+version is bumped, every file is treated as changed for this run -- there is no
+partial "only sig_hash needs recompute" state. This mirrors flatten -> sig_hash ->
+apply's shared dependency: sig_hash/join_hash are both pure per-record functions
+of (that record's own extracted items, the relevant policy file), so a policy
+change invalidates every record's derived value corpus-wide, not just some.
+
+RUN_A_CACHE_SCHEMA_VERSION is intentionally separate from
+`tools/discovery_orchestrator.py`'s DISCOVERY_ENGINE_VERSION -- that constant is a
+cache-semantic contract for the discovery-sweep engine (T1 candidate search) and
+must not be bumped or read by this module; this file owns its own version marker
+for Run A's own flatten/sig_hash/apply cache.
+
+Per-file change detection prefers a cheap `(mtime_ns, size)` stat comparison over
+unconditionally hashing file content: Revit export JSON files carry full
+per-record item payloads and can run from single-digit MB to well over 100MB on
+a large project, so hashing every file on every invocation (just to usually
+conclude "unchanged") would burn a meaningful fraction of the very I/O cost this
+cache exists to avoid. `(mtime_ns, size)` matching against the last recorded
+value is treated as sufficient proof of "unchanged" (the fast path -- the common
+case once a corpus is in steady state). Content hash (sha256, streamed in fixed
+chunks so a single huge export file never needs to be held in memory)  remains
+the authoritative signal and is stored alongside the stat pair for two reasons:
+(a) it is what actually gets compared whenever `(mtime_ns, size)` do NOT match
+(covering a touch-without-edit, a re-copy that preserves content but not mtime,
+or any tool that doesn't preserve stat metadata) so a spurious stat change never
+forces an unnecessary reparse, and (b) it is the value this module's own tests
+assert against, independent of filesystem stat granularity.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import time
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+RUN_A_CACHE_SCHEMA_VERSION = 1
+_HASH_CHUNK_SIZE = 1 << 20  # 1 MiB
+_ABSENT_POLICY_SENTINEL = "<absent>"
+
+
+def _sha256_stream(paths: List[Path]) -> str:
+    """Content hash of one or more files, concatenated in the given order.
+
+    Streamed in fixed-size chunks so a single large export file is never fully
+    materialized in memory just to be hashed.
+    """
+    h = hashlib.sha256()
+    for p in paths:
+        with p.open("rb") as f:
+            while True:
+                chunk = f.read(_HASH_CHUNK_SIZE)
+                if not chunk:
+                    break
+                h.update(chunk)
+        h.update(b"\x00")  # separator so (A,BC) != (AB,C) for split index/details pairs
+    return h.hexdigest()
+
+
+def fast_stat_signature(path: Path) -> Tuple[int, int]:
+    st = path.stat()
+    return (st.st_mtime_ns, st.st_size)
+
+
+def hash_policy_file(path: Optional[Path]) -> str:
+    """Content hash of a policy file, or a fixed sentinel when no policy is in use.
+
+    Used as part of the global cache-validity fingerprint: any change to the
+    sig_hash or join policy content must invalidate the whole cache (see module
+    docstring) even if the policy file's path/mtime happens to be identical
+    across runs (e.g. an in-place edit).
+    """
+    if path is None:
+        return _ABSENT_POLICY_SENTINEL
+    p = Path(path)
+    if not p.is_file():
+        return _ABSENT_POLICY_SENTINEL
+    return _sha256_stream([p])
+
+
+def cache_root(results_root: Path) -> Path:
+    """Root cache directory for a Run A invocation, sibling to records/analysis/policies."""
+    return Path(results_root) / ".run_a_cache"
+
+
+def _manifest_path(cache_dir: Path) -> Path:
+    return cache_dir / "manifest.json"
+
+
+def _entry_path(cache_dir: Path, file_id: str) -> Path:
+    digest = hashlib.sha1(file_id.encode("utf-8")).hexdigest()[:20]
+    return cache_dir / "entries" / f"{digest}.json"
+
+
+def _atomic_write_json(path: Path, payload: Dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile("w", encoding="utf-8", delete=False, dir=str(path.parent), suffix=".tmp") as tmp:
+        tmp_path = Path(tmp.name)
+        json.dump(payload, tmp, sort_keys=True)
+    tmp_path.replace(path)
+
+
+def load_manifest(cache_dir: Path) -> Optional[Dict[str, Any]]:
+    p = _manifest_path(cache_dir)
+    if not p.is_file():
+        return None
+    try:
+        with p.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
+def save_manifest(cache_dir: Path, manifest: Dict[str, Any]) -> None:
+    _atomic_write_json(_manifest_path(cache_dir), manifest)
+
+
+def load_entry(cache_dir: Path, file_id: str) -> Optional[Dict[str, Any]]:
+    p = _entry_path(cache_dir, file_id)
+    if not p.is_file():
+        return None
+    try:
+        with p.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return None
+    if not isinstance(data, dict) or data.get("file_id") != file_id:
+        return None
+    return data
+
+
+def save_entry(cache_dir: Path, file_id: str, payload: Dict[str, Any]) -> None:
+    payload = dict(payload)
+    payload["file_id"] = file_id
+    _atomic_write_json(_entry_path(cache_dir, file_id), payload)
+
+
+class RunState:
+    """Per-invocation decision of which export files can reuse cached rows.
+
+    `unchanged_file_ids` is empty whenever the cache is globally invalid (first
+    run, a policy changed, a forced-full run, or a schema version bump) -- in
+    that case every file is (re)computed fresh and a brand-new cache is written,
+    which is by construction byte-identical to a cold-cache run (there is no
+    partial/best-effort reuse path).
+    """
+
+    def __init__(
+        self,
+        *,
+        cache_dir: Path,
+        cache_was_valid: bool,
+        invalidation_reason: str,
+        sig_hash_policy_hash: str,
+        join_policy_hash: str,
+        unchanged_file_ids: Set[str],
+        fresh_signatures: Dict[str, Dict[str, Any]],
+    ) -> None:
+        self.cache_dir = cache_dir
+        self.cache_was_valid = cache_was_valid
+        self.invalidation_reason = invalidation_reason
+        self.sig_hash_policy_hash = sig_hash_policy_hash
+        self.join_policy_hash = join_policy_hash
+        self.unchanged_file_ids = unchanged_file_ids
+        # file_id -> {"mtime_ns": int, "size": int, "content_hash": str}, computed
+        # fresh for every file this run regardless of reuse decision, so the
+        # manifest written at the end of a successful run is always accurate.
+        self.fresh_signatures = fresh_signatures
+
+
+def compute_run_state(
+    *,
+    cache_dir: Path,
+    file_id_to_paths: Dict[str, List[Path]],
+    sig_hash_policy_path: Optional[Path],
+    join_policy_path: Optional[Path],
+    force_full: bool,
+) -> RunState:
+    """Decide, for every export file, whether its cached rows may be reused.
+
+    `file_id_to_paths` maps file_id -> [primary_path] or [primary_path, secondary_path]
+    (the split index/details pair), in whatever order flatten's own file
+    discovery produced them -- content hashing concatenates in that order so a
+    hash is comparable run over run only if the pairing itself is stable, which
+    `_iter_export_files` already guarantees deterministically by filename.
+    """
+    sig_hash_policy_hash = hash_policy_file(sig_hash_policy_path)
+    join_policy_hash = hash_policy_file(join_policy_path)
+
+    manifest = None if force_full else load_manifest(cache_dir)
+    cache_was_valid = True
+    invalidation_reason = ""
+    if force_full:
+        cache_was_valid = False
+        invalidation_reason = "force_full_requested"
+    elif manifest is None:
+        cache_was_valid = False
+        invalidation_reason = "no_prior_manifest"
+    elif manifest.get("schema_version") != RUN_A_CACHE_SCHEMA_VERSION:
+        cache_was_valid = False
+        invalidation_reason = "cache_schema_version_changed"
+    elif manifest.get("sig_hash_policy_hash") != sig_hash_policy_hash:
+        cache_was_valid = False
+        invalidation_reason = "sig_hash_policy_changed"
+    elif manifest.get("join_policy_hash") != join_policy_hash:
+        cache_was_valid = False
+        invalidation_reason = "join_policy_changed"
+
+    prior_files: Dict[str, Any] = {}
+    if cache_was_valid and isinstance(manifest, dict) and isinstance(manifest.get("files"), dict):
+        prior_files = manifest["files"]
+
+    unchanged_file_ids: Set[str] = set()
+    fresh_signatures: Dict[str, Dict[str, Any]] = {}
+
+    for file_id, paths in file_id_to_paths.items():
+        mtime_ns, size = fast_stat_signature(paths[0])
+        # Split index/details pairs: fold the secondary file's stat into the
+        # signature too so a details-only edit (secondary changes, primary/index
+        # untouched) is still detected without a content hash.
+        if len(paths) > 1:
+            m2, s2 = fast_stat_signature(paths[1])
+            mtime_ns = mtime_ns ^ m2
+            size = size + s2
+
+        prior = prior_files.get(file_id) if cache_was_valid else None
+        content_hash: Optional[str] = None
+        is_unchanged = False
+        if prior is not None and prior.get("mtime_ns") == mtime_ns and prior.get("size") == size:
+            # Fast path: stat pair matches, trust it without reading file content.
+            content_hash = prior.get("content_hash")
+            is_unchanged = bool(content_hash)
+        elif prior is not None:
+            # Stat pair differs (or is absent) -- fall back to content hash so a
+            # touch-without-edit or a re-copy that changed mtime but not bytes
+            # still reuses cache instead of forcing an unnecessary reparse.
+            content_hash = _sha256_stream(paths)
+            is_unchanged = content_hash == prior.get("content_hash")
+        # else: no prior entry for this file_id at all -> genuinely new, leave
+        # content_hash unset for now; computed lazily below only if needed.
+
+        if content_hash is None:
+            content_hash = _sha256_stream(paths)
+
+        fresh_signatures[file_id] = {"mtime_ns": mtime_ns, "size": size, "content_hash": content_hash}
+        if is_unchanged and load_entry(cache_dir, file_id) is not None:
+            unchanged_file_ids.add(file_id)
+
+    return RunState(
+        cache_dir=cache_dir,
+        cache_was_valid=cache_was_valid,
+        invalidation_reason=invalidation_reason,
+        sig_hash_policy_hash=sig_hash_policy_hash,
+        join_policy_hash=join_policy_hash,
+        unchanged_file_ids=unchanged_file_ids,
+        fresh_signatures=fresh_signatures,
+    )
+
+
+def finalize_manifest(state: RunState) -> None:
+    """Persist the updated manifest after a fully successful Run A invocation.
+
+    Callers must only call this once flatten, sig_hash, and apply have all
+    completed without error -- writing it earlier could record a file as
+    "cached" while its sig_hash/apply cache entry is missing or inconsistent
+    (e.g. a mid-run crash), corrupting reuse decisions on the next run.
+    """
+    manifest = {
+        "schema_version": RUN_A_CACHE_SCHEMA_VERSION,
+        "sig_hash_policy_hash": state.sig_hash_policy_hash,
+        "join_policy_hash": state.join_policy_hash,
+        "files": state.fresh_signatures,
+        "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    save_manifest(state.cache_dir, manifest)
+
+
+def write_reuse_file_ids_file(state: RunState, path: Path) -> None:
+    """Write one file_id per line for a subprocess (apply_join_policy.py) to read."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        for file_id in sorted(state.unchanged_file_ids):
+            f.write(file_id + "\n")
+
+
+def read_reuse_file_ids_file(path: Optional[Path]) -> Set[str]:
+    if path is None or not path.is_file():
+        return set()
+    with path.open("r", encoding="utf-8-sig") as f:
+        return {line.strip() for line in f if line.strip()}

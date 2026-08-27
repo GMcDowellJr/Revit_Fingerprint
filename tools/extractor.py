@@ -980,6 +980,252 @@ def _process_one_domain(
     }
 
 
+_RECORD_FIELDS = [
+    "schema_version", "export_run_id", "file_id", "domain", "record_pk", "record_id", "record_ordinal",
+    "status", "identity_quality", "sig_hash", "join_hash", "join_key_schema",
+    "join_key_status", "join_key_policy_id", "join_key_policy_version",
+    "label_display", "label_quality", "label_provenance", "is_purgeable",
+    "instance_count", "is_sole_type_in_category",
+]
+_LABEL_FIELDS = [
+    "schema_version", "export_run_id", "domain", "record_pk", "component_key", "component_value", "component_order",
+]
+_REASON_FIELDS = [
+    "schema_version", "export_run_id", "domain", "record_pk", "reason_code", "reason_detail",
+]
+_PARAM_FIELDS = [
+    "schema_version", "export_run_id", "domain", "record_pk", "param_index",
+    "lftp.key", "lftp.name", "lftp.guid", "lftp.id", "lftp.id_sign",
+    "lftp.storage_type", "lftp.has_value", "lftp.data_type",
+    "lftp.binding_scope", "lftp.semantic_role", "lftp.source",
+    "lftp.value_uniform", "lftp.value_distinct_count", "lftp.value_set", "lftp.value_raw_set",
+]
+_ITEM_FIELDS = [
+    "schema_version", "export_run_id", "domain", "record_pk", "item_key", "item_value",
+    "item_value_type", "item_role",
+]
+
+
+def _flatten_one_file(
+    primary: Path,
+    secondary: Optional[Path],
+    file_id_mode: str,
+    tool_version: str,
+    exported_utc: str,
+    governance_rules: List[Dict[str, str]],
+) -> Dict[str, Any]:
+    """Parse one export file and build its flatten-stage row bundle.
+
+    Pure function of (file content, file_id_mode, tool_version, exported_utc,
+    governance_rules) -- no cross-file state, no disk writes. Returns a
+    JSON-serializable bundle consumed both by the streaming (default) emit_records()
+    below and by Run A's per-file incremental cache (tools/run_a_cache.py /
+    tools/run_a_incremental.py), so the two code paths cannot silently diverge.
+
+    Deliberately excludes the user-editable file_metadata.csv annotation columns
+    (client_label, governance_role, discipline_label, business_center_label,
+    collection_label) and the sticky "keep existing unit_system" override --
+    those are layered on top of meta_core by the caller from the CURRENT
+    file_metadata.csv on every run, including cache-reuse runs, so a curator's
+    edits are never shadowed by a stale cached value. `derived_unit_system` is
+    the freshly-computed value _derive_unit_system() would have produced for this
+    file's content; callers fall back to it only when no sticky value exists yet.
+    """
+    data = _read_json(primary)
+    if secondary is not None:
+        data = _merge_index_details(data, _read_json(secondary))
+    export_run_id = _file_id(primary, file_id_mode)
+    file_id = export_run_id
+
+    contract = data.get("_contract") if isinstance(data.get("_contract"), dict) else {}
+    ident = contract.get("identity") if isinstance(contract.get("identity"), dict) else {}
+    identity_meta = _identity_metadata(data)
+
+    meta_core: Dict[str, str] = {
+        "schema_version": SCHEMA_VERSION,
+        "export_run_id": export_run_id,
+        "file_id": file_id,
+        "project_id": _safe_str(ident.get("project_id") or ident.get("project_title")),
+        "model_id": _safe_str(ident.get("model_id") or ident.get("model_title")),
+        "project_label": identity_meta["project_label"],
+        "model_label": identity_meta["model_label"],
+        "central_path": identity_meta["central_path"],
+        "central_path_norm": identity_meta["central_path_norm"],
+        "lineage_hash": identity_meta["lineage_hash"],
+        "revit_version_number": identity_meta["revit_version_number"],
+        "revit_version_name": identity_meta["revit_version_name"],
+        "revit_build": identity_meta["revit_build"],
+        "is_workshared": identity_meta["is_workshared"],
+        "tool_version": tool_version,
+        "exported_utc": exported_utc,
+        "derived_unit_system": _derive_unit_system(data, export_run_id),
+    }
+
+    records: List[Dict[str, str]] = []
+    label_rows: List[Dict[str, str]] = []
+    reason_rows: List[Dict[str, str]] = []
+    param_rows: List[Dict[str, str]] = []
+    item_shard_rows: Dict[str, List[Dict[str, str]]] = {}
+
+    for source_domain in _iter_domains(data):
+        payload = data.get(source_domain)
+        recs = payload.get("records") if isinstance(payload, dict) else None
+        if not isinstance(recs, list):
+            continue
+        for i, rec in enumerate(recs):
+            if not isinstance(rec, dict):
+                continue
+            domain = _remap_object_style_domain(source_domain, rec)
+            if not domain:
+                continue
+            domain = _remap_vco_domain(domain, rec)
+            if not domain:
+                continue
+            record_ordinal = f"{i:06d}"
+            record_pk = f"{file_id}|{domain}|{record_ordinal}"
+            record_id = _safe_str(rec.get("record_id") or rec.get("id") or rec.get("name"))
+            # Day-1 identity-mode flatten join regime:
+            # - keep sig_hash as-is
+            # - set join_hash = sig_hash
+            # - set join_key_schema = sig_hash_as_join_key.v1
+            sig_hash_v = _safe_str(rec.get("sig_hash"))
+            records.append({
+                "schema_version": SCHEMA_VERSION,
+                "export_run_id": export_run_id,
+                "file_id": file_id,
+                "domain": domain,
+                "record_pk": record_pk,
+                "record_id": record_id,
+                "record_ordinal": record_ordinal,
+                "status": _safe_str(rec.get("status")),
+                "identity_quality": _safe_str(rec.get("identity_quality")),
+                "sig_hash": sig_hash_v,
+                "join_hash": sig_hash_v,
+                "join_key_schema": "sig_hash_as_join_key.v1",
+                "join_key_status": "bootstrap",
+                "join_key_policy_id": "",
+                "join_key_policy_version": "",
+                "label_display": _safe_str((rec.get("label") or {}).get("display")),
+                "label_quality": _safe_str((rec.get("label") or {}).get("quality")),
+                "label_provenance": _safe_str((rec.get("label") or {}).get("provenance")),
+                "is_purgeable": _safe_str(rec.get("is_purgeable")),
+                "instance_count": _safe_str(rec.get("instance_count")),
+                "is_sole_type_in_category": _safe_str(rec.get("is_sole_type_in_category")),
+            })
+
+            for reason in rec.get("status_reasons") if isinstance(rec.get("status_reasons"), list) else []:
+                if isinstance(reason, str) and reason:
+                    reason_rows.append({
+                        "schema_version": SCHEMA_VERSION,
+                        "export_run_id": export_run_id,
+                        "domain": domain,
+                        "record_pk": record_pk,
+                        "reason_code": reason,
+                        "reason_detail": "",
+                    })
+
+            items = rec.get("items") if isinstance(rec.get("items"), list) else None
+            if not isinstance(items, list):
+                items = (rec.get("identity_basis") or {}).get("items") if isinstance(rec.get("identity_basis"), dict) else None
+            if isinstance(items, list):
+                for it in items:
+                    if not isinstance(it, dict):
+                        continue
+                    item_shard_rows.setdefault(domain, []).append({
+                        "schema_version": SCHEMA_VERSION,
+                        "export_run_id": export_run_id,
+                        "domain": domain,
+                        "record_pk": record_pk,
+                        "item_key": _safe_str(it.get("k")),
+                        "item_value": _safe_str(it.get("v")),
+                        "item_value_type": _safe_str(it.get("q")),
+                        "item_role": "",
+                    })
+
+            for pr in rec.get("parameter_rows") if isinstance(rec.get("parameter_rows"), list) else []:
+                if not isinstance(pr, dict):
+                    continue
+                param_rows.append({
+                    "schema_version": SCHEMA_VERSION,
+                    "export_run_id": export_run_id,
+                    "domain": domain,
+                    "record_pk": record_pk,
+                    "param_index": _safe_str(pr.get("param_index")),
+                    "lftp.key": _safe_str(pr.get("lftp.key")),
+                    "lftp.name": _safe_str(pr.get("lftp.name")),
+                    "lftp.guid": _safe_str(pr.get("lftp.guid")),
+                    "lftp.id": _safe_str(pr.get("lftp.id")),
+                    "lftp.id_sign": _safe_str(pr.get("lftp.id_sign")),
+                    "lftp.storage_type": _safe_str(pr.get("lftp.storage_type")),
+                    "lftp.has_value": _safe_str(pr.get("lftp.has_value")),
+                    "lftp.data_type": _safe_str(pr.get("lftp.data_type")),
+                    "lftp.binding_scope": _safe_str(pr.get("lftp.binding_scope")),
+                    "lftp.semantic_role": _safe_str(pr.get("lftp.semantic_role")),
+                    "lftp.source": _safe_str(pr.get("lftp.source")),
+                    "lftp.value_uniform": _safe_str(pr.get("lftp.value_uniform")),
+                    "lftp.value_distinct_count": _safe_str(pr.get("lftp.value_distinct_count")),
+                    "lftp.value_set": _safe_str(pr.get("lftp.value_set")),
+                    "lftp.value_raw_set": _safe_str(pr.get("lftp.value_raw_set")),
+                })
+
+            comps = (rec.get("label") or {}).get("components") if isinstance(rec.get("label"), dict) else None
+            if isinstance(comps, dict):
+                for order, key in enumerate(sorted(comps.keys(), key=str)):
+                    val = comps.get(key)
+                    if not isinstance(val, (str, int, float, bool)) and val is not None:
+                        val = json.dumps(val, ensure_ascii=False, sort_keys=True)
+                    label_rows.append({
+                        "schema_version": SCHEMA_VERSION,
+                        "export_run_id": export_run_id,
+                        "domain": domain,
+                        "record_pk": record_pk,
+                        "component_key": _safe_str(key),
+                        "component_value": _safe_str(val),
+                        "component_order": str(order),
+                    })
+
+    return {
+        "file_id": file_id,
+        "export_run_id": export_run_id,
+        "meta_core": meta_core,
+        "records": records,
+        "label_rows": label_rows,
+        "reason_rows": reason_rows,
+        "param_rows": param_rows,
+        "item_shard_rows": item_shard_rows,
+    }
+
+
+def _merge_meta_row(
+    meta_core: Dict[str, str],
+    existing_annotations: Dict[str, Dict[str, str]],
+    annotation_columns: List[str],
+    governance_rules: List[Dict[str, str]],
+) -> Dict[str, str]:
+    """Layer file_metadata.csv's user-editable/sticky columns on top of meta_core.
+
+    Called on every run for every file -- including a cache-reuse run where
+    meta_core came from a prior run's cached bundle rather than a fresh parse --
+    so a curator's edits to client_label/governance_role/unit_system/etc. in
+    file_metadata.csv are always honored and never shadowed by a stale cached
+    value (see _flatten_one_file's docstring).
+    """
+    export_run_id = meta_core["export_run_id"]
+    ann = existing_annotations.get(export_run_id, {})
+    existing_unit_system = ann.get("unit_system", "").strip()
+    meta_row: Dict[str, str] = {k: v for k, v in meta_core.items() if k != "derived_unit_system"}
+    meta_row["client_label"] = ""
+    meta_row["governance_role"] = ""
+    meta_row["unit_system"] = existing_unit_system or meta_core.get("derived_unit_system", "")
+    if ann:
+        for col in annotation_columns:
+            if not meta_row.get(col, "").strip():
+                meta_row[col] = ann.get(col, "")
+    if not meta_row.get("governance_role", "").strip():
+        meta_row["governance_role"] = _infer_governance_role(meta_row.get("central_path_norm", ""), governance_rules)
+    return meta_row
+
+
 def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename") -> Tuple[int, int]:
     """Stream flatten outputs directly to disk as each export file is processed.
 
@@ -991,31 +1237,6 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
     exported_utc = _utc_now_iso()
     tool_version = _get_tool_version()
     governance_rules = _load_governance_role_rules()
-
-    _RECORD_FIELDS = [
-        "schema_version", "export_run_id", "file_id", "domain", "record_pk", "record_id", "record_ordinal",
-        "status", "identity_quality", "sig_hash", "join_hash", "join_key_schema",
-        "join_key_status", "join_key_policy_id", "join_key_policy_version",
-        "label_display", "label_quality", "label_provenance", "is_purgeable",
-        "instance_count", "is_sole_type_in_category",
-    ]
-    _LABEL_FIELDS = [
-        "schema_version", "export_run_id", "domain", "record_pk", "component_key", "component_value", "component_order",
-    ]
-    _REASON_FIELDS = [
-        "schema_version", "export_run_id", "domain", "record_pk", "reason_code", "reason_detail",
-    ]
-    _PARAM_FIELDS = [
-        "schema_version", "export_run_id", "domain", "record_pk", "param_index",
-        "lftp.key", "lftp.name", "lftp.guid", "lftp.id", "lftp.id_sign",
-        "lftp.storage_type", "lftp.has_value", "lftp.data_type",
-        "lftp.binding_scope", "lftp.semantic_role", "lftp.source",
-        "lftp.value_uniform", "lftp.value_distinct_count", "lftp.value_set", "lftp.value_raw_set",
-    ]
-    _ITEM_FIELDS = [
-        "schema_version", "export_run_id", "domain", "record_pk", "item_key", "item_value",
-        "item_value_type", "item_role",
-    ]
 
     # Read existing annotations before opening output files so we can apply them inline.
     annotation_columns = [
@@ -1066,174 +1287,29 @@ def emit_records(exports_dir: Path, out_dir: Path, file_id_mode: str = "basename
             _w.writeheader()
 
         for _, primary, secondary in _iter_export_files(exports_dir):
-            data = _read_json(primary)
-            if secondary is not None:
-                data = _merge_index_details(data, _read_json(secondary))
-            export_run_id = _file_id(primary, file_id_mode)
-            file_id = export_run_id
-
-            contract = data.get("_contract") if isinstance(data.get("_contract"), dict) else {}
-            ident = contract.get("identity") if isinstance(contract.get("identity"), dict) else {}
-            identity_meta = _identity_metadata(data)
-            # A file that already has unit_system set in file_metadata.csv keeps that
-            # value verbatim -- only new files (no prior annotation) pay the cost of
-            # deriving unit_system from the export JSON.
-            ann = existing_annotations.get(export_run_id, {})
-            existing_unit_system = ann.get("unit_system", "").strip()
-            meta_row: Dict[str, str] = {
-                "schema_version": SCHEMA_VERSION,
-                "export_run_id": export_run_id,
-                "file_id": file_id,
-                "project_id": _safe_str(ident.get("project_id") or ident.get("project_title")),
-                "model_id": _safe_str(ident.get("model_id") or ident.get("model_title")),
-                "project_label": identity_meta["project_label"],
-                "model_label": identity_meta["model_label"],
-                "central_path": identity_meta["central_path"],
-                "central_path_norm": identity_meta["central_path_norm"],
-                "lineage_hash": identity_meta["lineage_hash"],
-                "revit_version_number": identity_meta["revit_version_number"],
-                "revit_version_name": identity_meta["revit_version_name"],
-                "revit_build": identity_meta["revit_build"],
-                "is_workshared": identity_meta["is_workshared"],
-                "tool_version": tool_version,
-                "exported_utc": exported_utc,
-                "client_label": "",
-                "governance_role": "",
-                "unit_system": existing_unit_system or _derive_unit_system(data, export_run_id),
-            }
-            # Apply annotation preservation and governance inference inline per file.
-            if ann:
-                for col in annotation_columns:
-                    if not meta_row.get(col, "").strip():
-                        meta_row[col] = ann.get(col, "")
-            if not meta_row.get("governance_role", "").strip():
-                meta_row["governance_role"] = _infer_governance_role(meta_row.get("central_path_norm", ""), governance_rules)
+            bundle = _flatten_one_file(primary, secondary, file_id_mode, tool_version, exported_utc, governance_rules)
+            meta_row = _merge_meta_row(bundle["meta_core"], existing_annotations, annotation_columns, governance_rules)
             governance_counts[meta_row.get("governance_role", "").strip()] += 1
             meta_rows.append(meta_row)
 
-            for source_domain in _iter_domains(data):
-                payload = data.get(source_domain)
-                recs = payload.get("records") if isinstance(payload, dict) else None
-                if not isinstance(recs, list):
-                    continue
-                for i, rec in enumerate(recs):
-                    if not isinstance(rec, dict):
-                        continue
-                    domain = _remap_object_style_domain(source_domain, rec)
-                    if not domain:
-                        continue
-                    domain = _remap_vco_domain(domain, rec)
-                    if not domain:
-                        continue
-                    record_ordinal = f"{i:06d}"
-                    record_pk = f"{file_id}|{domain}|{record_ordinal}"
-                    record_id = _safe_str(rec.get("record_id") or rec.get("id") or rec.get("name"))
-                    # Day-1 identity-mode flatten join regime:
-                    # - keep sig_hash as-is
-                    # - set join_hash = sig_hash
-                    # - set join_key_schema = sig_hash_as_join_key.v1
-                    sig_hash_v = _safe_str(rec.get("sig_hash"))
-                    _rec_w.writerow({
-                        "schema_version": SCHEMA_VERSION,
-                        "export_run_id": export_run_id,
-                        "file_id": file_id,
-                        "domain": domain,
-                        "record_pk": record_pk,
-                        "record_id": record_id,
-                        "record_ordinal": record_ordinal,
-                        "status": _safe_str(rec.get("status")),
-                        "identity_quality": _safe_str(rec.get("identity_quality")),
-                        "sig_hash": sig_hash_v,
-                        "join_hash": sig_hash_v,
-                        "join_key_schema": "sig_hash_as_join_key.v1",
-                        "join_key_status": "bootstrap",
-                        "join_key_policy_id": "",
-                        "join_key_policy_version": "",
-                        "label_display": _safe_str((rec.get("label") or {}).get("display")),
-                        "label_quality": _safe_str((rec.get("label") or {}).get("quality")),
-                        "label_provenance": _safe_str((rec.get("label") or {}).get("provenance")),
-                        "is_purgeable": _safe_str(rec.get("is_purgeable")),
-                        "instance_count": _safe_str(rec.get("instance_count")),
-                        "is_sole_type_in_category": _safe_str(rec.get("is_sole_type_in_category")),
-                    })
-                    record_count += 1
-
-                    for reason in rec.get("status_reasons") if isinstance(rec.get("status_reasons"), list) else []:
-                        if isinstance(reason, str) and reason:
-                            _rsn_w.writerow({
-                                "schema_version": SCHEMA_VERSION,
-                                "export_run_id": export_run_id,
-                                "domain": domain,
-                                "record_pk": record_pk,
-                                "reason_code": reason,
-                                "reason_detail": "",
-                            })
-
-                    items = rec.get("items") if isinstance(rec.get("items"), list) else None
-                    if not isinstance(items, list):
-                        items = (rec.get("identity_basis") or {}).get("items") if isinstance(rec.get("identity_basis"), dict) else None
-                    if isinstance(items, list):
-                        for it in items:
-                            if not isinstance(it, dict):
-                                continue
-                            if domain not in _item_shard_writers:
-                                _fp = (shard_dir / f"{domain}.csv").open("w", newline="", encoding="utf-8")
-                                _item_shard_handles[domain] = _fp
-                                _w = csv.DictWriter(_fp, fieldnames=_ITEM_FIELDS)
-                                _w.writeheader()
-                                _item_shard_writers[domain] = _w
-                            _item_shard_writers[domain].writerow({
-                                "schema_version": SCHEMA_VERSION,
-                                "export_run_id": export_run_id,
-                                "domain": domain,
-                                "record_pk": record_pk,
-                                "item_key": _safe_str(it.get("k")),
-                                "item_value": _safe_str(it.get("v")),
-                                "item_value_type": _safe_str(it.get("q")),
-                                "item_role": "",
-                            })
-
-                    for pr in rec.get("parameter_rows") if isinstance(rec.get("parameter_rows"), list) else []:
-                        if not isinstance(pr, dict):
-                            continue
-                        _par_w.writerow({
-                            "schema_version": SCHEMA_VERSION,
-                            "export_run_id": export_run_id,
-                            "domain": domain,
-                            "record_pk": record_pk,
-                            "param_index": _safe_str(pr.get("param_index")),
-                            "lftp.key": _safe_str(pr.get("lftp.key")),
-                            "lftp.name": _safe_str(pr.get("lftp.name")),
-                            "lftp.guid": _safe_str(pr.get("lftp.guid")),
-                            "lftp.id": _safe_str(pr.get("lftp.id")),
-                            "lftp.id_sign": _safe_str(pr.get("lftp.id_sign")),
-                            "lftp.storage_type": _safe_str(pr.get("lftp.storage_type")),
-                            "lftp.has_value": _safe_str(pr.get("lftp.has_value")),
-                            "lftp.data_type": _safe_str(pr.get("lftp.data_type")),
-                            "lftp.binding_scope": _safe_str(pr.get("lftp.binding_scope")),
-                            "lftp.semantic_role": _safe_str(pr.get("lftp.semantic_role")),
-                            "lftp.source": _safe_str(pr.get("lftp.source")),
-                            "lftp.value_uniform": _safe_str(pr.get("lftp.value_uniform")),
-                            "lftp.value_distinct_count": _safe_str(pr.get("lftp.value_distinct_count")),
-                            "lftp.value_set": _safe_str(pr.get("lftp.value_set")),
-                            "lftp.value_raw_set": _safe_str(pr.get("lftp.value_raw_set")),
-                        })
-
-                    comps = (rec.get("label") or {}).get("components") if isinstance(rec.get("label"), dict) else None
-                    if isinstance(comps, dict):
-                        for order, key in enumerate(sorted(comps.keys(), key=str)):
-                            val = comps.get(key)
-                            if not isinstance(val, (str, int, float, bool)) and val is not None:
-                                val = json.dumps(val, ensure_ascii=False, sort_keys=True)
-                            _lbl_w.writerow({
-                                "schema_version": SCHEMA_VERSION,
-                                "export_run_id": export_run_id,
-                                "domain": domain,
-                                "record_pk": record_pk,
-                                "component_key": _safe_str(key),
-                                "component_value": _safe_str(val),
-                                "component_order": str(order),
-                            })
+            for row in bundle["records"]:
+                _rec_w.writerow(row)
+                record_count += 1
+            for row in bundle["reason_rows"]:
+                _rsn_w.writerow(row)
+            for domain, rows in bundle["item_shard_rows"].items():
+                if domain not in _item_shard_writers:
+                    _fp = (shard_dir / f"{domain}.csv").open("w", newline="", encoding="utf-8")
+                    _item_shard_handles[domain] = _fp
+                    _w = csv.DictWriter(_fp, fieldnames=_ITEM_FIELDS)
+                    _w.writeheader()
+                    _item_shard_writers[domain] = _w
+                for row in rows:
+                    _item_shard_writers[domain].writerow(row)
+            for row in bundle["param_rows"]:
+                _par_w.writerow(row)
+            for row in bundle["label_rows"]:
+                _lbl_w.writerow(row)
 
     for _fp in _item_shard_handles.values():
         _fp.close()

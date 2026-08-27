@@ -62,6 +62,7 @@ if ($Run -eq "") {
     Write-Host "  .\corpus_update_runbook.ps1 -Run B    # authority + patterns + patch"
     Write-Host "  .\corpus_update_runbook.ps1 -Run C    # segments + all/used bundle analysis (use compare_cross_segment.py for cross-segment comparison)"
     Write-Host "  .\corpus_update_runbook.ps1 -Run C -ForceAll   # Run C, but re-run every segment regardless of registry status"
+    Write-Host "  .\corpus_update_runbook.ps1 -Run A -ForceAll   # Run A, but reprocess every export file regardless of the incremental cache"
     Write-Host "  .\corpus_update_runbook.ps1 -Run A -ExportsRoot 'D:\Somewhere\Else'   # override the exports/results/segments root"
     Write-Host ""
     Write-Host "  -ExportsRoot (default: $ExportsRoot):"
@@ -69,10 +70,18 @@ if ($Run -eq "") {
     Write-Host "    folders nested under it. Override if the data has moved without editing"
     Write-Host "    this script."
     Write-Host ""
-    Write-Host "  -ForceAll (Run C only): registry-driven skip is the default - a segment is"
-    Write-Host "    re-run only if its file population changed since the last complete run."
-    Write-Host "    Pass -ForceAll after a sig_hash/join_hash policy change (population_hash is"
-    Write-Host "    membership-only and cannot detect those) to force a full-corpus rebuild."
+    Write-Host "  -ForceAll: registry-/cache-driven skip is the default for both Run A and Run C."
+    Write-Host "    Run A: an export file whose content and both policy files (sig_hash, join)"
+    Write-Host "    are unchanged since the last successful Run A is reused from"
+    Write-Host "    $RESULTS\.run_a_cache\ instead of being re-flattened. -ForceAll bypasses this"
+    Write-Host "    gate and reprocesses every export file, rebuilding the cache fresh -- use it"
+    Write-Host "    if you suspect the cache is stale/corrupt, or after a change the cache can't"
+    Write-Host "    detect on its own (an edit to a policy file already forces a full rebuild"
+    Write-Host "    automatically; this is for edge cases beyond that)."
+    Write-Host "    Run C: a segment is re-run only if its file population changed since the last"
+    Write-Host "    complete run. Pass -ForceAll after a sig_hash/join_hash policy change"
+    Write-Host "    (population_hash is membership-only and cannot detect those) to force a"
+    Write-Host "    full-corpus rebuild."
     Write-Host ""
     Write-Host "  -NameKey (Run A/B/C, opt-in, additive): also produce the Canonical Name"
     Write-Host "    Identity Projection (join_key_name_identity) alongside the default"
@@ -102,12 +111,25 @@ if ($Run -eq "") {
 if ($Run -eq "A") {
     Write-Host "=== RUN A: Flatten / Apply / Placeholders ===" -ForegroundColor Green
 
+    # --incremental: skip re-parsing an export file whose content and both policy
+    # files are unchanged since the last successful Run A (tools/run_a_cache.py /
+    # tools/run_a_incremental.py). placeholders (T2b) always still runs over the
+    # full current population regardless of cache state -- only flatten/sig_hash/
+    # apply's per-file work is gated. -ForceAll bypasses the gate for this run.
+    $runAForceArg = @()
+    if ($ForceAll) {
+        Write-Host "--- Run A: -ForceAll -> bypassing the incremental cache, reprocessing every export file ---" -ForegroundColor Cyan
+        $runAForceArg = @("--force-full-cache")
+    }
+
     python tools/run_extract_all.py $EXPORTS `
         --out-root $RESULTS `
         --out-root-is-results-root `
         --stages sig_hash,flatten,apply,placeholders `
         --sig-hash-policy $SIG_POL `
-        --join-policy $JOIN_POL
+        --join-policy $JOIN_POL `
+        --incremental `
+        @runAForceArg
     Invoke-Checked -StepName "Run A: flatten/apply/placeholders"
 
     if ($NameKey) {
