@@ -191,6 +191,7 @@ class RunState:
         sig_hash_policy_hash: str,
         join_policy_hash: str,
         tool_version: str,
+        domain_filter_key: str,
         unchanged_file_ids: Set[str],
         fresh_signatures: Dict[str, Dict[str, Any]],
     ) -> None:
@@ -200,11 +201,26 @@ class RunState:
         self.sig_hash_policy_hash = sig_hash_policy_hash
         self.join_policy_hash = join_policy_hash
         self.tool_version = tool_version
+        self.domain_filter_key = domain_filter_key
         self.unchanged_file_ids = unchanged_file_ids
         # file_id -> {"parts": [{"mtime_ns": int, "size": int}, ...], "content_hash": str},
         # computed fresh for every file this run regardless of reuse decision, so
         # the manifest written at the end of a successful run is always accurate.
         self.fresh_signatures = fresh_signatures
+
+
+def domain_filter_key(domains: Optional[Any]) -> str:
+    """Stable string key for a sig_hash stage domain filter (None/empty = unfiltered).
+
+    Mirrors `_apply_sig_hash_to_phase0`'s own `dom_filter = set(domains or [])`
+    semantics -- an empty/None filter and a filter naming every domain are two
+    different things there (empty means "no filtering", not "filter out
+    everything"), so this key must distinguish "no filter" from any concrete
+    filter set, including one that happens to be empty-after-narrowing.
+    """
+    if not domains:
+        return "<none>"
+    return "|".join(sorted(str(d) for d in domains))
 
 
 def compute_run_state(
@@ -214,6 +230,7 @@ def compute_run_state(
     sig_hash_policy_path: Optional[Path],
     join_policy_path: Optional[Path],
     tool_version: str,
+    sig_hash_domains: Optional[Any] = None,
     force_full: bool,
 ) -> RunState:
     """Decide, for every export file, whether its cached rows may be reused.
@@ -228,9 +245,17 @@ def compute_run_state(
     file_metadata.csv's own tool_version column (`extractor._get_tool_version()`,
     normally a git SHA) -- see the module docstring on why it participates in
     cache validity.
+
+    `sig_hash_domains` should be the same domain filter the caller passes to the
+    sig_hash stage (`active_domains or domains` in run_extract_all.py's
+    non-incremental branch) -- it changes which domains' records get a
+    policy-driven sig_hash at all, so it must invalidate the cache the same way
+    a policy change does, or a narrower/wider `--domains` filter between runs
+    could reuse entries computed under a different filter.
     """
     sig_hash_policy_hash = hash_policy_file(sig_hash_policy_path)
     join_policy_hash = hash_policy_file(join_policy_path)
+    dom_filter_key = domain_filter_key(sig_hash_domains)
 
     manifest = None if force_full else load_manifest(cache_dir)
     cache_was_valid = True
@@ -253,6 +278,9 @@ def compute_run_state(
     elif manifest.get("tool_version") != tool_version:
         cache_was_valid = False
         invalidation_reason = "tool_version_changed"
+    elif manifest.get("domain_filter_key") != dom_filter_key:
+        cache_was_valid = False
+        invalidation_reason = "domain_filter_changed"
 
     prior_files: Dict[str, Any] = {}
     if cache_was_valid and isinstance(manifest, dict) and isinstance(manifest.get("files"), dict):
@@ -295,6 +323,7 @@ def compute_run_state(
         sig_hash_policy_hash=sig_hash_policy_hash,
         join_policy_hash=join_policy_hash,
         tool_version=tool_version,
+        domain_filter_key=dom_filter_key,
         unchanged_file_ids=unchanged_file_ids,
         fresh_signatures=fresh_signatures,
     )
@@ -313,6 +342,7 @@ def finalize_manifest(state: RunState) -> None:
         "sig_hash_policy_hash": state.sig_hash_policy_hash,
         "join_policy_hash": state.join_policy_hash,
         "tool_version": state.tool_version,
+        "domain_filter_key": state.domain_filter_key,
         "files": state.fresh_signatures,
         "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }

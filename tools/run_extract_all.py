@@ -965,6 +965,10 @@ def main() -> None:
             join_policy_path=join_policy_path,
             file_id_mode="basename",
             force_full=args.force_full_cache,
+            # Same domain filter the non-incremental sig_hash block passes to
+            # _apply_sig_hash_to_phase0() below -- keeps suppressed/--domains-
+            # narrowed domains untouched by sig_hash in both code paths.
+            sig_hash_domains=active_domains or domains,
         )
         print(
             f"[extract_all] incremental flatten+sig_hash+apply complete: "

@@ -266,6 +266,39 @@ def _apply_one_domain_records(
     return failures
 
 
+def _validate_line_pattern_synthetic_norm_hash_for_file(
+    file_id: str,
+    records: List[Dict[str, str]],
+    item_shard_rows: Dict[str, List[Dict[str, str]]],
+) -> None:
+    """Per-file equivalent of run_extract_all._validate_line_pattern_synthetic_norm_hash()
+    / apply_join_policy.py's own line_patterns PK check.
+
+    A line_patterns record with zero identity items in the export (or any other
+    reason `_augment_line_pattern_items` couldn't produce its synthetic item)
+    must hard-fail here, exactly like the non-incremental pipeline does --
+    without this, such a record silently gets a blocked/missing sig_hash and a
+    missing join_hash, and that degraded-but-"successful" result gets cached.
+    """
+    line_pattern_pks = [r["record_pk"] for r in records if r.get("domain") == "line_patterns"]
+    if not line_pattern_pks:
+        return
+    pks_with_norm = {
+        r.get("record_pk", "")
+        for r in item_shard_rows.get("line_patterns", [])
+        if r.get("item_key") == "line_pattern.segments_norm_hash"
+    }
+    missing = [pk for pk in line_pattern_pks if pk not in pks_with_norm]
+    if missing:
+        sample = ",".join(missing[:10])
+        more = "" if len(missing) <= 10 else f" (+{len(missing) - 10} more)"
+        raise SystemExit(
+            "flatten/enrichment stage did not produce synthetic norm hashes before apply: "
+            f"missing line_pattern.segments_norm_hash for {len(missing)} line_patterns records "
+            f"in {file_id}. sample_record_pks={sample}{more}"
+        )
+
+
 def _compute_fresh_entry(
     primary: Path,
     secondary: Optional[Path],
@@ -275,13 +308,22 @@ def _compute_fresh_entry(
     governance_rules: List[Dict[str, str]],
     sig_hash_policies: Dict[str, Any],
     join_policy_domains: Dict[str, Any],
+    dom_filter: Optional[set],
 ) -> Tuple[Dict[str, Any], Dict[str, int], Dict[str, int]]:
     """Run flatten + line-pattern augmentation + sig_hash + apply for one file.
+
+    `dom_filter`, when not None, mirrors `_apply_sig_hash_to_phase0`'s own
+    `dom_filter` semantics: a domain outside it never gets a policy-driven
+    sig_hash at all (its records keep flatten's bootstrap sig_hash/join_hash/
+    status untouched), regardless of whether that domain actually has a policy
+    entry. The apply/join stage has no equivalent filter in the non-incremental
+    pipeline either, so it is intentionally NOT filtered here.
 
     Returns (cache_entry, sig_hash_diag_delta, line_pattern_stats_delta).
     """
     bundle = _flatten_one_file(primary, secondary, file_id_mode, tool_version, exported_utc, governance_rules)
     lp_stats = _augment_line_pattern_items(bundle["item_shard_rows"])
+    _validate_line_pattern_synthetic_norm_hash_for_file(bundle["file_id"], bundle["records"], bundle["item_shard_rows"])
     items_by_domain_pk = _items_map_for_domain(bundle["item_shard_rows"])
 
     file_diag = {"records_processed": 0, "records_hashed": 0, "records_blocked": 0, "records_degraded": 0, "basis_items_written": 0}
@@ -291,6 +333,8 @@ def _compute_fresh_entry(
         row.setdefault("sig_basis_schema", "")
         domain = row["domain"]
         records_by_domain.setdefault(domain, []).append(row)
+        if dom_filter is not None and domain not in dom_filter:
+            continue  # sig_hash stage never considers this domain at all -- matches _apply_sig_hash_to_phase0
         pol = get_domain_sig_hash_policy(sig_hash_policies, domain)
         items = items_by_domain_pk.get(domain, {}).get(row["record_pk"], [])
         _was_processed, basis_rows, delta = _sig_hash_one_record(row, pol, items)
@@ -326,6 +370,7 @@ def run_incremental(
     join_policy_path: Optional[Path],
     file_id_mode: str = "basename",
     force_full: bool = False,
+    sig_hash_domains: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Run Run A's flatten+sig_hash+apply as one cache-aware pass.
 
@@ -337,7 +382,18 @@ def run_incremental(
     A cache manifest; callers must call `run_a_cache.finalize_manifest(state)`
     themselves once every downstream stage they care about (placeholders, in
     Run A's case) has also completed successfully.
+
+    `sig_hash_domains`, when given, is the same domain filter the
+    non-incremental sig_hash stage receives (`active_domains or domains` in
+    run_extract_all.py) -- a domain outside it is left entirely untouched by
+    sig_hash (bootstrap values from flatten persist). None/empty means
+    unfiltered, matching `_apply_sig_hash_to_phase0`'s own `dom_filter`
+    semantics. Participates in cache validity (tools/run_a_cache.py) so a
+    changed filter forces a full recompute instead of reusing entries computed
+    under a different filter.
     """
+    dom_filter = set(sig_hash_domains) if sig_hash_domains else None
+
     export_files = _iter_export_files(exports_dir)
     file_id_to_paths: Dict[str, List[Path]] = {}
     for _, primary, secondary in export_files:
@@ -367,6 +423,7 @@ def run_incremental(
         sig_hash_policy_path=sig_hash_policy_path,
         join_policy_path=join_policy_path,
         tool_version=tool_version,
+        sig_hash_domains=sig_hash_domains,
         force_full=force_full,
     )
 
@@ -454,7 +511,7 @@ def run_incremental(
                 files_recomputed += 1
                 entry, file_diag, lp_stats = _compute_fresh_entry(
                     primary, secondary, file_id_mode, tool_version, exported_utc,
-                    governance_rules, sig_hash_policies, join_policy_domains,
+                    governance_rules, sig_hash_policies, join_policy_domains, dom_filter,
                 )
                 entry["sig_hash_diag"] = file_diag
                 entry["line_pattern_stats"] = lp_stats
@@ -528,7 +585,12 @@ def run_incremental(
     # rows are written in file-iteration order instead. Neither file's row
     # order carries semantic meaning to any downstream reader (both are
     # per-record traceability/audit tables, not order-sensitive structures).
-    domains_without_policy = sorted(d for d in active_domains if not isinstance(get_domain_sig_hash_policy(sig_hash_policies, d), dict))
+    # Only domains the sig_hash stage actually considered (i.e. within
+    # dom_filter, or every domain when unfiltered) can be "without policy" --
+    # a filtered-out domain was never looked up at all, matching
+    # _apply_sig_hash_to_phase0's `continue`-before-considering-policy behavior.
+    sig_hash_considered_domains = active_domains if dom_filter is None else (active_domains & dom_filter)
+    domains_without_policy = sorted(d for d in sig_hash_considered_domains if not isinstance(get_domain_sig_hash_policy(sig_hash_policies, d), dict))
     # Matches _apply_sig_hash_to_phase0's diagnostics contract exactly:
     # "files_processed" counts sig_hash *stage invocations* (always 1 per run, not
     # export file count), and "sig_basis_items_written" is present only when > 0.

@@ -97,7 +97,7 @@ def _load_csv(path: Path, exclude=("exported_utc",)) -> List[Dict[str, str]]:
     )
 
 
-def _run_incremental(tmp_path: Path, exports_dir: Path, results_root: Path, sig_pol: Path, join_pol: Path, force_full: bool = False):
+def _run_incremental(tmp_path: Path, exports_dir: Path, results_root: Path, sig_pol: Path, join_pol: Path, force_full: bool = False, sig_hash_domains=None):
     records_dir = results_root / "records"
     cache_dir = run_a_cache.cache_root(results_root)
     report = run_a_incremental.run_incremental(
@@ -106,6 +106,7 @@ def _run_incremental(tmp_path: Path, exports_dir: Path, results_root: Path, sig_
         sig_hash_policy_path=sig_pol,
         join_policy_path=join_pol,
         force_full=force_full,
+        sig_hash_domains=sig_hash_domains,
     )
     run_a_cache.finalize_manifest(report["run_state"])
     return report, records_dir
@@ -476,6 +477,132 @@ def test_tool_version_change_invalidates_whole_cache(tmp_path: Path, monkeypatch
     assert report2["cache_invalidation_reason"] == "tool_version_changed"
     assert report2["files_recomputed"] == 2
     assert report2["files_reused"] == 0
+
+
+_WIDGETS_SIG_HASH_POLICY_BLOCK = {
+    "allowed_item_prefixes": [],
+    "allowed_items": ["widget.color"],
+    "hash_alg": "md5_utf8_join_pipe",
+    "minima": {"block_if_any_required_not_ok": True},
+    "required_items": ["widget.color"],
+    "sig_hash_schema": "widgets.sig_hash.v1",
+}
+
+
+def _two_domain_export(file_stem: str) -> Dict:
+    payload = _units_export(file_stem)
+    payload["_contract"]["domains"]["widgets"] = {"domain": "widgets", "status": "ok", "diag": {"count": 1}}
+    payload["widgets"] = {
+        "records": [
+            {
+                "record_id": f"{file_stem}-widgets-1",
+                "status": "ok",
+                "identity_quality": "complete",
+                "sig_hash": "bootstrapwidgethash0000000000001",
+                "is_purgeable": False,
+                "instance_count": 1,
+                "label": {"display": "Widget", "quality": "ok", "provenance": "extractor", "components": {}},
+                "items": [{"k": "widget.color", "v": "red", "q": "ok"}],
+            }
+        ]
+    }
+    return payload
+
+
+def test_domain_filter_excludes_domain_from_sig_hash_even_with_a_policy(tmp_path: Path) -> None:
+    """Regression: a domain outside the sig_hash filter must be left at
+    flatten's bootstrap sig_hash, exactly like _apply_sig_hash_to_phase0's own
+    dom_filter -- even when that domain DOES have a policy entry (this is not
+    about "no policy exists", it's about "this domain wasn't in scope")."""
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    _write_json(exports / "fp__proj__000__fingerprint.json", _two_domain_export("file0"))
+
+    sig_pol = tmp_path / "sig_hash_policy.json"
+    join_pol = tmp_path / "join_policy.json"
+    combined_sig_policy = {
+        "domains": {
+            "units": _UNITS_SIG_HASH_POLICY["domains"]["units"],
+            "widgets": _WIDGETS_SIG_HASH_POLICY_BLOCK,
+        }
+    }
+    _write_json(sig_pol, combined_sig_policy)
+    _write_json(join_pol, _UNITS_JOIN_POLICY)
+
+    report, records_dir = _run_incremental(
+        tmp_path, exports, tmp_path / "results", sig_pol, join_pol, sig_hash_domains=["units"],
+    )
+    rows = {r["domain"]: r for r in _load_csv(records_dir / "records.csv")}
+    assert rows["units"]["sig_hash"] != "deadbeefdeadbeefdeadbeefdeadbeef"  # actually hashed
+    assert rows["widgets"]["sig_hash"] == "bootstrapwidgethash0000000000001"  # untouched bootstrap
+    assert "widgets" not in report["sig_hash_diag"]["domains_without_policy"]
+
+    # Cross-check against the actual non-incremental pipeline with the same filter.
+    old_dir = tmp_path / "old"
+    extractor.emit_records(exports, old_dir, file_id_mode="basename")
+    old_diag = run_extract_all._apply_sig_hash_to_phase0(old_dir, sig_pol, ["units"])
+    old_rows = {r["domain"]: r for r in _load_csv(old_dir / "records.csv")}
+    assert old_rows["units"]["sig_hash"] == rows["units"]["sig_hash"]
+    assert old_rows["widgets"]["sig_hash"] == rows["widgets"]["sig_hash"]
+    assert "widgets" not in old_diag["domains_without_policy"]
+
+
+def test_domain_filter_change_invalidates_whole_cache(tmp_path: Path) -> None:
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    _write_json(exports / "fp__proj__000__fingerprint.json", _two_domain_export("file0"))
+    sig_pol = tmp_path / "sig_hash_policy.json"
+    join_pol = tmp_path / "join_policy.json"
+    _write_json(sig_pol, {"domains": {
+        "units": _UNITS_SIG_HASH_POLICY["domains"]["units"],
+        "widgets": _WIDGETS_SIG_HASH_POLICY_BLOCK,
+    }})
+    _write_json(join_pol, _UNITS_JOIN_POLICY)
+    results_root = tmp_path / "results"
+
+    report1, _ = _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol, sig_hash_domains=["units"])
+    assert report1["files_recomputed"] == 1
+
+    report2, _ = _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol, sig_hash_domains=["units", "widgets"])
+    assert report2["cache_invalidation_reason"] == "domain_filter_changed"
+    assert report2["files_recomputed"] == 1
+    assert report2["files_reused"] == 0
+
+
+def test_line_patterns_record_with_no_items_hard_fails(tmp_path: Path) -> None:
+    """A line_patterns record with zero identity items can never get the
+    synthetic segments_norm_hash item -- must hard-fail loudly (matching
+    run_extract_all._validate_line_pattern_synthetic_norm_hash /
+    apply_join_policy.py's own PK check) instead of silently caching a
+    blocked/missing-join_hash result."""
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    payload = {
+        "_contract": {"domains": {"line_patterns": {"domain": "line_patterns", "status": "ok", "diag": {"count": 1}}}},
+        "line_patterns": {
+            "records": [
+                {
+                    "record_id": "file0-lp-1",
+                    "status": "ok",
+                    "identity_quality": "complete",
+                    "sig_hash": "cafebabecafebabecafebabecafebabe",
+                    "is_purgeable": False,
+                    "instance_count": 1,
+                    "label": {"display": "Dash", "quality": "ok", "provenance": "extractor", "components": {}},
+                    "items": [],  # no items at all -> no synthetic item possible
+                }
+            ]
+        },
+    }
+    _write_json(exports / "fp__lp__000__fingerprint.json", payload)
+
+    sig_pol = tmp_path / "sig_hash_policy.json"
+    join_pol = tmp_path / "join_policy.json"
+    _write_json(sig_pol, {"domains": {}})
+    _write_json(join_pol, {"domains": {}})
+
+    with pytest.raises(SystemExit, match="segments_norm_hash"):
+        _run_incremental(tmp_path, exports, tmp_path / "results", sig_pol, join_pol)
 
 
 def test_malformed_join_policy_hard_fails_like_apply_join_policy(tmp_path: Path) -> None:
