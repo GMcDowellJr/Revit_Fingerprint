@@ -132,7 +132,11 @@ Domains whose `(join_key_schema, join_key_policy_id, join_key_policy_version)`
 tuple doesn't agree between `enterprise_all` and `client_acme` block with
 `CROSS_SEGMENT_JOIN_POLICY_MISMATCH` rather than comparing pattern_id sets
 produced under different join policies; other, agreeing domains still
-compare normally in the same run.
+compare normally in the same run. If the two segments' own
+`extractor_schema_version` don't agree (or either is absent), the entire run
+blocks with `CROSS_SEGMENT_SCHEMA_MISMATCH` before any domain is evaluated —
+join-key agreement alone doesn't prove the underlying pattern evidence is
+comparable across extractor versions.
 
 ## Outputs
 
@@ -190,6 +194,7 @@ comparator's)
 | `REFERENCE_AMBIGUOUS` / `TARGET_AMBIGUOUS` | the selector resolves to more than one export_run_id |
 | `NO_COMPARISON_TARGETS` | after excluding the reference itself, no comparison target remains (an explicit `--target` resolved to the same export_run_id as `--reference`, or the target segment has no other materialized file at all) |
 | `REFERENCE_HAS_NO_PATTERNS` | the resolved reference has zero `pattern_id` evidence across every domain in its segment's `pattern_presence_file.csv` — mirrors `reference_bundle.py::write_sidecar`'s own rejection of a globally empty reference |
+| `CROSS_SEGMENT_SCHEMA_MISMATCH` | only possible when `--reference-segment` != `--target-segment`: the reference segment's and target segment's `extractor_schema_version` (from each segment's own `corpus_manifest.csv`) don't agree, or either is absent — mirrors `reference_bundle.py::load_and_validate`'s own sidecar-vs-current `extractor_schema_version` rejection; without it, two segments materialized under different extractor schema versions that happen to share the same join-key tuple would pass the join-policy gate and report `ok` metrics across pattern evidence that isn't actually comparable |
 | `MATERIALIZATION_VERSION_INCOMPATIBLE` | the target segment's `records.csv` shows more than one distinct **complete** (all three fields populated) `(join_key_schema, join_key_policy_id, join_key_policy_version)` tuple for a requested domain -- an internal-consistency check within one segment's own materialization |
 | `MATERIALIZATION_COMPATIBILITY_UNPROVEN` | no complete tuple is populated for that domain at all in the target segment's `records.csv`, or at least one record has an incomplete tuple (any of the three fields blank) even alongside an otherwise-consistent complete one — a partially-populated tuple is never treated as proof of compatibility, and an incomplete record is never simply discarded |
 | `CROSS_SEGMENT_JOIN_POLICY_MISMATCH` | only possible when `--reference-segment` != `--target-segment`: the reference segment's and target segment's `(join_key_schema, join_key_policy_id, join_key_policy_version)` tuples for a requested domain don't agree, or either segment's own tuple for that domain isn't independently `ok` (see `MATERIALIZATION_VERSION_INCOMPATIBLE`/`_UNPROVEN` above) — distinct from those two codes, which check consistency *within* one segment; this checks agreement *between* two segments, since comparing pattern_id sets produced under different join policies is meaningless |
@@ -197,9 +202,10 @@ comparator's)
 
 A `SEGMENT_NOT_FOUND`/`SEGMENT_MATERIALIZATION_INCOMPLETE`/
 `REQUIRED_ANALYSIS_ARTIFACT_MISSING`/`*_NOT_MATERIALIZED`/`*_AMBIGUOUS`/
-`NO_COMPARISON_TARGETS`/`REFERENCE_HAS_NO_PATTERNS` condition blocks the
-**entire run** (nonzero exit; still writes the 4-file output contract,
-header-only summary/detail, so the failure is never console-only). A
+`NO_COMPARISON_TARGETS`/`REFERENCE_HAS_NO_PATTERNS`/`CROSS_SEGMENT_SCHEMA_MISMATCH`
+condition blocks the **entire run** (nonzero exit; still writes the 4-file
+output contract, header-only summary/detail, so the failure is never
+console-only). A
 `MATERIALIZATION_VERSION_INCOMPATIBLE`/`MATERIALIZATION_COMPATIBILITY_UNPROVEN`/
 `CROSS_SEGMENT_JOIN_POLICY_MISMATCH`/`STALE_MEMBERSHIP_MATRIX` condition
 blocks only the affected **domain** (exit `0`; check `comparison_status` per

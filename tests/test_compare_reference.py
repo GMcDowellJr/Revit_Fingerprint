@@ -89,6 +89,7 @@ def _build_segment(
     blank_join_key_schema: bool = False,
     partial_join_key_provenance: bool = False,
     other_registry_rows: Optional[List[Dict[str, str]]] = None,
+    schema_version: str = "2.1.0",
 ) -> Dict[str, Path]:
     """Build a corpus-level run_registry.csv plus one segment's
     results/{records,analysis,bundle_analysis} tree.
@@ -162,7 +163,7 @@ def _build_segment(
             ["analysis_run_id", "domain", "export_run_id", "pattern_id", "pattern_share_pct"],
             presence_rows,
         )
-        _write_csv(seg_analysis / "corpus_manifest.csv", ["schema_version"], [{"schema_version": "2.1.0"}])
+        _write_csv(seg_analysis / "corpus_manifest.csv", ["schema_version"], [{"schema_version": schema_version}])
         if write_bundle_dirs:
             for view in views:
                 _write_csv(
@@ -859,3 +860,48 @@ def test_cross_segment_differing_join_policy_blocks_only_that_domain(tmp_path):
 
     assert summary[domain2]["comparison_status"] == COMPARISON_STATUS_OK
     assert summary[domain2]["shared_count"] == "1"
+
+
+def test_cross_segment_differing_extractor_schema_version_blocks_whole_run(tmp_path):
+    # Two segments share the same join-key tuple for DOMAIN (so the
+    # CROSS_SEGMENT_JOIN_POLICY_MISMATCH gate alone would pass), but were
+    # materialized under different extractor_schema_version values. Mirrors
+    # reference_bundle.py::load_and_validate's own sidecar-schema rejection
+    # (Codex review, PR #471) -- this must block the entire run rather than
+    # silently reporting "ok" comparison metrics across incompatible pattern
+    # evidence.
+    ctx_a = _build_segment(tmp_path, {"ref.json": ["A", "B"]}, segment_id="seg_a", schema_version="2.1.0")
+    ctx_b = _build_segment(
+        tmp_path,
+        {"target.json": ["A"]},
+        segment_id="seg_b",
+        other_registry_rows=[ctx_a["registry_row"]],
+        schema_version="2.2.0",
+    )
+    ctx = {"registry_file": ctx_b["registry_file"], "segments_root": ctx_b["segments_root"]}
+
+    rc, out_dir = _run(
+        tmp_path,
+        ctx,
+        reference_segment="seg_a",
+        target_segment="seg_b",
+        reference="ref.json",
+        target="target.json",
+        purge_view="all",
+    )
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_CROSS_SEGMENT_SCHEMA_MISMATCH]
+    assert _read_csv(out_dir / cr.SUMMARY_FILENAME) == []
+
+
+def test_same_segment_schema_mismatch_check_never_runs(tmp_path):
+    # The new cross-segment schema gate must never fire in same-segment mode
+    # (schema_version is trivially self-consistent there anyway) -- part of
+    # the byte-identical same-segment regression guarantee.
+    ctx = _build_segment(tmp_path, {"ref.json": ["A", "B"], "target.json": ["A"]}, schema_version="2.1.0")
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
+    assert rc == 0
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert cr.REASON_CROSS_SEGMENT_SCHEMA_MISMATCH not in diag["run_comparison_reason_codes"]

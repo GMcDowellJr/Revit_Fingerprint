@@ -97,6 +97,16 @@ REASON_MATERIALIZATION_COMPATIBILITY_UNPROVEN = "MATERIALIZATION_COMPATIBILITY_U
 REASON_CROSS_SEGMENT_JOIN_POLICY_MISMATCH = "CROSS_SEGMENT_JOIN_POLICY_MISMATCH"
 REASON_NO_COMPARISON_TARGETS = "NO_COMPARISON_TARGETS"
 REASON_REFERENCE_HAS_NO_PATTERNS = "REFERENCE_HAS_NO_PATTERNS"
+# Only checked/reachable in cross-segment mode (reference_segment !=
+# target_segment); skipped entirely in same-segment mode, preserving byte-
+# identical same-segment output. Mirrors
+# tools/bundle_analysis/reference_bundle.py::load_and_validate's own
+# sidecar-vs-current extractor_schema_version rejection (lines ~181-186) --
+# without this, two segments materialized under different extractor schema
+# versions that happen to share the same join-key tuple would pass the
+# CROSS_SEGMENT_JOIN_POLICY_MISMATCH gate and report "ok" comparison metrics
+# across pattern evidence that isn't actually comparable (Codex review, PR #471).
+REASON_CROSS_SEGMENT_SCHEMA_MISMATCH = "CROSS_SEGMENT_SCHEMA_MISMATCH"
 REASON_STALE_MEMBERSHIP_MATRIX = "STALE_MEMBERSHIP_MATRIX"
 # Pure pre-flight/out-dir-safety failures -- raised before --out-dir can be
 # safely prepared at all, so no diagnostics file is ever written for these.
@@ -916,6 +926,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         reference_run_id = run_id if same_segment else resolve_reference_run_id(reference_presence_rows)
 
         extractor_schema_version = read_extractor_schema_version(reference_paths["analysis_dir"])
+        if not same_segment:
+            target_extractor_schema_version = read_extractor_schema_version(target_paths["analysis_dir"])
+            if (
+                not extractor_schema_version
+                or not target_extractor_schema_version
+                or extractor_schema_version != target_extractor_schema_version
+            ):
+                raise CompareReferenceError(
+                    REASON_CROSS_SEGMENT_SCHEMA_MISMATCH,
+                    f"reference segment {reference_segment_id!r} extractor_schema_version="
+                    f"{extractor_schema_version!r} does not match (or either is absent from) target segment "
+                    f"{target_segment_id!r} extractor_schema_version={target_extractor_schema_version!r} -- "
+                    "comparing pattern evidence materialized under different extractor schema versions is not "
+                    "supported.",
+                )
         reference = build_reference(reference_presence_rows, reference_run_id, reference_export_run_id, extractor_schema_version)
         if not reference["domains"]:
             # Mirrors reference_bundle.py::write_sidecar's own rejection of a
