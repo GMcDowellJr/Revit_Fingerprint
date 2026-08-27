@@ -384,6 +384,78 @@ def _compute_comparison_rows(
     return gap_rows, detail_rows
 
 
+def write_blocked_gap_placeholder(
+    compare_dir: Path,
+    reference: Dict[str, object],
+    run_id: str,
+    domain: str,
+    population_id: str,
+    reason_code: str,
+    detail: str = "",
+    match_any_population: bool = False,
+) -> None:
+    """Replace any stale per-file rows for a (run_id, domain[, population_id])
+    with a single blocked placeholder row (export_run_id="") in
+    compare_dir's file_gap_report.csv/file_gap_detail.csv.
+
+    Used whenever a blocked comparison summary is recorded for a domain (or
+    domain/population) whose per-file comparison never ran or could not be
+    trusted: run_compare_for_domain's own early return for bad inputs it
+    discovers itself, and run_bundle_analysis.py callers recording a domain
+    (or domain/population) whose pipeline stage failed *before*
+    run_compare_for_domain was ever reached, or whose reference sidecar was
+    rejected before any domain loop began. Without this, a prior successful
+    run's "ok"-looking per-file rows would be left standing next to a
+    blocked summary, or an already-blocked run's stale per-file rows would
+    persist under a *different*, no-longer-matching failure reason.
+
+    `match_any_population=True` clears every population_id under (run_id,
+    domain) instead of only the given `population_id` -- for callers (e.g. a
+    rejected reference sidecar, discovered before any population is known)
+    that cannot enumerate which specific populations a prior successful run
+    may have written.
+    """
+    gap_path = compare_dir / "file_gap_report.csv"
+    detail_path = compare_dir / "file_gap_detail.csv"
+    placeholder_row = {name: "" for name in _GAP_FIELDNAMES}
+    placeholder_row.update(
+        {
+            "reference_bundle_id": str(reference.get("reference_bundle_id", "")),
+            "effective_date": str(reference.get("effective_date", "")),
+            "analysis_run_id": run_id,
+            "domain": domain,
+            "population_id": population_id,
+            "export_run_id": "",
+            "comparison_status": COMPARISON_STATUS_BLOCKED,
+            "comparison_reason_codes": reason_code,
+            "comparison_detail": detail,
+        }
+    )
+
+    def _is_stale(r: Dict[str, str]) -> bool:
+        if r.get("analysis_run_id", "") != run_id or r.get("domain", "") != domain:
+            return False
+        return match_any_population or r.get("population_id", "") == population_id
+
+    with _GAP_REPORT_LOCK:
+        existing = read_csv_rows(gap_path) if gap_path.is_file() else []
+        existing_detail = read_csv_rows(detail_path) if detail_path.is_file() else []
+        merged = [r for r in existing if not _is_stale(r)] + [placeholder_row]
+        merged_detail = [r for r in existing_detail if not _is_stale(r)]
+        merged.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("export_run_id", "")))
+        merged_detail.sort(
+            key=lambda r: (
+                r.get("analysis_run_id", ""),
+                r.get("domain", ""),
+                r.get("population_id", ""),
+                r.get("export_run_id", ""),
+                r.get("pattern_id", ""),
+            )
+        )
+        atomic_write_csv(gap_path, _GAP_FIELDNAMES, merged)
+        atomic_write_csv(detail_path, _DETAIL_FIELDNAMES, merged_detail)
+
+
 def run_compare_for_domain(
     analysis_dir: Path,
     out_dir: Path,
@@ -430,48 +502,10 @@ def run_compare_for_domain(
             # "ok"-looking rows must not be left standing -- a downstream
             # reader of file_gap_report.csv would see old, no-longer-true
             # metrics with no indication the current run couldn't reproduce
-            # them. Replace them with a single domain-level blocked
-            # placeholder (export_run_id="" marks "no per-file breakdown
-            # available") instead of silently leaving stale data or silently
-            # deleting it with no trace.
-            placeholder_row = {name: "" for name in _GAP_FIELDNAMES}
-            placeholder_row.update(
-                {
-                    "reference_bundle_id": str(reference.get("reference_bundle_id", "")),
-                    "effective_date": str(reference.get("effective_date", "")),
-                    "analysis_run_id": fallback_run_id,
-                    "domain": domain,
-                    "population_id": population_id,
-                    "export_run_id": "",
-                    "comparison_status": COMPARISON_STATUS_BLOCKED,
-                    "comparison_reason_codes": REASON_COMPARISON_INPUT_INVALID,
-                    "comparison_detail": str(exc),
-                }
+            # them.
+            write_blocked_gap_placeholder(
+                compare_dir, reference, fallback_run_id, domain, population_id, REASON_COMPARISON_INPUT_INVALID, str(exc)
             )
-            def _is_stale(r: Dict[str, str]) -> bool:
-                return (
-                    r.get("analysis_run_id", "") == fallback_run_id
-                    and r.get("domain", "") == domain
-                    and r.get("population_id", "") == population_id
-                )
-
-            with _GAP_REPORT_LOCK:
-                existing = read_csv_rows(gap_path) if gap_path.is_file() else []
-                existing_detail = read_csv_rows(detail_path) if detail_path.is_file() else []
-                merged = [r for r in existing if not _is_stale(r)] + [placeholder_row]
-                merged_detail = [r for r in existing_detail if not _is_stale(r)]
-                merged.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", ""), r.get("export_run_id", "")))
-                merged_detail.sort(
-                    key=lambda r: (
-                        r.get("analysis_run_id", ""),
-                        r.get("domain", ""),
-                        r.get("population_id", ""),
-                        r.get("export_run_id", ""),
-                        r.get("pattern_id", ""),
-                    )
-                )
-                atomic_write_csv(gap_path, _GAP_FIELDNAMES, merged)
-                atomic_write_csv(detail_path, _DETAIL_FIELDNAMES, merged_detail)
 
         return {
             "reference_bundle_id": str(reference.get("reference_bundle_id", "")),

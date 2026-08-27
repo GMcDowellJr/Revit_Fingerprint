@@ -26,7 +26,7 @@ if __package__ in (None, ""):
     from step6_classify_files import emit_stub as emit_step6
     from step7_overlap_report import emit_stub as emit_step7
     from reference_bundle import load_and_validate, ReferenceBundleError
-    from step_compare import run_compare_for_domain
+    from step_compare import run_compare_for_domain, write_blocked_gap_placeholder
     from placeholder_exclusions import compute_placeholder_exclusions
     from jenks_utils import jenks_breaks
     from comparison_status import (
@@ -54,7 +54,7 @@ else:
     from .step6_classify_files import emit_stub as emit_step6
     from .step7_overlap_report import emit_stub as emit_step7
     from .reference_bundle import load_and_validate, ReferenceBundleError
-    from .step_compare import run_compare_for_domain
+    from .step_compare import run_compare_for_domain, write_blocked_gap_placeholder
     from .placeholder_exclusions import compute_placeholder_exclusions
     from ..jenks_utils import jenks_breaks
     from .comparison_status import (
@@ -622,6 +622,24 @@ def run_bundle_analysis(
                     expected_domains=domains,
                     missing_domain_reason_code=exc.reason_code,
                 )
+                # Per-file rows (file_gap_report.csv/file_gap_detail.csv) live
+                # in the same compare_<view>/ directory. A prior successful
+                # run into this reused out_dir may have left "ok"-looking
+                # per-file rows there for these domains; clear them (any
+                # population_id -- none is known yet at this point) and
+                # replace with one blocked placeholder per domain so they
+                # can't be read as still-valid despite the now-blocked status.
+                for dom in {d for d in domains if d}:
+                    write_blocked_gap_placeholder(
+                        out_dir / f"compare_{view}",
+                        {},
+                        run_id,
+                        dom,
+                        "",
+                        exc.reason_code,
+                        str(exc),
+                        match_any_population=True,
+                    )
                 # A domain-free run (e.g. an explicit empty domain filter)
                 # still needs the failure recorded even though there is no
                 # domain to synthesize a row for.
@@ -821,6 +839,14 @@ def run_bundle_analysis(
                         if not compare_appended:
                             view_compare_summary_rows.append(
                                 _blocked_compare_summary(reference, run_id, dom, "", REASON_COMPARISON_INPUT_INVALID, str(exc))
+                            )
+                            # build_membership_matrix/step2-7 raised before
+                            # run_compare_for_domain was ever reached, so its
+                            # own stale-row cleanup never ran either -- do it
+                            # here for this domain (population_id is always
+                            # "" in this non-population-aware loop).
+                            write_blocked_gap_placeholder(
+                                compare_out, reference or {}, run_id, dom, "", REASON_COMPARISON_INPUT_INVALID, str(exc)
                             )
 
             existing_timing_rows = read_csv_rows(view_out / "bundle_analysis_timing.csv") if (view_out / "bundle_analysis_timing.csv").exists() else []
@@ -1039,6 +1065,19 @@ def run_bundle_analysis(
                     if compare and reference is not None and not compare_appended:
                         view_compare_summary_rows[view].append(
                             _blocked_compare_summary(reference, run_id, dom, pid, REASON_COMPARISON_INPUT_INVALID, str(exc))
+                        )
+                        # _run_pipeline_once raised before run_compare_for_domain
+                        # was ever reached, so its own stale-row cleanup never
+                        # ran either -- do it here for this exact
+                        # (domain, population_id).
+                        write_blocked_gap_placeholder(
+                            view_out.parent / f"compare_{view}",
+                            reference,
+                            run_id,
+                            dom,
+                            pid,
+                            REASON_COMPARISON_INPUT_INVALID,
+                            str(exc),
                         )
 
     total_outliers = sum(outliers_by_domain.get(dom, 0) for dom in domains)

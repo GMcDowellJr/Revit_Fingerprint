@@ -208,6 +208,20 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   for the same `(analysis_run_id, domain, population_id)` and replaces them
   with a single blocked placeholder row, rather than leaving stale
   `ok`-looking metrics standing next to a blocked summary.
+  **Second follow-up round (same PR):** the first round's per-file stale-row
+  cleanup lived only inside `run_compare_for_domain` itself, so it never ran
+  for a blocked summary synthesized *outside* that function — a rejected
+  reference sidecar (no domain loop entered at all) or a pipeline stage
+  (`build_membership_matrix`/`_run_step2_to_step7`/`_run_pipeline_once`)
+  raising before `run_compare_for_domain` was ever reached. The cleanup is
+  now a shared `step_compare.write_blocked_gap_placeholder()`, called from
+  all three sites: `run_compare_for_domain`'s own early return (exact
+  `(run_id, domain, population_id)` match), the rejected-reference-sidecar
+  handler (`match_any_population=True` — clears every population under a
+  domain, since no specific population is known yet at that point), and
+  both compare loops' pre-comparison pipeline-failure handlers (exact
+  `(run_id, domain, population_id)` match, mirroring the `_blocked_compare_summary`
+  row appended alongside it).
 
 ### Added
 - **`loaded_family_types` domain: `can_have_structural_section`/`has_thermal_properties`

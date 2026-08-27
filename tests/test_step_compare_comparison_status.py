@@ -35,7 +35,7 @@ from tools.bundle_analysis.reference_bundle import (
     ReferenceBundleSchemaMismatchError,
 )
 from tools.bundle_analysis.run_bundle_analysis import _write_compare_run_outputs, _blocked_compare_summary, run_bundle_analysis
-from tools.bundle_analysis.step_compare import run_compare_for_domain
+from tools.bundle_analysis.step_compare import run_compare_for_domain, write_blocked_gap_placeholder, _GAP_FIELDNAMES
 
 
 def _write_csv(path: Path, fieldnames: List[str], rows: List[Dict[str, str]]) -> None:
@@ -619,3 +619,58 @@ def test_blocked_compare_summary_shape_matches_run_compare_for_domain_contract(t
         "comparison_status", "comparison_reason_codes",
         "comparison_ok_count", "comparison_degraded_count", "comparison_blocked_count",
     }
+
+
+def test_write_blocked_gap_placeholder_match_any_population_clears_all_populations(tmp_path):
+    # A caller that doesn't know which specific populations a prior
+    # successful run wrote (e.g. a rejected reference sidecar, discovered
+    # before any population is known) must be able to clear every
+    # population_id under (run_id, domain), not just one.
+    compare_dir = tmp_path / "compare_all"
+    _write_csv(
+        compare_dir / "file_gap_report.csv",
+        _GAP_FIELDNAMES,
+        [
+            {**{f: "" for f in _GAP_FIELDNAMES}, "analysis_run_id": "run1", "domain": "d1", "population_id": "p1", "export_run_id": "f1", "comparison_status": COMPARISON_STATUS_OK},
+            {**{f: "" for f in _GAP_FIELDNAMES}, "analysis_run_id": "run1", "domain": "d1", "population_id": "p2", "export_run_id": "f2", "comparison_status": COMPARISON_STATUS_OK},
+            {**{f: "" for f in _GAP_FIELDNAMES}, "analysis_run_id": "run1", "domain": "d2", "population_id": "p1", "export_run_id": "f3", "comparison_status": COMPARISON_STATUS_OK},
+        ],
+    )
+    reference = _reference("d1", ["A"])
+
+    write_blocked_gap_placeholder(compare_dir, reference, "run1", "d1", "", REASON_COMPARISON_INPUT_INVALID, "boom", match_any_population=True)
+
+    rows = _read_csv(compare_dir / "file_gap_report.csv")
+    d1_rows = [r for r in rows if r["domain"] == "d1"]
+    d2_rows = [r for r in rows if r["domain"] == "d2"]
+    assert len(d1_rows) == 1
+    assert d1_rows[0]["export_run_id"] == ""
+    assert d1_rows[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    # A different domain's rows are untouched.
+    assert len(d2_rows) == 1
+    assert d2_rows[0]["comparison_status"] == COMPARISON_STATUS_OK
+
+
+def test_run_bundle_analysis_clears_stale_per_file_rows_on_rejected_reference(tmp_path):
+    domain = "object_styles_model"
+    analysis_dir, out_dir = _setup_run_v2(tmp_path, domain, {"f1": {"A"}})
+    reference = _reference(domain, ["A"])
+
+    # First run succeeds and writes an "ok" per-file row.
+    run_compare_for_domain(analysis_dir, out_dir, reference, domain, compare_out_dir=out_dir / "compare_all")
+    ok_rows = _read_csv(out_dir / "compare_all" / "file_gap_report.csv")
+    assert _row_for(ok_rows, "f1")["comparison_status"] == COMPARISON_STATUS_OK
+
+    # A later run_bundle_analysis() invocation into the same out_dir has a
+    # broken reference sidecar -- comparison never even reaches this domain's
+    # loop. The stale "ok" row for f1 must not be left standing next to the
+    # now-blocked run status.
+    with pytest.raises(ReferenceBundleMissingError):
+        run_bundle_analysis(analysis_dir, out_dir, domain=domain, compare=True, discover_populations_flag=False, purge_view="all")
+
+    gap_rows = _read_csv(out_dir / "compare_all" / "file_gap_report.csv")
+    assert len(gap_rows) == 1
+    assert gap_rows[0]["export_run_id"] == ""
+    assert gap_rows[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert gap_rows[0]["comparison_reason_codes"] == REASON_REFERENCE_INVALID
+    assert not any(r.get("export_run_id") == "f1" for r in gap_rows)
