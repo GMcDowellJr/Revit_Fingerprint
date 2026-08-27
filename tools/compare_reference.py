@@ -185,8 +185,19 @@ def _validate_export_path(label: str, path: Path) -> Path:
         raise CompareReferenceError(
             f"{label} is a *.legacy.json export ({path}); legacy exports are never used, even when named explicitly."
         )
-    if not path.name.lower().endswith(".json"):
-        raise CompareReferenceError(f"{label} does not look like a fingerprint export (expected a .json file): {path}")
+    if not path.name.endswith(".json"):
+        # Case-sensitive on purpose: tools/extractor.py::_iter_export_files
+        # discovers inputs via the case-sensitive glob exports_dir.glob("*.json"),
+        # which never matches e.g. "model.JSON" on a case-sensitive filesystem
+        # (Linux). Accepting it here (as a case-insensitive check previously
+        # did) would let a file pass pre-flight validation, get staged, and
+        # then vanish from the pipeline with zero diagnostic trace -- it
+        # never reaches file_metadata.csv at all, so even the
+        # missing-target synthesis above can't catch it (Codex review, PR #466).
+        raise CompareReferenceError(
+            f"{label} does not look like a fingerprint export (expected a lowercase .json extension, "
+            f"exactly as tools/extractor.py's discovery glob requires): {path}"
+        )
     try:
         with path.open("r", encoding="utf-8") as f:
             json.load(f)
@@ -670,14 +681,21 @@ def assemble_outputs(
     run_status = dict(run_status)
 
     if synthesized_rows:
-        # run_bundle_analysis.py's own compare_run_status.csv rollup can't
-        # know about a target this tool discovered was silently missing
-        # (see _synthesize_missing_target_rows) -- recompute the run-level
-        # rollup from the merged row set using the same "blocked beats
-        # degraded beats ok, rolled up per domain first" algorithm
-        # tools/bundle_analysis/run_bundle_analysis.py's own
-        # _write_compare_run_outputs uses, so a synthesized blocked target
-        # is never masked by a stale "ok" run status.
+        # run_bundle_analysis.py's own compare_run_status.csv/
+        # compare_run_summary.csv rollups can't know about a target this
+        # tool discovered was silently missing (see
+        # _synthesize_missing_target_rows) -- recompute BOTH the run-level
+        # rollup and the per-domain summaries from the merged row set, using
+        # the same "blocked beats degraded beats ok, rolled up per domain
+        # first" algorithm tools/bundle_analysis/run_bundle_analysis.py's own
+        # _write_compare_run_outputs uses. Without this, a synthesized
+        # blocked target could be masked by a stale "ok" run status
+        # (Codex review, PR #466), or the top-level rollup could say
+        # blocked while domain_summaries still showed that same domain as
+        # ok with stale counts (Codex review, PR #466 follow-up finding).
+        # Synthesis is only ever enabled in single-pass mode (see main()),
+        # so every row's population_id is "" here -- safe to rebuild
+        # per-domain only, with no population_id dimension to preserve.
         statuses_by_domain: Dict[str, List[str]] = {}
         reasons_by_domain: Dict[str, List[str]] = {}
         for row in gap_rows:
@@ -695,6 +713,35 @@ def assemble_outputs(
         run_status["domains_degraded"] = str(status_counts.get(COMPARISON_STATUS_DEGRADED, 0))
         run_status["domains_blocked"] = str(status_counts.get(COMPARISON_STATUS_BLOCKED, 0))
 
+        domain_summaries = [
+            {
+                "domain": dom,
+                "population_id": "",
+                "comparison_status": domain_level_status[dom],
+                "comparison_reason_codes": sorted({c for c in reasons_by_domain[dom] if c}),
+                "files_scored": str(len(statuses_by_domain[dom])),
+                "comparison_ok_count": str(Counter(statuses_by_domain[dom]).get(COMPARISON_STATUS_OK, 0)),
+                "comparison_degraded_count": str(Counter(statuses_by_domain[dom]).get(COMPARISON_STATUS_DEGRADED, 0)),
+                "comparison_blocked_count": str(Counter(statuses_by_domain[dom]).get(COMPARISON_STATUS_BLOCKED, 0)),
+            }
+            for dom in sorted(statuses_by_domain)
+        ]
+    else:
+        domain_summaries = [
+            {
+                "domain": row.get("domain", ""),
+                "population_id": row.get("population_id", ""),
+                "comparison_status": row.get("comparison_status", ""),
+                "comparison_reason_codes": split_reason_codes(row.get("comparison_reason_codes", "")),
+                "files_scored": row.get("files_scored", ""),
+                "comparison_ok_count": row.get("comparison_ok_count", ""),
+                "comparison_degraded_count": row.get("comparison_degraded_count", ""),
+                "comparison_blocked_count": row.get("comparison_blocked_count", ""),
+            }
+            for row in run_summary_rows
+        ]
+    domain_summaries.sort(key=lambda r: (r["domain"], r["population_id"]))
+
     non_ok_targets = [
         {
             "target_export_run_id": row.get("export_run_id", ""),
@@ -708,21 +755,6 @@ def assemble_outputs(
         if row.get("comparison_status", COMPARISON_STATUS_OK) != COMPARISON_STATUS_OK
     ]
     non_ok_targets.sort(key=lambda r: (r["domain"], r["population_id"], r["target_export_run_id"]))
-
-    domain_summaries = [
-        {
-            "domain": row.get("domain", ""),
-            "population_id": row.get("population_id", ""),
-            "comparison_status": row.get("comparison_status", ""),
-            "comparison_reason_codes": split_reason_codes(row.get("comparison_reason_codes", "")),
-            "files_scored": row.get("files_scored", ""),
-            "comparison_ok_count": row.get("comparison_ok_count", ""),
-            "comparison_degraded_count": row.get("comparison_degraded_count", ""),
-            "comparison_blocked_count": row.get("comparison_blocked_count", ""),
-        }
-        for row in run_summary_rows
-    ]
-    domain_summaries.sort(key=lambda r: (r["domain"], r["population_id"]))
 
     reference_bundle_id = ""
     if gap_rows:
@@ -868,7 +900,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"[compare_reference][error] run_extract_all.py failed (exit {exc.returncode})", file=sys.stderr)
         return exc.returncode or 1
 
-    known_target_export_run_ids = _load_known_target_export_run_ids(records_dir, reference_primary.name)
+    # Missing-target synthesis (see _synthesize_missing_target_rows) assumes
+    # "every staged export other than the reference" is the eligible target
+    # universe. That assumption only holds in the default mode: --roles
+    # already makes run_bundle_analysis.py thread its own, role-filtered
+    # eligible_export_run_ids through to the comparator (which correctly
+    # flags a role-eligible-but-evidence-missing target as blocked on its
+    # own), so re-deriving an unfiltered universe here would wrongly flag
+    # targets the user explicitly excluded by role as TARGET_DOMAIN_UNAVAILABLE
+    # (Codex review, PR #466). --discover-populations groups rows by
+    # (domain, population_id), a dimension this synthesis doesn't model.
+    # Both are left to the underlying comparator's own eligibility handling.
+    known_target_export_run_ids = (
+        None
+        if (args.roles or args.discover_populations)
+        else _load_known_target_export_run_ids(records_dir, reference_primary.name)
+    )
 
     bundle_cmd = build_run_bundle_analysis_cmd(analysis_dir, bundle_out_dir, records_dir, args)
     try:

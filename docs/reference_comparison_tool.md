@@ -182,6 +182,14 @@ specifically to guarantee this, since the underlying `--compare` step only
 widens its own notion of "eligible targets" as a side effect of `--roles`
 filtering.
 
+This gap-closing behavior only applies to the default mode (no `--roles`,
+no `--discover-populations`). `--roles` already makes the underlying
+`--compare` step thread its own, role-filtered eligible-target set through
+correctly on its own — re-deriving an unfiltered universe here would
+wrongly flag a target you explicitly excluded by role as unavailable, so
+this tool defers to the comparator's own handling whenever `--roles` or
+`--discover-populations` is used.
+
 ## Overwrite / resume behavior
 
 Each invocation of this tool **cleanly replaces** the contents of

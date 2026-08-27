@@ -668,6 +668,162 @@ def test_assemble_outputs_without_known_targets_preserves_prior_behavior(tmp_pat
     assert {r["target_export_run_id"] for r in summary} == {"t1"}
 
 
+def test_assemble_outputs_rebuilds_domain_summaries_consistently_with_synthesized_targets(tmp_path):
+    # domain_summaries (in diagnostics.json) must not disagree with the
+    # top-level run_comparison_status / target_diagnostics about the same
+    # domain (Codex review, PR #466 follow-up finding).
+    domain = "object_styles_model"
+    bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A", "B"}}, ["A", "B"])
+    analysis_dir = tmp_path / "analysis"
+    reference_bundle_payload = {
+        "reference_bundle_id": "ref-2026-08-27", "effective_date": "2026-08-27",
+        "seed_export_run_id": "seed_file", "domains": {domain: ["A", "B"]},
+    }
+    (analysis_dir / "reference_bundle.json").write_text(json.dumps(reference_bundle_payload), encoding="utf-8")
+
+    out_dir = tmp_path / "final_out"
+    out_dir.mkdir()
+    cr.assemble_outputs(
+        bundle_out_dir, "all", out_dir, tmp_path / "ref.json",
+        {"reference_files": [], "target_files": [], "target_file_count": 2}, ["cmd"], ["cmd"],
+        analysis_dir=analysis_dir, known_target_export_run_ids=["t1", "t2"],
+    )
+
+    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diagnostics["run_comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
+    domain_summary = next(d for d in diagnostics["domain_summaries"] if d["domain"] == domain)
+    # Must agree with the top-level status and target_diagnostics -- not a
+    # stale "ok" left over from the comparator's own (pre-synthesis) view.
+    assert domain_summary["comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
+    assert domain_summary["files_scored"] == "2"
+    assert domain_summary["comparison_ok_count"] == "1"
+    assert domain_summary["comparison_blocked_count"] == "1"
+
+
+# ---------------------------------------------------------------------------
+# Regression: --roles / --discover-populations already thread eligibility
+# through the underlying comparator correctly on their own; re-deriving an
+# unfiltered target universe for missing-target synthesis in those modes
+# would wrongly flag a role-excluded target as unavailable (Codex review,
+# PR #466).
+# ---------------------------------------------------------------------------
+
+
+def test_main_skips_missing_target_synthesis_when_roles_is_used(tmp_path, monkeypatch):
+    domain = "object_styles_model"
+    reference = tmp_path / "ref.details.json"
+    target = tmp_path / "t1.details.json"
+    _write_json(reference, {"ok": True})
+    _write_json(target, {"ok": True})
+    out_dir = tmp_path / "out"
+    metadata_file = tmp_path / "roles_metadata.csv"
+    _write_csv(metadata_file, ["export_run_id", "governance_role"], [{"export_run_id": "t1", "governance_role": "Project"}])
+
+    captured_kwargs = {}
+    real_assemble = cr.assemble_outputs
+
+    def spy_assemble(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return real_assemble(*args, **kwargs)
+
+    def fake_execute(cmd):
+        cmd = list(cmd)
+        if "run_bundle_analysis.py" in cmd[1]:
+            bundle_out_dir = Path(cmd[cmd.index("--out-dir") + 1])
+            fixture_bundle_out_dir = _setup_compare_all(tmp_path / "fixture", domain, {"t1": {"A"}}, ["A"])
+            import shutil as _sh
+            if bundle_out_dir.exists():
+                _sh.rmtree(bundle_out_dir)
+            _sh.copytree(fixture_bundle_out_dir, bundle_out_dir)
+        elif "run_extract_all.py" in cmd[1]:
+            records_dir = Path(cmd[cmd.index("--out-root") + 1]) / "results" / "records"
+            records_dir.mkdir(parents=True, exist_ok=True)
+            _write_csv(
+                records_dir / "file_metadata.csv",
+                ["export_run_id", "file_id"],
+                [{"export_run_id": "seed_file", "file_id": "ref.details.json"}, {"export_run_id": "t1", "file_id": "t1.details.json"}],
+            )
+        return None
+
+    monkeypatch.setattr(cr, "_execute", fake_execute)
+    monkeypatch.setattr(cr, "assemble_outputs", spy_assemble)
+
+    rc = cr.main(
+        [
+            "--reference", str(reference), "--target", str(target),
+            "--roles", "Project", "--metadata-file", str(metadata_file),
+            "--out-dir", str(out_dir),
+        ]
+    )
+
+    assert rc == 0
+    assert captured_kwargs.get("known_target_export_run_ids") is None
+
+
+def test_main_skips_missing_target_synthesis_when_discover_populations_is_used(tmp_path, monkeypatch):
+    domain = "object_styles_model"
+    reference = tmp_path / "ref.details.json"
+    target = tmp_path / "t1.details.json"
+    _write_json(reference, {"ok": True})
+    _write_json(target, {"ok": True})
+    out_dir = tmp_path / "out"
+
+    captured_kwargs = {}
+    real_assemble = cr.assemble_outputs
+
+    def spy_assemble(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return real_assemble(*args, **kwargs)
+
+    def fake_execute(cmd):
+        cmd = list(cmd)
+        if "run_bundle_analysis.py" in cmd[1]:
+            bundle_out_dir = Path(cmd[cmd.index("--out-dir") + 1])
+            fixture_bundle_out_dir = _setup_compare_all(tmp_path / "fixture", domain, {"t1": {"A"}}, ["A"])
+            import shutil as _sh
+            if bundle_out_dir.exists():
+                _sh.rmtree(bundle_out_dir)
+            _sh.copytree(fixture_bundle_out_dir, bundle_out_dir)
+        elif "run_extract_all.py" in cmd[1]:
+            records_dir = Path(cmd[cmd.index("--out-root") + 1]) / "results" / "records"
+            records_dir.mkdir(parents=True, exist_ok=True)
+            _write_csv(
+                records_dir / "file_metadata.csv",
+                ["export_run_id", "file_id"],
+                [{"export_run_id": "seed_file", "file_id": "ref.details.json"}, {"export_run_id": "t1", "file_id": "t1.details.json"}],
+            )
+        return None
+
+    monkeypatch.setattr(cr, "_execute", fake_execute)
+    monkeypatch.setattr(cr, "assemble_outputs", spy_assemble)
+
+    rc = cr.main(
+        ["--reference", str(reference), "--target", str(target), "--discover-populations", "--out-dir", str(out_dir)]
+    )
+
+    assert rc == 0
+    assert captured_kwargs.get("known_target_export_run_ids") is None
+
+
+# ---------------------------------------------------------------------------
+# Regression: reject a case-mismatched extension the extractor's own
+# case-sensitive discovery glob would never find (Codex review, PR #466).
+# ---------------------------------------------------------------------------
+
+
+def test_validate_export_path_rejects_uppercase_json_extension(tmp_path):
+    path = tmp_path / "model.JSON"
+    _write_json(path, {"a": 1})
+    with pytest.raises(cr.CompareReferenceError, match="lowercase"):
+        cr._validate_export_path("--reference", path)
+
+
+def test_validate_export_path_accepts_lowercase_json_extension(tmp_path):
+    path = tmp_path / "model.json"
+    _write_json(path, {"a": 1})
+    assert cr._validate_export_path("--reference", path) == path
+
+
 # ---------------------------------------------------------------------------
 # 12. Filenames / output locations are deterministic.
 # ---------------------------------------------------------------------------
