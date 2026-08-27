@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import csv
 import shutil
@@ -24,10 +25,18 @@ if __package__ in (None, ""):
     from step5_classify_patterns import emit_stub as emit_step5
     from step6_classify_files import emit_stub as emit_step6
     from step7_overlap_report import emit_stub as emit_step7
-    from reference_bundle import load_and_validate
-    from step_compare import run_compare_for_domain
+    from reference_bundle import load_and_validate, ReferenceBundleError
+    from step_compare import run_compare_for_domain, write_blocked_gap_placeholder
     from placeholder_exclusions import compute_placeholder_exclusions
     from jenks_utils import jenks_breaks
+    from comparison_status import (
+        COMPARISON_STATUS_OK,
+        COMPARISON_STATUS_DEGRADED,
+        COMPARISON_STATUS_BLOCKED,
+        REASON_COMPARISON_INPUT_INVALID,
+        aggregate_comparison_status,
+        join_reason_codes,
+    )
     from name_projection_adapter import (
         DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID,
         emit_name_target_provenance,
@@ -44,10 +53,18 @@ else:
     from .step5_classify_patterns import emit_stub as emit_step5
     from .step6_classify_files import emit_stub as emit_step6
     from .step7_overlap_report import emit_stub as emit_step7
-    from .reference_bundle import load_and_validate
-    from .step_compare import run_compare_for_domain
+    from .reference_bundle import load_and_validate, ReferenceBundleError
+    from .step_compare import run_compare_for_domain, write_blocked_gap_placeholder
     from .placeholder_exclusions import compute_placeholder_exclusions
     from ..jenks_utils import jenks_breaks
+    from .comparison_status import (
+        COMPARISON_STATUS_OK,
+        COMPARISON_STATUS_DEGRADED,
+        COMPARISON_STATUS_BLOCKED,
+        REASON_COMPARISON_INPUT_INVALID,
+        aggregate_comparison_status,
+        join_reason_codes,
+    )
     from .name_projection_adapter import (
         DEFAULT_NAME_PROJECTION_ANALYSIS_RUN_ID,
         emit_name_target_provenance,
@@ -148,6 +165,167 @@ def _emit_meta_scatter_thresholds(out_dir: Path, run_id: str, domain_filter: str
         ["analysis_run_id", "axis", "break_value", "n_domains", "input_min", "input_max"],
         out_rows,
     )
+
+
+_COMPARE_RUN_SUMMARY_FIELDNAMES = [
+    "reference_bundle_id",
+    "effective_date",
+    "analysis_run_id",
+    "domain",
+    "population_id",
+    "files_scored",
+    "full_count",
+    "partial_count",
+    "none_count",
+    "no_reference_count",
+    "comparison_status",
+    "comparison_reason_codes",
+    "comparison_ok_count",
+    "comparison_degraded_count",
+    "comparison_blocked_count",
+]
+
+_COMPARE_RUN_STATUS_FIELDNAMES = [
+    "analysis_run_id",
+    "comparison_status",
+    "comparison_reason_codes",
+    "comparison_detail",
+    "domains_total",
+    "domains_ok",
+    "domains_degraded",
+    "domains_blocked",
+]
+
+
+def _write_compare_run_outputs(
+    compare_out_dir: Path,
+    run_id: str,
+    compare_rows: List[Dict[str, str]],
+    expected_domains: Optional[List[str]] = None,
+    missing_domain_reason_code: str = REASON_COMPARISON_INPUT_INVALID,
+) -> None:
+    """Write compare_run_summary.csv (per domain/population) and
+    compare_run_status.csv (a single deterministic run-level rollup: blocked
+    beats degraded beats ok -- see comparison_status.aggregate_comparison_status)
+    so a blocked/degraded comparison run is observable without console-log
+    inspection, per the "every comparison run declares ok/degraded/blocked"
+    invariant.
+
+    `expected_domains`, when given, is the full set of domains --compare was
+    asked to run for this view. A domain whose own pipeline stage (step0/
+    step1/discovery) raised before run_compare_for_domain ever appended a
+    summary is silently absent from `compare_rows` -- caught only by the
+    surrounding per-domain `except Exception: print(...)` handlers, which are
+    out of scope for this PR to rework. Without this check, an entirely
+    empty `compare_rows` (every requested domain failed upstream of
+    comparison) would aggregate to comparison_status=ok/domains_total=0,
+    falsely certifying a comparison run where nothing was actually compared.
+    A synthesized blocked row (reason `missing_domain_reason_code`) is added
+    per missing domain so both compare_run_summary.csv and the run-level
+    rollup reflect it. This is a coarse, domain-level safety net for failures
+    with no (domain, population_id)-scoped row at all; population-aware call
+    sites should prefer appending a precisely-scoped blocked row at the
+    actual point of failure (see run_bundle_analysis()'s per-population loop)
+    -- this net only catches what that per-site handling didn't.
+
+    `compare_rows` may carry more than one row per domain (population-aware
+    mode: one row per (domain, population_id)). domains_total/ok/degraded/
+    blocked in compare_run_status.csv count distinct *domains* -- each
+    domain's rows are first rolled up to one status via
+    aggregate_comparison_status before counting -- not summary rows, so a
+    domain with three population rows is not counted as three domains.
+    """
+    compare_rows = list(compare_rows)
+    if expected_domains:
+        domains_with_summary = {r.get("domain", "") for r in compare_rows}
+        missing_domains = sorted({d for d in expected_domains if d} - domains_with_summary)
+        for dom in missing_domains:
+            compare_rows.append(
+                {
+                    "reference_bundle_id": "",
+                    "effective_date": "",
+                    "analysis_run_id": run_id,
+                    "domain": dom,
+                    "population_id": "",
+                    "files_scored": "0",
+                    "full_count": "0",
+                    "partial_count": "0",
+                    "none_count": "0",
+                    "no_reference_count": "0",
+                    "comparison_status": COMPARISON_STATUS_BLOCKED,
+                    "comparison_reason_codes": missing_domain_reason_code,
+                    "comparison_ok_count": "0",
+                    "comparison_degraded_count": "0",
+                    "comparison_blocked_count": "0",
+                }
+            )
+        compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
+
+    atomic_write_csv(compare_out_dir / "compare_run_summary.csv", _COMPARE_RUN_SUMMARY_FIELDNAMES, compare_rows)
+
+    statuses_by_domain: Dict[str, List[str]] = {}
+    reasons_by_domain: Dict[str, List[str]] = {}
+    for r in compare_rows:
+        dom = r.get("domain", "")
+        statuses_by_domain.setdefault(dom, []).append(r.get("comparison_status", COMPARISON_STATUS_OK))
+        reasons_by_domain.setdefault(dom, []).extend(str(r.get("comparison_reason_codes", "") or "").split("|"))
+
+    domain_level_status = {dom: aggregate_comparison_status(sts) for dom, sts in statuses_by_domain.items()}
+    run_status = aggregate_comparison_status(domain_level_status.values())
+    run_reason_codes = join_reason_codes(code for codes in reasons_by_domain.values() for code in codes)
+    status_counts = Counter(domain_level_status.values())
+    atomic_write_csv(
+        compare_out_dir / "compare_run_status.csv",
+        _COMPARE_RUN_STATUS_FIELDNAMES,
+        [
+            {
+                "analysis_run_id": run_id,
+                "comparison_status": run_status,
+                "comparison_reason_codes": run_reason_codes,
+                "comparison_detail": "",
+                "domains_total": str(len(domain_level_status)),
+                "domains_ok": str(status_counts.get(COMPARISON_STATUS_OK, 0)),
+                "domains_degraded": str(status_counts.get(COMPARISON_STATUS_DEGRADED, 0)),
+                "domains_blocked": str(status_counts.get(COMPARISON_STATUS_BLOCKED, 0)),
+            }
+        ],
+    )
+
+
+def _blocked_compare_summary(
+    reference: Optional[Dict[str, object]],
+    run_id: str,
+    domain: str,
+    population_id: str,
+    reason_code: str,
+    detail: str = "",
+) -> Dict[str, str]:
+    """A synthesized blocked compare_summary dict, shaped like
+    run_compare_for_domain()'s return value, for a (domain, population_id)
+    whose own pipeline stage failed before run_compare_for_domain ever ran
+    (so there is no real summary to report) -- e.g. build_membership_matrix/
+    _run_step2_to_step7/discover_populations raising. Precisely scoped to the
+    (domain, population_id) that actually failed, unlike
+    _write_compare_run_outputs' coarser expected_domains safety net.
+    """
+    reference = reference or {}
+    return {
+        "reference_bundle_id": str(reference.get("reference_bundle_id", "")),
+        "effective_date": str(reference.get("effective_date", "")),
+        "analysis_run_id": run_id,
+        "domain": domain,
+        "population_id": population_id,
+        "files_scored": "0",
+        "full_count": "0",
+        "partial_count": "0",
+        "none_count": "0",
+        "no_reference_count": "0",
+        "comparison_status": COMPARISON_STATUS_BLOCKED,
+        "comparison_reason_codes": reason_code,
+        "comparison_ok_count": "0",
+        "comparison_degraded_count": "0",
+        "comparison_blocked_count": "0",
+    }
 
 
 def _load_purgeable_only_set(
@@ -421,7 +599,69 @@ def run_bundle_analysis(
 
     reference: Optional[Dict[str, object]] = None
     if compare:
-        reference = load_and_validate(analysis_dir, SCHEMA_VERSION)
+        try:
+            reference = load_and_validate(analysis_dir, SCHEMA_VERSION)
+        except ReferenceBundleError as exc:
+            # The reference sidecar is missing, malformed, or schema-incompatible.
+            # Comparison cannot truthfully proceed at all -- there is no domain
+            # loop to enter, so every requested domain blocks at run scope.
+            # Recorded to the same compare_run_summary.csv/compare_run_status.csv
+            # paths a successful run would write, under each requested view's own
+            # compare_<view>/ directory (not a one-off top-level path a consumer
+            # monitoring the normal per-view outputs would never check) -- and
+            # this also overwrites any stale "ok" status left there by an earlier
+            # successful run into the same reused out_dir. All logged before
+            # re-raising, so "comparison was requested but blocked" survives even
+            # though the process exits with a hard failure per "do not silently
+            # skip comparison".
+            for view in views_to_run:
+                _write_compare_run_outputs(
+                    out_dir / f"compare_{view}",
+                    run_id,
+                    [],
+                    expected_domains=domains,
+                    missing_domain_reason_code=exc.reason_code,
+                )
+                # Per-file rows (file_gap_report.csv/file_gap_detail.csv) live
+                # in the same compare_<view>/ directory. A prior successful
+                # run into this reused out_dir may have left "ok"-looking
+                # per-file rows there for these domains; clear them (any
+                # population_id -- none is known yet at this point) and
+                # replace with one blocked placeholder per domain so they
+                # can't be read as still-valid despite the now-blocked status.
+                for dom in {d for d in domains if d}:
+                    write_blocked_gap_placeholder(
+                        out_dir / f"compare_{view}",
+                        {},
+                        run_id,
+                        dom,
+                        "",
+                        exc.reason_code,
+                        str(exc),
+                        match_any_population=True,
+                    )
+                # A domain-free run (e.g. an explicit empty domain filter)
+                # still needs the failure recorded even though there is no
+                # domain to synthesize a row for.
+                if not [d for d in domains if d]:
+                    atomic_write_csv(
+                        out_dir / f"compare_{view}" / "compare_run_status.csv",
+                        _COMPARE_RUN_STATUS_FIELDNAMES,
+                        [
+                            {
+                                "analysis_run_id": run_id,
+                                "comparison_status": COMPARISON_STATUS_BLOCKED,
+                                "comparison_reason_codes": exc.reason_code,
+                                "comparison_detail": str(exc),
+                                "domains_total": "0",
+                                "domains_ok": "0",
+                                "domains_degraded": "0",
+                                "domains_blocked": "0",
+                            }
+                        ],
+                    )
+            print(f"[run][blocked] comparison blocked: reason={exc.reason_code} detail={exc}")
+            raise
 
     if not discover_populations_flag:
         for view in views_to_run:
@@ -512,6 +752,7 @@ def run_bundle_analysis(
                     if not dom:
                         continue
                     print(f"[run] domain={dom} start")
+                    compare_appended = False
                     try:
                         work_out_base = role_stage_root if resolved_roles else view_out
                         t0 = time.time()
@@ -557,6 +798,7 @@ def run_bundle_analysis(
                             compare_summary = compare_future.result()
                         compare_seconds = time.time() - compare_started
                         view_compare_summary_rows.append(compare_summary)
+                        compare_appended = True
                         step_times = {"step1": t1, **tail.get("step_times", {})}
                         print(
                             f"[timing] domain={dom} discovery_seconds={sum(float(step_times.get(k, 0.0)) for k in ('step1','step2','step2b','step3','step4','step5','step6','step7')):.3f} "
@@ -594,6 +836,18 @@ def run_bundle_analysis(
                             )
                     except Exception as exc:
                         print(f"[run][error] domain={dom} failed: {exc}")
+                        if not compare_appended:
+                            view_compare_summary_rows.append(
+                                _blocked_compare_summary(reference, run_id, dom, "", REASON_COMPARISON_INPUT_INVALID, str(exc))
+                            )
+                            # build_membership_matrix/step2-7 raised before
+                            # run_compare_for_domain was ever reached, so its
+                            # own stale-row cleanup never ran either -- do it
+                            # here for this domain (population_id is always
+                            # "" in this non-population-aware loop).
+                            write_blocked_gap_placeholder(
+                                compare_out, reference or {}, run_id, dom, "", REASON_COMPARISON_INPUT_INVALID, str(exc)
+                            )
 
             existing_timing_rows = read_csv_rows(view_out / "bundle_analysis_timing.csv") if (view_out / "bundle_analysis_timing.csv").exists() else []
             merged_timing_rows = [r for r in existing_timing_rows if r.get("analysis_run_id", "") != run_id] + view_timing_rows
@@ -603,22 +857,7 @@ def run_bundle_analysis(
             if compare and compare_out is not None:
                 compare_rows = [r for r in view_compare_summary_rows if r.get("analysis_run_id", "") == run_id]
                 compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
-                atomic_write_csv(
-                    compare_out / "compare_run_summary.csv",
-                    [
-                        "reference_bundle_id",
-                        "effective_date",
-                        "analysis_run_id",
-                        "domain",
-                        "population_id",
-                        "files_scored",
-                        "full_count",
-                        "partial_count",
-                        "none_count",
-                        "no_reference_count",
-                    ],
-                    compare_rows,
-                )
+                _write_compare_run_outputs(compare_out, run_id, compare_rows, expected_domains=domains)
 
             _emit_meta_scatter_thresholds(view_out, run_id, domain)
 
@@ -760,6 +999,7 @@ def run_bundle_analysis(
                 if final_out.exists():
                     shutil.rmtree(final_out)
 
+                compare_appended = False
                 try:
                     t0 = time.time()
                     stats = _run_pipeline_once(
@@ -815,12 +1055,30 @@ def run_bundle_analysis(
                         )
                         compare_reset_domains_by_view[view].add(dom)
                         view_compare_summary_rows[view].append(compare_summary)
+                        compare_appended = True
 
                     produced = stage_out / dom
                     final_out.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(produced), str(final_out))
                 except Exception as exc:
                     print(f"[run][error] domain={dom} population_id={pid} view={view} failed: {exc}")
+                    if compare and reference is not None and not compare_appended:
+                        view_compare_summary_rows[view].append(
+                            _blocked_compare_summary(reference, run_id, dom, pid, REASON_COMPARISON_INPUT_INVALID, str(exc))
+                        )
+                        # _run_pipeline_once raised before run_compare_for_domain
+                        # was ever reached, so its own stale-row cleanup never
+                        # ran either -- do it here for this exact
+                        # (domain, population_id).
+                        write_blocked_gap_placeholder(
+                            view_out.parent / f"compare_{view}",
+                            reference,
+                            run_id,
+                            dom,
+                            pid,
+                            REASON_COMPARISON_INPUT_INVALID,
+                            str(exc),
+                        )
 
     total_outliers = sum(outliers_by_domain.get(dom, 0) for dom in domains)
     print("[run] complete (population-aware)")
@@ -868,22 +1126,7 @@ def run_bundle_analysis(
             compare_out_dir = view_out.parent / f"compare_{view}"
             compare_rows = [r for r in view_compare_summary_rows[view] if r.get("analysis_run_id", "") == run_id]
             compare_rows.sort(key=lambda r: (r.get("analysis_run_id", ""), r.get("domain", ""), r.get("population_id", "")))
-            atomic_write_csv(
-                compare_out_dir / "compare_run_summary.csv",
-                [
-                    "reference_bundle_id",
-                    "effective_date",
-                    "analysis_run_id",
-                    "domain",
-                    "population_id",
-                    "files_scored",
-                    "full_count",
-                    "partial_count",
-                    "none_count",
-                    "no_reference_count",
-                ],
-                compare_rows,
-            )
+            _write_compare_run_outputs(compare_out_dir, run_id, compare_rows, expected_domains=domains)
 
         _emit_meta_scatter_thresholds(view_out, run_id, domain)
 

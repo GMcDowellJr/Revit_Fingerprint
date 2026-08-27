@@ -6,6 +6,41 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Dict, List
 
+if __package__ in (None, ""):
+    from comparison_status import (
+        REASON_REFERENCE_INVALID,
+        REASON_SCHEMA_INCOMPATIBLE,
+    )
+else:
+    from .comparison_status import (
+        REASON_REFERENCE_INVALID,
+        REASON_SCHEMA_INCOMPATIBLE,
+    )
+
+
+class ReferenceBundleError(ValueError):
+    """Base class for reference-bundle sidecar failures that must block comparison.
+
+    Subclasses ValueError so existing `except ValueError` call sites keep working
+    unchanged; new call sites can catch these specifically (or read `reason_code`)
+    to classify the failure per the comparison_status/comparison_reason_codes
+    contract instead of string-matching the message.
+    """
+
+    reason_code: str = REASON_REFERENCE_INVALID
+
+
+class ReferenceBundleMissingError(ReferenceBundleError):
+    reason_code = REASON_REFERENCE_INVALID
+
+
+class ReferenceBundleInvalidError(ReferenceBundleError):
+    reason_code = REASON_REFERENCE_INVALID
+
+
+class ReferenceBundleSchemaMismatchError(ReferenceBundleError):
+    reason_code = REASON_SCHEMA_INCOMPATIBLE
+
 
 def _escape_control_chars_in_json_strings(raw_json: str) -> str:
     """Return JSON text with raw control characters escaped only inside strings."""
@@ -103,9 +138,12 @@ def write_sidecar(
 def load_and_validate(analysis_out_dir: Path, current_schema_version: str) -> Dict[str, object]:
     path = analysis_out_dir / "reference_bundle.json"
     if not path.is_file():
-        raise ValueError(f"Missing reference bundle sidecar: {path}")
-    with path.open("r", encoding="utf-8") as f:
-        payload_raw = f.read()
+        raise ReferenceBundleMissingError(f"Missing reference bundle sidecar: {path}")
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            payload_raw = f.read()
+    except UnicodeDecodeError as exc:
+        raise ReferenceBundleInvalidError(f"Invalid reference bundle encoding in {path}: {exc}") from exc
     try:
         payload = json.loads(payload_raw)
     except json.JSONDecodeError as exc:
@@ -113,13 +151,13 @@ def load_and_validate(analysis_out_dir: Path, current_schema_version: str) -> Di
         # values (for example, unescaped tabs/newlines). Escape those characters
         # and retry parsing.
         if "Invalid control character" not in str(exc):
-            raise ValueError(f"Invalid reference bundle JSON in {path}: {exc}") from exc
+            raise ReferenceBundleInvalidError(f"Invalid reference bundle JSON in {path}: {exc}") from exc
         try:
             payload = json.loads(_escape_control_chars_in_json_strings(payload_raw))
         except json.JSONDecodeError as retry_exc:
-            raise ValueError(f"Invalid reference bundle JSON in {path}: {retry_exc}") from retry_exc
+            raise ReferenceBundleInvalidError(f"Invalid reference bundle JSON in {path}: {retry_exc}") from retry_exc
     if not isinstance(payload, dict):
-        raise ValueError(f"Invalid reference bundle JSON shape in {path}: expected object root.")
+        raise ReferenceBundleInvalidError(f"Invalid reference bundle JSON shape in {path}: expected object root.")
 
     required = {
         "reference_bundle_id",
@@ -130,17 +168,19 @@ def load_and_validate(analysis_out_dir: Path, current_schema_version: str) -> Di
     }
     missing = [k for k in sorted(required) if k not in payload]
     if missing:
-        raise ValueError(f"Invalid reference bundle: missing required field(s): {missing}")
+        raise ReferenceBundleInvalidError(f"Invalid reference bundle: missing required field(s): {missing}")
 
     effective_date = str(payload.get("effective_date", "")).strip()
     try:
         date.fromisoformat(effective_date)
     except ValueError as exc:
-        raise ValueError(f"Invalid reference bundle effective_date (expected ISO 8601 date): {effective_date!r}") from exc
+        raise ReferenceBundleInvalidError(
+            f"Invalid reference bundle effective_date (expected ISO 8601 date): {effective_date!r}"
+        ) from exc
 
     sidecar_schema = str(payload.get("extractor_schema_version", "")).strip()
     if sidecar_schema != str(current_schema_version):
-        raise ValueError(
+        raise ReferenceBundleSchemaMismatchError(
             "Reference bundle schema mismatch: "
             f"sidecar extractor_schema_version={sidecar_schema!r} "
             f"!= current schema_version={str(current_schema_version)!r}"
@@ -148,14 +188,16 @@ def load_and_validate(analysis_out_dir: Path, current_schema_version: str) -> Di
 
     domains = payload.get("domains")
     if not isinstance(domains, dict) or not domains:
-        raise ValueError("Invalid reference bundle: domains must be a non-empty object.")
+        raise ReferenceBundleInvalidError("Invalid reference bundle: domains must be a non-empty object.")
     for domain, pattern_ids in domains.items():
         if not isinstance(domain, str) or not domain.strip():
-            raise ValueError("Invalid reference bundle: domain keys must be non-empty strings.")
+            raise ReferenceBundleInvalidError("Invalid reference bundle: domain keys must be non-empty strings.")
         if not isinstance(pattern_ids, list) or not pattern_ids:
-            raise ValueError(f"Invalid reference bundle: domains[{domain!r}] must be a non-empty list.")
+            raise ReferenceBundleInvalidError(f"Invalid reference bundle: domains[{domain!r}] must be a non-empty list.")
         for pid in pattern_ids:
             if not isinstance(pid, str) or not pid.strip():
-                raise ValueError(f"Invalid reference bundle: domains[{domain!r}] contains an empty pattern id.")
+                raise ReferenceBundleInvalidError(
+                    f"Invalid reference bundle: domains[{domain!r}] contains an empty pattern id."
+                )
 
     return payload
