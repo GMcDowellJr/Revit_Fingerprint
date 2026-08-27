@@ -102,6 +102,14 @@ def print_usage(exports_root: Path, records: Path, name_key_csv: Path) -> None:
     print("    (population_hash is membership-only and cannot detect those) to force a")
     print("    full-corpus rebuild.")
     print()
+    print("  -RunAuthorityPatterns (Run B, opt-in, default OFF): run the corpus-wide")
+    print("    (unsegmented) authority,patterns stage and its patch_all_domain_patterns.py")
+    print("    follow-up. OFF by default because no governance consumer reads this")
+    print("    corpus-scoped output -- Run C independently recomputes the same statistics")
+    print("    at correct segment scope via the same code path (see")
+    print("    audit_results/audit_17_abc_reprocessing_scope_investigation.md). Pass this")
+    print("    switch only for ad hoc corpus-wide inspection; Run C does not require it.")
+    print()
     print("  -NameKey (Run A/B/C, opt-in, additive): also produce the Canonical Name")
     print("    Identity Projection (join_key_name_identity) alongside the default")
     print("    join_hash output. Does NOT change any default Run A/B/C output -- see")
@@ -137,6 +145,9 @@ def normalize_powershell_style_argv(argv: Sequence[str]) -> list[str]:
         "-namekey": "--name-key",
         "--namekey": "--name-key",
         "--name-key": "--name-key",
+        "-runauthoritypatterns": "--run-authority-patterns",
+        "--runauthoritypatterns": "--run-authority-patterns",
+        "--run-authority-patterns": "--run-authority-patterns",
         "-exportsroot": "--exports-root",
         "--exportsroot": "--exports-root",
         "--exports-root": "--exports-root",
@@ -161,6 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--run", dest="run", choices=("A", "B", "C"), default="")
     parser.add_argument("--force-all", dest="force_all", action="store_true")
     parser.add_argument("--name-key", dest="name_key", action="store_true")
+    parser.add_argument("--run-authority-patterns", dest="run_authority_patterns", action="store_true")
     parser.add_argument("--exports-root", dest="exports_root", default="./Fingerprint_Data")
     parser.add_argument("--help", action="store_true")
     return parser
@@ -240,20 +252,32 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.run == "B":
         print(green("=== RUN B: Authority / Patterns / Patch ==="))
-        print(cyan("--- B1: authority + patterns ---"))
-        run_external([
-            python, "tools/run_extract_all.py", exports,
-            "--out-root", results,
-            "--out-root-is-results-root",
-            "--stages", "authority,patterns",
-        ], "Run B1: authority/patterns")
 
-        print(cyan("--- B2: patch corpus domain_patterns ---"))
-        run_external([
-            python, "tools/label_synthesis/patch_all_domain_patterns.py",
-            "--results-root", results,
-            "--segments-root", segments,
-        ], "Run B2: patch_all_domain_patterns.py")
+        if args.run_authority_patterns:
+            print(cyan("--- B1: authority + patterns ---"))
+            run_external([
+                python, "tools/run_extract_all.py", exports,
+                "--out-root", results,
+                "--out-root-is-results-root",
+                "--stages", "authority,patterns",
+            ], "Run B1: authority/patterns")
+
+            # B2 is gated on B1 having just run, not just on the flag: patching
+            # a stale corpus domain_patterns.csv left over from a prior Run B
+            # invocation is harmless (nothing downstream reads corpus-scoped
+            # output -- see audit_results/audit_17_abc_reprocessing_scope_
+            # investigation.md), but pointless when B1 didn't just refresh it.
+            print(cyan("--- B2: patch corpus domain_patterns ---"))
+            run_external([
+                python, "tools/label_synthesis/patch_all_domain_patterns.py",
+                "--results-root", results,
+                "--segments-root", segments,
+            ], "Run B2: patch_all_domain_patterns.py")
+        else:
+            print(cyan("--- B1/B2: SKIPPED (pass -RunAuthorityPatterns to run corpus-wide authority/patterns/patch) ---"))
+            print(cyan("    Not required before Run C -- Run C recomputes authority/patterns at correct"))
+            print(cyan("    segment scope independently. See CLAUDE.md / audit_results/audit_17_abc_"))
+            print(cyan("    reprocessing_scope_investigation.md."))
 
         if args.name_key:
             print(cyan("--- B-NameKey (OPTIONAL; not required before Run C -- Run C re-clusters per segment) ---"))
