@@ -50,22 +50,30 @@ configuration is approved, required, or compliant.
   `--segments-root`).
 - `--registry-file PATH` (required) — the corpus-level `run_registry.csv`
   mapping `segment_id` to its `output_folder` and completion `status`.
-- `--segment SEGMENT_ID` (required) — which segment to compare within. Both
-  the reference and the target(s) are resolved against **this same
-  segment's** own materialization.
+- `--reference-segment SEGMENT_ID` (required) — the segment the `--reference`
+  selector and the reference pattern set are resolved against.
+- `--target-segment SEGMENT_ID` (optional) — the segment the `--target`
+  selector (or, if `--target` is omitted, the whole-segment comparison) is
+  resolved against. **Defaults to the same segment as `--reference-segment`**
+  — omitting it (or passing the same value) reproduces the tool's original
+  single-segment behavior exactly, byte-for-byte. Pass a different segment
+  to compare a reference from one segment against a target (file or entire
+  segment) from a different segment.
 - `--reference SELECTOR` (required) — a filename selector for the reference
-  export (e.g. `template_v3.details.json`). Resolved against the segment's
-  own `results/records/file_metadata.csv`, never against raw JSON.
+  export (e.g. `template_v3.details.json`). Resolved against the reference
+  segment's own `results/records/file_metadata.csv`, never against raw JSON.
 - `--target SELECTOR` (optional) — a filename selector for a single target
-  export. **Omit it to compare the reference against the entire segment**
-  (every other materialized file in the segment).
+  export, resolved against the target segment. **Omit it to compare the
+  reference against the entire target segment** (every other materialized
+  file in that segment).
 - `--out-dir DIR` (required) — output location, owned exclusively by this
   tool (see **Overwrite behavior** below). Must not be, or contain,
   `--segments-root` or `--registry-file` — this tool refuses to run rather
   than risk destroying materialization it only ever reads.
 - `--domains d1,d2` (optional) — restrict comparison to these domains.
-  Default: every domain present in the segment's own
-  `pattern_presence_file.csv`.
+  Default: every domain present in the **target segment's** own
+  `pattern_presence_file.csv` (that's the population actually being
+  scored).
 - `--purge-view {all,used,both}` (default `both`) — which segment-local
   bundle-analysis view(s) to compare against. `all`/`used` populations are
   never collapsed into one another; `both` runs and reports each
@@ -73,7 +81,7 @@ configuration is approved, required, or compliant.
 
 ## Filename resolution
 
-A selector is matched against the segment's `file_metadata.csv`
+A selector is matched against its own segment's `file_metadata.csv`
 `export_run_id` column, first for an exact match, then (falling back) by
 stripping known export-file suffixes (`.details.json`, `.index.json`,
 `__fingerprint.json`, `.json`) from both sides and matching on the
@@ -91,7 +99,7 @@ explicit reason code; the tool never guesses or picks a first match.
 python tools/compare_reference.py \
     --segments-root /data/Fingerprint_Data/segments \
     --registry-file /data/Fingerprint_Data/records/run_registry.csv \
-    --segment enterprise_all \
+    --reference-segment enterprise_all \
     --reference template_v3.details.json \
     --target project_42.details.json \
     --out-dir /data/comparisons/project_42_vs_template_v3
@@ -103,10 +111,28 @@ python tools/compare_reference.py \
 python tools/compare_reference.py \
     --segments-root /data/Fingerprint_Data/segments \
     --registry-file /data/Fingerprint_Data/records/run_registry.csv \
-    --segment client_acme \
+    --reference-segment client_acme \
     --reference template_v3.details.json \
     --out-dir /data/comparisons/client_acme_vs_template_v3
 ```
+
+### Compare a target segment against a reference sourced from a *different* segment
+
+```bash
+python tools/compare_reference.py \
+    --segments-root /data/Fingerprint_Data/segments \
+    --registry-file /data/Fingerprint_Data/records/run_registry.csv \
+    --reference-segment enterprise_all \
+    --target-segment client_acme \
+    --reference template_v3.details.json \
+    --out-dir /data/comparisons/client_acme_vs_enterprise_template_v3
+```
+
+Domains whose `(join_key_schema, join_key_policy_id, join_key_policy_version)`
+tuple doesn't agree between `enterprise_all` and `client_acme` block with
+`CROSS_SEGMENT_JOIN_POLICY_MISMATCH` rather than comparing pattern_id sets
+produced under different join policies; other, agreeing domains still
+compare normally in the same run.
 
 ## Outputs
 
@@ -117,7 +143,7 @@ Every run writes exactly these files directly under `--out-dir`:
 | `reference_comparison_summary.csv` | One row per purge_view × target × domain |
 | `reference_comparison_detail.csv` | One row per classified pattern (`shared` / `reference_only` / `target_only`) |
 | `reference_comparison_diagnostics.json` | Machine-readable status/failure/degradation information |
-| `reference_comparison_report.json` | Run manifest: resolved reference/target identities, segment, analysis run id, aggregate status |
+| `reference_comparison_report.json` | Run manifest: resolved reference/target identities, target segment (`segment_id`), reference segment (`reference_segment_id`), analysis run id, aggregate status |
 
 `--out-dir` also retains the raw intermediate `compare_all/`/`compare_used/`
 directories (`file_gap_report.csv`/`file_gap_detail.csv`, written directly
@@ -157,16 +183,17 @@ comparator's)
 
 | Reason code | Meaning |
 |---|---|
-| `SEGMENT_NOT_FOUND` | `--segment` has no matching row in `--registry-file` |
-| `SEGMENT_MATERIALIZATION_INCOMPLETE` | the segment's `run_registry.csv` status is not `complete` |
+| `SEGMENT_NOT_FOUND` | `--reference-segment`/`--target-segment` has no matching row in `--registry-file` |
+| `SEGMENT_MATERIALIZATION_INCOMPLETE` | that segment's `run_registry.csv` status is not `complete` |
 | `REQUIRED_ANALYSIS_ARTIFACT_MISSING` | `records.csv`/`file_metadata.csv`/`pattern_presence_file.csv`, or a requested `--purge-view` directory, is missing despite `status=complete` |
-| `REFERENCE_NOT_MATERIALIZED` / `TARGET_NOT_MATERIALIZED` | the selector resolves to zero export_run_ids in this segment |
+| `REFERENCE_NOT_MATERIALIZED` / `TARGET_NOT_MATERIALIZED` | the selector resolves to zero export_run_ids in its segment |
 | `REFERENCE_AMBIGUOUS` / `TARGET_AMBIGUOUS` | the selector resolves to more than one export_run_id |
-| `NO_COMPARISON_TARGETS` | after excluding the reference itself, no comparison target remains (an explicit `--target` resolved to the same export_run_id as `--reference`, or the segment has no other materialized file at all) |
-| `REFERENCE_HAS_NO_PATTERNS` | the resolved reference has zero `pattern_id` evidence across every domain in this segment's `pattern_presence_file.csv` — mirrors `reference_bundle.py::write_sidecar`'s own rejection of a globally empty reference |
-| `MATERIALIZATION_VERSION_INCOMPATIBLE` | this segment's `records.csv` shows more than one distinct **complete** (all three fields populated) `(join_key_schema, join_key_policy_id, join_key_policy_version)` tuple for a requested domain |
-| `MATERIALIZATION_COMPATIBILITY_UNPROVEN` | no complete tuple is populated for that domain at all, or at least one record has an incomplete tuple (any of the three fields blank) even alongside an otherwise-consistent complete one — a partially-populated tuple is never treated as proof of compatibility, and an incomplete record is never simply discarded |
-| `STALE_MEMBERSHIP_MATRIX` | a requested domain/view's `membership_matrix.csv` has rows, but none for the segment's current `analysis_run_id` — comparing against it would silently look like "target has none of the reference's patterns" |
+| `NO_COMPARISON_TARGETS` | after excluding the reference itself, no comparison target remains (an explicit `--target` resolved to the same export_run_id as `--reference`, or the target segment has no other materialized file at all) |
+| `REFERENCE_HAS_NO_PATTERNS` | the resolved reference has zero `pattern_id` evidence across every domain in its segment's `pattern_presence_file.csv` — mirrors `reference_bundle.py::write_sidecar`'s own rejection of a globally empty reference |
+| `MATERIALIZATION_VERSION_INCOMPATIBLE` | the target segment's `records.csv` shows more than one distinct **complete** (all three fields populated) `(join_key_schema, join_key_policy_id, join_key_policy_version)` tuple for a requested domain -- an internal-consistency check within one segment's own materialization |
+| `MATERIALIZATION_COMPATIBILITY_UNPROVEN` | no complete tuple is populated for that domain at all in the target segment's `records.csv`, or at least one record has an incomplete tuple (any of the three fields blank) even alongside an otherwise-consistent complete one — a partially-populated tuple is never treated as proof of compatibility, and an incomplete record is never simply discarded |
+| `CROSS_SEGMENT_JOIN_POLICY_MISMATCH` | only possible when `--reference-segment` != `--target-segment`: the reference segment's and target segment's `(join_key_schema, join_key_policy_id, join_key_policy_version)` tuples for a requested domain don't agree, or either segment's own tuple for that domain isn't independently `ok` (see `MATERIALIZATION_VERSION_INCOMPATIBLE`/`_UNPROVEN` above) — distinct from those two codes, which check consistency *within* one segment; this checks agreement *between* two segments, since comparing pattern_id sets produced under different join policies is meaningless |
+| `STALE_MEMBERSHIP_MATRIX` | a requested domain/view's `membership_matrix.csv` has rows, but none for the target segment's current `analysis_run_id` — comparing against it would silently look like "target has none of the reference's patterns" |
 
 A `SEGMENT_NOT_FOUND`/`SEGMENT_MATERIALIZATION_INCOMPLETE`/
 `REQUIRED_ANALYSIS_ARTIFACT_MISSING`/`*_NOT_MATERIALIZED`/`*_AMBIGUOUS`/
@@ -174,10 +201,10 @@ A `SEGMENT_NOT_FOUND`/`SEGMENT_MATERIALIZATION_INCOMPLETE`/
 **entire run** (nonzero exit; still writes the 4-file output contract,
 header-only summary/detail, so the failure is never console-only). A
 `MATERIALIZATION_VERSION_INCOMPATIBLE`/`MATERIALIZATION_COMPATIBILITY_UNPROVEN`/
-`STALE_MEMBERSHIP_MATRIX` condition blocks only the affected **domain**
-(exit `0`; check `comparison_status` per row) — matching the existing
-convention that a row/domain-level blocked outcome is not a process
-failure.
+`CROSS_SEGMENT_JOIN_POLICY_MISMATCH`/`STALE_MEMBERSHIP_MATRIX` condition
+blocks only the affected **domain** (exit `0`; check `comparison_status` per
+row) — matching the existing convention that a row/domain-level blocked
+outcome is not a process failure.
 
 A domain the caller explicitly requested via `--domains` that this segment
 never observed at all is not a new reason code: it surfaces as the
@@ -195,17 +222,24 @@ unless you pass `--overwrite`.
 
 ## Scope / limitations
 
-- One reference vs. one target, and one reference vs. the entire segment
-  population, are supported. Reference-vs-many-references,
-  multi-reference ranking, and comparing across two *different* segments
-  are explicitly out of scope for this tool.
+- One reference vs. one target, and one reference vs. the entire target
+  segment's population, are supported, whether the reference and target
+  come from the same segment or two different segments. Reference-vs-many-
+  references and multi-reference ranking are explicitly out of scope for
+  this tool.
 - No governance, compliance, or "ideal file" interpretation is added.
   `reference_only`/`target_only` are descriptive set differences only.
 - `--roles` filtering and `--discover-populations` population-aware mode
-  are not exposed by this tool — it always runs the segment's own
+  are not exposed by this tool — it always runs each segment's own
   already-computed default (non-population-aware) membership.
-- Reference and target need not share an `analysis_run_id`, but they must
-  come from the same segment materialization; a future artifact-SHA-based
-  compatibility check can be added to
-  `check_domain_compatibility()`/`(join_key_schema, join_key_policy_id,
-  join_key_policy_version)` without changing comparison semantics.
+- Reference and target need not share an `analysis_run_id`, even when they
+  come from the same segment; a future artifact-SHA-based compatibility
+  check can be added to `check_domain_compatibility()`/`(join_key_schema,
+  join_key_policy_id, join_key_policy_version)` without changing comparison
+  semantics.
+- Run selection is implicit in segment choice today because a segment's
+  materialization enforces exactly one `analysis_run_id`
+  (`resolve_analysis_run_id`). If segments ever retain multiple historical
+  runs without being re-materialized, `--reference-run-id`/
+  `--target-run-id` will need to become explicit, independent selectors
+  rather than assuming segment choice is sufficient.

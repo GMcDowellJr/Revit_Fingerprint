@@ -21,7 +21,7 @@ import csv
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import pytest
 
@@ -57,6 +57,21 @@ DOMAIN = "object_styles_model"
 RUN_ID = "run1"
 
 
+def _registry_row(segment_id: str, status: str = "complete") -> Dict[str, str]:
+    return {
+        "segment_id": segment_id, "parent_segment_id": "", "run_type": "bundle",
+        "population_hash": "", "conformance_reference_mode": "", "output_folder": segment_id,
+        "status": status, "last_run_utc": "", "notes": "", "segment_purpose": "", "segment_label": "",
+    }
+
+
+_REGISTRY_FIELDNAMES = [
+    "segment_id", "parent_segment_id", "run_type", "population_hash",
+    "conformance_reference_mode", "output_folder", "status", "last_run_utc",
+    "notes", "segment_purpose", "segment_label",
+]
+
+
 def _build_segment(
     tmp_path: Path,
     presence: Dict[str, List[str]],
@@ -73,6 +88,7 @@ def _build_segment(
     inconsistent_join_key_schema: bool = False,
     blank_join_key_schema: bool = False,
     partial_join_key_provenance: bool = False,
+    other_registry_rows: Optional[List[Dict[str, str]]] = None,
 ) -> Dict[str, Path]:
     """Build a corpus-level run_registry.csv plus one segment's
     results/{records,analysis,bundle_analysis} tree.
@@ -80,6 +96,12 @@ def _build_segment(
     `presence` maps export_run_id -> list of pattern_id values it has in
     DOMAIN (an empty list means the file is a materialized member of the
     segment but has no evidence in DOMAIN at all).
+
+    `other_registry_rows` lets a second (or later) call to this helper add
+    its own segment's row to the *same* run_registry.csv alongside rows
+    already written by prior calls, instead of each call overwriting the
+    single corpus-level registry file with only its own segment's row --
+    see _build_two_segments().
     """
     corpus_records_dir = tmp_path / "corpus" / "records"
     segments_root = tmp_path / "segments"
@@ -89,21 +111,8 @@ def _build_segment(
     seg_bundle = seg_root / "results" / "bundle_analysis"
 
     registry_file = corpus_records_dir / "run_registry.csv"
-    _write_csv(
-        registry_file,
-        [
-            "segment_id", "parent_segment_id", "run_type", "population_hash",
-            "conformance_reference_mode", "output_folder", "status", "last_run_utc",
-            "notes", "segment_purpose", "segment_label",
-        ],
-        [
-            {
-                "segment_id": segment_id, "parent_segment_id": "", "run_type": "bundle",
-                "population_hash": "", "conformance_reference_mode": "", "output_folder": segment_id,
-                "status": status, "last_run_utc": "", "notes": "", "segment_purpose": "", "segment_label": "",
-            }
-        ],
-    )
+    registry_rows = list(other_registry_rows or []) + [_registry_row(segment_id, status)]
+    _write_csv(registry_file, _REGISTRY_FIELDNAMES, registry_rows)
 
     all_ids = file_metadata_ids if file_metadata_ids is not None else sorted(presence.keys())
     if write_file_metadata:
@@ -166,6 +175,121 @@ def _build_segment(
         "registry_file": registry_file,
         "segments_root": segments_root,
         "segment_root": seg_root,
+        "registry_row": _registry_row(segment_id, status),
+    }
+
+
+def _build_two_segments(
+    tmp_path: Path,
+    presence_a: Dict[str, List[str]],
+    presence_b: Dict[str, List[str]],
+    segment_a: str = "seg_a",
+    segment_b: str = "seg_b",
+    **kwargs,
+) -> Dict[str, Path]:
+    """Build two independent segments (segment_a, segment_b) sharing one
+    corpus-level run_registry.csv, for cross-segment tests. Any keyword also
+    accepted by _build_segment (e.g. join_key_schema, inconsistent_join_key_schema)
+    is forwarded to the *second* (segment_b) call only, so a test can vary
+    segment_b's join-key provenance relative to segment_a's default.
+    """
+    ctx_a = _build_segment(tmp_path, presence_a, segment_id=segment_a)
+    ctx_b = _build_segment(
+        tmp_path, presence_b, segment_id=segment_b, other_registry_rows=[ctx_a["registry_row"]], **kwargs
+    )
+    return {
+        "registry_file": ctx_b["registry_file"],
+        "segments_root": ctx_b["segments_root"],
+        "segment_a_root": ctx_a["segment_root"],
+        "segment_b_root": ctx_b["segment_root"],
+    }
+
+
+def _build_multidomain_segment(
+    tmp_path: Path,
+    domain_presence: Dict[str, Dict[str, List[str]]],
+    segment_id: str,
+    domain_join_key: Optional[Dict[str, Tuple[str, str, str]]] = None,
+    status: str = "complete",
+    views: Sequence[str] = ("all", "used"),
+    other_registry_rows: Optional[List[Dict[str, str]]] = None,
+) -> Dict[str, Path]:
+    """Build one segment spanning multiple domains, for cross-segment
+    join-policy compatibility-gate tests where one domain's join-key
+    provenance needs to differ between two segments while another domain's
+    agrees. `domain_presence` maps domain -> {export_run_id: [pattern_id,...]}.
+    `domain_join_key` maps domain -> (join_key_schema, join_key_policy_id,
+    join_key_policy_version); a domain absent from it gets the default
+    ("<domain>.join_key.v1", "p1", "1") -- matching _build_segment's own
+    default for DOMAIN, so two segments built with no override agree.
+    """
+    domain_join_key = domain_join_key or {}
+    corpus_records_dir = tmp_path / "corpus" / "records"
+    segments_root = tmp_path / "segments"
+    seg_root = segments_root / segment_id
+    seg_records = seg_root / "results" / "records"
+    seg_analysis = seg_root / "results" / "analysis"
+    seg_bundle = seg_root / "results" / "bundle_analysis"
+
+    registry_file = corpus_records_dir / "run_registry.csv"
+    registry_rows = list(other_registry_rows or []) + [_registry_row(segment_id, status)]
+    _write_csv(registry_file, _REGISTRY_FIELDNAMES, registry_rows)
+
+    all_export_ids = sorted({eid for presence in domain_presence.values() for eid in presence.keys()})
+    _write_csv(
+        seg_records / "file_metadata.csv",
+        ["export_run_id", "central_path", "governance_role"],
+        [{"export_run_id": eid, "central_path": f"/x/{eid}", "governance_role": "Project"} for eid in all_export_ids],
+    )
+
+    records_rows: List[Dict[str, str]] = []
+    presence_rows: List[Dict[str, str]] = []
+    membership_rows_by_domain: Dict[str, List[Dict[str, str]]] = {}
+    for domain, presence in domain_presence.items():
+        schema, policy_id, policy_version = domain_join_key.get(domain, (f"{domain}.join_key.v1", "p1", "1"))
+        for eid in sorted(presence.keys()):
+            records_rows.append(
+                {
+                    "export_run_id": eid, "domain": domain,
+                    "join_key_schema": schema, "join_key_policy_id": policy_id, "join_key_policy_version": policy_version,
+                }
+            )
+        domain_membership: List[Dict[str, str]] = []
+        for eid, pattern_ids in presence.items():
+            for pid in pattern_ids:
+                presence_rows.append(
+                    {
+                        "analysis_run_id": RUN_ID, "domain": domain, "export_run_id": eid,
+                        "pattern_id": pid, "pattern_share_pct": "1.000000",
+                    }
+                )
+                domain_membership.append({"analysis_run_id": RUN_ID, "export_run_id": eid, "pattern_id": pid})
+        membership_rows_by_domain[domain] = domain_membership
+
+    _write_csv(
+        seg_records / "records.csv",
+        ["export_run_id", "domain", "join_key_schema", "join_key_policy_id", "join_key_policy_version"],
+        records_rows,
+    )
+    _write_csv(
+        seg_analysis / "pattern_presence_file.csv",
+        ["analysis_run_id", "domain", "export_run_id", "pattern_id", "pattern_share_pct"],
+        presence_rows,
+    )
+    _write_csv(seg_analysis / "corpus_manifest.csv", ["schema_version"], [{"schema_version": "2.1.0"}])
+    for view in views:
+        for domain, membership_rows in membership_rows_by_domain.items():
+            _write_csv(
+                seg_bundle / view / domain / "membership_matrix.csv",
+                ["analysis_run_id", "export_run_id", "pattern_id"],
+                membership_rows,
+            )
+
+    return {
+        "registry_file": registry_file,
+        "segments_root": segments_root,
+        "segment_root": seg_root,
+        "registry_row": _registry_row(segment_id, status),
     }
 
 
@@ -174,10 +298,12 @@ def _run(tmp_path, ctx, out_name="out", **extra) -> int:
     argv = [
         "--segments-root", str(ctx["segments_root"]),
         "--registry-file", str(ctx["registry_file"]),
-        "--segment", extra.pop("segment", "seg_a"),
+        "--reference-segment", extra.pop("reference_segment", extra.pop("segment", "seg_a")),
         "--reference", extra.pop("reference", "ref.json"),
         "--out-dir", str(out_dir),
     ]
+    if "target_segment" in extra:
+        argv += ["--target-segment", extra.pop("target_segment")]
     if "target" in extra:
         argv += ["--target", extra.pop("target")]
     if "purge_view" in extra:
@@ -605,7 +731,7 @@ def test_out_dir_inside_segments_root_refused(tmp_path):
     argv = [
         "--segments-root", str(ctx["segments_root"]),
         "--registry-file", str(ctx["registry_file"]),
-        "--segment", "seg_a",
+        "--reference-segment", "seg_a",
         "--reference", "ref.json",
         "--target", "target.json",
         "--out-dir", str(out_dir),
@@ -624,7 +750,7 @@ def test_out_dir_overwrite_required_for_foreign_directory(tmp_path):
     argv = [
         "--segments-root", str(ctx["segments_root"]),
         "--registry-file", str(ctx["registry_file"]),
-        "--segment", "seg_a",
+        "--reference-segment", "seg_a",
         "--reference", "ref.json",
         "--target", "target.json",
         "--out-dir", str(out_dir),
@@ -648,3 +774,88 @@ def test_domains_filter_restricts_comparison(tmp_path):
     assert rc == 0
     diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
     assert diag["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
+
+
+# ---------------------------------------------------------------------------
+# Cross-segment support: --reference-segment / --target-segment.
+# ---------------------------------------------------------------------------
+
+
+def test_same_segment_output_identical_omitted_vs_explicit_target_segment(tmp_path):
+    # --target-segment omitted must produce byte-identical output to passing
+    # --target-segment explicitly equal to --reference-segment -- the
+    # regression requirement for this feature.
+    ctx = _build_segment(
+        tmp_path,
+        {"ref.json": ["A", "B"], "target_1.json": ["A"], "target_2.json": ["B", "C"]},
+    )
+    rc1, out1 = _run(tmp_path, ctx, out_name="implicit", purge_view="all")
+    rc2, out2 = _run(tmp_path, ctx, out_name="explicit", purge_view="all", target_segment="seg_a")
+    assert rc1 == 0 and rc2 == 0
+    assert (out1 / cr.SUMMARY_FILENAME).read_text() == (out2 / cr.SUMMARY_FILENAME).read_text()
+    assert (out1 / cr.DETAIL_FILENAME).read_text() == (out2 / cr.DETAIL_FILENAME).read_text()
+
+
+def test_cross_segment_matching_join_policy_compares_normally(tmp_path):
+    ctx2 = _build_two_segments(
+        tmp_path,
+        presence_a={"ref.json": ["A", "B"]},
+        presence_b={"target.json": ["A"]},
+    )
+    ctx = {"registry_file": ctx2["registry_file"], "segments_root": ctx2["segments_root"]}
+    rc, out_dir = _run(
+        tmp_path,
+        ctx,
+        reference_segment="seg_a",
+        target_segment="seg_b",
+        reference="ref.json",
+        target="target.json",
+        purge_view="all",
+    )
+    assert rc == 0
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert len(summary) == 1
+    row = summary[0]
+    assert row["comparison_status"] == COMPARISON_STATUS_OK
+    assert cr.REASON_CROSS_SEGMENT_JOIN_POLICY_MISMATCH not in row["comparison_reason_codes"]
+    assert row["shared_count"] == "1"
+    assert row["reference_only_count"] == "1"
+    assert row["target_only_count"] == "0"
+
+
+def test_cross_segment_differing_join_policy_blocks_only_that_domain(tmp_path):
+    domain2 = "line_styles"
+    presence_a = {DOMAIN: {"ref.json": ["A"]}, domain2: {"ref.json": ["X"]}}
+    presence_b = {DOMAIN: {"target.json": ["A"]}, domain2: {"target.json": ["X"]}}
+
+    ctx_a = _build_multidomain_segment(tmp_path, presence_a, segment_id="seg_a")
+    ctx_b = _build_multidomain_segment(
+        tmp_path,
+        presence_b,
+        segment_id="seg_b",
+        other_registry_rows=[ctx_a["registry_row"]],
+        # DOMAIN's join_key_schema disagrees with seg_a's default; domain2's
+        # matches seg_a's default and must compare unaffected.
+        domain_join_key={DOMAIN: ("object_styles_model.join_key.v2", "p1", "1")},
+    )
+    ctx = {"registry_file": ctx_b["registry_file"], "segments_root": ctx_b["segments_root"]}
+
+    rc, out_dir = _run(
+        tmp_path,
+        ctx,
+        reference_segment="seg_a",
+        target_segment="seg_b",
+        reference="ref.json",
+        target="target.json",
+        purge_view="all",
+        domains=f"{DOMAIN},{domain2}",
+    )
+    assert rc == 0  # domain-level block, not a process failure
+    summary = {r["domain"]: r for r in _read_csv(out_dir / cr.SUMMARY_FILENAME)}
+
+    assert summary[DOMAIN]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert summary[DOMAIN]["comparison_reason_codes"] == cr.REASON_CROSS_SEGMENT_JOIN_POLICY_MISMATCH
+    assert summary[DOMAIN]["shared_count"] == ""  # blocked rows never fabricate a zero
+
+    assert summary[domain2]["comparison_status"] == COMPARISON_STATUS_OK
+    assert summary[domain2]["shared_count"] == "1"
