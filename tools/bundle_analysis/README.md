@@ -125,3 +125,97 @@ Per scope, Step 2 logs:
 - `[step2_threshold] ... expected_floor=... natural_breaks_floor=... chosen=... cli_floor=... effective=...`
 - `[step2_threshold_fallback] ...` when auto-threshold computation errors
 - `[step2] ... effective_threshold=...` on step summary
+
+---
+
+## Reference Bundle Comparison (`--compare` / `step_compare.py`)
+
+`run_bundle_analysis.py --compare` compares each target file's discovered
+bundle-analysis patterns against a `reference_bundle.json` sidecar (written
+by `tools/run_extract_all.py --seed`, see `reference_bundle.write_sidecar`)
+for the same domain. Pattern identity is the existing bundle-analysis
+`pattern_id` from `membership_matrix.csv` — no separate identity scheme is
+introduced.
+
+The comparison is symmetric: for every `reference_bundle_id × export_run_id
+× domain × population_id` it derives
+
+- `shared = reference ∩ target`
+- `reference_only = reference - target`
+- `target_only = target - reference`
+- `union = reference ∪ target`
+
+`export_run_id` never includes the seed file itself
+(`reference["seed_export_run_id"]` is excluded from the comparable set).
+
+### `compare_*/file_gap_report.csv`
+
+One row per `reference_bundle_id × export_run_id × domain × population_id`.
+
+Original one-way reference-coverage fields (semantics unchanged):
+
+| Field | Meaning |
+|---|---|
+| `patterns_required` | `len(reference)` |
+| `patterns_present` | `len(shared)` |
+| `patterns_missing` | `len(reference_only)` |
+| `gap_pattern_ids` | sorted `reference_only`, `\|`-joined |
+| `coverage_pct` | `patterns_present / patterns_required`, `%.6f` |
+| `coverage_status` | `full` / `partial` / `none` / `NO_REFERENCE_DEFINED` |
+
+Symmetric set-comparison fields (added):
+
+| Field | Meaning |
+|---|---|
+| `reference_pattern_count` | `len(reference)` |
+| `target_pattern_count` | `len(target)` |
+| `shared_count` | `len(shared)` |
+| `reference_only_count` | `len(reference_only)` |
+| `target_only_count` | `len(target_only)` |
+| `union_count` | `len(union)` |
+| `shared_pattern_ids` | sorted `shared`, `\|`-joined |
+| `reference_only_pattern_ids` | sorted `reference_only`, `\|`-joined (same set as `gap_pattern_ids`) |
+| `target_only_pattern_ids` | sorted `target_only`, `\|`-joined |
+| `reference_coverage_pct` | same value as `coverage_pct`, under the new field name |
+| `jaccard` | `shared_count / union_count`, `%.6f` |
+
+A target that contains every reference pattern plus additional ones
+(`coverage_status == "full"`, `coverage_pct == "1.000000"`) still reports
+those additional patterns via `target_only_count`/`target_only_pattern_ids`
+— full reference coverage no longer causes target-only patterns to be
+dropped from the output.
+
+**`NO_REFERENCE_DEFINED`** (the domain has no entry in the reference
+sidecar's `domains` map) is distinct from a defined reference containing
+zero patterns (the sidecar schema forbids an empty pattern list per
+domain). In this case the new count fields are `"0"`, the new
+pattern-id/ratio fields are `""`, and no detail rows are emitted for that
+`export_run_id`/domain — there is no reference set to classify patterns
+against.
+
+**Zero-denominator ratios** (`coverage_pct`, `reference_coverage_pct`,
+`jaccard`) never emit `NaN`/`Infinity`; the only zero-denominator case is
+`NO_REFERENCE_DEFINED`, where they serialize as `""`.
+
+### `compare_*/file_gap_detail.csv`
+
+One row per `reference_bundle_id × export_run_id × domain × population_id ×
+pattern_id`, for machine-readable per-pattern drill-down:
+
+| Field | Meaning |
+|---|---|
+| `reference_bundle_id` | from the reference sidecar |
+| `analysis_run_id` | current analysis run |
+| `domain` | domain name |
+| `population_id` | population id, or `""` outside population-aware mode |
+| `export_run_id` | target file |
+| `pattern_id` | bundle-analysis pattern identity |
+| `comparison_class` | one of `shared` / `reference_only` / `target_only` |
+
+Rows are sorted by `(analysis_run_id, domain, population_id, export_run_id,
+pattern_id)`; pattern IDs within each class are always emitted in sorted
+order for deterministic output.
+
+No governance, compliance, or "correctness" meaning is assigned to
+`reference_only`/`target_only` — these are descriptive set differences
+only. Whether a difference matters is left to a downstream consumer.

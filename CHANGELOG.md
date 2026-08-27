@@ -76,6 +76,37 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   for a non-owning class at all — not merely told not to name on it. See
   DECISIONS.md D-049 item 6.
 
+### Changed
+- **Reference-bundle comparison (`tools/bundle_analysis/step_compare.py`):
+  now reports symmetric configuration differences rather than only
+  reference-pattern coverage (PR1).** Targets can contain all reference
+  configurations while also containing additional configurations that
+  one-way coverage never surfaced — a target with `coverage_pct=1.0` could
+  silently carry patterns the reference never defined. `_compute_gap_rows`
+  is now `_compute_comparison_rows` and, per `export_run_id`, derives
+  `shared = reference ∩ target`, `reference_only = reference - target`, and
+  `target_only = target - reference` (plus `union` and Jaccard) from the
+  same `membership_matrix.csv` pattern-identity data the existing coverage
+  computation already used — no new identity scheme, no sig_hash/join_hash/
+  canonicalization change. `compare_*/file_gap_report.csv` gains
+  `reference_pattern_count`/`target_pattern_count`/`shared_count`/
+  `reference_only_count`/`target_only_count`/`union_count`/
+  `shared_pattern_ids`/`reference_only_pattern_ids`/`target_only_pattern_ids`/
+  `reference_coverage_pct`/`jaccard`; all existing fields
+  (`patterns_required`/`patterns_present`/`patterns_missing`/
+  `gap_pattern_ids`/`coverage_pct`/`coverage_status`) keep their prior
+  values and meaning. A new `compare_*/file_gap_detail.csv` adds one row per
+  `reference_bundle_id × export_run_id × domain × pattern_id`, classified
+  `shared`/`reference_only`/`target_only`, for machine-readable per-pattern
+  drill-down. The `NO_REFERENCE_DEFINED` case (domain absent from the
+  reference sidecar) is unchanged and does not emit detail rows — it is not
+  reinterpreted as an empty-but-defined reference. Zero-denominator ratios
+  (`coverage_pct`/`reference_coverage_pct`/`jaccard` when no reference is
+  defined) serialize as `""`, never NaN/Infinity. No governance or
+  compliance meaning is assigned to `target_only`/`reference_only` — this is
+  descriptive set comparison only. See `tools/bundle_analysis/README.md`
+  and `tests/test_step_compare.py`.
+
 ### Added
 - **`loaded_family_types` domain: `can_have_structural_section`/`has_thermal_properties`
   identity fields (Audit 16 §2 / PR2, Tier 1 capability flags only).**
