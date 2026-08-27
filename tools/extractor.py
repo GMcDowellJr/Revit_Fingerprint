@@ -1514,6 +1514,13 @@ def emit_analysis(
             "membership_reason_code": "missing_join_hash",
         })
 
+    # Remove any stale authority_metrics.csv left behind by an older extractor.py
+    # version rerun into this same out_dir -- this function no longer writes it
+    # (zero readers anywhere in the codebase), so a leftover copy would otherwise
+    # survive indefinitely with a stale analysis_run_id/population, misleading ad
+    # hoc inspection alongside the freshly-written outputs below.
+    (out_dir / "authority_metrics.csv").unlink(missing_ok=True)
+
     _write_csv(out_dir / "domain_patterns.csv", [
         # Keep legacy first 11 columns in the original order for Power BI queries
         # that pin Csv.Document([Columns=11]) and/or type-steps against that shape.
