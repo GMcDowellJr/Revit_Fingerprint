@@ -163,18 +163,21 @@ comparator's)
 | `REFERENCE_NOT_MATERIALIZED` / `TARGET_NOT_MATERIALIZED` | the selector resolves to zero export_run_ids in this segment |
 | `REFERENCE_AMBIGUOUS` / `TARGET_AMBIGUOUS` | the selector resolves to more than one export_run_id |
 | `NO_COMPARISON_TARGETS` | after excluding the reference itself, no comparison target remains (an explicit `--target` resolved to the same export_run_id as `--reference`, or the segment has no other materialized file at all) |
+| `REFERENCE_HAS_NO_PATTERNS` | the resolved reference has zero `pattern_id` evidence across every domain in this segment's `pattern_presence_file.csv` — mirrors `reference_bundle.py::write_sidecar`'s own rejection of a globally empty reference |
 | `MATERIALIZATION_VERSION_INCOMPATIBLE` | this segment's `records.csv` shows more than one distinct **complete** (all three fields populated) `(join_key_schema, join_key_policy_id, join_key_policy_version)` tuple for a requested domain |
 | `MATERIALIZATION_COMPATIBILITY_UNPROVEN` | no complete tuple is populated for that domain at all, or at least one record has an incomplete tuple (any of the three fields blank) even alongside an otherwise-consistent complete one — a partially-populated tuple is never treated as proof of compatibility, and an incomplete record is never simply discarded |
+| `STALE_MEMBERSHIP_MATRIX` | a requested domain/view's `membership_matrix.csv` has rows, but none for the segment's current `analysis_run_id` — comparing against it would silently look like "target has none of the reference's patterns" |
 
 A `SEGMENT_NOT_FOUND`/`SEGMENT_MATERIALIZATION_INCOMPLETE`/
 `REQUIRED_ANALYSIS_ARTIFACT_MISSING`/`*_NOT_MATERIALIZED`/`*_AMBIGUOUS`/
-`NO_COMPARISON_TARGETS` condition blocks the **entire run** (nonzero exit;
-still writes the 4-file output contract, header-only summary/detail, so the
-failure is never console-only). A `MATERIALIZATION_VERSION_INCOMPATIBLE`/
-`MATERIALIZATION_COMPATIBILITY_UNPROVEN` condition blocks only the affected
-**domain** (exit `0`; check `comparison_status` per row) — matching the
-existing convention that a row/domain-level blocked outcome is not a
-process failure.
+`NO_COMPARISON_TARGETS`/`REFERENCE_HAS_NO_PATTERNS` condition blocks the
+**entire run** (nonzero exit; still writes the 4-file output contract,
+header-only summary/detail, so the failure is never console-only). A
+`MATERIALIZATION_VERSION_INCOMPATIBLE`/`MATERIALIZATION_COMPATIBILITY_UNPROVEN`/
+`STALE_MEMBERSHIP_MATRIX` condition blocks only the affected **domain**
+(exit `0`; check `comparison_status` per row) — matching the existing
+convention that a row/domain-level blocked outcome is not a process
+failure.
 
 A domain the caller explicitly requested via `--domains` that this segment
 never observed at all is not a new reason code: it surfaces as the

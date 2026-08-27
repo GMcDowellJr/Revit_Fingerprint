@@ -485,6 +485,68 @@ def test_reference_excluded_from_segment_targets(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# A reference that is materialized but has no usable pattern evidence in any
+# domain must block, not silently succeed as REFERENCE_DOMAIN_UNDEFINED
+# everywhere (Codex review, PR #467).
+# ---------------------------------------------------------------------------
+
+
+def test_reference_with_no_patterns_anywhere_is_blocked(tmp_path):
+    # "ref.json" is a materialized member of the segment (present in
+    # file_metadata.csv) but has zero pattern_id presence rows in DOMAIN.
+    ctx = _build_segment(tmp_path, {"ref.json": [], "target.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, target="target.json")
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_REFERENCE_HAS_NO_PATTERNS]
+    assert _read_csv(out_dir / cr.SUMMARY_FILENAME) == []
+
+
+# ---------------------------------------------------------------------------
+# A `.legacy.json` selector must resolve through an exact match only, never
+# via the suffix-stripping stem fallback (Codex review, PR #467).
+# ---------------------------------------------------------------------------
+
+
+def test_legacy_selector_does_not_fall_back_to_a_different_file(tmp_path):
+    ctx = _build_segment(tmp_path, {"foo.json": ["A"], "target.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, reference="foo.legacy.json", target="target.json")
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_REFERENCE_NOT_MATERIALIZED]
+
+
+# ---------------------------------------------------------------------------
+# A stale membership_matrix.csv (rows only for an old analysis_run_id) must
+# block that domain/view, never silently compare as if the target has none
+# of the reference's patterns (Codex review, PR #467).
+# ---------------------------------------------------------------------------
+
+
+def test_stale_membership_matrix_blocks_domain(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]})
+    stale_path = ctx["segment_root"] / "results" / "bundle_analysis" / "all" / DOMAIN / "membership_matrix.csv"
+    _write_csv(
+        stale_path,
+        ["analysis_run_id", "export_run_id", "pattern_id"],
+        [{"analysis_run_id": "old_run", "export_run_id": "ref.json", "pattern_id": "A"}],
+    )
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
+    assert rc == 0  # domain/view-level block, not a process failure
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert len(summary) == 1
+    assert summary[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert summary[0]["comparison_reason_codes"] == cr.REASON_STALE_MEMBERSHIP_MATRIX
+    assert summary[0]["shared_count"] == ""
+
+    # The "used" view (untouched, still current) must be unaffected.
+    rc2, out_dir2 = _run(tmp_path, ctx, out_name="out2", target="target.json", purge_view="used")
+    assert rc2 == 0
+    summary2 = _read_csv(out_dir2 / cr.SUMMARY_FILENAME)
+    assert summary2[0]["comparison_status"] == COMPARISON_STATUS_OK
+
+
+# ---------------------------------------------------------------------------
 # 16. Parity with directly calling the authoritative comparator.
 # ---------------------------------------------------------------------------
 

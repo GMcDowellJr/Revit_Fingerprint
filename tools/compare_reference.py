@@ -78,6 +78,8 @@ REASON_REQUIRED_ANALYSIS_ARTIFACT_MISSING = "REQUIRED_ANALYSIS_ARTIFACT_MISSING"
 REASON_MATERIALIZATION_VERSION_INCOMPATIBLE = "MATERIALIZATION_VERSION_INCOMPATIBLE"
 REASON_MATERIALIZATION_COMPATIBILITY_UNPROVEN = "MATERIALIZATION_COMPATIBILITY_UNPROVEN"
 REASON_NO_COMPARISON_TARGETS = "NO_COMPARISON_TARGETS"
+REASON_REFERENCE_HAS_NO_PATTERNS = "REFERENCE_HAS_NO_PATTERNS"
+REASON_STALE_MEMBERSHIP_MATRIX = "STALE_MEMBERSHIP_MATRIX"
 # Pure pre-flight/out-dir-safety failures -- raised before --out-dir can be
 # safely prepared at all, so no diagnostics file is ever written for these.
 REASON_OUT_DIR_UNSAFE = "OUT_DIR_UNSAFE"
@@ -118,7 +120,13 @@ _DETAIL_FIELDNAMES = [
 # split-export/file-format convention, so a filename selector like
 # "model.details.json" resolves to the same export identity as
 # "model.index.json" (the canonical export_run_id whenever both exist).
-_EXPORT_SUFFIXES = (".details.json", ".index.json", "__fingerprint.json", ".legacy.json", ".json")
+# Deliberately excludes ".legacy.json": legacy exports are never picked up
+# implicitly anywhere else in this project (tools/extractor.py's own
+# discovery never registers one as a real export_run_id), so a selector
+# ending in ".legacy.json" must resolve through an exact match only --
+# never fall back to matching a differently-suffixed file's stem (Codex
+# review, PR #467).
+_EXPORT_SUFFIXES = (".details.json", ".index.json", "__fingerprint.json", ".json")
 
 
 class CompareReferenceError(RuntimeError):
@@ -418,6 +426,28 @@ def _synthesized_blocked_summary(
     }
 
 
+def _membership_matrix_is_current(bundle_dir: Path, view: str, domain: str, run_id: str) -> bool:
+    """A domain's bundle_analysis/<view>/<domain>/membership_matrix.csv can
+    persist from an older segment run whose analysis_run_id no longer
+    matches the current pattern_presence_file.csv (e.g. a domain that was
+    active in a prior population but wasn't touched by the most recent
+    patterns+bundle pass). run_compare_for_domain filters membership rows
+    to the current run_id internally, so a stale file with only old-run
+    rows silently degrades to "target has zero patterns" -- reported as a
+    trustworthy comparison_status=ok/none result rather than blocked
+    (Codex review, PR #467). A missing file is not this function's concern
+    (the comparator's own existing missing-input handling covers it); a
+    genuinely empty file (zero rows at all) is not stale, just empty.
+    """
+    path = bundle_dir / view / domain / "membership_matrix.csv"
+    if not path.is_file():
+        return True
+    rows = read_csv_rows(path)
+    if not rows:
+        return True
+    return any(row.get("analysis_run_id", "") == run_id for row in rows)
+
+
 def run_comparisons(
     run_id: str,
     analysis_dir: Path,
@@ -449,6 +479,13 @@ def run_comparisons(
                     compare_out_dir, reference, run_id, dom, "", reason_code, detail, match_any_population=True
                 )
                 view_summaries.append(_synthesized_blocked_summary(reference, run_id, dom, reason_code, detail))
+                continue
+            if not _membership_matrix_is_current(bundle_dir, view, dom, run_id):
+                detail = f"membership_matrix.csv for domain={dom!r} view={view!r} has no rows for analysis_run_id={run_id!r}"
+                write_blocked_gap_placeholder(
+                    compare_out_dir, reference, run_id, dom, "", REASON_STALE_MEMBERSHIP_MATRIX, detail, match_any_population=True
+                )
+                view_summaries.append(_synthesized_blocked_summary(reference, run_id, dom, REASON_STALE_MEMBERSHIP_MATRIX, detail))
                 continue
             summary = run_compare_for_domain(
                 analysis_dir,
@@ -757,6 +794,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         run_id, domains = resolve_run_id_and_domains(presence_rows, args.domains)
         extractor_schema_version = read_extractor_schema_version(paths["analysis_dir"])
         reference = build_reference(presence_rows, run_id, reference_export_run_id, extractor_schema_version)
+        if not reference["domains"]:
+            # Mirrors reference_bundle.py::write_sidecar's own rejection of a
+            # globally empty reference (the --seed path never persists a
+            # reference_bundle.json with no domains at all). Without this,
+            # every requested domain would report ok/REFERENCE_DOMAIN_UNDEFINED
+            # and the run would exit successfully despite comparing nothing
+            # meaningful (Codex review, PR #467).
+            raise CompareReferenceError(
+                REASON_REFERENCE_HAS_NO_PATTERNS,
+                f"reference {reference_export_run_id!r} has zero pattern_id evidence in this segment's "
+                "pattern_presence_file.csv, across every domain -- there is nothing to compare against.",
+            )
         compatibility = check_domain_compatibility(paths["records_dir"] / "records.csv", domains)
         all_export_run_ids = sorted(
             {(r.get("export_run_id", "") or "").strip() for r in file_metadata_rows if (r.get("export_run_id", "") or "").strip()}
