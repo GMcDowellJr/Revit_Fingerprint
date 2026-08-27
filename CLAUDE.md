@@ -170,6 +170,20 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                             `emit_analysis`/`emit_records` from this module directly. Owns the production
                             join_hash-based pattern-clustering algorithm (`_stable_pattern_id()`), path
                             normalization (see `docs/CENTRAL_PATH_NORM_RULE.md`), and export-file discovery.
+  run_a_cache.py          Run A's per-export-file change-detection cache primitives (content hashing,
+                            fast mtime+size signature, manifest/entry read-write). Cache-validity is
+                            all-or-nothing: keyed by (cache schema version, sig_hash policy file hash,
+                            join policy file hash) -- any policy change invalidates every file's cache
+                            entry, not just some. Independent of and never touches
+                            discovery_orchestrator.py's DISCOVERY_ENGINE_VERSION.
+  run_a_incremental.py    Run A's cache-aware flatten+sig_hash+apply pass (`--incremental` on
+                            run_extract_all.py, requires exactly flatten+sig_hash+apply selected and
+                            discover not selected). Replaces the three separately-invoked stage bodies
+                            with one per-export-file pass that reuses tools/run_a_cache.py's cached rows
+                            for unchanged files and recomputes flatten -> line_patterns synthetic-hash
+                            augmentation -> sig_hash -> join_hash in one shot for changed files.
+                            placeholders (T2b) is untouched -- it always runs afterward over the full
+                            current population (cached + fresh rows already unioned on disk).
   pattern_id_utils.py     Shared `pattern_id`/`pattern_label` formula per `docs/PATTERN_ID_AND_LABEL_RULES.md`;
                             a deliberately independent reimplementation of `extractor.py`'s private
                             `_stable_pattern_id()` (kept stdlib-only, not imported from `extractor.py`, so
