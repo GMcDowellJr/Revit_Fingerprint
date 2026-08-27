@@ -48,6 +48,8 @@ if str(SCRIPT_DIR) not in sys.path:
 from bundle_analysis.common import atomic_write_csv, read_csv_rows  # noqa: E402
 from bundle_analysis.comparison_status import (  # noqa: E402
     COMPARISON_STATUS_OK,
+    COMPARISON_STATUS_BLOCKED,
+    REASON_COMPARISON_INPUT_INVALID,
     split_reason_codes,
 )
 
@@ -62,7 +64,12 @@ DIAGNOSTICS_FILENAME = "reference_comparison_diagnostics.json"
 # *.index.json before a bare *.json export; *.legacy.json is never picked up
 # implicitly.
 _EXPORT_SUFFIXES = (".details.json", ".index.json", "__fingerprint.json", ".legacy.json", ".json")
-_PRIMARY_PRIORITY = ("__fingerprint.json", ".details.json", ".json")
+# Matches tools/extractor.py::_iter_export_files exactly: for a split-export
+# pair, the *.index.json file (not *.details.json) is the canonical file_id
+# when both exist -- *.details.json is only primary when no index file
+# accompanies it. Getting this wrong makes --seed name-match nothing (Codex
+# review, PR #466).
+_PRIMARY_PRIORITY = ("__fingerprint.json", ".index.json", ".details.json", ".json")
 
 _SUMMARY_FIELDNAMES = [
     "reference_bundle_id",
@@ -137,13 +144,15 @@ def _sibling_export_files(path: Path) -> List[Path]:
 
 def _pick_primary_export(paths: Sequence[Path]) -> Path:
     """Pick the file run_extract_all.py's own file-discovery would treat as
-    the export's canonical `file_id` for a set of sibling files, per the same
-    fingerprint > details > plain priority used throughout the pipeline.
+    the export's canonical `file_id` for a set of sibling files -- fingerprint
+    > index (when a split pair) > details-only > plain, matching
+    tools/extractor.py::_iter_export_files exactly (index is preferred over
+    details whenever both are present).
     """
     for suffix in _PRIMARY_PRIORITY:
         for p in paths:
             lname = p.name.lower()
-            if lname.endswith(suffix) and not lname.endswith(".index.json") and not lname.endswith(".legacy.json"):
+            if lname.endswith(suffix) and not lname.endswith(".legacy.json"):
                 return p
     return paths[0]
 
@@ -168,44 +177,76 @@ def _validate_export_path(label: str, path: Path) -> Path:
 def _stage_export(src: Path, staging_dir: Path, seen: Dict[str, Path]) -> List[Path]:
     """Hardlink-or-copy every sibling file for `src` into staging_dir.
 
-    `seen` deduplicates by destination filename so staging the same file
-    twice (e.g. the reference happening to also live inside --target-dir) is
-    a no-op rather than an error or a duplicate.
+    `seen` maps a staged destination filename to the resolved *source* path
+    that produced it, so re-staging the exact same source file under a name
+    already seen (e.g. the reference happening to also live inside
+    --target-dir) is a no-op -- but two genuinely different source files that
+    happen to share a destination filename (e.g. --reference /a/model.json
+    and an explicitly different --target /b/model.json) raise explicitly
+    instead of silently aliasing the second onto the first (Codex review, PR
+    #466 -- the earlier destination-name-only dedup silently discarded an
+    explicitly requested, distinct target, which then read as "nothing to
+    compare" with no indication why).
     """
     staged: List[Path] = []
     for sibling in _sibling_export_files(src):
-        if sibling.name in seen:
-            staged.append(seen[sibling.name])
-            continue
-        staging_dir.mkdir(parents=True, exist_ok=True)
+        resolved_source = sibling.resolve()
         dest = staging_dir / sibling.name
+        prior_source = seen.get(sibling.name)
+        if prior_source is not None:
+            if prior_source == resolved_source:
+                staged.append(dest)
+                continue
+            raise CompareReferenceError(
+                f"Filename collision while staging exports: {prior_source} and {resolved_source} "
+                f"are different files that would both be staged as {sibling.name!r}. Rename one of "
+                "them, or ensure the reference and target(s) don't share export filenames."
+            )
+        staging_dir.mkdir(parents=True, exist_ok=True)
         try:
-            os.link(sibling, dest)
+            os.link(resolved_source, dest)
         except OSError:
-            shutil.copy2(sibling, dest)
-        seen[sibling.name] = dest
+            shutil.copy2(resolved_source, dest)
+        seen[sibling.name] = resolved_source
         staged.append(dest)
     return staged
 
 
 def _discover_primary_export_files(directory: Path) -> List[Path]:
-    """Enumerate primary export files in a target corpus directory, using the
-    same priority order as run_extract_all.py's own discovery (never
-    implicitly includes *.legacy.json or a *.index.json as its own primary --
-    an index file is only ever staged as a details file's sibling).
+    """Enumerate one primary export file per distinct export (stem) in a
+    target corpus directory. Discovery is per-stem, not per-format across the
+    whole directory: a corpus containing a mix of *__fingerprint.json,
+    *.details.json/*.index.json pairs, and plain *.json exports (e.g. an
+    incrementally-migrated corpus) must surface every one of them, not only
+    whichever single format happens to be present anywhere in the directory
+    (Codex review, PR #466 -- the earlier whole-directory-priority version
+    silently dropped every non-fingerprint export the moment even one
+    *__fingerprint.json file existed). Within one stem, fingerprint > index >
+    details > plain still applies (mirrors tools/extractor.py); a
+    *.index.json is only ever included via its details sibling, never as its
+    own primary. *.legacy.json is never picked up implicitly.
     """
-    fingerprints = sorted(directory.glob("*__fingerprint.json"))
-    if fingerprints:
-        return fingerprints
-    details = sorted(directory.glob("*.details.json"))
-    if details:
-        return details
-    plain = sorted(
-        p
-        for p in directory.glob("*.json")
-        if not (p.name.lower().endswith(".legacy.json") or p.name.lower().endswith(".index.json"))
-    )
-    return plain
+    seen_stems: Dict[str, Path] = {}
+    result: List[Path] = []
+
+    def _consider(p: Path) -> None:
+        stem = _export_stem(p)
+        if stem not in seen_stems:
+            seen_stems[stem] = p
+            result.append(p)
+
+    for p in sorted(directory.glob("*__fingerprint.json")):
+        _consider(p)
+    for p in sorted(directory.glob("*.details.json")):
+        _consider(p)
+    for p in sorted(directory.glob("*.json")):
+        lname = p.name.lower()
+        if lname.endswith(".legacy.json") or lname.endswith(".index.json"):
+            continue
+        if lname.endswith("__fingerprint.json") or lname.endswith(".details.json"):
+            continue
+        _consider(p)
+    return sorted(result, key=lambda p: p.name.lower())
 
 
 def stage_comparison_inputs(
@@ -432,14 +473,20 @@ def assemble_outputs(
     detail_out_rows.sort(key=lambda r: (r["domain"], r["population_id"], r["target_export_run_id"], r["pattern_id"]))
     atomic_write_csv(out_dir / DETAIL_FILENAME, _DETAIL_FIELDNAMES, detail_out_rows)
 
+    # No compare_run_status.csv at all means run_bundle_analysis.py never
+    # reached the point of recording a real run-level status -- e.g. it
+    # failed before --compare's own reference-sidecar handling ran (a
+    # missing --metadata-file for --roles, an argument error). That is a
+    # failed/unknown run, never "ok": defaulting to ok here would certify a
+    # comparison that never actually happened (Codex review, PR #466).
     run_status = (
         run_status_rows[0]
         if run_status_rows
         else {
             "analysis_run_id": "",
-            "comparison_status": COMPARISON_STATUS_OK,
-            "comparison_reason_codes": "",
-            "comparison_detail": "",
+            "comparison_status": COMPARISON_STATUS_BLOCKED,
+            "comparison_reason_codes": REASON_COMPARISON_INPUT_INVALID,
+            "comparison_detail": "no compare_run_status.csv was produced by run_bundle_analysis.py",
             "domains_total": "0",
             "domains_ok": "0",
             "domains_degraded": "0",

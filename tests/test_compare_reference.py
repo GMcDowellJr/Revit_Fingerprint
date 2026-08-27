@@ -640,12 +640,158 @@ def test_stage_comparison_inputs_raises_on_no_targets_after_exclusion(tmp_path):
         cr.stage_comparison_inputs(reference, [], corpus_dir, tmp_path / "staged")
 
 
-def test_pick_primary_export_prefers_fingerprint_then_details_then_plain(tmp_path):
+def test_pick_primary_export_prefers_fingerprint_then_index_then_details_then_plain(tmp_path):
+    # Matches tools/extractor.py::_iter_export_files exactly: for a split
+    # pair, *.index.json (not *.details.json) is the canonical file_id when
+    # both exist. Getting this backwards makes --seed name-match nothing
+    # (Codex review finding, PR #466).
     a = tmp_path / "x.details.json"
     b = tmp_path / "x__fingerprint.json"
     c = tmp_path / "x.index.json"
     for p in (a, b, c):
         p.touch()
     assert cr._pick_primary_export([a, b, c]) == b
-    assert cr._pick_primary_export([a, c]) == a
+    assert cr._pick_primary_export([a, c]) == c  # index wins over details when both exist
+    assert cr._pick_primary_export([a]) == a  # details-only (no index) falls back to details
     assert cr._pick_primary_export([c]) == c
+
+
+def test_stage_comparison_inputs_reference_primary_resolves_to_index_for_split_pair(tmp_path):
+    # End-to-end regression for the same bug: staging a split-export
+    # reference and picking its primary via _pick_primary_export must yield
+    # the index file, matching what run_extract_all.py's own file discovery
+    # will use as this export's file_id.
+    src_dir = tmp_path / "src"
+    reference = src_dir / "ref.details.json"
+    _write_json(reference, {"a": 1})
+    _write_json(src_dir / "ref.index.json", {"a": "index"})
+    target = src_dir / "t1.details.json"
+    _write_json(target, {"a": 2})
+
+    staging_dir = tmp_path / "staged"
+    info = cr.stage_comparison_inputs(reference, [target], None, staging_dir)
+    primary = cr._pick_primary_export([Path(p) for p in info["reference_files"]])
+    assert primary.name == "ref.index.json"
+
+
+# ---------------------------------------------------------------------------
+# Regression: mixed-format target corpora (Codex review, PR #466) -- a
+# corpus containing more than one export format must surface every export,
+# not only the highest-priority format present anywhere in the directory.
+# ---------------------------------------------------------------------------
+
+
+def test_discover_primary_export_files_covers_mixed_formats_in_one_corpus(tmp_path):
+    directory = tmp_path / "corpus"
+    _write_json(directory / "a__fingerprint.json", {"a": 1})
+    _write_json(directory / "b.details.json", {"b": 1})
+    _write_json(directory / "b.index.json", {"b": "index"})
+    _write_json(directory / "c.json", {"c": 1})
+    _write_json(directory / "d.legacy.json", {"d": 1})  # never picked up implicitly
+
+    found = cr._discover_primary_export_files(directory)
+    stems = {cr._export_stem(p) for p in found}
+    assert stems == {"a", "b", "c"}
+    assert "d" not in stems
+
+
+def test_stage_comparison_inputs_target_dir_stages_every_mixed_format_export(tmp_path):
+    src_dir = tmp_path / "src"
+    reference = src_dir / "ref.details.json"
+    _write_json(reference, {"a": 1})
+    corpus_dir = tmp_path / "corpus"
+    _write_json(corpus_dir / "t_fp__fingerprint.json", {"t": "fp"})
+    _write_json(corpus_dir / "t_details.details.json", {"t": "details"})
+    _write_json(corpus_dir / "t_plain.json", {"t": "plain"})
+
+    staging_dir = tmp_path / "staged"
+    info = cr.stage_comparison_inputs(reference, [], corpus_dir, staging_dir)
+
+    assert info["target_file_count"] == 3
+    for name in ("t_fp__fingerprint.json", "t_details.details.json", "t_plain.json"):
+        assert (staging_dir / name).is_file()
+
+
+# ---------------------------------------------------------------------------
+# Regression: an explicit --reference and --target that happen to share a
+# basename but are genuinely different files must fail explicitly, not
+# silently alias the target onto the already-staged reference (Codex
+# review, PR #466).
+# ---------------------------------------------------------------------------
+
+
+def test_stage_comparison_inputs_raises_on_genuine_filename_collision(tmp_path):
+    reference = tmp_path / "a" / "model.details.json"
+    target = tmp_path / "b" / "model.details.json"  # different file, same basename
+    _write_json(reference, {"which": "reference"})
+    _write_json(target, {"which": "target"})
+
+    with pytest.raises(cr.CompareReferenceError, match="[Ff]ilename collision"):
+        cr.stage_comparison_inputs(reference, [target], None, tmp_path / "staged")
+
+
+def test_stage_comparison_inputs_allows_restaging_the_identical_source_path(tmp_path):
+    # Not a collision: the exact same resolved source file staged twice
+    # (e.g. named explicitly via --target and also discovered via
+    # --target-dir) is a no-op, not an error.
+    src_dir = tmp_path / "src"
+    reference = src_dir / "ref.details.json"
+    _write_json(reference, {"a": 1})
+    target = src_dir / "t1.details.json"
+    _write_json(target, {"a": 2})
+
+    info = cr.stage_comparison_inputs(reference, [target, target], None, tmp_path / "staged")
+    assert info["target_file_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Regression: a run_bundle_analysis.py failure with no compare_run_status.csv
+# at all must never be reported as "ok" (Codex review, PR #466).
+# ---------------------------------------------------------------------------
+
+
+def test_assemble_outputs_defaults_to_blocked_when_no_run_status_csv_exists(tmp_path):
+    domain = "object_styles_model"
+    bundle_out_dir = tmp_path / "bundle_out"
+    # compare_all/ exists but run_bundle_analysis.py never got far enough to
+    # write compare_run_status.csv (e.g. it failed on early argument
+    # validation, such as a missing --metadata-file for --roles).
+    (bundle_out_dir / "compare_all").mkdir(parents=True)
+
+    out_dir = tmp_path / "final_out"
+    out_dir.mkdir()
+    manifest = cr.assemble_outputs(
+        bundle_out_dir, "all", out_dir, tmp_path / "ref.json",
+        {"reference_files": [], "target_files": [], "target_file_count": 1}, ["cmd"], ["cmd"],
+    )
+
+    assert manifest["aggregate_comparison_status"] == COMPARISON_STATUS_BLOCKED
+    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diagnostics["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert "COMPARISON_INPUT_INVALID" in diagnostics["run_comparison_reason_codes"]
+
+
+def test_main_reports_blocked_not_ok_when_bundle_analysis_fails_before_any_status_output(tmp_path, monkeypatch):
+    reference = tmp_path / "ref.details.json"
+    target = tmp_path / "t1.details.json"
+    _write_json(reference, {"ok": True})
+    _write_json(target, {"ok": True})
+    out_dir = tmp_path / "out"
+
+    def fake_execute(cmd):
+        cmd = list(cmd)
+        if "run_bundle_analysis.py" in cmd[1]:
+            # Simulate an early failure (e.g. bad --metadata-file) that never
+            # writes compare_run_status.csv or file_gap_report.csv at all.
+            bundle_out_dir = Path(cmd[cmd.index("--out-dir") + 1])
+            (bundle_out_dir / "compare_all").mkdir(parents=True, exist_ok=True)
+            raise subprocess.CalledProcessError(2, cmd)
+        return None
+
+    monkeypatch.setattr(cr, "_execute", fake_execute)
+    rc = cr.main(["--reference", str(reference), "--target", str(target), "--out-dir", str(out_dir)])
+
+    assert rc != 0
+    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diagnostics["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert diagnostics["run_comparison_status"] != COMPARISON_STATUS_OK
