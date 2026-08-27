@@ -1,22 +1,39 @@
 # Reference Comparison Tool (`tools/compare_reference.py`)
 
-PR3. A standalone, deliberately-invoked workflow for comparing one reference
-fingerprint export against one target export or a target corpus, producing a
-stable package of consumable outputs.
+A standalone, deliberately-invoked workflow for comparing one reference
+fingerprint export against a single target export, or an entire
+already-materialized segment, producing a stable package of consumable
+outputs.
 
-This tool implements **no comparison mathematics of its own**. It is an
-orchestration/output layer over the existing, authoritative implementation:
+This tool implements **no comparison mathematics of its own**. It is a thin
+orchestration/output layer, called **in-process** (no subprocess), over the
+existing, authoritative implementation:
 
-- `tools/run_extract_all.py --seed` builds the `reference_bundle.json`
-  sidecar and the analysis-side pattern outputs.
-- `tools/bundle_analysis/run_bundle_analysis.py --compare` computes the
-  symmetric shared/reference_only/target_only comparison
-  (`tools/bundle_analysis/step_compare.py`) and its ok/degraded/blocked
-  reliability semantics (`tools/bundle_analysis/comparison_status.py`,
-  documented in full in `tools/bundle_analysis/README.md`).
+- `tools/bundle_analysis/step_compare.py::run_compare_for_domain` computes
+  the symmetric shared/reference_only/target_only comparison and its
+  ok/degraded/blocked reliability semantics
+  (`tools/bundle_analysis/comparison_status.py`, documented in full in
+  `tools/bundle_analysis/README.md`).
 
-Both are invoked as subprocesses. There remains exactly one implementation of
-comparison semantics; this tool only stages inputs and reshapes outputs.
+## What this tool does NOT do
+
+Unlike an earlier version of this tool, `compare_reference.py` does **not**:
+
+- parse or open any fingerprint export JSON file
+  (`*.details.json`/`*.index.json`/`*__fingerprint.json`);
+- stage export files anywhere;
+- invoke `tools/run_extract_all.py`, or regenerate records, sig_hashes,
+  join keys, or patterns;
+- fall back to any JSON-driven path when a filename can't be resolved or a
+  segment's materialization is incomplete.
+
+Instead, it consumes the **already-materialized, segment-local** outputs
+`tools/run_segment_orchestrator.py` produced for one segment:
+`results/records/{records.csv,file_metadata.csv}`,
+`results/analysis/pattern_presence_file.csv`, and
+`results/bundle_analysis/{all,used}/<domain>/membership_matrix.csv`. If that
+materialization is missing, incomplete, or internally inconsistent, the
+comparison blocks explicitly rather than regenerating anything.
 
 ## What a "reference" is (and is not)
 
@@ -24,65 +41,71 @@ A reference file is a **comparison anchor**. It is not automatically a
 standard, approved content, authoritative, required, or a remediation
 target. `reference_only` / `target_only` differences reported by this tool
 are **descriptive only** — the tool does not determine whether either
-configuration is approved, required, or compliant. That judgment is left
-entirely to whoever reads the output.
+configuration is approved, required, or compliant.
 
 ## Inputs
 
-This tool operates on **already-extracted fingerprint exports**
-(`*.details.json` / `*.index.json` / `*__fingerprint.json`), not raw RVT
-files. If you only have RVT files, extract them first with the existing
-Dynamo runner (`runner/run_dynamo.py`) — that step is unchanged by this PR.
-
-- `--reference PATH` (required) — the comparison anchor's export file.
-- `--target PATH [PATH ...]` — one or more target export files (mutually
-  exclusive with `--target-dir`).
-- `--target-dir DIR` — a directory containing a target corpus of export
-  files. Every primary export file discovered there (same file-format
-  priority as the rest of the pipeline: `*__fingerprint.json` >
-  `*.details.json` > a bare `*.json`; `*.legacy.json` is never picked up
-  implicitly) becomes a target. A file that happens to share the
-  reference's exact filename is silently excluded from the target set (it
-  is the reference, not a target).
+- `--segments-root DIR` (required) — root directory containing every
+  segment's output folder (`tools/run_segment_orchestrator.py`'s
+  `--segments-root`).
+- `--registry-file PATH` (required) — the corpus-level `run_registry.csv`
+  mapping `segment_id` to its `output_folder` and completion `status`.
+- `--segment SEGMENT_ID` (required) — which segment to compare within. Both
+  the reference and the target(s) are resolved against **this same
+  segment's** own materialization.
+- `--reference SELECTOR` (required) — a filename selector for the reference
+  export (e.g. `template_v3.details.json`). Resolved against the segment's
+  own `results/records/file_metadata.csv`, never against raw JSON.
+- `--target SELECTOR` (optional) — a filename selector for a single target
+  export. **Omit it to compare the reference against the entire segment**
+  (every other materialized file in the segment).
 - `--out-dir DIR` (required) — output location, owned exclusively by this
-  tool (see **Overwrite behavior** below).
+  tool (see **Overwrite behavior** below). Must not be, or contain,
+  `--segments-root` or `--registry-file` — this tool refuses to run rather
+  than risk destroying materialization it only ever reads.
+- `--domains d1,d2` (optional) — restrict comparison to these domains.
+  Default: every domain present in the segment's own
+  `pattern_presence_file.csv`.
+- `--purge-view {all,used,both}` (default `both`) — which segment-local
+  bundle-analysis view(s) to compare against. `all`/`used` populations are
+  never collapsed into one another; `both` runs and reports each
+  separately, distinguished by the `purge_view` column.
 
-Split-export pairs (`foo.details.json` + `foo.index.json`) are staged
-together automatically, whichever half you point `--reference`/`--target`
-at.
+## Filename resolution
 
-## Recommended: pass an existing join-key policy
-
-`--join-policy PATH` lets you point at an already-discovered,
-corpus-representative `domain_join_key_policies.v21.json` (from a prior full
-corpus run of `tools/run_extract_all.py`). This is the recommended way to
-run a reference-vs-target comparison: discovering a *new* join-key policy
-from just a reference plus a handful of targets is not statistically
-meaningful, so `--join-policy` skips the `discover` stage entirely and
-reuses your corpus's established policy. Without `--join-policy`, this tool
-runs `discover` fresh every time, which is only appropriate for small
-exploratory comparisons.
+A selector is matched against the segment's `file_metadata.csv`
+`export_run_id` column, first for an exact match, then (falling back) by
+stripping known export-file suffixes (`.details.json`, `.index.json`,
+`__fingerprint.json`, `.json`) from both sides and matching on the
+resulting stem — so `template_v3.details.json` resolves correctly even when
+the segment's canonical `export_run_id` for that file is
+`template_v3.index.json` (index is always canonical for a split-export
+pair). **Zero matches or more than one match blocks the comparison** with an
+explicit reason code; the tool never guesses or picks a first match.
 
 ## Examples
 
-### Compare one extracted file against a reference
+### Compare one file within a segment against a reference
 
 ```bash
 python tools/compare_reference.py \
-    --reference /data/exports/template_v3.details.json \
-    --target /data/exports/project_42.details.json \
-    --join-policy /data/corpus_results/policies/domain_join_key_policies.v21.json \
+    --segments-root /data/Fingerprint_Data/segments \
+    --registry-file /data/Fingerprint_Data/records/run_registry.csv \
+    --segment enterprise_all \
+    --reference template_v3.details.json \
+    --target project_42.details.json \
     --out-dir /data/comparisons/project_42_vs_template_v3
 ```
 
-### Compare a corpus against a reference
+### Compare an entire segment against a reference
 
 ```bash
 python tools/compare_reference.py \
-    --reference /data/exports/template_v3.details.json \
-    --target-dir /data/exports/regional_office_corpus/ \
-    --join-policy /data/corpus_results/policies/domain_join_key_policies.v21.json \
-    --out-dir /data/comparisons/regional_office_vs_template_v3
+    --segments-root /data/Fingerprint_Data/segments \
+    --registry-file /data/Fingerprint_Data/records/run_registry.csv \
+    --segment client_acme \
+    --reference template_v3.details.json \
+    --out-dir /data/comparisons/client_acme_vs_template_v3
 ```
 
 ## Outputs
@@ -91,104 +114,75 @@ Every run writes exactly these files directly under `--out-dir`:
 
 | File | Role |
 |---|---|
-| `reference_comparison_summary.csv` | One row per reference × target × domain (× population, if `--discover-populations` is used) |
+| `reference_comparison_summary.csv` | One row per purge_view × target × domain |
 | `reference_comparison_detail.csv` | One row per classified pattern (`shared` / `reference_only` / `target_only`) |
-| `reference_comparison_diagnostics.json` | Machine-readable status/failure/degradation information, scoped to the affected domain/target |
-| `reference_comparison_report.json` | Run manifest: reference identity, target scope, analysis run id, output files, aggregate status, the exact sub-tool commands run |
+| `reference_comparison_diagnostics.json` | Machine-readable status/failure/degradation information |
+| `reference_comparison_report.json` | Run manifest: resolved reference/target identities, segment, analysis run id, aggregate status |
 
-`--out-dir` also retains the raw intermediate output of the two sub-tools
-(`extraction/`, `bundle_analysis/`, `staged_exports/`) for drill-down or
-debugging — the four files above are the intended consumable package.
+`--out-dir` also retains the raw intermediate `compare_all/`/`compare_used/`
+directories (`file_gap_report.csv`/`file_gap_detail.csv`, written directly
+by the authoritative comparator) for drill-down or debugging.
 
 ### `reference_comparison_summary.csv` columns
 
-`reference_bundle_id, analysis_run_id, target_export_run_id, domain,
-population_id, comparison_status, comparison_reason_codes,
-reference_pattern_count, target_pattern_count, shared_count,
-reference_only_count, target_only_count, union_count,
+`segment_id, purge_view, reference_bundle_id, analysis_run_id,
+target_export_run_id, domain, population_id, comparison_status,
+comparison_reason_codes, reference_pattern_count, target_pattern_count,
+shared_count, reference_only_count, target_only_count, union_count,
 reference_coverage_pct, jaccard`
 
 On a `blocked` row, every target-derived field (`target_pattern_count`
-onward) is blank rather than a fabricated zero — see **Statuses** below.
+onward) is blank rather than a fabricated zero.
 
 ### `reference_comparison_detail.csv` columns
 
-`reference_bundle_id, analysis_run_id, target_export_run_id, domain,
-population_id, pattern_id, comparison_class` where `comparison_class` is one
-of `shared` / `reference_only` / `target_only`.
-
-### `reference_comparison_diagnostics.json` shape
-
-```json
-{
-  "reference_bundle_id": "...",
-  "analysis_run_id": "...",
-  "run_comparison_status": "ok|degraded|blocked",
-  "run_comparison_reason_codes": ["..."],
-  "domains_total": "1", "domains_ok": "1", "domains_degraded": "0", "domains_blocked": "0",
-  "domain_summaries": [ { "domain": "...", "comparison_status": "...", "files_scored": "...", ... } ],
-  "target_diagnostics": [ { "target_export_run_id": "...", "domain": "...", "comparison_status": "degraded|blocked", "comparison_reason_codes": ["..."], "comparison_detail": "..." } ]
-}
-```
-
-`target_diagnostics` lists only non-`ok` targets/domains — you should not
-need to scrape stdout to learn that a comparison failed or degraded.
-
-## What the fields mean
-
-- **shared** — a configuration (pattern) appears in both the reference and
-  the target.
-- **reference_only** — a configuration appears in the reference but not the
-  target.
-- **target_only** — a configuration appears in the target but not the
-  reference.
-- **reference_coverage** — the proportion of reference configurations found
-  in the target.
-- **jaccard** — shared configurations divided by all distinct configurations
-  across both files (`shared / union`).
-
-Reference-only and target-only differences are **descriptive**. This tool
-does not determine whether either configuration is approved, required, or
-compliant.
+`segment_id, purge_view, reference_bundle_id, analysis_run_id,
+target_export_run_id, domain, population_id, pattern_id, comparison_class`
+where `comparison_class` is one of `shared` / `reference_only` /
+`target_only`.
 
 ## Statuses: `ok` / `degraded` / `blocked`
 
-- **ok** — the comparison ran with fully trustworthy target evidence.
-- **degraded** — part of the target's evidence for a domain was unreliable
-  (e.g. some records had unassignable identity); the comparison still
-  reports a real, partial result over the reliable subset.
-- **blocked** — there was not enough trustworthy evidence to compute the
-  comparison at all for that target/domain (e.g. the domain was never
-  observed, or every record's identity was unassignable), or the reference
-  itself was missing/invalid/schema-incompatible.
+Same semantics as the underlying comparator
+(`tools/bundle_analysis/README.md`, "Comparison reliability semantics"):
+**ok** — fully trustworthy target evidence; **degraded** — part of the
+target's evidence was unreliable but a real partial result is still
+reported; **blocked** — not enough trustworthy evidence to compute the
+comparison at all for that target/domain. A `blocked` row is never zero
+similarity — every target-derived numeric field is left blank specifically
+so it can never be misread as a real `0`.
 
-**Do not interpret a `blocked` comparison as zero similarity or complete
-absence.** A blocked row means the comparison could not be trusted, not that
-the target has none of the reference's configurations — every
-target-derived numeric field on a blocked row is left blank specifically so
-it can never be misread as a real `0`.
+## Pre-flight blocking reason codes (this tool's own, distinct from the
+comparator's)
 
-Full semantics (including exact classification rules) live in
-`tools/bundle_analysis/README.md`, "Comparison reliability semantics".
+| Reason code | Meaning |
+|---|---|
+| `SEGMENT_NOT_FOUND` | `--segment` has no matching row in `--registry-file` |
+| `SEGMENT_MATERIALIZATION_INCOMPLETE` | the segment's `run_registry.csv` status is not `complete` |
+| `REQUIRED_ANALYSIS_ARTIFACT_MISSING` | `records.csv`/`file_metadata.csv`/`pattern_presence_file.csv`, or a requested `--purge-view` directory, is missing despite `status=complete` |
+| `REFERENCE_NOT_MATERIALIZED` / `TARGET_NOT_MATERIALIZED` | the selector resolves to zero export_run_ids in this segment |
+| `REFERENCE_AMBIGUOUS` / `TARGET_AMBIGUOUS` | the selector resolves to more than one export_run_id |
+| `NO_COMPARISON_TARGETS` | after excluding the reference itself, no comparison target remains (an explicit `--target` resolved to the same export_run_id as `--reference`, or the segment has no other materialized file at all) |
+| `REFERENCE_HAS_NO_PATTERNS` | the resolved reference has zero `pattern_id` evidence across every domain in this segment's `pattern_presence_file.csv` — mirrors `reference_bundle.py::write_sidecar`'s own rejection of a globally empty reference |
+| `MATERIALIZATION_VERSION_INCOMPATIBLE` | this segment's `records.csv` shows more than one distinct **complete** (all three fields populated) `(join_key_schema, join_key_policy_id, join_key_policy_version)` tuple for a requested domain |
+| `MATERIALIZATION_COMPATIBILITY_UNPROVEN` | no complete tuple is populated for that domain at all, or at least one record has an incomplete tuple (any of the three fields blank) even alongside an otherwise-consistent complete one — a partially-populated tuple is never treated as proof of compatibility, and an incomplete record is never simply discarded |
+| `STALE_MEMBERSHIP_MATRIX` | a requested domain/view's `membership_matrix.csv` has rows, but none for the segment's current `analysis_run_id` — comparing against it would silently look like "target has none of the reference's patterns" |
 
-**A staged target that produced zero evidence for a domain** (the domain
-was never extracted for that file, or genuinely has no elements) is
-reported as `blocked` / `TARGET_DOMAIN_UNAVAILABLE` for that
-target/domain, using the same classification the underlying comparator
-already defines for this exact condition — it is never silently absent
-from `reference_comparison_summary.csv`. This tool determines the full set
-of staged targets itself (from the staged run's own `file_metadata.csv`)
-specifically to guarantee this, since the underlying `--compare` step only
-widens its own notion of "eligible targets" as a side effect of `--roles`
-filtering.
+A `SEGMENT_NOT_FOUND`/`SEGMENT_MATERIALIZATION_INCOMPLETE`/
+`REQUIRED_ANALYSIS_ARTIFACT_MISSING`/`*_NOT_MATERIALIZED`/`*_AMBIGUOUS`/
+`NO_COMPARISON_TARGETS`/`REFERENCE_HAS_NO_PATTERNS` condition blocks the
+**entire run** (nonzero exit; still writes the 4-file output contract,
+header-only summary/detail, so the failure is never console-only). A
+`MATERIALIZATION_VERSION_INCOMPATIBLE`/`MATERIALIZATION_COMPATIBILITY_UNPROVEN`/
+`STALE_MEMBERSHIP_MATRIX` condition blocks only the affected **domain**
+(exit `0`; check `comparison_status` per row) — matching the existing
+convention that a row/domain-level blocked outcome is not a process
+failure.
 
-This gap-closing behavior only applies to the default mode (no `--roles`,
-no `--discover-populations`). `--roles` already makes the underlying
-`--compare` step thread its own, role-filtered eligible-target set through
-correctly on its own — re-deriving an unfiltered universe here would
-wrongly flag a target you explicitly excluded by role as unavailable, so
-this tool defers to the comparator's own handling whenever `--roles` or
-`--discover-populations` is used.
+A domain the caller explicitly requested via `--domains` that this segment
+never observed at all is not a new reason code: it surfaces as the
+comparator's own existing `COMPARISON_INPUT_INVALID`
+(missing `membership_matrix.csv`), reused rather than duplicated.
 
 ## Overwrite / resume behavior
 
@@ -197,38 +191,21 @@ Each invocation of this tool **cleanly replaces** the contents of
 treated as owned exclusively by this tool: if it already exists, is
 non-empty, and was not produced by a prior run of this tool (no
 `reference_comparison_report.json` present), the tool refuses to touch it
-unless you pass `--overwrite`. This guarantees a stale prior comparison can
-never be confused with the current one, and that reference/target
-provenance is always explicit in every persisted result.
-
-## Command exit behavior
-
-- Missing or malformed `--reference`/`--target` input → nonzero exit before
-  any sub-tool is invoked.
-- A totally invalid or schema-incompatible reference (caught by
-  `run_bundle_analysis.py --compare`) → nonzero exit, but
-  `reference_comparison_diagnostics.json` is still written with the blocked
-  status and reason code recorded — the failure is never console-only.
-- A comparison that completes with some `degraded` or row/domain-level
-  `blocked` results (but no total sidecar failure) → exit `0`; check
-  `reference_comparison_report.json`'s `aggregate_comparison_status` and
-  `reference_comparison_diagnostics.json`'s `target_diagnostics` for the
-  real status. This matches the existing convention in
-  `tools/bundle_analysis/run_bundle_analysis.py`.
+unless you pass `--overwrite`.
 
 ## Scope / limitations
 
-- One reference vs. one target, and one reference vs. many targets (via
-  `--target-dir`, reusing the existing corpus/bundle-analysis pipeline in a
-  single pass) are supported. Reference-vs-many-references and
-  multi-reference ranking are explicitly out of scope for this PR.
+- One reference vs. one target, and one reference vs. the entire segment
+  population, are supported. Reference-vs-many-references,
+  multi-reference ranking, and comparing across two *different* segments
+  are explicitly out of scope for this tool.
 - No governance, compliance, or "ideal file" interpretation is added.
   `reference_only`/`target_only` are descriptive set differences only.
-- `--target-dir` stages (hardlinks or copies) the discovered export files
-  into `--out-dir/staged_exports/`; for a very large corpus this is a
-  one-time, bounded-memory file-copy operation, not a re-extraction.
-- Fine-grained population scoping (`--discover-populations` and its
-  thresholds) and governance-role filtering (`--roles` /
-  `--metadata-file`) are passed straight through to
-  `run_bundle_analysis.py`; see that script's own `--help` for the full
-  semantics.
+- `--roles` filtering and `--discover-populations` population-aware mode
+  are not exposed by this tool — it always runs the segment's own
+  already-computed default (non-population-aware) membership.
+- Reference and target need not share an `analysis_run_id`, but they must
+  come from the same segment materialization; a future artifact-SHA-based
+  compatibility check can be added to
+  `check_domain_compatibility()`/`(join_key_schema, join_key_policy_id,
+  join_key_policy_version)` without changing comparison semantics.

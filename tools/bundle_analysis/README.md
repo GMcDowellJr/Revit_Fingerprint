@@ -1,9 +1,10 @@
 # Bundle Analysis Pipeline
 
 > For a deliberately-invoked, single-command reference-vs-target comparison
-> workflow that orchestrates this pipeline together with
-> `tools/run_extract_all.py` end to end, see `tools/compare_reference.py`
-> and `docs/reference_comparison_tool.md`. This README remains the
+> workflow that calls `run_compare_for_domain` directly against an
+> already-materialized segment's outputs (no JSON parsing, no
+> `run_extract_all.py` invocation), see `tools/compare_reference.py` and
+> `docs/reference_comparison_tool.md`. This README remains the
 > authoritative reference for the underlying `--compare` contract itself.
 
 This directory contains the multi-step bundle analysis pipeline:

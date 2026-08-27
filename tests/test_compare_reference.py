@@ -1,24 +1,17 @@
 # tests/test_compare_reference.py
 #
-# PR3: orchestration/output-surface tests for tools/compare_reference.py.
+# Regression tests for the segment-native tools/compare_reference.py.
 #
-# This module implements no comparison mathematics of its own (see its module
-# docstring) -- it stages inputs for, and shells out to, run_extract_all.py
-# and run_bundle_analysis.py, then reshapes their already-tested outputs
-# (tests/test_step_compare.py, tests/test_step_compare_comparison_status.py)
-# into the PR3 consumable package. These tests therefore:
-#
-#   - exercise the pure staging/validation helpers directly (no subprocess);
-#   - exercise `assemble_outputs()` against real compare_all/ output produced
-#     by tools.bundle_analysis.step_compare.run_compare_for_domain (the same
-#     fixture style as test_step_compare_comparison_status.py), so the
-#     reshaping logic is checked against the actual authoritative contract,
-#     not a hand-rolled approximation of it;
-#   - exercise main()'s orchestration/exit-code wiring with the two
-#     subprocess calls stubbed out (compare_reference._execute), since
-#     driving the full extraction pipeline end-to-end is out of scope for an
-#     orchestration-layer test suite (tools/run_extract_all.py and
-#     tools/bundle_analysis/ already have their own test coverage).
+# This tool implements no comparison mathematics of its own -- it resolves a
+# reference/target filename against a segment's own already-materialized
+# results/records/file_metadata.csv, then calls
+# tools.bundle_analysis.step_compare.run_compare_for_domain directly
+# (in-process, no subprocess) against the segment's own already-built
+# results/bundle_analysis/{all,used}/<domain>/membership_matrix.csv. These
+# tests build a minimal, realistic on-disk segment tree (corpus-level
+# run_registry.csv + one segment's records/analysis/bundle_analysis outputs)
+# and exercise the tool end-to-end via its own main(), since there is no
+# subprocess boundary left to stub out.
 #
 # Use synthetic fixtures only. No Revit dependency.
 
@@ -26,10 +19,9 @@ from __future__ import annotations
 
 import csv
 import json
-import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Sequence
 
 import pytest
 
@@ -42,24 +34,15 @@ for _candidate in (str(_REPO_ROOT), str(_TOOLS_DIR)):
 import compare_reference as cr  # noqa: E402
 from tools.bundle_analysis.comparison_status import (  # noqa: E402
     COMPARISON_STATUS_OK,
-    COMPARISON_STATUS_DEGRADED,
     COMPARISON_STATUS_BLOCKED,
-    REASON_TARGET_DOMAIN_UNAVAILABLE,
-    REASON_TARGET_DOMAIN_DEGRADED,
-    REASON_REFERENCE_INVALID,
 )
-from tools.bundle_analysis.step_compare import run_compare_for_domain
+from tools.bundle_analysis.step_compare import run_compare_for_domain  # noqa: E402
 
 
-def _write_json(path: Path, payload: dict) -> None:
+def _write_csv(path: Path, fieldnames: Sequence[str], rows: List[Dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload), encoding="utf-8")
-
-
-def _write_csv(path: Path, fieldnames: List[str], rows: List[Dict[str, str]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(fieldnames))
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
@@ -70,1358 +53,598 @@ def _read_csv(path: Path) -> List[Dict[str, str]]:
         return list(csv.DictReader(f))
 
 
-def _reference_dict(domain: str, pattern_ids: List[str], seed_export_run_id: str = "seed_file") -> Dict[str, object]:
-    return {
-        "reference_bundle_id": "ref-2026-08-27",
-        "effective_date": "2026-08-27",
-        "seed_export_run_id": seed_export_run_id,
-        "domains": {domain: list(pattern_ids)},
-    }
+DOMAIN = "object_styles_model"
+RUN_ID = "run1"
 
 
-def _setup_compare_all(
+def _build_segment(
     tmp_path: Path,
-    domain: str,
-    known: Dict[str, Set[str]],
-    reference_pattern_ids: List[str],
-    unknown_only: Set[str] = frozenset(),
-    partial_unknown: Dict[str, float] = None,
-    run_id: str = "run1",
-) -> Path:
-    """Produce a real compare_all/ directory via the authoritative comparator
-    (tools.bundle_analysis.step_compare.run_compare_for_domain), matching
-    test_step_compare_comparison_status.py's fixture shape. Returns the
-    bundle_out_dir such that compare_all/ sits directly under it.
-    """
-    partial_unknown = partial_unknown or {}
-    analysis_dir = tmp_path / "analysis"
-    bundle_out_dir = tmp_path / "bundle_out"
+    presence: Dict[str, List[str]],
+    segment_id: str = "seg_a",
+    status: str = "complete",
+    file_metadata_ids: Optional[List[str]] = None,
+    extra_records_rows: Optional[List[Dict[str, str]]] = None,
+    views: Sequence[str] = ("all", "used"),
+    write_pattern_presence: bool = True,
+    write_records: bool = True,
+    write_file_metadata: bool = True,
+    write_bundle_dirs: bool = True,
+    join_key_schema: Optional[str] = "object_styles_model.join_key.v1",
+    inconsistent_join_key_schema: bool = False,
+    blank_join_key_schema: bool = False,
+    partial_join_key_provenance: bool = False,
+) -> Dict[str, Path]:
+    """Build a corpus-level run_registry.csv plus one segment's
+    results/{records,analysis,bundle_analysis} tree.
 
-    presence_rows: List[Dict[str, str]] = []
-    membership_rows: List[Dict[str, str]] = []
-    for export_run_id, pattern_ids in known.items():
-        for pattern_id in sorted(pattern_ids):
-            presence_rows.append(
-                {
-                    "analysis_run_id": run_id,
-                    "domain": domain,
-                    "export_run_id": export_run_id,
-                    "pattern_id": pattern_id,
-                    "pattern_share_pct": f"{(1.0 / len(pattern_ids)):.6f}" if pattern_ids else "0.000000",
-                }
-            )
-            membership_rows.append({"analysis_run_id": run_id, "export_run_id": export_run_id, "pattern_id": pattern_id})
-        if export_run_id in partial_unknown:
-            presence_rows.append(
-                {
-                    "analysis_run_id": run_id,
-                    "domain": domain,
-                    "export_run_id": export_run_id,
-                    "pattern_id": "",
-                    "pattern_share_pct": f"{partial_unknown[export_run_id]:.6f}",
-                }
-            )
-    for export_run_id in unknown_only:
-        presence_rows.append(
-            {"analysis_run_id": run_id, "domain": domain, "export_run_id": export_run_id, "pattern_id": "", "pattern_share_pct": "1.000000"}
+    `presence` maps export_run_id -> list of pattern_id values it has in
+    DOMAIN (an empty list means the file is a materialized member of the
+    segment but has no evidence in DOMAIN at all).
+    """
+    corpus_records_dir = tmp_path / "corpus" / "records"
+    segments_root = tmp_path / "segments"
+    seg_root = segments_root / segment_id
+    seg_records = seg_root / "results" / "records"
+    seg_analysis = seg_root / "results" / "analysis"
+    seg_bundle = seg_root / "results" / "bundle_analysis"
+
+    registry_file = corpus_records_dir / "run_registry.csv"
+    _write_csv(
+        registry_file,
+        [
+            "segment_id", "parent_segment_id", "run_type", "population_hash",
+            "conformance_reference_mode", "output_folder", "status", "last_run_utc",
+            "notes", "segment_purpose", "segment_label",
+        ],
+        [
+            {
+                "segment_id": segment_id, "parent_segment_id": "", "run_type": "bundle",
+                "population_hash": "", "conformance_reference_mode": "", "output_folder": segment_id,
+                "status": status, "last_run_utc": "", "notes": "", "segment_purpose": "", "segment_label": "",
+            }
+        ],
+    )
+
+    all_ids = file_metadata_ids if file_metadata_ids is not None else sorted(presence.keys())
+    if write_file_metadata:
+        _write_csv(
+            seg_records / "file_metadata.csv",
+            ["export_run_id", "central_path", "governance_role"],
+            [{"export_run_id": eid, "central_path": f"/x/{eid}", "governance_role": "Project"} for eid in all_ids],
         )
 
-    _write_csv(
-        analysis_dir / "pattern_presence_file.csv",
-        ["analysis_run_id", "domain", "export_run_id", "pattern_id", "pattern_share_pct"],
-        presence_rows,
-    )
-    _write_csv(bundle_out_dir / domain / "membership_matrix.csv", ["analysis_run_id", "export_run_id", "pattern_id"], membership_rows)
+    if write_records:
+        records_rows: List[Dict[str, str]] = []
+        for idx, eid in enumerate(sorted(presence.keys())):
+            schema = join_key_schema or ""
+            policy_id, policy_version = "p1", "1"
+            if inconsistent_join_key_schema and idx == 0:
+                schema = "object_styles_model.join_key.v2"
+            if blank_join_key_schema:
+                schema, policy_id, policy_version = "", "", ""
+            if partial_join_key_provenance:
+                policy_id, policy_version = "", ""
+            records_rows.append(
+                {
+                    "export_run_id": eid, "domain": DOMAIN,
+                    "join_key_schema": schema, "join_key_policy_id": policy_id, "join_key_policy_version": policy_version,
+                }
+            )
+        records_rows.extend(extra_records_rows or [])
+        _write_csv(
+            seg_records / "records.csv",
+            ["export_run_id", "domain", "join_key_schema", "join_key_policy_id", "join_key_policy_version"],
+            records_rows,
+        )
 
-    reference = _reference_dict(domain, reference_pattern_ids)
-    run_compare_for_domain(analysis_dir, bundle_out_dir, reference, domain, compare_out_dir=bundle_out_dir / "compare_all")
+    if write_pattern_presence:
+        presence_rows: List[Dict[str, str]] = []
+        membership_rows: List[Dict[str, str]] = []
+        for eid, pattern_ids in presence.items():
+            if not pattern_ids:
+                continue
+            for pid in pattern_ids:
+                presence_rows.append(
+                    {"analysis_run_id": RUN_ID, "domain": DOMAIN, "export_run_id": eid, "pattern_id": pid, "pattern_share_pct": "1.000000"}
+                )
+                membership_rows.append({"analysis_run_id": RUN_ID, "export_run_id": eid, "pattern_id": pid})
+        _write_csv(
+            seg_analysis / "pattern_presence_file.csv",
+            ["analysis_run_id", "domain", "export_run_id", "pattern_id", "pattern_share_pct"],
+            presence_rows,
+        )
+        _write_csv(seg_analysis / "corpus_manifest.csv", ["schema_version"], [{"schema_version": "2.1.0"}])
+        if write_bundle_dirs:
+            for view in views:
+                _write_csv(
+                    seg_bundle / view / DOMAIN / "membership_matrix.csv",
+                    ["analysis_run_id", "export_run_id", "pattern_id"],
+                    membership_rows,
+                )
 
-    # compare_run_summary.csv / compare_run_status.csv are normally written by
-    # run_bundle_analysis.py's own wrapper around run_compare_for_domain --
-    # reproduce that thin step here so assemble_outputs() has real inputs.
-    from tools.bundle_analysis.run_bundle_analysis import _write_compare_run_outputs
-
-    gap_rows = _read_csv(bundle_out_dir / "compare_all" / "file_gap_report.csv")
-    _write_compare_run_outputs(bundle_out_dir / "compare_all", run_id, [
-        {
-            "reference_bundle_id": reference["reference_bundle_id"],
-            "effective_date": reference["effective_date"],
-            "analysis_run_id": run_id,
-            "domain": domain,
-            "population_id": "",
-            "files_scored": str(len(gap_rows)),
-            "full_count": "0",
-            "partial_count": "0",
-            "none_count": "0",
-            "no_reference_count": "0",
-            "comparison_status": max(
-                (r.get("comparison_status", COMPARISON_STATUS_OK) for r in gap_rows),
-                key=lambda s: {COMPARISON_STATUS_OK: 0, COMPARISON_STATUS_DEGRADED: 1, COMPARISON_STATUS_BLOCKED: 2}.get(s, 0),
-                default=COMPARISON_STATUS_OK,
-            ),
-            "comparison_reason_codes": "|".join(sorted({c for r in gap_rows for c in (r.get("comparison_reason_codes") or "").split("|") if c})),
-            "comparison_ok_count": str(sum(1 for r in gap_rows if r.get("comparison_status") == COMPARISON_STATUS_OK)),
-            "comparison_degraded_count": str(sum(1 for r in gap_rows if r.get("comparison_status") == COMPARISON_STATUS_DEGRADED)),
-            "comparison_blocked_count": str(sum(1 for r in gap_rows if r.get("comparison_status") == COMPARISON_STATUS_BLOCKED)),
-        }
-    ])
-    return bundle_out_dir
+    return {
+        "registry_file": registry_file,
+        "segments_root": segments_root,
+        "segment_root": seg_root,
+    }
 
 
-def _assemble(tmp_path: Path, bundle_out_dir: Path, reference_file: Path = None) -> Path:
-    out_dir = tmp_path / "final_out"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    cr.assemble_outputs(
-        bundle_out_dir,
-        "all",
-        out_dir,
-        reference_file or (tmp_path / "ref.json"),
-        {"reference_files": [], "target_files": [], "target_file_count": 1},
-        ["fake", "extract", "cmd"],
-        ["fake", "bundle", "cmd"],
-    )
-    return out_dir
+def _run(tmp_path, ctx, out_name="out", **extra) -> int:
+    out_dir = tmp_path / out_name
+    argv = [
+        "--segments-root", str(ctx["segments_root"]),
+        "--registry-file", str(ctx["registry_file"]),
+        "--segment", extra.pop("segment", "seg_a"),
+        "--reference", extra.pop("reference", "ref.json"),
+        "--out-dir", str(out_dir),
+    ]
+    if "target" in extra:
+        argv += ["--target", extra.pop("target")]
+    if "purge_view" in extra:
+        argv += ["--purge-view", extra.pop("purge_view")]
+    if "domains" in extra:
+        argv += ["--domains", extra.pop("domains")]
+    rc = cr.main(argv)
+    return rc, out_dir
 
 
 # ---------------------------------------------------------------------------
-# 1. One reference vs one target -- successful run.
+# 1/3. Reference vs one target, both materialized -- all and used.
 # ---------------------------------------------------------------------------
 
 
-def test_one_reference_one_target_success(tmp_path):
-    domain = "object_styles_model"
-    bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A", "B"}}, ["A", "B"])
-    out_dir = _assemble(tmp_path, bundle_out_dir)
+def test_reference_vs_one_target_both_views(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A", "B"], "target.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, target="target.json")
+    assert rc == 0
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    views = {r["purge_view"] for r in summary}
+    assert views == {"all", "used"}
+    for row in summary:
+        assert row["target_export_run_id"] == "target.json"
+        assert row["comparison_status"] == COMPARISON_STATUS_OK
+        assert row["shared_count"] == "1"
+        assert row["reference_only_count"] == "1"
+        assert row["target_only_count"] == "0"
 
+
+def test_purge_view_single_selection(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="used")
+    assert rc == 0
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert {r["purge_view"] for r in summary} == {"used"}
+
+
+# ---------------------------------------------------------------------------
+# 2. Reference vs complete segment.
+# ---------------------------------------------------------------------------
+
+
+def test_reference_vs_complete_segment(tmp_path):
+    ctx = _build_segment(
+        tmp_path,
+        {"ref.json": ["A"], "target_1.json": ["A"], "target_2.json": ["B"]},
+    )
+    rc, out_dir = _run(tmp_path, ctx, purge_view="all")
+    assert rc == 0
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    targets = {r["target_export_run_id"] for r in summary}
+    assert targets == {"target_1.json", "target_2.json"}
+
+
+# ---------------------------------------------------------------------------
+# 4/5. Reference filename resolution: zero matches / ambiguous.
+# ---------------------------------------------------------------------------
+
+
+def test_reference_zero_matches_is_blocked(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, reference="nonexistent.json", target="target.json")
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_REFERENCE_NOT_MATERIALIZED]
+    assert _read_csv(out_dir / cr.SUMMARY_FILENAME) == []
+
+
+def test_reference_ambiguous_is_blocked(tmp_path):
+    ctx = _build_segment(
+        tmp_path,
+        {"dup.json": ["A"], "dup.index.json": ["A"], "target.json": ["A"]},
+        file_metadata_ids=["dup.json", "dup.index.json", "target.json"],
+    )
+    rc, out_dir = _run(tmp_path, ctx, reference="dup.details.json", target="target.json")
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_REFERENCE_AMBIGUOUS]
+
+
+# ---------------------------------------------------------------------------
+# 6/7. Target filename resolution: zero matches / ambiguous.
+# ---------------------------------------------------------------------------
+
+
+def test_target_zero_matches_is_blocked(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, target="missing.json")
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_TARGET_NOT_MATERIALIZED]
+
+
+def test_target_ambiguous_is_blocked(tmp_path):
+    ctx = _build_segment(
+        tmp_path,
+        {"ref.json": ["A"], "dup.json": ["A"], "dup.index.json": ["A"]},
+        file_metadata_ids=["ref.json", "dup.json", "dup.index.json"],
+    )
+    rc, out_dir = _run(tmp_path, ctx, target="dup.details.json")
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_TARGET_AMBIGUOUS]
+
+
+# ---------------------------------------------------------------------------
+# 8. Incomplete segment materialization -> blocked.
+# ---------------------------------------------------------------------------
+
+
+def test_incomplete_segment_is_blocked(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]}, status="failed")
+    rc, out_dir = _run(tmp_path, ctx, target="target.json")
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_SEGMENT_MATERIALIZATION_INCOMPLETE]
+
+
+# ---------------------------------------------------------------------------
+# 9. Required analysis artifact missing (despite status=complete) -> blocked.
+# ---------------------------------------------------------------------------
+
+
+def test_missing_pattern_presence_file_is_blocked(tmp_path):
+    ctx = _build_segment(
+        tmp_path, {"ref.json": ["A"], "target.json": ["A"]}, write_pattern_presence=False
+    )
+    rc, out_dir = _run(tmp_path, ctx, target="target.json")
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_REQUIRED_ANALYSIS_ARTIFACT_MISSING]
+
+
+def test_missing_bundle_view_dir_is_blocked(tmp_path):
+    ctx = _build_segment(
+        tmp_path, {"ref.json": ["A"], "target.json": ["A"]}, views=("all",), write_bundle_dirs=True
+    )
+    # "used" view directory was never created.
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="both")
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_REQUIRED_ANALYSIS_ARTIFACT_MISSING]
+
+
+# ---------------------------------------------------------------------------
+# 10/11. Materialization compatibility: incompatible / unproven.
+# ---------------------------------------------------------------------------
+
+
+def test_incompatible_join_key_schema_blocks_domain(tmp_path):
+    ctx = _build_segment(
+        tmp_path,
+        {"ref.json": ["A"], "target.json": ["A"]},
+        inconsistent_join_key_schema=True,
+    )
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
+    assert rc == 0  # the run completes; the affected domain reports blocked
     summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
     assert len(summary) == 1
-    assert summary[0]["target_export_run_id"] == "t1"
-    assert summary[0]["comparison_status"] == COMPARISON_STATUS_OK
-    assert summary[0]["shared_count"] == "2"
+    row = summary[0]
+    assert row["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert row["comparison_reason_codes"] == cr.REASON_MATERIALIZATION_VERSION_INCOMPATIBLE
+    assert row["shared_count"] == ""  # blocked rows never fabricate a zero
 
 
-# ---------------------------------------------------------------------------
-# 2. One reference vs multiple targets.
-# ---------------------------------------------------------------------------
-
-
-def test_one_reference_multiple_targets(tmp_path):
-    domain = "object_styles_model"
-    bundle_out_dir = _setup_compare_all(
-        tmp_path, domain, {"t1": {"A", "B"}, "t2": {"A"}, "t3": {"A", "B", "C"}}, ["A", "B"]
+def test_unproven_join_key_schema_blocks_domain(tmp_path):
+    ctx = _build_segment(
+        tmp_path,
+        {"ref.json": ["A"], "target.json": ["A"]},
+        blank_join_key_schema=True,
     )
-    out_dir = _assemble(tmp_path, bundle_out_dir)
-
-    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
-    assert {r["target_export_run_id"] for r in summary} == {"t1", "t2", "t3"}
-    assert len(summary) == 3
-
-
-# ---------------------------------------------------------------------------
-# 3. Reference export excluded from target results.
-# ---------------------------------------------------------------------------
-
-
-def test_reference_export_excluded_from_targets(tmp_path):
-    domain = "object_styles_model"
-    # run_compare_for_domain (the authoritative comparator) already excludes
-    # reference["seed_export_run_id"] from the eligible target set -- this
-    # test asserts that guarantee survives assemble_outputs() unchanged.
-    bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A"}}, ["A"])
-    out_dir = _assemble(tmp_path, bundle_out_dir)
-
-    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
-    assert "seed_file" not in {r["target_export_run_id"] for r in summary}
-
-
-# ---------------------------------------------------------------------------
-# 4 / 5. Deterministic summary / detail output.
-# ---------------------------------------------------------------------------
-
-
-def test_summary_output_is_deterministic_across_runs(tmp_path):
-    domain = "object_styles_model"
-    bundle_out_dir = _setup_compare_all(
-        tmp_path, domain, {"t3": {"A"}, "t1": {"A", "B"}, "t2": {"B"}}, ["A", "B"]
-    )
-    out_dir_1 = _assemble(tmp_path / "run1_final", bundle_out_dir)
-    out_dir_2 = _assemble(tmp_path / "run2_final", bundle_out_dir)
-
-    assert (out_dir_1 / cr.SUMMARY_FILENAME).read_text() == (out_dir_2 / cr.SUMMARY_FILENAME).read_text()
-    rows = _read_csv(out_dir_1 / cr.SUMMARY_FILENAME)
-    assert [r["target_export_run_id"] for r in rows] == ["t1", "t2", "t3"]
-
-
-def test_detail_output_is_deterministic_and_covers_all_classes(tmp_path):
-    domain = "object_styles_model"
-    bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A", "C"}}, ["A", "B"])
-    out_dir = _assemble(tmp_path, bundle_out_dir)
-
-    detail = _read_csv(out_dir / cr.DETAIL_FILENAME)
-    classes = {(r["pattern_id"], r["comparison_class"]) for r in detail}
-    assert classes == {("A", "shared"), ("B", "reference_only"), ("C", "target_only")}
-    assert list(detail) == sorted(detail, key=lambda r: (r["domain"], r["population_id"], r["target_export_run_id"], r["pattern_id"]))
-
-
-# ---------------------------------------------------------------------------
-# 6 / 7. Diagnostics for blocked target/domain; degraded status survives.
-# ---------------------------------------------------------------------------
-
-
-def test_diagnostics_emitted_for_blocked_target(tmp_path):
-    domain = "object_styles_model"
-    bundle_out_dir = _setup_compare_all(tmp_path, domain, {}, ["A"], unknown_only={"t_bad"})
-    out_dir = _assemble(tmp_path, bundle_out_dir)
-
-    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
-    assert diagnostics["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
-    target_diag = diagnostics["target_diagnostics"]
-    assert len(target_diag) == 1
-    assert target_diag[0]["target_export_run_id"] == "t_bad"
-    assert target_diag[0]["domain"] == domain
-    assert target_diag[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
-
-    # Not scrapeable-from-stdout-only: it's a file on disk.
-    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
-    assert summary[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
-    assert summary[0]["shared_count"] == ""  # never a fabricated zero
-
-
-def test_degraded_status_survives_into_final_outputs(tmp_path):
-    domain = "object_styles_model"
-    bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A"}}, ["A", "B"], partial_unknown={"t1": 0.5})
-    out_dir = _assemble(tmp_path, bundle_out_dir)
-
-    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
-    assert summary[0]["comparison_status"] == COMPARISON_STATUS_DEGRADED
-    assert REASON_TARGET_DOMAIN_DEGRADED in summary[0]["comparison_reason_codes"].split("|")
-    # A degraded row is a real partial result, not blanked.
-    assert summary[0]["shared_count"] == "1"
-
-    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
-    assert diagnostics["run_comparison_status"] == COMPARISON_STATUS_DEGRADED
-    assert diagnostics["target_diagnostics"][0]["comparison_status"] == COMPARISON_STATUS_DEGRADED
-
-
-# ---------------------------------------------------------------------------
-# 8 / 9. Missing / malformed reference input fails explicitly (pre-flight,
-#         before any subprocess is ever invoked).
-# ---------------------------------------------------------------------------
-
-
-def test_missing_reference_input_fails_explicitly(tmp_path):
-    with pytest.raises(cr.CompareReferenceError, match="not found"):
-        cr._validate_export_path("--reference", tmp_path / "does_not_exist.json")
-
-
-def test_malformed_reference_json_fails_explicitly(tmp_path):
-    bad = tmp_path / "bad_ref.json"
-    bad.write_text("{not valid json", encoding="utf-8")
-    with pytest.raises(cr.CompareReferenceError, match="not valid JSON"):
-        cr._validate_export_path("--reference", bad)
-
-
-def test_legacy_export_rejected_explicitly(tmp_path):
-    legacy = tmp_path / "foo.legacy.json"
-    _write_json(legacy, {"ok": True})
-    with pytest.raises(cr.CompareReferenceError, match="legacy"):
-        cr._validate_export_path("--reference", legacy)
-
-
-def test_main_exits_nonzero_and_does_not_invoke_subprocess_on_missing_reference(tmp_path, monkeypatch):
-    calls = []
-    monkeypatch.setattr(cr, "_execute", lambda cmd: calls.append(cmd))
-    target = tmp_path / "t1.details.json"
-    _write_json(target, {"ok": True})
-
-    rc = cr.main(
-        [
-            "--reference", str(tmp_path / "missing_ref.json"),
-            "--target", str(target),
-            "--out-dir", str(tmp_path / "out"),
-        ]
-    )
-    assert rc != 0
-    assert calls == []  # no subprocess was ever invoked
-
-
-# ---------------------------------------------------------------------------
-# 10. Schema-incompatible reference blocks explicitly, propagated through
-#     main()'s orchestration (run_bundle_analysis.py subprocess simulated as
-#     failing after recording a blocked compare_run_status.csv, exactly as
-#     the real script does per tools/bundle_analysis/README.md).
-# ---------------------------------------------------------------------------
-
-
-def test_main_propagates_blocked_reference_failure_and_writes_diagnostics(tmp_path, monkeypatch):
-    reference = tmp_path / "ref.details.json"
-    target = tmp_path / "t1.details.json"
-    _write_json(reference, {"ok": True})
-    _write_json(target, {"ok": True})
-    out_dir = tmp_path / "out"
-
-    def fake_execute(cmd):
-        cmd = list(cmd)
-        if "run_bundle_analysis.py" in cmd[1]:
-            bundle_out_dir = Path(cmd[cmd.index("--out-dir") + 1])
-            compare_dir = bundle_out_dir / "compare_all"
-            _write_csv(
-                compare_dir / "file_gap_report.csv",
-                ["reference_bundle_id", "analysis_run_id", "domain", "population_id", "export_run_id", "comparison_status", "comparison_reason_codes"],
-                [],
-            )
-            _write_csv(
-                compare_dir / "compare_run_status.csv",
-                ["analysis_run_id", "comparison_status", "comparison_reason_codes", "comparison_detail", "domains_total", "domains_ok", "domains_degraded", "domains_blocked"],
-                [
-                    {
-                        "analysis_run_id": "run1",
-                        "comparison_status": COMPARISON_STATUS_BLOCKED,
-                        "comparison_reason_codes": REASON_REFERENCE_INVALID,
-                        "comparison_detail": "Missing reference bundle sidecar",
-                        "domains_total": "1",
-                        "domains_ok": "0",
-                        "domains_degraded": "0",
-                        "domains_blocked": "1",
-                    }
-                ],
-            )
-            raise subprocess.CalledProcessError(1, cmd)
-        return None
-
-    monkeypatch.setattr(cr, "_execute", fake_execute)
-    rc = cr.main(["--reference", str(reference), "--target", str(target), "--out-dir", str(out_dir)])
-
-    assert rc != 0
-    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
-    assert diagnostics["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
-    assert REASON_REFERENCE_INVALID in diagnostics["run_comparison_reason_codes"]
-
-
-# ---------------------------------------------------------------------------
-# 11. Stale prior-run rows cannot be confused with current results.
-# ---------------------------------------------------------------------------
-
-
-def test_stale_prior_run_rows_are_not_confused_with_current_results(tmp_path):
-    domain = "object_styles_model"
-    out_dir = tmp_path / "final_out"
-    out_dir.mkdir()
-
-    bundle_out_dir_1 = _setup_compare_all(tmp_path / "run1", domain, {"t1": {"A"}}, ["A"])
-    cr.assemble_outputs(
-        bundle_out_dir_1, "all", out_dir, tmp_path / "ref1.json",
-        {"reference_files": [], "target_files": [], "target_file_count": 1}, ["cmd1"], ["cmd1"],
-    )
-    first_summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
-    assert {r["target_export_run_id"] for r in first_summary} == {"t1"}
-
-    # A second, unrelated comparison run reuses the same out_dir (as
-    # --overwrite/prepare_out_dir would allow) -- its outputs must fully
-    # replace the first run's, not merge with them.
-    bundle_out_dir_2 = _setup_compare_all(tmp_path / "run2", domain, {"t2": {"B"}}, ["B"])
-    cr.assemble_outputs(
-        bundle_out_dir_2, "all", out_dir, tmp_path / "ref2.json",
-        {"reference_files": [], "target_files": [], "target_file_count": 1}, ["cmd2"], ["cmd2"],
-    )
-    second_summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
-    assert {r["target_export_run_id"] for r in second_summary} == {"t2"}
-    assert "t1" not in {r["target_export_run_id"] for r in second_summary}
-
-
-def test_prepare_out_dir_refuses_foreign_directory_without_overwrite(tmp_path):
-    out_dir = tmp_path / "existing"
-    out_dir.mkdir()
-    (out_dir / "unrelated_user_file.txt").write_text("do not delete me", encoding="utf-8")
-
-    with pytest.raises(cr.CompareReferenceError, match="was not produced by a prior run"):
-        cr.prepare_out_dir(out_dir, overwrite=False)
-
-    # File must survive the refused call.
-    assert (out_dir / "unrelated_user_file.txt").is_file()
-
-    # --overwrite explicitly allows clearing it.
-    cr.prepare_out_dir(out_dir, overwrite=True)
-    assert not (out_dir / "unrelated_user_file.txt").exists()
-
-
-def test_prepare_out_dir_allows_reuse_of_its_own_prior_output(tmp_path):
-    out_dir = tmp_path / "owned"
-    out_dir.mkdir()
-    (out_dir / cr.MANIFEST_FILENAME).write_text("{}", encoding="utf-8")
-    (out_dir / "stale.csv").write_text("stale", encoding="utf-8")
-
-    cr.prepare_out_dir(out_dir, overwrite=False)
-    assert not (out_dir / "stale.csv").exists()
-
-
-# ---------------------------------------------------------------------------
-# Regression: --out-dir must never be allowed to destroy the user's source
-# exports (Codex review, PR #466). prepare_out_dir unconditionally clears
-# --out-dir; check_out_dir_does_not_contain_inputs must catch an overlapping
-# --out-dir BEFORE that clearing ever runs.
-# ---------------------------------------------------------------------------
-
-
-def test_check_out_dir_rejects_out_dir_equal_to_reference_parent(tmp_path):
-    exports_dir = tmp_path / "exports"
-    reference = exports_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    target = exports_dir / "t1.details.json"
-    _write_json(target, {"a": 2})
-
-    with pytest.raises(cr.CompareReferenceError, match="ancestor"):
-        cr.check_out_dir_does_not_contain_inputs(exports_dir, reference, [target], None)
-
-
-def test_check_out_dir_rejects_out_dir_equal_to_target_dir(tmp_path):
-    reference = tmp_path / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    corpus_dir = tmp_path / "corpus"
-    _write_json(corpus_dir / "t1.details.json", {"a": 2})
-
-    with pytest.raises(cr.CompareReferenceError, match="ancestor"):
-        cr.check_out_dir_does_not_contain_inputs(corpus_dir, reference, [], corpus_dir)
-
-
-def test_check_out_dir_rejects_out_dir_that_is_an_ancestor_of_an_input(tmp_path):
-    exports_dir = tmp_path / "a" / "b" / "exports"
-    reference = exports_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    target = exports_dir / "t1.details.json"
-    _write_json(target, {"a": 2})
-
-    with pytest.raises(cr.CompareReferenceError, match="ancestor"):
-        cr.check_out_dir_does_not_contain_inputs(tmp_path / "a", reference, [target], None)
-
-
-def test_check_out_dir_allows_unrelated_or_descendant_out_dir(tmp_path):
-    exports_dir = tmp_path / "exports"
-    reference = exports_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    target = exports_dir / "t1.details.json"
-    _write_json(target, {"a": 2})
-
-    # Unrelated directory: fine.
-    cr.check_out_dir_does_not_contain_inputs(tmp_path / "out", reference, [target], None)
-    # A subdirectory nested inside the exports dir doesn't threaten the
-    # exports files living alongside it: fine.
-    cr.check_out_dir_does_not_contain_inputs(exports_dir / "out", reference, [target], None)
-
-
-def test_main_refuses_to_run_when_out_dir_would_destroy_reference(tmp_path, monkeypatch):
-    exports_dir = tmp_path / "exports"
-    reference = exports_dir / "ref.details.json"
-    target = exports_dir / "t1.details.json"
-    _write_json(reference, {"a": 1})
-    _write_json(target, {"a": 2})
-
-    calls = []
-    monkeypatch.setattr(cr, "_execute", lambda cmd: calls.append(cmd))
-
-    rc = cr.main(["--reference", str(reference), "--target", str(target), "--out-dir", str(exports_dir), "--overwrite"])
-
-    assert rc != 0
-    assert calls == []  # no subprocess ever ran
-    assert reference.is_file()  # the source export survived
-    assert target.is_file()
-
-
-def test_check_out_dir_rejects_ancestor_of_join_policy_auxiliary_input(tmp_path):
-    # --join-policy / --sig-hash-policy / --metadata-file are also input
-    # files this tool must never destroy (Codex review, PR #466 -- the
-    # first overlap fix only covered reference/target/target-dir).
-    reference = tmp_path / "ref.details.json"
-    target = tmp_path / "t1.details.json"
-    _write_json(reference, {"a": 1})
-    _write_json(target, {"a": 2})
-    policy_dir = tmp_path / "corpus_policies"
-    join_policy = policy_dir / "domain_join_key_policies.v21.json"
-    _write_json(join_policy, {})
-
-    with pytest.raises(cr.CompareReferenceError, match="ancestor"):
-        cr.check_out_dir_does_not_contain_inputs(policy_dir, reference, [target], None, [join_policy])
-
-
-def test_main_refuses_to_run_when_out_dir_would_destroy_join_policy(tmp_path, monkeypatch):
-    reference = tmp_path / "src" / "ref.details.json"
-    target = tmp_path / "src" / "t1.details.json"
-    _write_json(reference, {"a": 1})
-    _write_json(target, {"a": 2})
-    policy_dir = tmp_path / "policies"
-    join_policy = policy_dir / "domain_join_key_policies.v21.json"
-    _write_json(join_policy, {})
-
-    calls = []
-    monkeypatch.setattr(cr, "_execute", lambda cmd: calls.append(cmd))
-
-    rc = cr.main(
-        [
-            "--reference", str(reference), "--target", str(target),
-            "--join-policy", str(join_policy),
-            "--out-dir", str(policy_dir), "--overwrite",
-        ]
-    )
-
-    assert rc != 0
-    assert calls == []
-    assert join_policy.is_file()  # the policy file survived
-
-
-# ---------------------------------------------------------------------------
-# Regression: a target with zero presence rows for a domain (e.g. the
-# domain has no elements, or was never extracted for that file) must not be
-# silently omitted from the comparison -- it is reported using the existing
-# blocked/TARGET_DOMAIN_UNAVAILABLE classification instead (Codex review,
-# PR #466).
-# ---------------------------------------------------------------------------
-
-
-def test_synthesize_missing_target_rows_flags_target_with_no_presence_for_a_domain():
-    domain = "object_styles_model"
-    gap_rows = [
-        {
-            "reference_bundle_id": "ref-1", "effective_date": "2026-08-27", "analysis_run_id": "run1",
-            "domain": domain, "population_id": "", "export_run_id": "t1",
-            "reference_pattern_count": "2", "target_pattern_count": "2", "shared_count": "2",
-            "reference_only_count": "0", "target_only_count": "0", "union_count": "2",
-            "reference_coverage_pct": "1.000000", "jaccard": "1.000000",
-            "comparison_status": "ok", "comparison_reason_codes": "", "comparison_detail": "",
-        }
-    ]
-    run_summary_rows = [{"domain": domain, "population_id": ""}]
-    reference_bundle = {"reference_bundle_id": "ref-1", "domains": {domain: ["A", "B"]}}
-
-    synthesized = cr._synthesize_missing_target_rows(gap_rows, run_summary_rows, ["t1", "t2"], reference_bundle)
-
-    assert len(synthesized) == 1
-    row = synthesized[0]
-    assert row["export_run_id"] == "t2"
-    assert row["domain"] == domain
-    assert row["comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
-    assert row["comparison_reason_codes"] == "TARGET_DOMAIN_UNAVAILABLE"
-    assert row["reference_pattern_count"] == "2"  # cribbed from the existing row for this domain
-    assert row["target_pattern_count"] == ""  # never a fabricated value
-
-
-def test_synthesize_missing_target_rows_uses_reference_bundle_when_no_existing_row_for_domain():
-    # Every known target is missing for this domain -- no existing gap_row
-    # to crib reference_pattern_count from, so fall back to the sidecar.
-    domain = "object_styles_model"
-    run_summary_rows = [{"domain": domain, "population_id": ""}]
-    reference_bundle = {"reference_bundle_id": "ref-1", "effective_date": "2026-08-27", "domains": {domain: ["A", "B", "C"]}}
-
-    synthesized = cr._synthesize_missing_target_rows([], run_summary_rows, ["t1"], reference_bundle)
-
-    assert len(synthesized) == 1
-    assert synthesized[0]["reference_pattern_count"] == "3"
-    assert synthesized[0]["reference_bundle_id"] == "ref-1"
-
-
-def test_synthesize_missing_target_rows_no_op_without_known_targets():
-    assert cr._synthesize_missing_target_rows([], [{"domain": "d1", "population_id": ""}], [], {}) == []
-
-
-def test_synthesize_missing_target_rows_includes_domain_absent_from_every_target():
-    # Every staged target lacks a domain the reference defines -- that
-    # domain never even reaches run_summary_rows/gap_rows (they're derived
-    # from the target corpus's own presence data), so it must be pulled in
-    # from the reference sidecar's own domain list, not just from rows the
-    # comparator happened to produce (Codex review, PR #466).
-    reference_bundle = {
-        "reference_bundle_id": "ref-1", "effective_date": "2026-08-27",
-        "domains": {"object_styles_model": ["A", "B"], "line_styles": ["X"]},
-    }
-    # Only object_styles_model appears in the comparator's own output --
-    # line_styles was never observed for ANY target at all.
-    run_summary_rows = [{"domain": "object_styles_model", "population_id": ""}]
-    gap_rows = [
-        {
-            "reference_bundle_id": "ref-1", "analysis_run_id": "run1", "domain": "object_styles_model",
-            "population_id": "", "export_run_id": "t1", "reference_pattern_count": "2",
-            "comparison_status": "ok", "comparison_reason_codes": "",
-        }
-    ]
-
-    synthesized = cr._synthesize_missing_target_rows(gap_rows, run_summary_rows, ["t1", "t2"], reference_bundle)
-
-    line_styles_rows = [r for r in synthesized if r["domain"] == "line_styles"]
-    assert {r["export_run_id"] for r in line_styles_rows} == {"t1", "t2"}
-    for row in line_styles_rows:
-        assert row["comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
-        assert row["reference_pattern_count"] == "1"  # len(["X"])
-
-
-def test_assemble_outputs_surfaces_target_missing_from_a_domain_entirely(tmp_path):
-    domain = "object_styles_model"
-    bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A", "B"}}, ["A", "B"])
-    # t2 was staged (part of the known target universe) but produced zero
-    # presence rows for this domain -- invisible to run_compare_for_domain's
-    # default derivation, which is exactly the gap this closes.
-    analysis_dir = tmp_path / "analysis"
-    reference_bundle_payload = {
-        "reference_bundle_id": "ref-2026-08-27", "effective_date": "2026-08-27",
-        "seed_export_run_id": "seed_file", "domains": {domain: ["A", "B"]},
-    }
-    (analysis_dir / "reference_bundle.json").write_text(json.dumps(reference_bundle_payload), encoding="utf-8")
-
-    out_dir = tmp_path / "final_out"
-    out_dir.mkdir()
-    manifest = cr.assemble_outputs(
-        bundle_out_dir, "all", out_dir, tmp_path / "ref.json",
-        {"reference_files": [], "target_files": [], "target_file_count": 2}, ["cmd"], ["cmd"],
-        analysis_dir=analysis_dir, known_target_export_run_ids=["t1", "t2"],
-    )
-
-    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
-    assert {r["target_export_run_id"] for r in summary} == {"t1", "t2"}
-    t2_row = next(r for r in summary if r["target_export_run_id"] == "t2")
-    assert t2_row["comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
-    assert "TARGET_DOMAIN_UNAVAILABLE" in t2_row["comparison_reason_codes"]
-    assert t2_row["target_pattern_count"] == ""
-
-    # The run-level rollup must reflect the synthesized blocked target too,
-    # not report a stale "ok" from before this tool discovered the gap.
-    assert manifest["aggregate_comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
-    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
-    assert diagnostics["run_comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
-    assert any(d["target_export_run_id"] == "t2" for d in diagnostics["target_diagnostics"])
-
-
-def test_assemble_outputs_without_known_targets_preserves_prior_behavior(tmp_path):
-    # Backward compatible: omitting known_target_export_run_ids (the
-    # default) must not change any existing behavior.
-    domain = "object_styles_model"
-    bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A", "B"}}, ["A", "B"])
-    out_dir = _assemble(tmp_path, bundle_out_dir)
-    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
-    assert {r["target_export_run_id"] for r in summary} == {"t1"}
-
-
-def test_assemble_outputs_rebuilds_domain_summaries_consistently_with_synthesized_targets(tmp_path):
-    # domain_summaries (in diagnostics.json) must not disagree with the
-    # top-level run_comparison_status / target_diagnostics about the same
-    # domain (Codex review, PR #466 follow-up finding).
-    domain = "object_styles_model"
-    bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A", "B"}}, ["A", "B"])
-    analysis_dir = tmp_path / "analysis"
-    reference_bundle_payload = {
-        "reference_bundle_id": "ref-2026-08-27", "effective_date": "2026-08-27",
-        "seed_export_run_id": "seed_file", "domains": {domain: ["A", "B"]},
-    }
-    (analysis_dir / "reference_bundle.json").write_text(json.dumps(reference_bundle_payload), encoding="utf-8")
-
-    out_dir = tmp_path / "final_out"
-    out_dir.mkdir()
-    cr.assemble_outputs(
-        bundle_out_dir, "all", out_dir, tmp_path / "ref.json",
-        {"reference_files": [], "target_files": [], "target_file_count": 2}, ["cmd"], ["cmd"],
-        analysis_dir=analysis_dir, known_target_export_run_ids=["t1", "t2"],
-    )
-
-    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
-    assert diagnostics["run_comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
-    domain_summary = next(d for d in diagnostics["domain_summaries"] if d["domain"] == domain)
-    # Must agree with the top-level status and target_diagnostics -- not a
-    # stale "ok" left over from the comparator's own (pre-synthesis) view.
-    assert domain_summary["comparison_status"] == cr.COMPARISON_STATUS_BLOCKED
-    assert domain_summary["files_scored"] == "2"
-    assert domain_summary["comparison_ok_count"] == "1"
-    assert domain_summary["comparison_blocked_count"] == "1"
-
-
-# ---------------------------------------------------------------------------
-# Regression: --roles / --discover-populations already thread eligibility
-# through the underlying comparator correctly on their own; re-deriving an
-# unfiltered target universe for missing-target synthesis in those modes
-# would wrongly flag a role-excluded target as unavailable (Codex review,
-# PR #466).
-# ---------------------------------------------------------------------------
-
-
-def test_main_skips_missing_target_synthesis_when_roles_is_used(tmp_path, monkeypatch):
-    domain = "object_styles_model"
-    reference = tmp_path / "ref.details.json"
-    target = tmp_path / "t1.details.json"
-    _write_json(reference, {"ok": True})
-    _write_json(target, {"ok": True})
-    out_dir = tmp_path / "out"
-    metadata_file = tmp_path / "roles_metadata.csv"
-    _write_csv(metadata_file, ["export_run_id", "governance_role"], [{"export_run_id": "t1", "governance_role": "Project"}])
-
-    captured_kwargs = {}
-    real_assemble = cr.assemble_outputs
-
-    def spy_assemble(*args, **kwargs):
-        captured_kwargs.update(kwargs)
-        return real_assemble(*args, **kwargs)
-
-    def fake_execute(cmd):
-        cmd = list(cmd)
-        if "run_bundle_analysis.py" in cmd[1]:
-            bundle_out_dir = Path(cmd[cmd.index("--out-dir") + 1])
-            fixture_bundle_out_dir = _setup_compare_all(tmp_path / "fixture", domain, {"t1": {"A"}}, ["A"])
-            import shutil as _sh
-            if bundle_out_dir.exists():
-                _sh.rmtree(bundle_out_dir)
-            _sh.copytree(fixture_bundle_out_dir, bundle_out_dir)
-        elif "run_extract_all.py" in cmd[1]:
-            records_dir = Path(cmd[cmd.index("--out-root") + 1]) / "results" / "records"
-            records_dir.mkdir(parents=True, exist_ok=True)
-            _write_csv(
-                records_dir / "file_metadata.csv",
-                ["export_run_id", "file_id"],
-                [{"export_run_id": "seed_file", "file_id": "ref.details.json"}, {"export_run_id": "t1", "file_id": "t1.details.json"}],
-            )
-        return None
-
-    monkeypatch.setattr(cr, "_execute", fake_execute)
-    monkeypatch.setattr(cr, "assemble_outputs", spy_assemble)
-
-    rc = cr.main(
-        [
-            "--reference", str(reference), "--target", str(target),
-            "--roles", "Project", "--metadata-file", str(metadata_file),
-            "--out-dir", str(out_dir),
-        ]
-    )
-
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
     assert rc == 0
-    assert captured_kwargs.get("known_target_export_run_ids") is None
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert summary[0]["comparison_reason_codes"] == cr.REASON_MATERIALIZATION_COMPATIBILITY_UNPROVEN
 
 
-def test_main_skips_missing_target_synthesis_when_discover_populations_is_used(tmp_path, monkeypatch):
-    domain = "object_styles_model"
-    reference = tmp_path / "ref.details.json"
-    target = tmp_path / "t1.details.json"
-    _write_json(reference, {"ok": True})
-    _write_json(target, {"ok": True})
-    out_dir = tmp_path / "out"
-
-    captured_kwargs = {}
-    real_assemble = cr.assemble_outputs
-
-    def spy_assemble(*args, **kwargs):
-        captured_kwargs.update(kwargs)
-        return real_assemble(*args, **kwargs)
-
-    def fake_execute(cmd):
-        cmd = list(cmd)
-        if "run_bundle_analysis.py" in cmd[1]:
-            bundle_out_dir = Path(cmd[cmd.index("--out-dir") + 1])
-            fixture_bundle_out_dir = _setup_compare_all(tmp_path / "fixture", domain, {"t1": {"A"}}, ["A"])
-            import shutil as _sh
-            if bundle_out_dir.exists():
-                _sh.rmtree(bundle_out_dir)
-            _sh.copytree(fixture_bundle_out_dir, bundle_out_dir)
-        elif "run_extract_all.py" in cmd[1]:
-            records_dir = Path(cmd[cmd.index("--out-root") + 1]) / "results" / "records"
-            records_dir.mkdir(parents=True, exist_ok=True)
-            _write_csv(
-                records_dir / "file_metadata.csv",
-                ["export_run_id", "file_id"],
-                [{"export_run_id": "seed_file", "file_id": "ref.details.json"}, {"export_run_id": "t1", "file_id": "t1.details.json"}],
-            )
-        return None
-
-    monkeypatch.setattr(cr, "_execute", fake_execute)
-    monkeypatch.setattr(cr, "assemble_outputs", spy_assemble)
-
-    rc = cr.main(
-        ["--reference", str(reference), "--target", str(target), "--discover-populations", "--out-dir", str(out_dir)]
+def test_partially_populated_tuple_is_unproven_not_ok(tmp_path):
+    # join_key_schema is populated but join_key_policy_id/version are blank
+    # for every record -- no *complete* tuple exists, so this must not be
+    # accepted as a legitimate compatibility signal (Codex review, PR #467).
+    ctx = _build_segment(
+        tmp_path,
+        {"ref.json": ["A"], "target.json": ["A"]},
+        partial_join_key_provenance=True,
     )
-
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
     assert rc == 0
-    assert captured_kwargs.get("known_target_export_run_ids") is None
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert summary[0]["comparison_reason_codes"] == cr.REASON_MATERIALIZATION_COMPATIBILITY_UNPROVEN
 
 
-# ---------------------------------------------------------------------------
-# Regression: a --metadata-file pointing at a corpus-wide file (not this
-# run's own staged file_metadata.csv) must not leak unrelated,
-# never-staged export_run_ids into the role-filtered comparison, where
-# they'd be reported as blocked/TARGET_DOMAIN_UNAVAILABLE despite never
-# being part of this comparison at all (Codex review, PR #466).
-# ---------------------------------------------------------------------------
-
-
-def test_write_staged_only_metadata_file_filters_to_staged_ids(tmp_path):
-    records_dir = tmp_path / "records"
-    _write_csv(
-        records_dir / "file_metadata.csv",
-        ["export_run_id", "file_id"],
-        [{"export_run_id": "seed_file", "file_id": "ref.details.json"}, {"export_run_id": "t1", "file_id": "t1.details.json"}],
-    )
-    corpus_wide_metadata = tmp_path / "corpus_metadata.csv"
-    _write_csv(
-        corpus_wide_metadata,
-        ["export_run_id", "governance_role"],
-        [
-            {"export_run_id": "t1", "governance_role": "Project"},
-            {"export_run_id": "unrelated_file_42", "governance_role": "Project"},  # never staged in this run
+def test_incomplete_record_alongside_complete_one_is_unproven(tmp_path):
+    # One record has a fully-populated (join_key_schema, policy_id, version)
+    # tuple; another record for the same domain has an entirely blank one.
+    # The blank record must not be silently discarded in favor of the
+    # populated one -- the domain as a whole is not provably compatible
+    # (Codex review, PR #467).
+    ctx = _build_segment(
+        tmp_path,
+        {"ref.json": ["A"], "target.json": ["A"]},
+        extra_records_rows=[
+            {"export_run_id": "target.json", "domain": DOMAIN, "join_key_schema": "", "join_key_policy_id": "", "join_key_policy_version": ""}
         ],
     )
-
-    out_path = tmp_path / "filtered.csv"
-    cr._write_staged_only_metadata_file(corpus_wide_metadata, records_dir, out_path)
-
-    filtered_rows = _read_csv(out_path)
-    assert {r["export_run_id"] for r in filtered_rows} == {"t1"}
-
-
-def test_main_filters_explicit_metadata_file_to_staged_ids_before_role_filtering(tmp_path, monkeypatch):
-    domain = "object_styles_model"
-    reference = tmp_path / "ref.details.json"
-    target = tmp_path / "t1.details.json"
-    _write_json(reference, {"ok": True})
-    _write_json(target, {"ok": True})
-    out_dir = tmp_path / "out"
-
-    corpus_wide_metadata = tmp_path / "corpus_metadata.csv"
-    _write_csv(
-        corpus_wide_metadata,
-        ["export_run_id", "governance_role"],
-        [
-            {"export_run_id": "t1", "governance_role": "Project"},
-            {"export_run_id": "unrelated_file_42", "governance_role": "Project"},
-        ],
-    )
-
-    captured_bundle_cmd = []
-
-    def fake_execute(cmd):
-        cmd = list(cmd)
-        if "run_extract_all.py" in cmd[1]:
-            records_dir = Path(cmd[cmd.index("--out-root") + 1]) / "results" / "records"
-            records_dir.mkdir(parents=True, exist_ok=True)
-            _write_csv(
-                records_dir / "file_metadata.csv",
-                ["export_run_id", "file_id"],
-                [{"export_run_id": "seed_file", "file_id": "ref.details.json"}, {"export_run_id": "t1", "file_id": "t1.details.json"}],
-            )
-        elif "run_bundle_analysis.py" in cmd[1]:
-            captured_bundle_cmd.extend(cmd)
-            bundle_out_dir = Path(cmd[cmd.index("--out-dir") + 1])
-            fixture_bundle_out_dir = _setup_compare_all(tmp_path / "fixture", domain, {"t1": {"A"}}, ["A"])
-            import shutil as _sh
-            if bundle_out_dir.exists():
-                _sh.rmtree(bundle_out_dir)
-            _sh.copytree(fixture_bundle_out_dir, bundle_out_dir)
-        return None
-
-    monkeypatch.setattr(cr, "_execute", fake_execute)
-
-    rc = cr.main(
-        [
-            "--reference", str(reference), "--target", str(target),
-            "--roles", "Project", "--metadata-file", str(corpus_wide_metadata),
-            "--out-dir", str(out_dir),
-        ]
-    )
-
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
     assert rc == 0
-    metadata_arg = captured_bundle_cmd[captured_bundle_cmd.index("--metadata-file") + 1]
-    filtered_rows = _read_csv(Path(metadata_arg))
-    assert {r["export_run_id"] for r in filtered_rows} == {"t1"}
-    assert "unrelated_file_42" not in {r["export_run_id"] for r in filtered_rows}
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert summary[0]["comparison_reason_codes"] == cr.REASON_MATERIALIZATION_COMPATIBILITY_UNPROVEN
 
 
 # ---------------------------------------------------------------------------
-# Regression: reject a case-mismatched extension the extractor's own
-# case-sensitive discovery glob would never find (Codex review, PR #466).
+# Empty comparison target set (after excluding the reference) must block,
+# never silently roll up to "ok" (Codex review, PR #467).
 # ---------------------------------------------------------------------------
 
 
-def test_validate_export_path_rejects_uppercase_json_extension(tmp_path):
-    path = tmp_path / "model.JSON"
-    _write_json(path, {"a": 1})
-    with pytest.raises(cr.CompareReferenceError, match="lowercase"):
-        cr._validate_export_path("--reference", path)
-
-
-def test_validate_export_path_accepts_lowercase_json_extension(tmp_path):
-    path = tmp_path / "model.json"
-    _write_json(path, {"a": 1})
-    assert cr._validate_export_path("--reference", path) == path
-
-
-# ---------------------------------------------------------------------------
-# 12. Filenames / output locations are deterministic.
-# ---------------------------------------------------------------------------
-
-
-def test_output_filenames_and_locations_are_fixed(tmp_path):
-    domain = "object_styles_model"
-    bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A"}}, ["A"])
-    out_dir = _assemble(tmp_path, bundle_out_dir)
-
-    assert (out_dir / "reference_comparison_summary.csv").is_file()
-    assert (out_dir / "reference_comparison_detail.csv").is_file()
-    assert (out_dir / "reference_comparison_diagnostics.json").is_file()
-
-
-# ---------------------------------------------------------------------------
-# 13. Command exit behavior matches documented status behavior.
-# ---------------------------------------------------------------------------
-
-
-def test_main_returns_zero_on_success(tmp_path, monkeypatch):
-    domain = "object_styles_model"
-    reference = tmp_path / "ref.details.json"
-    target = tmp_path / "t1.details.json"
-    _write_json(reference, {"ok": True})
-    _write_json(target, {"ok": True})
-    out_dir = tmp_path / "out"
-
-    def fake_execute(cmd):
-        cmd = list(cmd)
-        if "run_bundle_analysis.py" in cmd[1]:
-            bundle_out_dir = Path(cmd[cmd.index("--out-dir") + 1])
-            bundle_out_dir_bundle = _setup_compare_all(tmp_path / "fixture", domain, {"t1": {"A"}}, ["A"])
-            import shutil as _sh
-
-            if bundle_out_dir.exists():
-                _sh.rmtree(bundle_out_dir)
-            _sh.copytree(bundle_out_dir_bundle, bundle_out_dir)
-        return None
-
-    monkeypatch.setattr(cr, "_execute", fake_execute)
-    rc = cr.main(["--reference", str(reference), "--target", str(target), "--out-dir", str(out_dir)])
-    assert rc == 0
-    manifest = json.loads((out_dir / cr.MANIFEST_FILENAME).read_text())
-    assert manifest["aggregate_comparison_status"] == COMPARISON_STATUS_OK
-
-
-def test_main_returns_two_on_validation_error(tmp_path):
-    rc = cr.main(["--reference", str(tmp_path / "nope.json"), "--target", str(tmp_path / "also_nope.json"), "--out-dir", str(tmp_path / "out")])
+def test_target_resolving_to_reference_itself_is_blocked(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, reference="ref.json", target="ref.json")
     assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_NO_COMPARISON_TARGETS]
+    assert _read_csv(out_dir / cr.SUMMARY_FILENAME) == []
 
 
-def test_main_requires_target_or_target_dir(tmp_path, capsys):
-    with pytest.raises(SystemExit):
-        cr.main(["--reference", str(tmp_path / "ref.json"), "--out-dir", str(tmp_path / "out")])
+def test_whole_segment_with_only_reference_file_is_blocked(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, reference="ref.json")  # no --target: whole-segment mode
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_NO_COMPARISON_TARGETS]
 
 
 # ---------------------------------------------------------------------------
-# 14. Reference and target provenance present in every required artifact.
+# 12/13. No JSON export access; no run_extract_all.py invocation.
 # ---------------------------------------------------------------------------
 
 
-def test_provenance_present_in_every_artifact(tmp_path):
-    domain = "object_styles_model"
-    bundle_out_dir = _setup_compare_all(tmp_path, domain, {"t1": {"A"}}, ["A"])
-    ref_file = tmp_path / "ref.details.json"
-    _write_json(ref_file, {"ok": True})
-    out_dir = tmp_path / "final_out"
-    out_dir.mkdir()
-    cr.assemble_outputs(
-        bundle_out_dir, "all", out_dir, ref_file,
-        {"reference_files": [str(ref_file)], "target_files": ["t1"], "target_file_count": 1},
-        ["extract", "cmd"], ["bundle", "cmd"],
+def test_no_json_export_file_ever_created_or_needed(tmp_path):
+    # No *.details.json / *.index.json / *__fingerprint.json file exists
+    # anywhere under tmp_path -- only CSVs. A successful run proves the tool
+    # never needed to open one.
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]})
+    assert not list(tmp_path.rglob("*.details.json"))
+    assert not list(tmp_path.rglob("*.index.json"))
+    assert not list(tmp_path.rglob("*__fingerprint.json"))
+    rc, out_dir = _run(tmp_path, ctx, target="target.json")
+    assert rc == 0
+    assert not list(tmp_path.rglob("*.details.json"))
+    assert not list(tmp_path.rglob("*.index.json"))
+
+
+def test_module_never_shells_out_to_run_extract_all():
+    import ast
+
+    tree = ast.parse(Path(cr.__file__).read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            assert not any(alias.name == "subprocess" for alias in node.names)
+        if isinstance(node, ast.ImportFrom):
+            assert node.module != "subprocess"
+    assert not hasattr(cr, "subprocess")
+
+
+# ---------------------------------------------------------------------------
+# 14. Deterministic output ordering.
+# ---------------------------------------------------------------------------
+
+
+def test_deterministic_output_ordering(tmp_path):
+    ctx = _build_segment(
+        tmp_path,
+        {"ref.json": ["A", "B"], "target_z.json": ["A"], "target_a.json": ["B"]},
     )
+    rc1, out1 = _run(tmp_path, ctx, out_name="out1")
+    rc2, out2 = _run(tmp_path, ctx, out_name="out2")
+    assert rc1 == 0 and rc2 == 0
+    s1 = (out1 / cr.SUMMARY_FILENAME).read_text()
+    s2 = (out2 / cr.SUMMARY_FILENAME).read_text()
+    assert s1 == s2
+    rows = _read_csv(out1 / cr.SUMMARY_FILENAME)
+    targets_in_order = [r["target_export_run_id"] for r in rows if r["purge_view"] == "all"]
+    assert targets_in_order == sorted(targets_in_order)
 
+
+# ---------------------------------------------------------------------------
+# 15. Reference-vs-segment does not self-compare.
+# ---------------------------------------------------------------------------
+
+
+def test_reference_excluded_from_segment_targets(tmp_path):
+    ctx = _build_segment(
+        tmp_path,
+        {"ref.json": ["A"], "target_1.json": ["A"], "target_2.json": ["B"]},
+    )
+    rc, out_dir = _run(tmp_path, ctx, purge_view="all")
+    assert rc == 0
     summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
-    assert summary[0]["reference_bundle_id"] == "ref-2026-08-27"
-    assert summary[0]["target_export_run_id"] == "t1"
-
-    detail = _read_csv(out_dir / cr.DETAIL_FILENAME)
-    assert detail[0]["reference_bundle_id"] == "ref-2026-08-27"
-    assert detail[0]["target_export_run_id"] == "t1"
-
-    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
-    assert diagnostics["reference_bundle_id"] == "ref-2026-08-27"
-    assert diagnostics["analysis_run_id"] == "run1"
-
-    manifest = json.loads((out_dir / cr.MANIFEST_FILENAME).read_text())
-    assert manifest["reference_export"] == str(ref_file)
-    assert manifest["reference_bundle_id"] == "ref-2026-08-27"
-    assert manifest["target_scope"]["target_file_count"] == 1
+    assert "ref.json" not in {r["target_export_run_id"] for r in summary}
 
 
 # ---------------------------------------------------------------------------
-# Staging / discovery helper tests (pure filesystem logic, no subprocess).
+# A reference that is materialized but has no usable pattern evidence in any
+# domain must block, not silently succeed as REFERENCE_DOMAIN_UNDEFINED
+# everywhere (Codex review, PR #467).
 # ---------------------------------------------------------------------------
 
 
-def test_stage_comparison_inputs_one_target(tmp_path):
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref.details.json"
-    target = src_dir / "t1.details.json"
-    _write_json(reference, {"a": 1})
-    _write_json(target, {"a": 2})
-
-    staging_dir = tmp_path / "staged"
-    info = cr.stage_comparison_inputs(reference, [target], None, staging_dir)
-
-    assert (staging_dir / "ref.details.json").is_file()
-    assert (staging_dir / "t1.details.json").is_file()
-    assert info["target_file_count"] == 1
-
-
-def test_stage_comparison_inputs_multiple_targets_via_target_dir(tmp_path):
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    corpus_dir = tmp_path / "corpus"
-    for name in ("t1.details.json", "t2.details.json", "t3.details.json"):
-        _write_json(corpus_dir / name, {"a": name})
-
-    staging_dir = tmp_path / "staged"
-    info = cr.stage_comparison_inputs(reference, [], corpus_dir, staging_dir)
-
-    assert info["target_file_count"] == 3
-    for name in ("t1.details.json", "t2.details.json", "t3.details.json"):
-        assert (staging_dir / name).is_file()
-
-
-def test_stage_comparison_inputs_excludes_reference_copy_from_target_dir(tmp_path):
-    # The reference literally lives inside --target-dir (same resolved
-    # source path, e.g. --target-dir points at the whole corpus root that
-    # also contains the reference) -- excluded rather than compared against
-    # itself.
-    corpus_dir = tmp_path / "corpus"
-    reference = corpus_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    _write_json(corpus_dir / "t1.details.json", {"a": 2})
-
-    staging_dir = tmp_path / "staged"
-    info = cr.stage_comparison_inputs(reference, [], corpus_dir, staging_dir)
-
-    assert info["target_file_count"] == 1
-    assert info["target_files"] == [str(staging_dir / "t1.details.json")]
-
-
-def test_stage_comparison_inputs_raises_on_target_dir_basename_collision_with_reference(tmp_path):
-    # A DIFFERENT file (different resolved source path) that merely shares
-    # the reference's basename must not be silently dropped as if it were
-    # the reference (Codex review, PR #466) -- it's a genuine collision.
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref.details.json"
-    _write_json(reference, {"which": "reference"})
-    corpus_dir = tmp_path / "corpus"
-    _write_json(corpus_dir / "ref.details.json", {"which": "a distinct target, same basename"})
-
-    with pytest.raises(cr.CompareReferenceError, match="[Ff]ilename collision"):
-        cr.stage_comparison_inputs(reference, [], corpus_dir, tmp_path / "staged")
-
-
-def test_stage_comparison_inputs_stages_split_export_siblings(tmp_path):
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    _write_json(src_dir / "ref.index.json", {"a": "index"})
-    target = src_dir / "t1.details.json"
-    _write_json(target, {"a": 2})
-    _write_json(src_dir / "t1.index.json", {"a": "index"})
-
-    staging_dir = tmp_path / "staged"
-    cr.stage_comparison_inputs(reference, [target], None, staging_dir)
-
-    assert (staging_dir / "ref.index.json").is_file()
-    assert (staging_dir / "t1.index.json").is_file()
-
-
-def test_sibling_export_files_finds_mate_regardless_of_internal_suffix_case(tmp_path):
-    # tools/extractor.py classifies the .details./.index. infix case-
-    # insensitively (only its outer *.json glob is case-sensitive), so an
-    # oddly-cased pair like "model.DETAILS.json" + "model.INDEX.json" is
-    # still merged by the extractor -- staging must find that mate too,
-    # not just an exact-case "model.index.json" (Codex review, PR #466).
-    details = tmp_path / "model.DETAILS.json"
-    index = tmp_path / "model.INDEX.json"
-    _write_json(details, {"a": "details"})
-    _write_json(index, {"a": "index"})
-
-    found = set(cr._sibling_export_files(details))
-    assert found == {details, index}
-
-
-def test_stage_comparison_inputs_stages_mixed_case_split_export_sibling(tmp_path):
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref.DETAILS.json"
-    _write_json(reference, {"a": 1})
-    _write_json(src_dir / "ref.INDEX.json", {"a": "index"})
-    target = src_dir / "t1.details.json"
-    _write_json(target, {"a": 2})
-
-    staging_dir = tmp_path / "staged"
-    info = cr.stage_comparison_inputs(reference, [target], None, staging_dir)
-
-    assert (staging_dir / "ref.INDEX.json").is_file()
-    assert len(info["reference_files"]) == 2
-
-
-def test_stage_comparison_inputs_never_pulls_in_legacy_sibling(tmp_path):
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    _write_json(src_dir / "ref.legacy.json", {"a": "legacy"})
-    target = src_dir / "t1.details.json"
-    _write_json(target, {"a": 2})
-
-    staging_dir = tmp_path / "staged"
-    cr.stage_comparison_inputs(reference, [target], None, staging_dir)
-
-    assert not (staging_dir / "ref.legacy.json").exists()
+def test_reference_with_no_patterns_anywhere_is_blocked(tmp_path):
+    # "ref.json" is a materialized member of the segment (present in
+    # file_metadata.csv) but has zero pattern_id presence rows in DOMAIN.
+    ctx = _build_segment(tmp_path, {"ref.json": [], "target.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, target="target.json")
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_REFERENCE_HAS_NO_PATTERNS]
+    assert _read_csv(out_dir / cr.SUMMARY_FILENAME) == []
 
 
 # ---------------------------------------------------------------------------
-# Regression: staging must never pull in an unrelated *alternate-format*
-# representation of the same stem (Codex review, PR #466) -- a migrated
-# directory can retain both a new *__fingerprint.json and an obsolete
-# *.details.json/*.index.json pair for the same conceptual export.
-# tools/extractor.py treats those as two distinct exports; staging both
-# would let the obsolete one sneak in as if it were a separate export.
+# A `.legacy.json` selector must resolve through an exact match only, never
+# via the suffix-stripping stem fallback (Codex review, PR #467).
 # ---------------------------------------------------------------------------
 
 
-def test_sibling_export_files_does_not_cross_format_families(tmp_path):
-    directory = tmp_path / "src"
-    fp = directory / "x__fingerprint.json"
-    details = directory / "x.details.json"
-    index = directory / "x.index.json"
-    for p in (fp, details, index):
-        _write_json(p, {"p": p.name})
-
-    assert cr._sibling_export_files(fp) == [fp]
-    assert set(cr._sibling_export_files(details)) == {details, index}
-
-
-def test_stage_comparison_inputs_reference_ignores_obsolete_alternate_representation(tmp_path):
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref__fingerprint.json"
-    _write_json(reference, {"a": "fingerprint"})
-    # Obsolete alternate representation of the SAME conceptual export,
-    # left over from before a migration to the fingerprint format.
-    _write_json(src_dir / "ref.details.json", {"a": "obsolete details"})
-    _write_json(src_dir / "ref.index.json", {"a": "obsolete index"})
-    target = src_dir / "t1.details.json"
-    _write_json(target, {"a": 2})
-
-    staging_dir = tmp_path / "staged"
-    info = cr.stage_comparison_inputs(reference, [target], None, staging_dir)
-
-    assert (staging_dir / "ref__fingerprint.json").is_file()
-    assert not (staging_dir / "ref.details.json").exists()
-    assert not (staging_dir / "ref.index.json").exists()
-    assert info["reference_files"] == [str(staging_dir / "ref__fingerprint.json")]
-
-
-def test_stage_comparison_inputs_target_dir_skips_obsolete_alternate_representation(tmp_path):
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    corpus_dir = tmp_path / "corpus"
-    _write_json(corpus_dir / "t1__fingerprint.json", {"t": "fingerprint"})
-    # Obsolete alternate representation of the SAME target export -- must
-    # not be staged as if it were a second, distinct target.
-    _write_json(corpus_dir / "t1.details.json", {"t": "obsolete details"})
-    _write_json(corpus_dir / "t1.index.json", {"t": "obsolete index"})
-
-    staging_dir = tmp_path / "staged"
-    info = cr.stage_comparison_inputs(reference, [], corpus_dir, staging_dir)
-
-    assert info["target_file_count"] == 1
-    assert (staging_dir / "t1__fingerprint.json").is_file()
-    assert not (staging_dir / "t1.details.json").exists()
-    assert not (staging_dir / "t1.index.json").exists()
-
-
-def test_stage_comparison_inputs_raises_on_no_targets_after_exclusion(tmp_path):
-    # --target-dir is the same directory the reference itself lives in, with
-    # nothing else in it -- the reference (same resolved source path) is
-    # correctly excluded from the target set, leaving nothing to compare.
-    corpus_dir = tmp_path / "corpus"
-    reference = corpus_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-
-    with pytest.raises(cr.CompareReferenceError, match="nothing to compare"):
-        cr.stage_comparison_inputs(reference, [], corpus_dir, tmp_path / "staged")
-
-
-def test_pick_primary_export_prefers_fingerprint_then_index_then_details_then_plain(tmp_path):
-    # Matches tools/extractor.py::_iter_export_files exactly: for a split
-    # pair, *.index.json (not *.details.json) is the canonical file_id when
-    # both exist. Getting this backwards makes --seed name-match nothing
-    # (Codex review finding, PR #466).
-    a = tmp_path / "x.details.json"
-    b = tmp_path / "x__fingerprint.json"
-    c = tmp_path / "x.index.json"
-    for p in (a, b, c):
-        p.touch()
-    assert cr._pick_primary_export([a, b, c]) == b
-    assert cr._pick_primary_export([a, c]) == c  # index wins over details when both exist
-    assert cr._pick_primary_export([a]) == a  # details-only (no index) falls back to details
-    assert cr._pick_primary_export([c]) == c
-
-
-def test_stage_comparison_inputs_reference_primary_resolves_to_index_for_split_pair(tmp_path):
-    # End-to-end regression for the same bug: staging a split-export
-    # reference and picking its primary via _pick_primary_export must yield
-    # the index file, matching what run_extract_all.py's own file discovery
-    # will use as this export's file_id.
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    _write_json(src_dir / "ref.index.json", {"a": "index"})
-    target = src_dir / "t1.details.json"
-    _write_json(target, {"a": 2})
-
-    staging_dir = tmp_path / "staged"
-    info = cr.stage_comparison_inputs(reference, [target], None, staging_dir)
-    primary = cr._pick_primary_export([Path(p) for p in info["reference_files"]])
-    assert primary.name == "ref.index.json"
+def test_legacy_selector_does_not_fall_back_to_a_different_file(tmp_path):
+    ctx = _build_segment(tmp_path, {"foo.json": ["A"], "target.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, reference="foo.legacy.json", target="target.json")
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_REFERENCE_NOT_MATERIALIZED]
 
 
 # ---------------------------------------------------------------------------
-# Regression: mixed-format target corpora (Codex review, PR #466) -- a
-# corpus containing more than one export format must surface every export,
-# not only the highest-priority format present anywhere in the directory.
+# A stale membership_matrix.csv (rows only for an old analysis_run_id) must
+# block that domain/view, never silently compare as if the target has none
+# of the reference's patterns (Codex review, PR #467).
 # ---------------------------------------------------------------------------
 
 
-def test_discover_primary_export_files_covers_mixed_formats_in_one_corpus(tmp_path):
-    directory = tmp_path / "corpus"
-    _write_json(directory / "a__fingerprint.json", {"a": 1})
-    _write_json(directory / "b.details.json", {"b": 1})
-    _write_json(directory / "b.index.json", {"b": "index"})
-    _write_json(directory / "c.json", {"c": 1})
-    _write_json(directory / "d.legacy.json", {"d": 1})  # never picked up implicitly
-
-    found = cr._discover_primary_export_files(directory)
-    stems = {cr._export_stem(p) for p in found}
-    assert stems == {"a", "b", "c"}
-    assert "d" not in stems
-
-
-def test_discover_primary_export_files_includes_standalone_index_export(tmp_path):
-    # tools/extractor.py::_iter_export_files registers a *standalone* index
-    # file (no details mate) as its own primary export -- discovery must
-    # surface it too, not silently drop every *.index.json unconditionally
-    # (Codex review, PR #466).
-    directory = tmp_path / "corpus"
-    _write_json(directory / "a.details.json", {"a": 1})
-    _write_json(directory / "a.index.json", {"a": "index, has a details mate"})
-    _write_json(directory / "b.index.json", {"b": "index-only, no details mate"})
-
-    found = cr._discover_primary_export_files(directory)
-    stems = {cr._export_stem(p) for p in found}
-    names = {p.name for p in found}
-    assert stems == {"a", "b"}
-    assert "a.details.json" in names  # a's details mate wins, per stem priority
-    assert "b.index.json" in names  # b has no details mate -- its index is primary
-
-
-def test_stage_comparison_inputs_target_dir_includes_standalone_index_export(tmp_path):
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    corpus_dir = tmp_path / "corpus"
-    _write_json(corpus_dir / "t1.index.json", {"t": "index-only target"})
-
-    staging_dir = tmp_path / "staged"
-    info = cr.stage_comparison_inputs(reference, [], corpus_dir, staging_dir)
-
-    assert info["target_file_count"] == 1
-    assert (staging_dir / "t1.index.json").is_file()
-
-
-def test_stage_comparison_inputs_target_dir_stages_every_mixed_format_export(tmp_path):
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    corpus_dir = tmp_path / "corpus"
-    _write_json(corpus_dir / "t_fp__fingerprint.json", {"t": "fp"})
-    _write_json(corpus_dir / "t_details.details.json", {"t": "details"})
-    _write_json(corpus_dir / "t_plain.json", {"t": "plain"})
-
-    staging_dir = tmp_path / "staged"
-    info = cr.stage_comparison_inputs(reference, [], corpus_dir, staging_dir)
-
-    assert info["target_file_count"] == 3
-    for name in ("t_fp__fingerprint.json", "t_details.details.json", "t_plain.json"):
-        assert (staging_dir / name).is_file()
-
-
-# ---------------------------------------------------------------------------
-# Regression: an explicit --reference and --target that happen to share a
-# basename but are genuinely different files must fail explicitly, not
-# silently alias the target onto the already-staged reference (Codex
-# review, PR #466).
-# ---------------------------------------------------------------------------
-
-
-def test_stage_comparison_inputs_raises_on_genuine_filename_collision(tmp_path):
-    reference = tmp_path / "a" / "model.details.json"
-    target = tmp_path / "b" / "model.details.json"  # different file, same basename
-    _write_json(reference, {"which": "reference"})
-    _write_json(target, {"which": "target"})
-
-    with pytest.raises(cr.CompareReferenceError, match="[Ff]ilename collision"):
-        cr.stage_comparison_inputs(reference, [target], None, tmp_path / "staged")
-
-
-def test_stage_comparison_inputs_allows_restaging_the_identical_source_path(tmp_path):
-    # Not a collision: the exact same resolved source file staged twice
-    # (e.g. named explicitly via --target and also discovered via
-    # --target-dir) is a no-op, not an error.
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
-    target = src_dir / "t1.details.json"
-    _write_json(target, {"a": 2})
-
-    info = cr.stage_comparison_inputs(reference, [target, target], None, tmp_path / "staged")
-    assert info["target_file_count"] == 1
-
-
-# ---------------------------------------------------------------------------
-# Regression: a run_bundle_analysis.py failure with no compare_run_status.csv
-# at all must never be reported as "ok" (Codex review, PR #466).
-# ---------------------------------------------------------------------------
-
-
-def test_assemble_outputs_defaults_to_blocked_when_no_run_status_csv_exists(tmp_path):
-    domain = "object_styles_model"
-    bundle_out_dir = tmp_path / "bundle_out"
-    # compare_all/ exists but run_bundle_analysis.py never got far enough to
-    # write compare_run_status.csv (e.g. it failed on early argument
-    # validation, such as a missing --metadata-file for --roles).
-    (bundle_out_dir / "compare_all").mkdir(parents=True)
-
-    out_dir = tmp_path / "final_out"
-    out_dir.mkdir()
-    manifest = cr.assemble_outputs(
-        bundle_out_dir, "all", out_dir, tmp_path / "ref.json",
-        {"reference_files": [], "target_files": [], "target_file_count": 1}, ["cmd"], ["cmd"],
+def test_stale_membership_matrix_blocks_domain(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]})
+    stale_path = ctx["segment_root"] / "results" / "bundle_analysis" / "all" / DOMAIN / "membership_matrix.csv"
+    _write_csv(
+        stale_path,
+        ["analysis_run_id", "export_run_id", "pattern_id"],
+        [{"analysis_run_id": "old_run", "export_run_id": "ref.json", "pattern_id": "A"}],
     )
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
+    assert rc == 0  # domain/view-level block, not a process failure
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert len(summary) == 1
+    assert summary[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert summary[0]["comparison_reason_codes"] == cr.REASON_STALE_MEMBERSHIP_MATRIX
+    assert summary[0]["shared_count"] == ""
 
-    assert manifest["aggregate_comparison_status"] == COMPARISON_STATUS_BLOCKED
-    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
-    assert diagnostics["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
-    assert "COMPARISON_INPUT_INVALID" in diagnostics["run_comparison_reason_codes"]
+    # The "used" view (untouched, still current) must be unaffected.
+    rc2, out_dir2 = _run(tmp_path, ctx, out_name="out2", target="target.json", purge_view="used")
+    assert rc2 == 0
+    summary2 = _read_csv(out_dir2 / cr.SUMMARY_FILENAME)
+    assert summary2[0]["comparison_status"] == COMPARISON_STATUS_OK
 
 
-def test_main_reports_blocked_not_ok_when_bundle_analysis_fails_before_any_status_output(tmp_path, monkeypatch):
-    reference = tmp_path / "ref.details.json"
-    target = tmp_path / "t1.details.json"
-    _write_json(reference, {"ok": True})
-    _write_json(target, {"ok": True})
-    out_dir = tmp_path / "out"
+# ---------------------------------------------------------------------------
+# 16. Parity with directly calling the authoritative comparator.
+# ---------------------------------------------------------------------------
 
-    def fake_execute(cmd):
-        cmd = list(cmd)
-        if "run_bundle_analysis.py" in cmd[1]:
-            # Simulate an early failure (e.g. bad --metadata-file) that never
-            # writes compare_run_status.csv or file_gap_report.csv at all.
-            bundle_out_dir = Path(cmd[cmd.index("--out-dir") + 1])
-            (bundle_out_dir / "compare_all").mkdir(parents=True, exist_ok=True)
-            raise subprocess.CalledProcessError(2, cmd)
-        return None
 
-    monkeypatch.setattr(cr, "_execute", fake_execute)
-    rc = cr.main(["--reference", str(reference), "--target", str(target), "--out-dir", str(out_dir)])
+def test_parity_with_direct_run_compare_for_domain(tmp_path):
+    presence = {"ref.json": ["A", "B"], "target_1.json": ["A"], "target_2.json": ["B", "C"]}
+    ctx = _build_segment(tmp_path, presence)
 
-    assert rc != 0
-    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
-    assert diagnostics["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
-    assert diagnostics["run_comparison_status"] != COMPARISON_STATUS_OK
+    rc, out_dir = _run(tmp_path, ctx, purge_view="all")
+    assert rc == 0
+    tool_rows = {r["target_export_run_id"]: r for r in _read_csv(out_dir / cr.SUMMARY_FILENAME) if r["purge_view"] == "all"}
+
+    direct_out = tmp_path / "direct_compare"
+    reference = {
+        "reference_bundle_id": "irrelevant",
+        "effective_date": "2026-01-01",
+        "seed_export_run_id": "ref.json",
+        "domains": {DOMAIN: ["A", "B"]},
+    }
+    direct_summary = run_compare_for_domain(
+        ctx["segment_root"] / "results" / "analysis",
+        ctx["segment_root"] / "results" / "bundle_analysis" / "all",
+        reference,
+        DOMAIN,
+        compare_out_dir=direct_out,
+    )
+    direct_rows = {r["export_run_id"]: r for r in _read_csv(direct_out / "file_gap_report.csv")}
+
+    assert set(tool_rows.keys()) == set(direct_rows.keys())
+    for export_run_id, tool_row in tool_rows.items():
+        direct_row = direct_rows[export_run_id]
+        for field, direct_key in (
+            ("reference_pattern_count", "reference_pattern_count"),
+            ("target_pattern_count", "target_pattern_count"),
+            ("shared_count", "shared_count"),
+            ("reference_only_count", "reference_only_count"),
+            ("target_only_count", "target_only_count"),
+            ("union_count", "union_count"),
+            ("reference_coverage_pct", "reference_coverage_pct"),
+            ("jaccard", "jaccard"),
+            ("comparison_status", "comparison_status"),
+            ("comparison_reason_codes", "comparison_reason_codes"),
+        ):
+            assert tool_row[field] == direct_row[direct_key], f"{export_run_id}.{field}"
+    assert direct_summary["comparison_status"] == COMPARISON_STATUS_OK
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage: out-dir safety, overwrite semantics, domain filter.
+# ---------------------------------------------------------------------------
+
+
+def test_out_dir_inside_segments_root_refused(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]})
+    out_dir = ctx["segments_root"] / "seg_a"  # same as the segment root itself
+    argv = [
+        "--segments-root", str(ctx["segments_root"]),
+        "--registry-file", str(ctx["registry_file"]),
+        "--segment", "seg_a",
+        "--reference", "ref.json",
+        "--target", "target.json",
+        "--out-dir", str(out_dir),
+    ]
+    rc = cr.main(argv)
+    assert rc == 2
+    # Must not have been cleared/touched.
+    assert (out_dir / "results" / "records" / "file_metadata.csv").is_file()
+
+
+def test_out_dir_overwrite_required_for_foreign_directory(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]})
+    out_dir = tmp_path / "foreign"
+    out_dir.mkdir()
+    (out_dir / "unrelated.txt").write_text("keep me", encoding="utf-8")
+    argv = [
+        "--segments-root", str(ctx["segments_root"]),
+        "--registry-file", str(ctx["registry_file"]),
+        "--segment", "seg_a",
+        "--reference", "ref.json",
+        "--target", "target.json",
+        "--out-dir", str(out_dir),
+    ]
+    rc = cr.main(argv)
+    assert rc == 2
+    assert (out_dir / "unrelated.txt").is_file()
+
+    rc = cr.main(argv + ["--overwrite"])
+    assert rc == 0
+    assert not (out_dir / "unrelated.txt").is_file()
+
+
+def test_domains_filter_restricts_comparison(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", domains="other_domain", purge_view="all")
+    # A requested domain this segment never observed at all blocks at the
+    # domain level (no membership_matrix.csv / no compatibility signal) --
+    # this is a row/domain-level blocked outcome, not a process failure, per
+    # the existing "row/domain blocked -> exit 0, check diagnostics" convention.
+    assert rc == 0
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_status"] == COMPARISON_STATUS_BLOCKED
