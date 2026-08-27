@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, List
+
+import pytest
 
 from tools import extractor, run_extract_all
 from tools import run_a_cache
@@ -408,3 +411,84 @@ def test_run_extract_all_cli_incremental_end_to_end(tmp_path: Path) -> None:
     assert before_placeholders == after_placeholders
     after_ph_content = {p.name: p.read_bytes() for p in placeholder_dir.glob("*.csv")}
     assert before_ph_content == after_ph_content
+
+
+def test_split_file_signature_does_not_collapse_two_mtimes(tmp_path: Path) -> None:
+    """Regression for a real bug: folding a split index/details pair's two
+    (mtime_ns, size) stats together (XOR mtimes, sum sizes) can produce the
+    same folded signature across two genuinely different content states --
+    e.g. if the two files' mtimes simply swap between states, XOR is
+    commutative and stays identical, and if sizes are unchanged (content
+    edited without changing byte length) the sum stays identical too. That
+    would wrongly skip the content-hash fallback and reuse stale rows. Each
+    path's stat pair must be tracked and compared independently."""
+    primary = tmp_path / "a.index.json"
+    secondary = tmp_path / "a.details.json"
+    primary.write_text('{"x": 1}', encoding="utf-8")   # 8 bytes
+    secondary.write_text('{"y": 22}', encoding="utf-8")  # 9 bytes
+
+    t1 = 1_700_000_000_000_000_000
+    t2 = 1_700_000_100_000_000_000
+    os.utime(primary, ns=(t1, t1))
+    os.utime(secondary, ns=(t2, t2))
+
+    cache_dir = tmp_path / "cache"
+    file_id_to_paths = {"a.index.json": [primary, secondary]}
+    state1 = run_a_cache.compute_run_state(
+        cache_dir=cache_dir, file_id_to_paths=file_id_to_paths,
+        sig_hash_policy_path=None, join_policy_path=None,
+        tool_version="v1", force_full=False,
+    )
+    assert state1.cache_was_valid is False  # no prior manifest yet
+    run_a_cache.save_entry(cache_dir, "a.index.json", {"marker": "first"})
+    run_a_cache.finalize_manifest(state1)
+
+    # Swap the two mtimes (same values, opposite files) and edit content while
+    # holding each file's own byte length constant -- the naive XOR/sum fold
+    # is identical to before; each file's own (mtime_ns, size) pair is not.
+    primary.write_text('{"x": 9}', encoding="utf-8")  # still 8 bytes, different content
+    os.utime(primary, ns=(t2, t2))
+    os.utime(secondary, ns=(t1, t1))
+
+    state2 = run_a_cache.compute_run_state(
+        cache_dir=cache_dir, file_id_to_paths=file_id_to_paths,
+        sig_hash_policy_path=None, join_policy_path=None,
+        tool_version="v1", force_full=False,
+    )
+    assert "a.index.json" not in state2.unchanged_file_ids
+
+
+def test_tool_version_change_invalidates_whole_cache(tmp_path: Path, monkeypatch) -> None:
+    exports = tmp_path / "exports"
+    _write_corpus(exports, 2)
+    sig_pol = tmp_path / "sig_hash_policy.json"
+    join_pol = tmp_path / "join_policy.json"
+    _write_json(sig_pol, _UNITS_SIG_HASH_POLICY)
+    _write_json(join_pol, _UNITS_JOIN_POLICY)
+    results_root = tmp_path / "results"
+
+    monkeypatch.setenv("FINGERPRINT_TOOL_VERSION", "1.0.0")
+    report1, _ = _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol)
+    assert report1["files_recomputed"] == 2
+
+    monkeypatch.setenv("FINGERPRINT_TOOL_VERSION", "1.0.1")
+    report2, _ = _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol)
+    assert report2["cache_invalidation_reason"] == "tool_version_changed"
+    assert report2["files_recomputed"] == 2
+    assert report2["files_reused"] == 0
+
+
+def test_malformed_join_policy_hard_fails_like_apply_join_policy(tmp_path: Path) -> None:
+    """apply_join_policy.py raises SystemExit("Invalid policy format: missing
+    domains") on a malformed policy file rather than silently treating every
+    domain as policy-less. The incremental path must match, not quietly cache
+    a run where every record is join_key_status=missing_policy."""
+    exports = tmp_path / "exports"
+    _write_corpus(exports, 1)
+    sig_pol = tmp_path / "sig_hash_policy.json"
+    join_pol = tmp_path / "join_policy.json"
+    _write_json(sig_pol, _UNITS_SIG_HASH_POLICY)
+    _write_json(join_pol, {"not_domains": {}})  # malformed: no "domains" key
+
+    with pytest.raises(SystemExit, match="Invalid policy format"):
+        _run_incremental(tmp_path, exports, tmp_path / "results", sig_pol, join_pol)

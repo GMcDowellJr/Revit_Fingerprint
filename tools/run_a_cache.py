@@ -15,12 +15,18 @@ instead of recomputed.
 Cache-validity contract (deliberately coarse, not per-stage): this module treats
 the *entire* cache as valid or stale as a single unit, keyed by
 (cache schema version, sig_hash policy file content hash, join policy file content
-hash). If either policy file's content changes, or this module's own schema
-version is bumped, every file is treated as changed for this run -- there is no
+hash, tool_version). If either policy file's content changes, this module's own
+schema version is bumped, OR the extraction tool version changes (`tool_version`,
+normally a git SHA -- see core/hashing conventions and `_get_tool_version()` in
+tools/extractor.py), every file is treated as changed for this run -- there is no
 partial "only sig_hash needs recompute" state. This mirrors flatten -> sig_hash ->
 apply's shared dependency: sig_hash/join_hash are both pure per-record functions
-of (that record's own extracted items, the relevant policy file), so a policy
-change invalidates every record's derived value corpus-wide, not just some.
+of (that record's own extracted items, the relevant policy file, and the code that
+computes them), so a policy OR code change invalidates every record's derived
+value corpus-wide, not just some. Keying on `tool_version` (rather than relying
+solely on a human remembering to bump RUN_A_CACHE_SCHEMA_VERSION by hand) means an
+ordinary code change to `_flatten_one_file`/sig_hash/join-key logic automatically
+invalidates stale cached derived values instead of silently reusing them.
 
 RUN_A_CACHE_SCHEMA_VERSION is intentionally separate from
 `tools/discovery_orchestrator.py`'s DISCOVERY_ENGINE_VERSION -- that constant is a
@@ -51,7 +57,7 @@ import json
 import time
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 RUN_A_CACHE_SCHEMA_VERSION = 1
 _HASH_CHUNK_SIZE = 1 << 20  # 1 MiB
@@ -74,11 +80,6 @@ def _sha256_stream(paths: List[Path]) -> str:
                 h.update(chunk)
         h.update(b"\x00")  # separator so (A,BC) != (AB,C) for split index/details pairs
     return h.hexdigest()
-
-
-def fast_stat_signature(path: Path) -> Tuple[int, int]:
-    st = path.stat()
-    return (st.st_mtime_ns, st.st_size)
 
 
 def hash_policy_file(path: Optional[Path]) -> str:
@@ -157,6 +158,20 @@ def save_entry(cache_dir: Path, file_id: str, payload: Dict[str, Any]) -> None:
     _atomic_write_json(_entry_path(cache_dir, file_id), payload)
 
 
+def stat_signature_parts(paths: List[Path]) -> List[Dict[str, int]]:
+    """Independent (mtime_ns, size) pairs, one per path, in the given order.
+
+    Kept as separate per-path pairs -- never folded together (e.g. via XOR/sum)
+    -- because a split index/details export's two files are frequently written
+    with identical or near-identical timestamps by the exporting tool; folding
+    them collapses real signal (two distinct mtimes can XOR to a value that
+    coincidentally recurs, and summed sizes can coincidentally match across two
+    genuinely different byte-for-byte contents) that a later run could rely on
+    to wrongly skip the content-hash fallback and reuse stale cached rows.
+    """
+    return [{"mtime_ns": st.st_mtime_ns, "size": st.st_size} for st in (p.stat() for p in paths)]
+
+
 class RunState:
     """Per-invocation decision of which export files can reuse cached rows.
 
@@ -175,6 +190,7 @@ class RunState:
         invalidation_reason: str,
         sig_hash_policy_hash: str,
         join_policy_hash: str,
+        tool_version: str,
         unchanged_file_ids: Set[str],
         fresh_signatures: Dict[str, Dict[str, Any]],
     ) -> None:
@@ -183,10 +199,11 @@ class RunState:
         self.invalidation_reason = invalidation_reason
         self.sig_hash_policy_hash = sig_hash_policy_hash
         self.join_policy_hash = join_policy_hash
+        self.tool_version = tool_version
         self.unchanged_file_ids = unchanged_file_ids
-        # file_id -> {"mtime_ns": int, "size": int, "content_hash": str}, computed
-        # fresh for every file this run regardless of reuse decision, so the
-        # manifest written at the end of a successful run is always accurate.
+        # file_id -> {"parts": [{"mtime_ns": int, "size": int}, ...], "content_hash": str},
+        # computed fresh for every file this run regardless of reuse decision, so
+        # the manifest written at the end of a successful run is always accurate.
         self.fresh_signatures = fresh_signatures
 
 
@@ -196,6 +213,7 @@ def compute_run_state(
     file_id_to_paths: Dict[str, List[Path]],
     sig_hash_policy_path: Optional[Path],
     join_policy_path: Optional[Path],
+    tool_version: str,
     force_full: bool,
 ) -> RunState:
     """Decide, for every export file, whether its cached rows may be reused.
@@ -205,6 +223,11 @@ def compute_run_state(
     discovery produced them -- content hashing concatenates in that order so a
     hash is comparable run over run only if the pairing itself is stable, which
     `_iter_export_files` already guarantees deterministically by filename.
+
+    `tool_version` should be the same value the caller stamps into
+    file_metadata.csv's own tool_version column (`extractor._get_tool_version()`,
+    normally a git SHA) -- see the module docstring on why it participates in
+    cache validity.
     """
     sig_hash_policy_hash = hash_policy_file(sig_hash_policy_path)
     join_policy_hash = hash_policy_file(join_policy_path)
@@ -227,6 +250,9 @@ def compute_run_state(
     elif manifest.get("join_policy_hash") != join_policy_hash:
         cache_was_valid = False
         invalidation_reason = "join_policy_changed"
+    elif manifest.get("tool_version") != tool_version:
+        cache_was_valid = False
+        invalidation_reason = "tool_version_changed"
 
     prior_files: Dict[str, Any] = {}
     if cache_was_valid and isinstance(manifest, dict) and isinstance(manifest.get("files"), dict):
@@ -236,24 +262,18 @@ def compute_run_state(
     fresh_signatures: Dict[str, Dict[str, Any]] = {}
 
     for file_id, paths in file_id_to_paths.items():
-        mtime_ns, size = fast_stat_signature(paths[0])
-        # Split index/details pairs: fold the secondary file's stat into the
-        # signature too so a details-only edit (secondary changes, primary/index
-        # untouched) is still detected without a content hash.
-        if len(paths) > 1:
-            m2, s2 = fast_stat_signature(paths[1])
-            mtime_ns = mtime_ns ^ m2
-            size = size + s2
+        parts = stat_signature_parts(paths)
 
         prior = prior_files.get(file_id) if cache_was_valid else None
         content_hash: Optional[str] = None
         is_unchanged = False
-        if prior is not None and prior.get("mtime_ns") == mtime_ns and prior.get("size") == size:
-            # Fast path: stat pair matches, trust it without reading file content.
+        if prior is not None and prior.get("parts") == parts:
+            # Fast path: every path's own (mtime_ns, size) pair matches, trust
+            # it without reading file content.
             content_hash = prior.get("content_hash")
             is_unchanged = bool(content_hash)
         elif prior is not None:
-            # Stat pair differs (or is absent) -- fall back to content hash so a
+            # Stat parts differ (or are absent) -- fall back to content hash so a
             # touch-without-edit or a re-copy that changed mtime but not bytes
             # still reuses cache instead of forcing an unnecessary reparse.
             content_hash = _sha256_stream(paths)
@@ -264,7 +284,7 @@ def compute_run_state(
         if content_hash is None:
             content_hash = _sha256_stream(paths)
 
-        fresh_signatures[file_id] = {"mtime_ns": mtime_ns, "size": size, "content_hash": content_hash}
+        fresh_signatures[file_id] = {"parts": parts, "content_hash": content_hash}
         if is_unchanged and load_entry(cache_dir, file_id) is not None:
             unchanged_file_ids.add(file_id)
 
@@ -274,6 +294,7 @@ def compute_run_state(
         invalidation_reason=invalidation_reason,
         sig_hash_policy_hash=sig_hash_policy_hash,
         join_policy_hash=join_policy_hash,
+        tool_version=tool_version,
         unchanged_file_ids=unchanged_file_ids,
         fresh_signatures=fresh_signatures,
     )
@@ -291,22 +312,8 @@ def finalize_manifest(state: RunState) -> None:
         "schema_version": RUN_A_CACHE_SCHEMA_VERSION,
         "sig_hash_policy_hash": state.sig_hash_policy_hash,
         "join_policy_hash": state.join_policy_hash,
+        "tool_version": state.tool_version,
         "files": state.fresh_signatures,
         "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     save_manifest(state.cache_dir, manifest)
-
-
-def write_reuse_file_ids_file(state: RunState, path: Path) -> None:
-    """Write one file_id per line for a subprocess (apply_join_policy.py) to read."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        for file_id in sorted(state.unchanged_file_ids):
-            f.write(file_id + "\n")
-
-
-def read_reuse_file_ids_file(path: Optional[Path]) -> Set[str]:
-    if path is None or not path.is_file():
-        return set()
-    with path.open("r", encoding="utf-8-sig") as f:
-        return {line.strip() for line in f if line.strip()}

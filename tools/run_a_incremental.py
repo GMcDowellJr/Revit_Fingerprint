@@ -44,6 +44,7 @@ tools/run_a_cache.py).
 """
 from __future__ import annotations
 
+import csv
 import json
 import sys
 import time
@@ -338,28 +339,37 @@ def run_incremental(
     Run A's case) has also completed successfully.
     """
     export_files = _iter_export_files(exports_dir)
-    file_id_to_primary: Dict[str, Path] = {}
     file_id_to_paths: Dict[str, List[Path]] = {}
     for _, primary, secondary in export_files:
         fid = _file_id(primary, file_id_mode)
-        file_id_to_primary[fid] = primary
         file_id_to_paths[fid] = [primary] + ([secondary] if secondary is not None else [])
 
     sig_hash_policies = load_sig_hash_policies(str(sig_hash_policy_path)) if sig_hash_policy_path else {"domains": {}}
-    join_policy_raw: Dict[str, Any] = {}
-    if join_policy_path is not None and Path(join_policy_path).is_file():
-        join_policy_raw = json.loads(Path(join_policy_path).read_text(encoding="utf-8"))
-    join_policy_domains = join_policy_raw.get("domains") if isinstance(join_policy_raw.get("domains"), dict) else {}
+    join_policy_domains: Dict[str, Any] = {}
+    if join_policy_path is not None:
+        join_policy_path = Path(join_policy_path)
+        if not join_policy_path.is_file():
+            raise SystemExit(f"Join policy not found: {join_policy_path}")
+        join_policy_raw = json.loads(join_policy_path.read_text(encoding="utf-8"))
+        # Matches apply_join_policy.py's own validation exactly: a malformed
+        # policy (missing/non-dict "domains") must hard-fail here too, not
+        # silently degrade to "every domain has no policy" -- that would mark
+        # every record join_key_status=missing_policy and let a corrupt policy
+        # file get cached as a "successful" run.
+        join_policy_domains = join_policy_raw.get("domains") if isinstance(join_policy_raw, dict) else None
+        if not isinstance(join_policy_domains, dict):
+            raise SystemExit("Invalid policy format: missing domains")
 
+    tool_version = _get_tool_version()
     state = run_a_cache.compute_run_state(
         cache_dir=cache_dir,
         file_id_to_paths=file_id_to_paths,
         sig_hash_policy_path=sig_hash_policy_path,
         join_policy_path=join_policy_path,
+        tool_version=tool_version,
         force_full=force_full,
     )
 
-    tool_version = _get_tool_version()
     exported_utc = _utc_now_iso()
     governance_rules = _load_governance_role_rules()
 
@@ -378,70 +388,117 @@ def run_incremental(
                 if any(v for v in preserved.values()):
                     existing_annotations[eid] = preserved
 
-    all_records: List[Dict[str, str]] = []
-    all_labels: List[Dict[str, str]] = []
-    all_reasons: List[Dict[str, str]] = []
-    all_params: List[Dict[str, str]] = []
-    all_item_shard_rows: Dict[str, List[Dict[str, str]]] = {}
-    all_sig_basis_rows: List[Dict[str, str]] = []
-    all_join_failures: List[Dict[str, str]] = []
-    meta_rows: List[Dict[str, str]] = []
-
-    files_reused = 0
-    files_recomputed = 0
-    total_diag = {"records_processed": 0, "records_hashed": 0, "records_blocked": 0, "records_degraded": 0, "basis_items_written": 0}
-    lp_total = {"total": 0, "ok": 0, "missing": 0}
-
-    for _, primary, secondary in export_files:
-        file_id = _file_id(primary, file_id_mode)
-        entry: Optional[Dict[str, Any]] = None
-        if file_id in state.unchanged_file_ids:
-            entry = run_a_cache.load_entry(cache_dir, file_id)
-        if entry is not None:
-            files_reused += 1
-            for k in total_diag:
-                total_diag[k] += entry.get("sig_hash_diag", {}).get(k, 0)
-            lp = entry.get("line_pattern_stats", {"total": 0, "ok": 0, "missing": 0})
-            for k in lp_total:
-                lp_total[k] += lp.get(k, 0)
-        else:
-            files_recomputed += 1
-            entry, file_diag, lp_stats = _compute_fresh_entry(
-                primary, secondary, file_id_mode, tool_version, exported_utc,
-                governance_rules, sig_hash_policies, join_policy_domains,
-            )
-            entry["sig_hash_diag"] = file_diag
-            entry["line_pattern_stats"] = lp_stats
-            for k in total_diag:
-                total_diag[k] += file_diag[k]
-            for k in lp_total:
-                lp_total[k] += lp_stats[k]
-            run_a_cache.save_entry(cache_dir, file_id, entry)
-
-        meta_row = _merge_meta_row(entry["meta_core"], existing_annotations, annotation_columns, governance_rules)
-        meta_rows.append(meta_row)
-        all_records.extend(entry["records"])
-        all_labels.extend(entry["label_rows"])
-        all_reasons.extend(entry["reason_rows"])
-        all_params.extend(entry["param_rows"])
-        for domain, rows in entry["item_shard_rows"].items():
-            all_item_shard_rows.setdefault(domain, []).extend(rows)
-        all_sig_basis_rows.extend(entry["sig_basis_rows"])
-        all_join_failures.extend(entry["join_failure_rows"])
-
+    # Every artifact below is written incrementally, one export file's rows at a
+    # time, and a processed file's `entry` (records/labels/item-shard rows/etc.)
+    # is discarded once its rows are streamed out -- so peak memory is bounded by
+    # one file's data, not the whole corpus, whether that file's rows come from
+    # cache or a fresh recompute. This preserves the same bound `emit_records()`
+    # already has (see its own docstring) instead of quietly discarding it; a
+    # zero-change run over a large corpus (the case this cache mainly targets)
+    # must not have to hold every record/label/reason/param/identity-item row in
+    # memory just to confirm nothing changed.
     out_dir.mkdir(parents=True, exist_ok=True)
-    _write_csv(out_dir / "records.csv", _RECORDS_CSV_FIELDS, all_records)
-    _write_csv(out_dir / "label_components.csv", _LABEL_FIELDS, all_labels)
-    _write_csv(out_dir / "status_reasons.csv", _REASON_FIELDS, all_reasons)
-    _write_csv(out_dir / "parameter_rows.csv", _PARAM_FIELDS, all_params)
-
     shard_dir = out_dir / "identity_items_by_domain"
     shard_dir.mkdir(parents=True, exist_ok=True)
     for stale in shard_dir.glob("*.csv"):
         stale.unlink(missing_ok=True)
     (shard_dir / ".complete").unlink(missing_ok=True)
-    for domain, rows in all_item_shard_rows.items():
-        _write_csv(shard_dir / f"{domain}.csv", _ITEM_FIELDS, rows)
+    item_shard_handles: Dict[str, Any] = {}
+    item_shard_writers: Dict[str, Any] = {}
+
+    diag_dir = out_dir.parent / "diagnostics"
+    diag_dir.mkdir(parents=True, exist_ok=True)
+
+    _streaming_stems = ["records", "label_components", "status_reasons", "parameter_rows", "sig_basis_items"]
+    _tmp: Dict[str, Path] = {s: out_dir / f"{s}.csv.tmp" for s in _streaming_stems}
+    _join_failures_tmp = diag_dir / "join_policy_failures.csv.tmp"
+
+    meta_rows: List[Dict[str, str]] = []  # one row per file -- stays in memory, matches emit_records()
+    files_reused = 0
+    files_recomputed = 0
+    record_count = 0
+    total_diag = {"records_processed": 0, "records_hashed": 0, "records_blocked": 0, "records_degraded": 0, "basis_items_written": 0}
+    lp_total = {"total": 0, "ok": 0, "missing": 0}
+    active_domains: set = set()
+
+    with (
+        _tmp["records"].open("w", newline="", encoding="utf-8") as _rec_f,
+        _tmp["label_components"].open("w", newline="", encoding="utf-8") as _lbl_f,
+        _tmp["status_reasons"].open("w", newline="", encoding="utf-8") as _rsn_f,
+        _tmp["parameter_rows"].open("w", newline="", encoding="utf-8") as _par_f,
+        _tmp["sig_basis_items"].open("w", newline="", encoding="utf-8") as _basis_f,
+        _join_failures_tmp.open("w", newline="", encoding="utf-8") as _fail_f,
+    ):
+        _rec_w = csv.DictWriter(_rec_f, fieldnames=_RECORDS_CSV_FIELDS)
+        _lbl_w = csv.DictWriter(_lbl_f, fieldnames=_LABEL_FIELDS)
+        _rsn_w = csv.DictWriter(_rsn_f, fieldnames=_REASON_FIELDS)
+        _par_w = csv.DictWriter(_par_f, fieldnames=_PARAM_FIELDS)
+        _basis_w = csv.DictWriter(_basis_f, fieldnames=_SIG_BASIS_FIELDS)
+        _fail_w = csv.DictWriter(_fail_f, fieldnames=_JOIN_FAILURE_FIELDS)
+        for _w in (_rec_w, _lbl_w, _rsn_w, _par_w, _basis_w, _fail_w):
+            _w.writeheader()
+
+        for _, primary, secondary in export_files:
+            file_id = _file_id(primary, file_id_mode)
+            entry: Optional[Dict[str, Any]] = None
+            if file_id in state.unchanged_file_ids:
+                entry = run_a_cache.load_entry(cache_dir, file_id)
+            if entry is not None:
+                files_reused += 1
+                for k in total_diag:
+                    total_diag[k] += entry.get("sig_hash_diag", {}).get(k, 0)
+                lp = entry.get("line_pattern_stats", {"total": 0, "ok": 0, "missing": 0})
+                for k in lp_total:
+                    lp_total[k] += lp.get(k, 0)
+            else:
+                files_recomputed += 1
+                entry, file_diag, lp_stats = _compute_fresh_entry(
+                    primary, secondary, file_id_mode, tool_version, exported_utc,
+                    governance_rules, sig_hash_policies, join_policy_domains,
+                )
+                entry["sig_hash_diag"] = file_diag
+                entry["line_pattern_stats"] = lp_stats
+                for k in total_diag:
+                    total_diag[k] += file_diag[k]
+                for k in lp_total:
+                    lp_total[k] += lp_stats[k]
+                run_a_cache.save_entry(cache_dir, file_id, entry)
+
+            meta_row = _merge_meta_row(entry["meta_core"], existing_annotations, annotation_columns, governance_rules)
+            meta_rows.append(meta_row)
+
+            for row in entry["records"]:
+                _rec_w.writerow(row)
+                active_domains.add(row["domain"])
+                record_count += 1
+            for row in entry["label_rows"]:
+                _lbl_w.writerow(row)
+            for row in entry["reason_rows"]:
+                _rsn_w.writerow(row)
+            for row in entry["param_rows"]:
+                _par_w.writerow(row)
+            for domain, rows in entry["item_shard_rows"].items():
+                if domain not in item_shard_writers:
+                    _fp = (shard_dir / f"{domain}.csv").open("w", newline="", encoding="utf-8")
+                    item_shard_handles[domain] = _fp
+                    _shard_w = csv.DictWriter(_fp, fieldnames=_ITEM_FIELDS)
+                    _shard_w.writeheader()
+                    item_shard_writers[domain] = _shard_w
+                for row in rows:
+                    item_shard_writers[domain].writerow(row)
+            for row in entry["sig_basis_rows"]:
+                _basis_w.writerow(row)
+            for row in entry["join_failure_rows"]:
+                _fail_w.writerow(row)
+            # `entry` (and any large per-domain row lists it held) is now free to
+            # be garbage-collected before the next export file is processed.
+
+    for _fp in item_shard_handles.values():
+        _fp.close()
+    item_shard_handles.clear()
+    item_shard_writers.clear()
+    # Sentinel content is never parsed by any reader (existence-only gate), so a
+    # wall-clock timestamp is sufficient -- matches extractor.emit_records().
     (shard_dir / ".complete").write_text(str(time.time()), encoding="utf-8")
     (out_dir / "identity_items.csv").unlink(missing_ok=True)
 
@@ -458,21 +515,19 @@ def run_incremental(
         _sort_rows(meta_rows, ["export_run_id"]),
     )
 
-    _write_csv(
-        out_dir / "sig_basis_items.csv",
-        _SIG_BASIS_FIELDS,
-        _sort_rows(all_sig_basis_rows, ["record_pk", "ordinal"]),
-    )
+    # Files are promoted to their final names only after every writer above
+    # succeeds, matching extractor.emit_records()'s own .tmp-then-replace
+    # convention -- a mid-loop failure leaves the previous complete output
+    # intact instead of a half-written records.csv.
+    for stem in _streaming_stems:
+        _tmp[stem].replace(out_dir / f"{stem}.csv")
+    _join_failures_tmp.replace(diag_dir / "join_policy_failures.csv")
 
-    diag_dir = out_dir.parent / "diagnostics"
-    diag_dir.mkdir(parents=True, exist_ok=True)
-    _write_csv(
-        diag_dir / "join_policy_failures.csv",
-        _JOIN_FAILURE_FIELDS,
-        _sort_rows(all_join_failures, ["domain", "file_id", "record_pk"]),
-    )
-
-    active_domains = sorted({r["domain"] for r in all_records})
+    # sig_basis_items.csv and join_policy_failures.csv are no longer sorted
+    # corpus-wide (that required materializing every row in memory first) --
+    # rows are written in file-iteration order instead. Neither file's row
+    # order carries semantic meaning to any downstream reader (both are
+    # per-record traceability/audit tables, not order-sensitive structures).
     domains_without_policy = sorted(d for d in active_domains if not isinstance(get_domain_sig_hash_policy(sig_hash_policies, d), dict))
     # Matches _apply_sig_hash_to_phase0's diagnostics contract exactly:
     # "files_processed" counts sig_hash *stage invocations* (always 1 per run, not
@@ -493,7 +548,7 @@ def run_incremental(
         "files_total": len(export_files),
         "files_reused": files_reused,
         "files_recomputed": files_recomputed,
-        "record_count": len(all_records),
+        "record_count": record_count,
         "sig_hash_diag": sig_hash_diag,
         "line_pattern_stats": lp_total,
         "cache_was_valid": state.cache_was_valid,
