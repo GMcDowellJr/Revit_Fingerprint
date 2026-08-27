@@ -585,11 +585,13 @@ def test_stage_comparison_inputs_multiple_targets_via_target_dir(tmp_path):
 
 
 def test_stage_comparison_inputs_excludes_reference_copy_from_target_dir(tmp_path):
-    src_dir = tmp_path / "src"
-    reference = src_dir / "ref.details.json"
-    _write_json(reference, {"a": 1})
+    # The reference literally lives inside --target-dir (same resolved
+    # source path, e.g. --target-dir points at the whole corpus root that
+    # also contains the reference) -- excluded rather than compared against
+    # itself.
     corpus_dir = tmp_path / "corpus"
-    _write_json(corpus_dir / "ref.details.json", {"a": 1})  # accidental duplicate of the reference
+    reference = corpus_dir / "ref.details.json"
+    _write_json(reference, {"a": 1})
     _write_json(corpus_dir / "t1.details.json", {"a": 2})
 
     staging_dir = tmp_path / "staged"
@@ -597,6 +599,20 @@ def test_stage_comparison_inputs_excludes_reference_copy_from_target_dir(tmp_pat
 
     assert info["target_file_count"] == 1
     assert info["target_files"] == [str(staging_dir / "t1.details.json")]
+
+
+def test_stage_comparison_inputs_raises_on_target_dir_basename_collision_with_reference(tmp_path):
+    # A DIFFERENT file (different resolved source path) that merely shares
+    # the reference's basename must not be silently dropped as if it were
+    # the reference (Codex review, PR #466) -- it's a genuine collision.
+    src_dir = tmp_path / "src"
+    reference = src_dir / "ref.details.json"
+    _write_json(reference, {"which": "reference"})
+    corpus_dir = tmp_path / "corpus"
+    _write_json(corpus_dir / "ref.details.json", {"which": "a distinct target, same basename"})
+
+    with pytest.raises(cr.CompareReferenceError, match="[Ff]ilename collision"):
+        cr.stage_comparison_inputs(reference, [], corpus_dir, tmp_path / "staged")
 
 
 def test_stage_comparison_inputs_stages_split_export_siblings(tmp_path):
@@ -629,12 +645,75 @@ def test_stage_comparison_inputs_never_pulls_in_legacy_sibling(tmp_path):
     assert not (staging_dir / "ref.legacy.json").exists()
 
 
-def test_stage_comparison_inputs_raises_on_no_targets_after_exclusion(tmp_path):
+# ---------------------------------------------------------------------------
+# Regression: staging must never pull in an unrelated *alternate-format*
+# representation of the same stem (Codex review, PR #466) -- a migrated
+# directory can retain both a new *__fingerprint.json and an obsolete
+# *.details.json/*.index.json pair for the same conceptual export.
+# tools/extractor.py treats those as two distinct exports; staging both
+# would let the obsolete one sneak in as if it were a separate export.
+# ---------------------------------------------------------------------------
+
+
+def test_sibling_export_files_does_not_cross_format_families(tmp_path):
+    directory = tmp_path / "src"
+    fp = directory / "x__fingerprint.json"
+    details = directory / "x.details.json"
+    index = directory / "x.index.json"
+    for p in (fp, details, index):
+        _write_json(p, {"p": p.name})
+
+    assert cr._sibling_export_files(fp) == [fp]
+    assert set(cr._sibling_export_files(details)) == {details, index}
+
+
+def test_stage_comparison_inputs_reference_ignores_obsolete_alternate_representation(tmp_path):
+    src_dir = tmp_path / "src"
+    reference = src_dir / "ref__fingerprint.json"
+    _write_json(reference, {"a": "fingerprint"})
+    # Obsolete alternate representation of the SAME conceptual export,
+    # left over from before a migration to the fingerprint format.
+    _write_json(src_dir / "ref.details.json", {"a": "obsolete details"})
+    _write_json(src_dir / "ref.index.json", {"a": "obsolete index"})
+    target = src_dir / "t1.details.json"
+    _write_json(target, {"a": 2})
+
+    staging_dir = tmp_path / "staged"
+    info = cr.stage_comparison_inputs(reference, [target], None, staging_dir)
+
+    assert (staging_dir / "ref__fingerprint.json").is_file()
+    assert not (staging_dir / "ref.details.json").exists()
+    assert not (staging_dir / "ref.index.json").exists()
+    assert info["reference_files"] == [str(staging_dir / "ref__fingerprint.json")]
+
+
+def test_stage_comparison_inputs_target_dir_skips_obsolete_alternate_representation(tmp_path):
     src_dir = tmp_path / "src"
     reference = src_dir / "ref.details.json"
     _write_json(reference, {"a": 1})
     corpus_dir = tmp_path / "corpus"
-    _write_json(corpus_dir / "ref.details.json", {"a": 1})  # only the reference itself
+    _write_json(corpus_dir / "t1__fingerprint.json", {"t": "fingerprint"})
+    # Obsolete alternate representation of the SAME target export -- must
+    # not be staged as if it were a second, distinct target.
+    _write_json(corpus_dir / "t1.details.json", {"t": "obsolete details"})
+    _write_json(corpus_dir / "t1.index.json", {"t": "obsolete index"})
+
+    staging_dir = tmp_path / "staged"
+    info = cr.stage_comparison_inputs(reference, [], corpus_dir, staging_dir)
+
+    assert info["target_file_count"] == 1
+    assert (staging_dir / "t1__fingerprint.json").is_file()
+    assert not (staging_dir / "t1.details.json").exists()
+    assert not (staging_dir / "t1.index.json").exists()
+
+
+def test_stage_comparison_inputs_raises_on_no_targets_after_exclusion(tmp_path):
+    # --target-dir is the same directory the reference itself lives in, with
+    # nothing else in it -- the reference (same resolved source path) is
+    # correctly excluded from the target set, leaving nothing to compare.
+    corpus_dir = tmp_path / "corpus"
+    reference = corpus_dir / "ref.details.json"
+    _write_json(reference, {"a": 1})
 
     with pytest.raises(cr.CompareReferenceError, match="nothing to compare"):
         cr.stage_comparison_inputs(reference, [], corpus_dir, tmp_path / "staged")

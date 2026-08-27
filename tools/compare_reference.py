@@ -123,17 +123,33 @@ def _export_stem(path: Path) -> str:
 
 
 def _sibling_export_files(path: Path) -> List[Path]:
-    """Every file alongside `path` that belongs to the same export -- a
-    split-export .details.json/.index.json pair, or a single
-    *__fingerprint.json/.json file. Never includes a *.legacy.json sibling
-    that wasn't the path explicitly given.
+    """Every file alongside `path` that belongs to the SAME export
+    representation as `path` -- a split-export .details.json/.index.json
+    pair stages together, but never an unrelated *alternate-format*
+    representation of the same stem (Codex review, PR #466): a migrated
+    directory can retain e.g. both `foo__fingerprint.json` and an obsolete
+    `foo.details.json`/`foo.index.json` pair for the same conceptual export.
+    tools/extractor.py::_iter_export_files treats those as two distinct
+    exports (different file_ids); staging both would let an obsolete
+    representation of a chosen file sneak into the corpus as if it were a
+    separate export, or double-count a target scored under two
+    representations at once. Never includes a *.legacy.json sibling that
+    wasn't the path explicitly given.
     """
     stem = _export_stem(path)
     parent = path.parent
+    name_lower = path.name.lower()
+    if name_lower.endswith(".details.json") or name_lower.endswith(".index.json"):
+        candidate_suffixes: Sequence[str] = (".details.json", ".index.json")
+    elif name_lower.endswith("__fingerprint.json"):
+        candidate_suffixes = ("__fingerprint.json",)
+    elif name_lower.endswith(".legacy.json"):
+        candidate_suffixes = (".legacy.json",)
+    else:
+        candidate_suffixes = (".json",)
+
     found: List[Path] = []
-    for suffix in _EXPORT_SUFFIXES:
-        if suffix == ".legacy.json" and not path.name.lower().endswith(".legacy.json"):
-            continue
+    for suffix in candidate_suffixes:
         candidate = parent / f"{stem}{suffix}"
         if candidate.is_file() and candidate not in found:
             found.append(candidate)
@@ -267,7 +283,14 @@ def stage_comparison_inputs(
     reference_files = _stage_export(reference, staging_dir, seen)
     if not reference_files:
         raise CompareReferenceError(f"Reference export not found: {reference}")
-    reference_names = {p.name for p in reference_files}
+    # Resolved *source* paths the reference actually staged from -- used to
+    # recognize "this target-dir file literally IS the reference" (e.g.
+    # --target-dir points at a corpus root that also contains the reference
+    # itself). Deliberately not name-based: a different file that merely
+    # shares the reference's basename is not the same export and must not be
+    # silently dropped here (Codex review, PR #466) -- it should either
+    # stage normally or hit _stage_export's own explicit collision error.
+    reference_source_paths = set(seen.values())
 
     target_files: List[Path] = []
     for t in targets:
@@ -283,20 +306,25 @@ def stage_comparison_inputs(
         if not corpus_primaries:
             raise CompareReferenceError(f"--target-dir contains no fingerprint exports: {target_dir}")
         for primary in corpus_primaries:
-            if primary.name in reference_names:
-                # The reference happens to also live in the target corpus
-                # directory -- excluded rather than compared against itself.
+            if primary.resolve() in reference_source_paths:
+                # This literally is the reference file (same resolved source)
+                # rediscovered inside the target corpus -- excluded rather
+                # than compared against itself. A different file that merely
+                # shares its basename is NOT excluded here; _stage_export
+                # will stage it normally or raise on a genuine collision.
                 continue
             target_files.extend(_stage_export(primary, staging_dir, seen))
 
-    target_names = {p.name for p in target_files} - reference_names
-    if not target_names:
+    if not target_files:
         raise CompareReferenceError("No target export files resolved (after excluding the reference) -- nothing to compare.")
 
     return {
         "reference_files": sorted(str(p) for p in reference_files),
-        "target_files": sorted(str(p) for p in target_files if p.name in target_names),
-        "target_file_count": len(target_names),
+        "target_files": sorted({str(p) for p in target_files}),
+        # Counted by export stem, not raw staged filename: a split-export
+        # target spans two files (.details.json + .index.json) but is one
+        # target export.
+        "target_file_count": len({_export_stem(p) for p in target_files}),
     }
 
 
