@@ -25,8 +25,10 @@ class EnterprisePolicy:
     policy_path: Optional[str] = None
     schema: str = POLICY_SCHEMA
 
-    def is_enterprise(self, client_label: str) -> bool:
-        return (client_label or "").strip().casefold() == self.normalized_enterprise_label
+    def is_enterprise(self, client_label: Any) -> bool:
+        if not isinstance(client_label, str):
+            return False
+        return client_label.strip().casefold() == self.normalized_enterprise_label
 
     def provenance(self) -> Dict[str, Any]:
         value: Dict[str, Any] = {
