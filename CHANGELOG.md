@@ -75,6 +75,89 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   in the codebase at either corpus or segment scope.
 
 ### Fixed
+- **`tools/compare_reference.py`'s `semantic_changes_skipped_reason` manifest
+  key is no longer simply absent on a pre-flight-blocked run.**
+  `write_top_level_blocked()` (segment not found, materialization incomplete,
+  reference/target unresolved, cross-segment unit-system/schema mismatch --
+  any failure caught before `assemble_final_outputs()` is ever reached) now
+  takes a `same_segment` parameter and populates the key the same way
+  `assemble_final_outputs()` does: `REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_
+  CROSS_SEGMENT` when `same_segment` is False (cross-segment mode always
+  skips the file, regardless of why the run failed), `""` when True
+  (consistent with every other per-run field in this blocked manifest --
+  `domains_total="0"` etc. -- being explained by `run_comparison_status=
+  blocked`, not by a field-specific reason of its own). Previously a
+  consumer checking this key on every manifest could hit a missing key on
+  this path despite the contract stating it's always recorded. New
+  coverage: `tests/test_compare_reference.py::
+  test_semantic_changes_skipped_reason_present_on_same_segment_preflight_failure`
+  / `::test_semantic_changes_skipped_reason_present_on_cross_segment_preflight_failure`.
+  Addresses PR review feedback on
+  GMcDowellJr/Revit_Fingerprint#475.
+- **`tools/bundle_analysis/common.py::read_csv_rows` no longer crashes on a
+  field larger than Python csv's default 131072-byte limit.** A domain with a
+  very large pattern population could push a single pipe-joined
+  `*_pattern_ids` cell in `file_gap_report.csv`
+  (`tools/bundle_analysis/step_compare.py`) past that default, raising
+  `_csv.Error: field larger than field limit (131072)` on the very next
+  `run_compare_for_domain` call that re-reads the file to merge in a new
+  domain's rows. `tools/run_extract_all.py` and
+  `tools/run_segment_orchestrator.py` already raise
+  `csv.field_size_limit()` for exactly this reason; `common.py`'s own
+  `read_csv_rows()` -- the one reader in the compare/bundle-analysis path --
+  was the omission. Now raised at import time to `2**31-1` (falling back to
+  `2**30` on the `OverflowError` a 32-bit Windows C `long` can hit at
+  `sys.maxsize`), same Windows-safe idiom already used in both of those
+  files. New coverage: `tests/test_bundle_analysis_common.py`.
+- **`step_compare.py`'s four `*_pattern_ids` columns in `file_gap_report.csv`
+  no longer inline an unbounded pipe-joined list into a single cell.** Past
+  `_MAX_INLINE_PATTERN_LIST_CHARS` (8000 chars), `gap_pattern_ids`/
+  `shared_pattern_ids`/`reference_only_pattern_ids`/`target_only_pattern_ids`
+  now hold the literal marker `<see file_gap_detail.csv>` instead of the
+  full joined value -- the identical data is already written,
+  unconditionally, one row per `pattern_id`, to `file_gap_detail.csv`
+  (`comparison_class` in `{shared, reference_only, target_only}`), which
+  never inlines a list into a single cell and so can never hit a field-size
+  limit regardless of population size. Below the threshold (the common
+  case), the literal `\|`-joined value is byte-for-byte unchanged from
+  before this fix -- every pre-existing `tests/test_step_compare.py` /
+  `tests/test_step_compare_comparison_status.py` assertion on these columns'
+  exact content still passes unmodified. `tools/bundle_analysis/README.md`'s
+  field table documents the new size note. New coverage:
+  `tests/test_step_compare.py::test_large_pattern_id_list_defers_to_file_gap_detail_csv`
+  / `::test_small_pattern_id_list_stays_literal_below_threshold`.
+- **`tools/compare_reference.py`'s `--reference-segment`/`--target-segment`
+  now resolve against `run_registry.csv`'s normalized `output_folder`
+  column, not the raw pipe-delimited `segment_id`.** A multi-dimension
+  segment's `segment_id` is itself `"|"`-joined (e.g.
+  `imperial|Template|Architectural`, from
+  `tools/build_segment_manifest.py`'s dimensional lattice), which is
+  awkward and error-prone to type or shell-quote on a command line
+  (especially on Windows). `output_folder` is already the same segment's
+  normalized, filesystem-safe, unique folder name
+  (`_sanitize_folder()`: lowercased, `"|"` -> `"_"`, e.g.
+  `imperial_template_architectural`) -- `resolve_segment()` now matches
+  against that column instead. A `segment_id` with no pipe in it (e.g.
+  `enterprise_all`, per `docs/reference_comparison_tool.md`'s own examples)
+  sanitizes to itself, so simple existing selectors are unaffected; only a
+  raw pipe-delimited selector stops resolving (it must be replaced with the
+  normalized folder name -- `REASON_SEGMENT_NOT_FOUND`, not a new reason
+  code). `docs/reference_comparison_tool.md` and the CLI `--help` text
+  updated accordingly. **Output fields still carry the canonical
+  `segment_id`, not the folder-name selector** (Codex review, PR #475):
+  `resolve_segment()` now returns `(segment_root, status,
+  canonical_segment_id)` -- the matched registry row's own `segment_id`
+  column -- and `main()` uses that (not the CLI-supplied folder selector)
+  for every `segment_id`/`reference_segment_id` value written into
+  `reference_comparison_summary.csv`/`_detail.csv`, the manifest, and
+  diagnostics, so those outputs keep joining to
+  `segment_manifest.csv`/`run_registry.csv` by `segment_id` exactly as
+  before. The folder selector is retained only for the pre-resolution-
+  failure output path (`write_top_level_blocked`), where no canonical id
+  was ever resolved. New coverage:
+  `tests/test_compare_reference.py::test_segment_lookup_uses_normalized_output_folder_not_raw_segment_id`
+  (now also asserts the canonical `segment_id` -- not the folder selector --
+  appears in every output field).
 - **`arrowheads`: the five style-specific fields are no longer discarded
   for non-owning record classes — extract-always / gate-hash-separately
   (D-049).** `domains/arrowheads.py` previously computed
@@ -285,6 +368,42 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   row appended alongside it).
 
 ### Added
+- **`tools/compare_reference.py`: `reference_comparison_semantic_changes.csv`
+  (same-segment mode only).** Reclassifies existing `reference_only`/
+  `target_only` rows from `reference_comparison_detail.csv` by resolved
+  name, surfacing likely renames/content-changes under a stable name as
+  distinct from genuine additions/removals. No new comparison mathematics
+  -- pattern-identity set membership (`shared`/`reference_only`/
+  `target_only`) is unchanged, reused directly from `assemble_final_outputs()`'s
+  already-computed `all_detail_rows`. Names are resolved from
+  `results/analysis/domain_patterns.csv`'s `pattern_id -> pattern_label_human`
+  map, built once per domain, excluding any row with
+  `pattern_label_source == "fallback"` (templated placeholders like
+  "Line Pattern (Variant 2 of 5)", not observed values). Per
+  `(purge_view, domain, population_id, target_export_run_id)` group, names
+  are compared exact-string after `.strip()` (case-sensitive -- open
+  question flagged for Greg, not blocking); a name on both sides with
+  exactly one `pattern_id` per side is `semantic_change_class=changed`, more
+  than one on either side is `ambiguous_name_match` (all candidates
+  pipe-joined), reference-only is `removed`, target-only is `added`. A
+  `pattern_id` with no resolvable non-fallback name is simply absent from
+  this file (still visible, unaffected, in `reference_comparison_detail.csv`).
+  **Cross-segment mode (`--target-segment` != `--reference-segment`) does not
+  write this file at all** -- `reference_comparison_detail.csv`'s
+  `pattern_id` values are already translated to the cross-segment-stable
+  `join_hash` identity there (see `resolve_cross_segment_pattern_identity()`),
+  and mapping a `join_hash` back to a trustworthy per-segment name is a
+  separate, harder problem (a `join_hash` can correspond to multiple local
+  `pattern_id`s via `source_cluster_id`, each potentially resolving to a
+  different `pattern_label_human`) -- not attempted here. New reason code
+  `REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT`, recorded in
+  `reference_comparison_report.json`'s new `semantic_changes_skipped_reason`
+  key (empty string when the file was written) so a consumer can tell "not
+  computed" from "computed, zero rows." No changes to
+  `tools/bundle_analysis/step_compare.py`,
+  `tools/bundle_analysis/comparison_status.py`,
+  `tools/build_segment_manifest.py`, or `tools/compare_cross_segment.py`.
+  New coverage in `tests/test_compare_reference.py`.
 - **`loaded_family_types` domain: `can_have_structural_section`/`has_thermal_properties`
   identity fields (Audit 16 §2 / PR2, Tier 1 capability flags only).**
   `domains/loaded_family_types.py`'s existing per-family loop now also reads

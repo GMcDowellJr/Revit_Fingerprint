@@ -13,6 +13,19 @@ SCHEMA_VERSION = "2.1"
 ROW_KEY_DOMAINS = {"object_styles_model", "object_styles_annotation", "view_category_overrides"}
 SHAPE_GATED_DOMAINS = {"dimension_types", "arrowheads"}
 
+# csv.field_size_limit() converts to a C long; on Windows CPython the C long
+# is 32-bit so sys.maxsize overflows (same fix already applied in
+# tools/run_extract_all.py and tools/run_segment_orchestrator.py -- this
+# module's own read_csv_rows() was the one reader in the compare/bundle-
+# analysis path that never raised it, which is what let a large pipe-joined
+# pattern_id-list cell in file_gap_report.csv (see step_compare.py's
+# _GAP_FIELDNAMES) exceed the 131072-byte default and crash on re-read).
+# Cap at 2^31-1, which fits everywhere; a 32-bit overflow falls back further.
+try:
+    csv.field_size_limit(2**31 - 1)
+except OverflowError:
+    csv.field_size_limit(2**30)
+
 
 def retry_fs_op(op, *args, attempts: int = 5, delay_seconds: float = 1.0) -> None:
     """Run a filesystem-mutating callable (shutil.move / shutil.rmtree), retrying with

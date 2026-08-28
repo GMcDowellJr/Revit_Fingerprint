@@ -249,6 +249,56 @@ def test_existing_reference_coverage_values_preserved(tmp_path):
     assert row["coverage_status"] == "partial"
 
 
+def test_large_pattern_id_list_defers_to_file_gap_detail_csv(tmp_path):
+    # A domain with a very large pattern population must never inline the
+    # full pipe-joined pattern_id list into a single file_gap_report.csv
+    # cell -- past step_compare._MAX_INLINE_PATTERN_LIST_CHARS, that risks
+    # the exact field-size-limit crash that motivated this fix (Windows
+    # Python's csv module default is 131072 bytes). The literal data must
+    # still be fully recoverable, unconditionally, from file_gap_detail.csv
+    # (one row per pattern_id).
+    from tools.bundle_analysis.step_compare import _LARGE_PATTERN_LIST_MARKER
+
+    domain = "object_styles_model"
+    # ~4000 patterns * ~9 chars ("PATTERN_"+3 digits+"|") comfortably exceeds
+    # the 8000-char inline threshold.
+    reference_patterns = [f"PATTERN_{i:04d}" for i in range(4000)]
+    membership = {"f1": set(reference_patterns)}
+    analysis_dir, out_dir = _setup_run(tmp_path, domain, membership)
+    reference = _reference(domain, reference_patterns)
+
+    run_compare_for_domain(analysis_dir, out_dir, reference, domain)
+
+    row = _row_for(_read_csv(out_dir.parent / "compare" / "file_gap_report.csv"), "f1")
+    assert row["shared_count"] == str(len(reference_patterns))
+    assert row["shared_pattern_ids"] == _LARGE_PATTERN_LIST_MARKER
+    assert row["reference_only_pattern_ids"] == ""  # empty set stays literal, never the marker
+    assert row["target_only_pattern_ids"] == ""
+
+    detail_rows = _read_csv(out_dir.parent / "compare" / "file_gap_detail.csv")
+    shared_ids_from_detail = {r["pattern_id"] for r in detail_rows if r["comparison_class"] == "shared"}
+    assert shared_ids_from_detail == set(reference_patterns)
+
+
+def test_small_pattern_id_list_stays_literal_below_threshold(tmp_path):
+    # Regression guard: the common case (small pattern populations, i.e.
+    # every pre-existing test in this file) must be byte-for-byte unaffected
+    # by the large-list deferral.
+    from tools.bundle_analysis.step_compare import _LARGE_PATTERN_LIST_MARKER
+
+    domain = "object_styles_model"
+    analysis_dir, out_dir = _setup_run(tmp_path, domain, {"f1": {"A", "B"}})
+    reference = _reference(domain, ["A", "B", "C"])
+
+    run_compare_for_domain(analysis_dir, out_dir, reference, domain)
+
+    row = _row_for(_read_csv(out_dir.parent / "compare" / "file_gap_report.csv"), "f1")
+    assert row["shared_pattern_ids"] == "A|B"
+    assert row["reference_only_pattern_ids"] == "C"
+    assert row["gap_pattern_ids"] == "C"
+    assert _LARGE_PATTERN_LIST_MARKER not in row.values()
+
+
 def test_zero_denominator_metrics_use_no_reference_defined_semantics(tmp_path):
     domain = "object_styles_model"
     analysis_dir, out_dir = _setup_run(tmp_path, domain, {"f1": set()})

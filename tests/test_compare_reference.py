@@ -481,6 +481,54 @@ def test_incomplete_segment_is_blocked(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Segment lookup is by run_registry.csv's normalized output_folder, not the
+# raw pipe-delimited segment_id (e.g. "imperial|Template|Architectural" ->
+# "imperial_template_architectural", per
+# tools/build_segment_manifest.py::_sanitize_folder()) -- a caller should
+# never have to type or shell-quote a pipe character.
+# ---------------------------------------------------------------------------
+
+
+def test_segment_lookup_uses_normalized_output_folder_not_raw_segment_id(tmp_path):
+    raw_segment_id = "imperial|Template|Architectural"
+    normalized_folder = "imperial_template_architectural"
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]}, segment_id=normalized_folder)
+    rows = _read_csv(ctx["registry_file"])
+    assert len(rows) == 1 and rows[0]["output_folder"] == normalized_folder
+    rows[0]["segment_id"] = raw_segment_id
+    _write_csv(ctx["registry_file"], _REGISTRY_FIELDNAMES, rows)
+
+    rc, out_dir = _run(tmp_path, ctx, reference_segment=normalized_folder, target="target.json", purge_view="all")
+    assert rc == 0
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert summary and summary[0]["comparison_status"] == COMPARISON_STATUS_OK
+
+    # Output fields must carry the canonical (pipe-delimited) segment_id --
+    # not the folder-name selector that was actually typed on the command
+    # line -- so reference_comparison_summary.csv/_detail.csv and the
+    # manifest keep joining to segment_manifest.csv/run_registry.csv by
+    # segment_id (Codex review, PR #475).
+    assert summary[0]["segment_id"] == raw_segment_id
+    assert normalized_folder not in {r["segment_id"] for r in summary}
+    detail = _read_csv(out_dir / cr.DETAIL_FILENAME)
+    assert detail and all(r["segment_id"] == raw_segment_id for r in detail)
+    manifest = json.loads((out_dir / cr.MANIFEST_FILENAME).read_text())
+    assert manifest["segment_id"] == raw_segment_id
+    assert manifest["reference_segment_id"] == raw_segment_id
+    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diagnostics["segment_id"] == raw_segment_id
+    assert diagnostics["reference_segment_id"] == raw_segment_id
+
+    # The raw, pipe-delimited segment_id must no longer resolve at all.
+    rc2, out_dir2 = _run(
+        tmp_path, ctx, out_name="out2", reference_segment=raw_segment_id, target="target.json", purge_view="all"
+    )
+    assert rc2 == 2
+    diag = json.loads((out_dir2 / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_SEGMENT_NOT_FOUND]
+
+
+# ---------------------------------------------------------------------------
 # 9. Required analysis artifact missing (despite status=complete) -> blocked.
 # ---------------------------------------------------------------------------
 
@@ -1187,6 +1235,237 @@ def test_cross_segment_export_run_id_collision_is_not_reference_exclusion(tmp_pa
     by_target = {r["target_export_run_id"]: r for r in summary}
     assert by_target["shared_name.json"]["comparison_status"] == COMPARISON_STATUS_OK
     assert by_target["shared_name.json"]["shared_count"] == "1"
+
+
+# ---------------------------------------------------------------------------
+# reference_comparison_semantic_changes.csv (same-segment name-based
+# reclassification of reference_only/target_only rows).
+# ---------------------------------------------------------------------------
+
+
+def _write_domain_patterns_with_labels(seg_root: Path, rows: List[Dict[str, str]], schema_version: str = "2.1.0") -> None:
+    """Same shape as _build_segment's own domain_patterns.csv writer, plus
+    the pattern_label_human/pattern_label_source columns the semantic-
+    changes feature reads. Written directly (bypassing _build_segment's
+    write_domain_patterns=True path, whose hardcoded fieldnames list doesn't
+    include these two columns) so a test can control exactly which
+    pattern_ids resolve to which names/sources.
+    """
+    _write_csv(
+        seg_root / "results" / "analysis" / "domain_patterns.csv",
+        ["schema_version", "analysis_run_id", "domain", "pattern_id", "source_cluster_id", "pattern_label_human", "pattern_label_source"],
+        rows,
+    )
+
+
+def _label_row(pattern_id: str, label: str, source: str) -> Dict[str, str]:
+    return {
+        "schema_version": "2.1.0",
+        "analysis_run_id": RUN_ID,
+        "domain": DOMAIN,
+        "pattern_id": pattern_id,
+        "source_cluster_id": f"{DOMAIN}|{pattern_id}",
+        "pattern_label_human": label,
+        "pattern_label_source": source,
+    }
+
+
+def test_semantic_changes_real_numbers_changed_removed_added_ambiguous(tmp_path):
+    # reference_only pattern_ids: MATCH, NONAME (no domain_patterns.csv row
+    # at all), FALLBACK (row present but source=fallback), AMBIG_1, AMBIG_2,
+    # REMOVED -- 6 total.
+    # target_only pattern_ids: MATCH_T (same resolved name as MATCH),
+    # AMBIG_T (same resolved name as AMBIG_1/AMBIG_2), ADDED -- 3 total.
+    # SHARED is present on both sides (comparison_class=shared) and must
+    # never appear in the new file at all.
+    presence = {
+        "ref.json": ["MATCH", "NONAME", "FALLBACK", "AMBIG_1", "AMBIG_2", "REMOVED", "SHARED"],
+        "target.json": ["MATCH_T", "AMBIG_T", "ADDED", "SHARED"],
+    }
+    ctx = _build_segment(tmp_path, presence, write_domain_patterns=False)
+    _write_domain_patterns_with_labels(
+        ctx["segment_root"],
+        [
+            _label_row("MATCH", "Interior Walls", "synopsis"),
+            _label_row("FALLBACK", "Object Style — Variant 3 of 5", "fallback"),
+            _label_row("AMBIG_1", "Ambiguous Group", "modal"),
+            _label_row("AMBIG_2", "Ambiguous Group", "curator"),
+            _label_row("REMOVED", "Deprecated Standard", "synopsis"),
+            _label_row("MATCH_T", "Interior Walls", "modal"),
+            _label_row("AMBIG_T", "Ambiguous Group", "synopsis"),
+            _label_row("ADDED", "New Standard", "curator"),
+            _label_row("SHARED", "Shared Style", "synopsis"),
+            # NONAME deliberately has no row at all.
+        ],
+    )
+
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
+    assert rc == 0
+
+    detail = _read_csv(out_dir / cr.DETAIL_FILENAME)
+    ref_only_ids = {r["pattern_id"] for r in detail if r["comparison_class"] == "reference_only"}
+    tgt_only_ids = {r["pattern_id"] for r in detail if r["comparison_class"] == "target_only"}
+    assert ref_only_ids == {"MATCH", "NONAME", "FALLBACK", "AMBIG_1", "AMBIG_2", "REMOVED"}
+    assert tgt_only_ids == {"MATCH_T", "AMBIG_T", "ADDED"}
+
+    semantic = _read_csv(out_dir / cr.SEMANTIC_CHANGES_FILENAME)
+    by_class: Dict[str, List[Dict[str, str]]] = {}
+    for row in semantic:
+        by_class.setdefault(row["semantic_change_class"], []).append(row)
+
+    assert len(by_class["changed"]) == 1
+    changed = by_class["changed"][0]
+    assert changed["pattern_name"] == "Interior Walls"
+    assert changed["reference_pattern_id"] == "MATCH"
+    assert changed["target_pattern_id"] == "MATCH_T"
+    assert changed["name_match_basis"] == "pattern_label_human"
+
+    assert len(by_class["removed"]) == 1
+    assert by_class["removed"][0]["pattern_name"] == "Deprecated Standard"
+    assert by_class["removed"][0]["reference_pattern_id"] == "REMOVED"
+    assert by_class["removed"][0]["target_pattern_id"] == ""
+
+    assert len(by_class["added"]) == 1
+    assert by_class["added"][0]["pattern_name"] == "New Standard"
+    assert by_class["added"][0]["target_pattern_id"] == "ADDED"
+    assert by_class["added"][0]["reference_pattern_id"] == ""
+
+    assert len(by_class["ambiguous_name_match"]) == 1
+    ambiguous = by_class["ambiguous_name_match"][0]
+    assert ambiguous["pattern_name"] == "Ambiguous Group"
+    assert ambiguous["reference_pattern_id"] == "AMBIG_1|AMBIG_2"
+    assert ambiguous["target_pattern_id"] == "AMBIG_T"
+
+    # Never built from a fallback-sourced name, and no row mentions "SHARED"
+    # or "NONAME" (unresolvable) pattern_ids anywhere.
+    all_pattern_ids_in_output = set()
+    for row in semantic:
+        all_pattern_ids_in_output.update(row["reference_pattern_id"].split("|"))
+        all_pattern_ids_in_output.update(row["target_pattern_id"].split("|"))
+    all_pattern_ids_in_output.discard("")
+    assert "FALLBACK" not in all_pattern_ids_in_output
+    assert "NONAME" not in all_pattern_ids_in_output
+    assert "SHARED" not in all_pattern_ids_in_output
+    assert not any(row["pattern_name"] == "Object Style — Variant 3 of 5" for row in semantic)
+
+    # Before/after counts: covered pattern_ids never exceed the original
+    # reference_only/target_only counts (2 reference_only ids dropped for
+    # having no non-fallback name: NONAME + FALLBACK).
+    covered_ref_ids = {pid for row in semantic for pid in row["reference_pattern_id"].split("|") if pid}
+    covered_tgt_ids = {pid for row in semantic for pid in row["target_pattern_id"].split("|") if pid}
+    assert covered_ref_ids <= ref_only_ids
+    assert covered_tgt_ids <= tgt_only_ids
+    assert len(covered_ref_ids) == 4  # MATCH, AMBIG_1, AMBIG_2, REMOVED
+    assert len(covered_tgt_ids) == 3  # MATCH_T, AMBIG_T, ADDED
+
+
+def test_semantic_changes_domain_with_no_diff_contributes_zero_rows(tmp_path):
+    # Every pattern is shared on both sides -- no reference_only/target_only
+    # rows exist at all, so the new file must have zero data rows (not a
+    # placeholder row of blanks).
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]}, write_domain_patterns=False)
+    _write_domain_patterns_with_labels(ctx["segment_root"], [_label_row("A", "Shared Style", "synopsis")])
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
+    assert rc == 0
+    assert _read_csv(out_dir / cr.SEMANTIC_CHANGES_FILENAME) == []
+
+
+def test_semantic_changes_missing_domain_patterns_csv_yields_zero_rows_not_error(tmp_path):
+    # Same-segment mode never requires domain_patterns.csv to exist (see
+    # test_same_segment_never_requires_domain_patterns) -- the semantic-
+    # changes file must still be written, just empty, not raise.
+    ctx = _build_segment(tmp_path, {"ref.json": ["A", "B"], "target.json": ["A"]}, write_domain_patterns=False)
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
+    assert rc == 0
+    assert (out_dir / cr.SEMANTIC_CHANGES_FILENAME).is_file()
+    assert _read_csv(out_dir / cr.SEMANTIC_CHANGES_FILENAME) == []
+    manifest = json.loads((out_dir / cr.MANIFEST_FILENAME).read_text())
+    assert manifest["semantic_changes_skipped_reason"] == ""
+    assert cr.SEMANTIC_CHANGES_FILENAME in manifest["output_files"]
+
+
+def test_semantic_changes_not_written_cross_segment(tmp_path):
+    ctx2 = _build_two_segments(
+        tmp_path,
+        presence_a={"ref.json": ["A", "B"]},
+        presence_b={"target.json": ["A"]},
+    )
+    ctx = {"registry_file": ctx2["registry_file"], "segments_root": ctx2["segments_root"]}
+    rc, out_dir = _run(
+        tmp_path,
+        ctx,
+        reference_segment="seg_a",
+        target_segment="seg_b",
+        reference="ref.json",
+        target="target.json",
+        purge_view="all",
+    )
+    assert rc == 0
+    assert not (out_dir / cr.SEMANTIC_CHANGES_FILENAME).exists()
+    manifest = json.loads((out_dir / cr.MANIFEST_FILENAME).read_text())
+    assert manifest["semantic_changes_skipped_reason"] == cr.REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT
+    assert cr.SEMANTIC_CHANGES_FILENAME not in manifest["output_files"]
+
+
+# ---------------------------------------------------------------------------
+# semantic_changes_skipped_reason must never be simply absent from the
+# manifest, even on the pre-flight-failure path (write_top_level_blocked),
+# which never reaches assemble_final_outputs() at all -- a consumer must be
+# able to rely on the key always being present (Codex review, PR #475).
+# ---------------------------------------------------------------------------
+
+
+def test_semantic_changes_skipped_reason_present_on_same_segment_preflight_failure(tmp_path):
+    ctx = _build_segment(tmp_path, {"ref.json": ["A"], "target.json": ["A"]})
+    rc, out_dir = _run(tmp_path, ctx, reference="nonexistent.json", target="target.json")
+    assert rc == 2
+    manifest = json.loads((out_dir / cr.MANIFEST_FILENAME).read_text())
+    assert "semantic_changes_skipped_reason" in manifest
+    assert manifest["semantic_changes_skipped_reason"] == ""
+
+
+def test_semantic_changes_skipped_reason_present_on_cross_segment_preflight_failure(tmp_path):
+    ctx_a = _build_segment(tmp_path, {"ref.json": ["A", "B"]}, segment_id="seg_a", unit_system="imperial")
+    ctx_b = _build_segment(
+        tmp_path,
+        {"target.json": ["A"]},
+        segment_id="seg_b",
+        other_registry_rows=[ctx_a["registry_row"]],
+        unit_system="metric",
+    )
+    ctx = {"registry_file": ctx_b["registry_file"], "segments_root": ctx_b["segments_root"]}
+    rc, out_dir = _run(
+        tmp_path,
+        ctx,
+        reference_segment="seg_a",
+        target_segment="seg_b",
+        reference="ref.json",
+        target="target.json",
+        purge_view="all",
+    )
+    assert rc == 2
+    diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diag["run_comparison_reason_codes"] == [cr.REASON_CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH]
+    manifest = json.loads((out_dir / cr.MANIFEST_FILENAME).read_text())
+    assert manifest["semantic_changes_skipped_reason"] == cr.REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT
+
+
+def test_semantic_changes_case_sensitive_names_do_not_match(tmp_path):
+    # Spec'd as exact, case-sensitive match after .strip() -- confirm two
+    # names differing only in case are NOT treated as the same name (open
+    # question flagged for Greg; this documents current, deliberate behavior).
+    presence = {"ref.json": ["A"], "target.json": ["B"]}
+    ctx = _build_segment(tmp_path, presence, write_domain_patterns=False)
+    _write_domain_patterns_with_labels(
+        ctx["segment_root"],
+        [_label_row("A", "Interior Walls", "synopsis"), _label_row("B", "interior walls", "synopsis")],
+    )
+    rc, out_dir = _run(tmp_path, ctx, target="target.json", purge_view="all")
+    assert rc == 0
+    semantic = _read_csv(out_dir / cr.SEMANTIC_CHANGES_FILENAME)
+    classes = {row["semantic_change_class"] for row in semantic}
+    assert classes == {"removed", "added"}
+    assert not any(row["semantic_change_class"] == "changed" for row in semantic)
 
 
 def test_cross_segment_target_only_domain_is_reference_undefined_not_blocked(tmp_path):
