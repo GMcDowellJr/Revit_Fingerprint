@@ -159,6 +159,11 @@ def load_entry_diagnostic(cache_dir: Path, file_id: str) -> Tuple[Optional[Dict[
         # required UTF-8 text format. Treat this as unreadable cache data and
         # retain the established safe-recompute fallback.
         return None, "unreadable"
+    except (ValueError, RecursionError):
+        # json.load can raise data-dependent parser errors outside the more
+        # specific JSONDecodeError (for example Python's integer digit limit or
+        # pathological nesting). Corrupt cache data remains a safe fallback.
+        return None, "invalid_json"
     except OSError:
         return None, "unreadable"
     if not isinstance(data, dict) or data.get("file_id") != file_id:

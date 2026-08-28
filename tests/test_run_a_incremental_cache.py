@@ -686,3 +686,50 @@ def test_failed_run_stops_heartbeat(tmp_path: Path) -> None:
 
     assert reporter._thread is None
     assert reporter._stop.is_set()
+
+
+def test_over_limit_integer_cache_entry_is_invalid_json_fallback(tmp_path: Path) -> None:
+    exports = tmp_path / "exports"
+    _write_corpus(exports, 1)
+    sig_pol = tmp_path / "sig.json"
+    join_pol = tmp_path / "join.json"
+    _write_json(sig_pol, _UNITS_SIG_HASH_POLICY)
+    _write_json(join_pol, _UNITS_JOIN_POLICY)
+    results_root = tmp_path / "results"
+    _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol)
+
+    cache_dir = run_a_cache.cache_root(results_root)
+    entry_path = next((cache_dir / "entries").glob("*.json"))
+    entry_path.write_text('{"file_id":"ignored","n":' + ("9" * 5000) + "}", encoding="utf-8")
+
+    report, _ = _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol)
+    assert report["files_reused"] == 0
+    assert report["files_recomputed"] == 1
+    assert report["performance"]["fallback_reasons"] == {"invalid_json": 1}
+
+
+def test_extract_all_starts_and_closes_heartbeat_before_domain_inference(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import threading
+
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    observed_running = False
+
+    def fail_during_startup(_exports_dir):
+        nonlocal observed_running
+        observed_running = any(t.name == "run-a-progress" and t.is_alive() for t in threading.enumerate())
+        raise RuntimeError("startup failure")
+
+    monkeypatch.setattr(run_extract_all, "_detect_surfaces", fail_during_startup)
+    monkeypatch.setattr(sys, "argv", [
+        "run_extract_all.py", str(exports), "--out-root", str(tmp_path / "out"),
+        "--progress-interval-seconds", "60",
+    ])
+
+    with pytest.raises(RuntimeError, match="startup failure"):
+        run_extract_all.main()
+
+    assert observed_running is True
+    assert not any(t.name == "run-a-progress" and t.is_alive() for t in threading.enumerate())

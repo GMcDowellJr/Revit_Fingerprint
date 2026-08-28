@@ -749,7 +749,7 @@ def _enforce_policy_gate(rows: List[Dict[str, str]], diagnostics_dir: Path, doma
         sys.stderr.write("!" * 80 + "\n\n")
 
 
-def main() -> None:
+def _run_main(progress_reporters: List[Any]) -> None:
     total_started = time.perf_counter()
     stage_names = ["flatten", "sig_hash", "discover", "apply", "placeholders", "authority", "patterns", "split", "flat_tables"]
     ap = argparse.ArgumentParser(
@@ -853,6 +853,8 @@ def main() -> None:
                     help="Suppress periodic Run A heartbeats; warnings and final summaries remain.")
     args = ap.parse_args()
     progress = ProgressReporter(args.progress_interval_seconds, args.quiet_progress)
+    progress_reporters.append(progress)
+    progress.start_heartbeat()
 
     allow_sig_hash_join_key = args.allow_sig_hash_join_key
     require_join_policy = True
@@ -1384,6 +1386,15 @@ def main() -> None:
     with report_path.open("w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, sort_keys=True)
     print(f"Wrote: {report_path}")
+
+
+def main() -> None:
+    progress_reporters: List[Any] = []
+    try:
+        _run_main(progress_reporters)
+    finally:
+        for reporter in progress_reporters:
+            reporter.close()
 
 
 if __name__ == "__main__":

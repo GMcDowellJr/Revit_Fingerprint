@@ -16,7 +16,13 @@ heartbeats, not warnings or final summaries. Heartbeats during opaque operations
 are best effort: interpreter scheduling, the GIL, and blocked I/O can delay them;
 no percentage is claimed.
 
+The reporter heartbeat starts before export-surface detection and automatic
+domain inference, including their sample JSON read, and is always closed when
+the orchestrator exits successfully or raises.
+
 Invalid UTF-8 cache payloads are classified as unreadable and safely recomputed.
+Other data-dependent JSON parser failures, including over-limit integers and
+pathological nesting, are classified as invalid JSON and safely recomputed.
 The heartbeat is stopped and joined after success, processing failure,
 `SystemExit`, or interruption; the original failure remains the process outcome.
 
