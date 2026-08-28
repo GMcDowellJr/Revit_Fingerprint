@@ -619,3 +619,24 @@ def test_malformed_join_policy_hard_fails_like_apply_join_policy(tmp_path: Path)
 
     with pytest.raises(SystemExit, match="Invalid policy format"):
         _run_incremental(tmp_path, exports, tmp_path / "results", sig_pol, join_pol)
+
+
+def test_warm_cache_deserializes_each_candidate_once(tmp_path: Path, monkeypatch) -> None:
+    exports = tmp_path / "exports"
+    _write_corpus(exports, 3)
+    sig_pol = tmp_path / "sig.json"; join_pol = tmp_path / "join.json"
+    _write_json(sig_pol, _UNITS_SIG_HASH_POLICY); _write_json(join_pol, _UNITS_JOIN_POLICY)
+    results_root = tmp_path / "results"
+    _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol)
+    calls = 0
+    original = run_a_cache.load_entry_diagnostic
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+    monkeypatch.setattr(run_a_incremental.run_a_cache, "load_entry_diagnostic", counted)
+    report, _ = _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol)
+    assert calls == report["files_total"] == 3
+    assert report["performance"]["cache_entry_loads"] == 3
+    assert report["files_reused"] == 3
+    assert report["performance"]["source_files_hashed"] == 0

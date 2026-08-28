@@ -57,14 +57,14 @@ import json
 import time
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 RUN_A_CACHE_SCHEMA_VERSION = 1
 _HASH_CHUNK_SIZE = 1 << 20  # 1 MiB
 _ABSENT_POLICY_SENTINEL = "<absent>"
 
 
-def _sha256_stream(paths: List[Path]) -> str:
+def _sha256_stream(paths: List[Path], on_bytes: Optional[Callable[[int], None]] = None) -> str:
     """Content hash of one or more files, concatenated in the given order.
 
     Streamed in fixed-size chunks so a single large export file is never fully
@@ -78,6 +78,8 @@ def _sha256_stream(paths: List[Path]) -> str:
                 if not chunk:
                     break
                 h.update(chunk)
+                if on_bytes:
+                    on_bytes(len(chunk))
         h.update(b"\x00")  # separator so (A,BC) != (AB,C) for split index/details pairs
     return h.hexdigest()
 
@@ -139,17 +141,24 @@ def save_manifest(cache_dir: Path, manifest: Dict[str, Any]) -> None:
 
 
 def load_entry(cache_dir: Path, file_id: str) -> Optional[Dict[str, Any]]:
+    return load_entry_diagnostic(cache_dir, file_id)[0]
+
+
+def load_entry_diagnostic(cache_dir: Path, file_id: str) -> Tuple[Optional[Dict[str, Any]], str]:
+    """Load and validate one payload, returning a stable fallback reason."""
     p = _entry_path(cache_dir, file_id)
     if not p.is_file():
-        return None
+        return None, "missing"
     try:
         with p.open("r", encoding="utf-8") as f:
             data = json.load(f)
-    except Exception:
-        return None
+    except json.JSONDecodeError:
+        return None, "invalid_json"
+    except OSError:
+        return None, "unreadable"
     if not isinstance(data, dict) or data.get("file_id") != file_id:
-        return None
-    return data
+        return None, "rejected_structure_or_identity"
+    return data, "accepted"
 
 
 def save_entry(cache_dir: Path, file_id: str, payload: Dict[str, Any]) -> None:
@@ -192,8 +201,10 @@ class RunState:
         join_policy_hash: str,
         tool_version: str,
         domain_filter_key: str,
-        unchanged_file_ids: Set[str],
+        reuse_candidate_file_ids: Set[str],
         fresh_signatures: Dict[str, Dict[str, Any]],
+        source_files_hashed: int = 0,
+        source_bytes_hashed: int = 0,
     ) -> None:
         self.cache_dir = cache_dir
         self.cache_was_valid = cache_was_valid
@@ -202,7 +213,11 @@ class RunState:
         self.join_policy_hash = join_policy_hash
         self.tool_version = tool_version
         self.domain_filter_key = domain_filter_key
-        self.unchanged_file_ids = unchanged_file_ids
+        self.reuse_candidate_file_ids = reuse_candidate_file_ids
+        # Compatibility alias; candidates have not yet had payload validation.
+        self.unchanged_file_ids = reuse_candidate_file_ids
+        self.source_files_hashed = source_files_hashed
+        self.source_bytes_hashed = source_bytes_hashed
         # file_id -> {"parts": [{"mtime_ns": int, "size": int}, ...], "content_hash": str},
         # computed fresh for every file this run regardless of reuse decision, so
         # the manifest written at the end of a successful run is always accurate.
@@ -232,6 +247,7 @@ def compute_run_state(
     tool_version: str,
     sig_hash_domains: Optional[Any] = None,
     force_full: bool,
+    progress: Optional[Any] = None,
 ) -> RunState:
     """Decide, for every export file, whether its cached rows may be reused.
 
@@ -286,10 +302,25 @@ def compute_run_state(
     if cache_was_valid and isinstance(manifest, dict) and isinstance(manifest.get("files"), dict):
         prior_files = manifest["files"]
 
-    unchanged_file_ids: Set[str] = set()
+    reuse_candidate_file_ids: Set[str] = set()
     fresh_signatures: Dict[str, Dict[str, Any]] = {}
+    source_files_hashed = 0
+    source_bytes_hashed = 0
 
-    for file_id, paths in file_id_to_paths.items():
+    def counted_hash(paths: List[Path]) -> str:
+        nonlocal source_files_hashed, source_bytes_hashed
+        source_files_hashed += len(paths)
+        return _sha256_stream(paths, lambda n: _add_bytes(n))
+
+    def _add_bytes(n: int) -> None:
+        nonlocal source_bytes_hashed
+        source_bytes_hashed += n
+
+    total = len(file_id_to_paths)
+    for checked, (file_id, paths) in enumerate(file_id_to_paths.items(), 1):
+        if progress:
+            progress.update(phase="source_signature_scan", current=file_id, checked=checked - 1, total=total,
+                            files_hashed=source_files_hashed, bytes_hashed=source_bytes_hashed)
         parts = stat_signature_parts(paths)
 
         prior = prior_files.get(file_id) if cache_was_valid else None
@@ -304,17 +335,21 @@ def compute_run_state(
             # Stat parts differ (or are absent) -- fall back to content hash so a
             # touch-without-edit or a re-copy that changed mtime but not bytes
             # still reuses cache instead of forcing an unnecessary reparse.
-            content_hash = _sha256_stream(paths)
+            content_hash = counted_hash(paths)
             is_unchanged = content_hash == prior.get("content_hash")
         # else: no prior entry for this file_id at all -> genuinely new, leave
         # content_hash unset for now; computed lazily below only if needed.
 
         if content_hash is None:
-            content_hash = _sha256_stream(paths)
+            content_hash = counted_hash(paths)
 
         fresh_signatures[file_id] = {"parts": parts, "content_hash": content_hash}
-        if is_unchanged and load_entry(cache_dir, file_id) is not None:
-            unchanged_file_ids.add(file_id)
+        if is_unchanged:
+            reuse_candidate_file_ids.add(file_id)
+
+    if progress:
+        progress.event("source signature scan complete", phase="source_signature_scan", checked=total, total=total,
+                       files_hashed=source_files_hashed, bytes_hashed=source_bytes_hashed)
 
     return RunState(
         cache_dir=cache_dir,
@@ -324,8 +359,10 @@ def compute_run_state(
         join_policy_hash=join_policy_hash,
         tool_version=tool_version,
         domain_filter_key=dom_filter_key,
-        unchanged_file_ids=unchanged_file_ids,
+        reuse_candidate_file_ids=reuse_candidate_file_ids,
         fresh_signatures=fresh_signatures,
+        source_files_hashed=source_files_hashed,
+        source_bytes_hashed=source_bytes_hashed,
     )
 
 

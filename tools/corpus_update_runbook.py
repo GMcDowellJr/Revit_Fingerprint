@@ -8,6 +8,7 @@ and operator-facing messages.
 from __future__ import annotations
 
 import argparse
+import time
 import os
 import subprocess
 import sys
@@ -151,6 +152,10 @@ def normalize_powershell_style_argv(argv: Sequence[str]) -> list[str]:
         "-exportsroot": "--exports-root",
         "--exportsroot": "--exports-root",
         "--exports-root": "--exports-root",
+        "-progressintervalseconds": "--progress-interval-seconds",
+        "--progress-interval-seconds": "--progress-interval-seconds",
+        "-quietprogress": "--quiet-progress",
+        "--quiet-progress": "--quiet-progress",
         "-h": "--help",
         "--help": "--help",
     }
@@ -174,6 +179,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--name-key", dest="name_key", action="store_true")
     parser.add_argument("--run-authority-patterns", dest="run_authority_patterns", action="store_true")
     parser.add_argument("--exports-root", dest="exports_root", default="./Fingerprint_Data")
+    parser.add_argument("--progress-interval-seconds", type=float, default=10.0)
+    parser.add_argument("--quiet-progress", action="store_true")
     parser.add_argument("--help", action="store_true")
     return parser
 
@@ -202,6 +209,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.run == "A":
+        run_a_started = time.perf_counter()
         print(green("=== RUN A: Flatten / Apply / Placeholders ==="))
 
         # --incremental: skip re-parsing an export file whose content and both
@@ -223,10 +231,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             "--sig-hash-policy", sig_pol,
             "--join-policy", join_pol,
             "--incremental",
+            "--progress-interval-seconds", str(args.progress_interval_seconds),
+            *(["--quiet-progress"] if args.quiet_progress else []),
             *run_a_force_args,
         ], "Run A: flatten/apply/placeholders")
 
         if args.name_key:
+            name_key_started = time.perf_counter()
             print()
             print(cyan("--- A-NameKey: parse exports for name-identity projection (join_key_name_identity) ---"))
             run_external([
@@ -236,7 +247,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "--out", name_key_csv,
             ], "Run A-NameKey: apply_name_key_policy.py")
             print(cyan(f"  wrote {name_key_csv}"))
+            print(cyan(f"  NameKey complete: elapsed_seconds={time.perf_counter()-name_key_started:.3f}; runs after extract_all.report.json and is not included in that report total"))
 
+        print(cyan(f"Run A runbook total elapsed_seconds={time.perf_counter()-run_a_started:.3f} (includes optional NameKey when requested)"))
         print()
         print(yellow("=== RUN A COMPLETE ==="))
         print(yellow("NEXT: Edit file_metadata.csv before running Run B"))
