@@ -54,6 +54,13 @@ def test_malformed_schema_and_invalid_bookkeeping_token_are_rejected(tmp_path):
         load_enterprise_policy(path)
 
 
+def test_is_enterprise_tolerates_non_string_values():
+    policy = load_enterprise_policy()
+    assert not policy.is_enterprise(None)
+    assert not policy.is_enterprise(float("nan"))
+    assert not policy.is_enterprise(123)
+
+
 def test_policy_file_path_is_memory_only_provenance_is_safe(tmp_path):
     path = tmp_path / "private-deployment" / "enterprise.json"
     path.parent.mkdir()
