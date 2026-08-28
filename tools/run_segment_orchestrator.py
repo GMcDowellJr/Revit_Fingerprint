@@ -1063,9 +1063,12 @@ def _active_domains_from_name_patterns(name_patterns_dir: Path) -> Optional[froz
         )
 
 
-def _segment_has_name_leg_output(out_root: Path, run_type: str) -> bool:
+def _segment_has_name_leg_output(
+    out_root: Path, run_type: str, name_key_results_csv: Optional[Path] = None
+) -> bool:
     """Whether this segment's name-projection leg (step 2b/3c, plus 3b/BI-merge-name for a
-    "bundle" segment) has already completed at least once. emit_name_target_provenance()
+    "bundle" segment) has already completed at least once, AND is not stale relative to this
+    invocation's own `--name-key-results-csv`. emit_name_target_provenance()
     (tools/bundle_analysis's --comparison-target name path) always writes
     bundle_provenance.csv on a successful run, even when the segment's name-target pattern
     set comes back empty -- so its presence is a reliable "bundle name leg already ran"
@@ -1084,18 +1087,35 @@ def _segment_has_name_leg_output(out_root: Path, run_type: str) -> bool:
     segment gets it too, unlike Step 3b's bundle_provenance.csv, which only a "bundle"
     segment ever produces at all).
 
+    Existence alone is not enough: if `-Run A -NameKey` rewrote the corpus-wide
+    name_key_results.csv (a rename, a policy change) without changing this segment's own
+    export-ID population, build_segment_manifest.py leaves the segment's registry status
+    "complete" and every artifact above still exists -- but it reflects the OLD name
+    evidence. When `name_key_results_csv` is given (this invocation's own
+    --name-key-results-csv, always passed by both call sites below whenever
+    comparison_target requests the name leg), the segment's own filtered
+    results/name_key/name_key_results.csv (Step 2b's output -- see
+    _filter_name_key_csv_to_segment(), whose mtime now tracks the corpus-wide source's own
+    mtime rather than write time, per the fix directly above it) must exist and be no older
+    than it, or this returns False (PR #476 review, third round).
+
     --- trace ---
     reads: `out_root` -- this segment's output root; checks
         `out_root/results/analysis/pattern_name_fragmentation.csv` AND
         `..._summary.csv` for existence always (generate_pattern_name_fragmentation.py's
         main() always writes both together -- see PR #476 review, second round: checking
         only the detail file let a partial/deleted artifact set still read as satisfied),
-        and (only when `run_type == "bundle"`) also
+        `out_root/results/name_key/name_key_results.csv`'s mtime against
+        `name_key_results_csv`'s own mtime when the latter is given, and (only when
+        `run_type == "bundle"`) also
         `out_root/results/bundle_analysis/name_all/bundle_provenance.csv`; `run_type` --
         caller's own reg_row["run_type"], since the bundle_provenance.csv requirement only
         applies to a "bundle" segment (a "reference" segment never produces Step 3b output
-        regardless of comparison_target).
-    calls: none (Path.is_file()).
+        regardless of comparison_target); `name_key_results_csv` -- caller's own
+        args.name_key_results_csv (as a Path), or None (config-only runs never reach this
+        function's `needs_name_leg`-gated call sites at all, so None in practice only means
+        "caller chose not to check freshness").
+    calls: none (Path.is_file(), Path.stat()).
     thresholds: none.
     returns: bool; consumed by run_orchestrator() (dry-run and live-run skip-check
         loops) to decide `already_satisfied` for a segment whose registry status is
@@ -1106,10 +1126,17 @@ def _segment_has_name_leg_output(out_root: Path, run_type: str) -> bool:
         (analysis_dir / "pattern_name_fragmentation.csv").is_file()
         and (analysis_dir / "pattern_name_fragmentation_summary.csv").is_file()
     )
+    if not fragmentation_ok:
+        return False
+    if name_key_results_csv is not None:
+        segment_name_key_csv = out_root / "results" / "name_key" / "name_key_results.csv"
+        if not segment_name_key_csv.is_file():
+            return False
+        if name_key_results_csv.stat().st_mtime > segment_name_key_csv.stat().st_mtime:
+            return False
     if run_type != "bundle":
-        return fragmentation_ok
-    bundle_ok = (out_root / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv").is_file()
-    return fragmentation_ok and bundle_ok
+        return True
+    return (out_root / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv").is_file()
 
 
 def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozenset] = None) -> dict:
@@ -1964,7 +1991,10 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             # skip-check loop below and _segment_has_name_leg_output()'s own docstring.
             needs_name_leg = args.comparison_target in ("name", "both")
             already_satisfied = status == "complete" and (
-                not needs_name_leg or _segment_has_name_leg_output(out_root, run_type)
+                not needs_name_leg or _segment_has_name_leg_output(
+                    out_root, run_type,
+                    Path(args.name_key_results_csv) if args.name_key_results_csv else None,
+                )
             )
             skip = already_satisfied and not args.force
 
@@ -2129,7 +2159,10 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         # needlessly reprocessed for output it can't produce.
         needs_name_leg = args.comparison_target in ("name", "both")
         already_satisfied = status == "complete" and (
-            not needs_name_leg or _segment_has_name_leg_output(out_root, run_type)
+            not needs_name_leg or _segment_has_name_leg_output(
+                out_root, run_type,
+                Path(args.name_key_results_csv) if args.name_key_results_csv else None,
+            )
         )
         if already_satisfied and not args.force:
             print(f"[orchestrator] skip segment={sid} (status=complete; use --force to re-run)")

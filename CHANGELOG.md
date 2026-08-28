@@ -528,6 +528,23 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   New coverage: `test_false_when_fragmentation_detail_present_but_summary_missing`,
   `test_out_csv_mtime_matches_source_not_write_time`,
   `test_name_overlap_keys_present_on_preflight_blocked_manifest`.
+
+  **Fourth fix, third round of PR #476 review:** even after the mtime-preservation fix
+  above, the registry-driven skip check itself never compared the segment's own filtered
+  `results/name_key/name_key_results.csv` against the CURRENT invocation's own
+  `--name-key-results-csv` -- so if `-Run A -NameKey` rewrote the corpus-wide source (a
+  rename, a policy change) without changing this segment's export-ID population,
+  `build_segment_manifest.py` leaves the segment `complete`, every artifact
+  `_segment_has_name_leg_output()` checks still exists from before, and the segment would be
+  skipped forever under `--comparison-target name/both` -- silently using stale name
+  evidence (including in `--include-name-overlap` results) unless the operator remembered
+  `--force`. `_segment_has_name_leg_output()` now takes an optional `name_key_results_csv`
+  parameter (both orchestrator call sites always pass `args.name_key_results_csv` when set)
+  and additionally requires the segment's own copy to exist and be no older than it. New
+  coverage: `test_false_when_segment_name_key_copy_older_than_source`,
+  `test_true_when_segment_name_key_copy_at_least_as_fresh_as_source`,
+  `test_false_when_name_key_results_csv_given_but_segment_copy_missing`,
+  `test_freshness_ignored_when_name_key_results_csv_not_given`.
 - **`loaded_family_types` domain: `can_have_structural_section`/`has_thermal_properties`
   identity fields (Audit 16 §2 / PR2, Tier 1 capability flags only).**
   `domains/loaded_family_types.py`'s existing per-family loop now also reads

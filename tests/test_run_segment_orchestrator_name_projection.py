@@ -287,6 +287,69 @@ class TestSegmentHasNameLegOutput:
         (analysis_dir / "pattern_name_fragmentation_summary.csv").write_text("domain,total_patterns\n", encoding="utf-8")
         assert _segment_has_name_leg_output(tmp_path, "reference") is True
 
+    def test_freshness_ignored_when_name_key_results_csv_not_given(self, tmp_path):
+        # Default (None) preserves prior behavior exactly -- existence-only, no mtime check.
+        analysis_dir = tmp_path / "results" / "analysis"
+        analysis_dir.mkdir(parents=True)
+        (analysis_dir / "pattern_name_fragmentation.csv").write_text("domain,pattern_id\n", encoding="utf-8")
+        (analysis_dir / "pattern_name_fragmentation_summary.csv").write_text("domain,total_patterns\n", encoding="utf-8")
+        assert _segment_has_name_leg_output(tmp_path, "reference", None) is True
+
+    def test_false_when_segment_name_key_copy_older_than_source(self, tmp_path):
+        # PR #476 review (third round): -Run A -NameKey rewriting the corpus-wide
+        # name_key_results.csv (a rename, a policy change) without changing this segment's
+        # own export-ID population must NOT read as satisfied purely because the old
+        # fragmentation artifacts still exist on disk.
+        import os
+        import time
+
+        analysis_dir = tmp_path / "results" / "analysis"
+        analysis_dir.mkdir(parents=True)
+        (analysis_dir / "pattern_name_fragmentation.csv").write_text("domain,pattern_id\n", encoding="utf-8")
+        (analysis_dir / "pattern_name_fragmentation_summary.csv").write_text("domain,total_patterns\n", encoding="utf-8")
+
+        segment_name_key_csv = tmp_path / "results" / "name_key" / "name_key_results.csv"
+        segment_name_key_csv.parent.mkdir(parents=True)
+        segment_name_key_csv.write_text("export_file,domain,record_id,status\n", encoding="utf-8")
+        old_mtime = time.time() - 10_000
+        os.utime(segment_name_key_csv, (old_mtime, old_mtime))
+
+        corpus_name_key_csv = tmp_path / "corpus_name_key_results.csv"
+        corpus_name_key_csv.write_text("export_file,domain,record_id,status\n", encoding="utf-8")  # fresh (now)
+
+        assert _segment_has_name_leg_output(tmp_path, "reference", corpus_name_key_csv) is False
+
+    def test_true_when_segment_name_key_copy_at_least_as_fresh_as_source(self, tmp_path):
+        import os
+        import time
+
+        analysis_dir = tmp_path / "results" / "analysis"
+        analysis_dir.mkdir(parents=True)
+        (analysis_dir / "pattern_name_fragmentation.csv").write_text("domain,pattern_id\n", encoding="utf-8")
+        (analysis_dir / "pattern_name_fragmentation_summary.csv").write_text("domain,total_patterns\n", encoding="utf-8")
+
+        corpus_name_key_csv = tmp_path / "corpus_name_key_results.csv"
+        corpus_name_key_csv.write_text("export_file,domain,record_id,status\n", encoding="utf-8")
+
+        segment_name_key_csv = tmp_path / "results" / "name_key" / "name_key_results.csv"
+        segment_name_key_csv.parent.mkdir(parents=True)
+        segment_name_key_csv.write_text("export_file,domain,record_id,status\n", encoding="utf-8")
+        future = time.time() + 10_000
+        os.utime(segment_name_key_csv, (future, future))
+
+        assert _segment_has_name_leg_output(tmp_path, "reference", corpus_name_key_csv) is True
+
+    def test_false_when_name_key_results_csv_given_but_segment_copy_missing(self, tmp_path):
+        analysis_dir = tmp_path / "results" / "analysis"
+        analysis_dir.mkdir(parents=True)
+        (analysis_dir / "pattern_name_fragmentation.csv").write_text("domain,pattern_id\n", encoding="utf-8")
+        (analysis_dir / "pattern_name_fragmentation_summary.csv").write_text("domain,total_patterns\n", encoding="utf-8")
+
+        corpus_name_key_csv = tmp_path / "corpus_name_key_results.csv"
+        corpus_name_key_csv.write_text("export_file,domain,record_id,status\n", encoding="utf-8")
+
+        assert _segment_has_name_leg_output(tmp_path, "reference", corpus_name_key_csv) is False
+
 
 class TestCLIComparisonTarget:
     def _build_fixture(self, tmp_path: Path) -> dict:
@@ -406,6 +469,18 @@ class TestCompleteSegmentSkipHonorsNameTarget:
             analysis_dir.mkdir(parents=True, exist_ok=True)
             (analysis_dir / "pattern_name_fragmentation.csv").write_text("domain,pattern_id\n", encoding="utf-8")
             (analysis_dir / "pattern_name_fragmentation_summary.csv").write_text("domain,total_patterns\n", encoding="utf-8")
+            # PR #476 review (P2, third round): the freshness check compares this segment's
+            # own results/name_key/name_key_results.csv mtime against the CLI's
+            # --name-key-results-csv (written fresh by each calling test, after this fixture
+            # runs) -- stamp a deliberately-future mtime so "already satisfied" fixtures
+            # aren't accidentally read as stale purely from test setup ordering.
+            import os
+            import time
+            segment_name_key_csv = segments_root / "seg1" / "results" / "name_key" / "name_key_results.csv"
+            segment_name_key_csv.parent.mkdir(parents=True, exist_ok=True)
+            segment_name_key_csv.write_text("export_file,domain,record_id,status\n", encoding="utf-8")
+            future = time.time() + 10_000
+            os.utime(segment_name_key_csv, (future, future))
 
         return {
             "manifest_file": manifest_file,
