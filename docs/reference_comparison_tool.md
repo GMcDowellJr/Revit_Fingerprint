@@ -83,15 +83,23 @@ configuration is approved, required, or compliant.
   `--segments-root`).
 - `--registry-file PATH` (required) — the corpus-level `run_registry.csv`
   mapping `segment_id` to its `output_folder` and completion `status`.
-- `--reference-segment SEGMENT_ID` (required) — the segment the `--reference`
-  selector and the reference pattern set are resolved against.
-- `--target-segment SEGMENT_ID` (optional) — the segment the `--target`
+- `--reference-segment SEGMENT_FOLDER` (required) — the segment the
+  `--reference` selector and the reference pattern set are resolved against.
+  Matched against `run_registry.csv`'s own `output_folder` column — the
+  normalized, filesystem-safe folder name (e.g.
+  `imperial_template_architectural`), not the raw pipe-delimited
+  `segment_id` (`imperial|Template|Architectural`) — so a caller never has
+  to type or shell-quote a pipe character. A `segment_id` with no pipe in it
+  (e.g. `enterprise_all`) sanitizes to itself, so simple selectors are
+  unaffected.
+- `--target-segment SEGMENT_FOLDER` (optional) — the segment the `--target`
   selector (or, if `--target` is omitted, the whole-segment comparison) is
-  resolved against. **Defaults to the same segment as `--reference-segment`**
-  — omitting it (or passing the same value) reproduces the tool's original
-  single-segment behavior exactly, byte-for-byte. Pass a different segment
-  to compare a reference from one segment against a target (file or entire
-  segment) from a different segment.
+  resolved against (same `output_folder` matching as `--reference-segment`).
+  **Defaults to the same segment as `--reference-segment`** — omitting it
+  (or passing the same value) reproduces the tool's original single-segment
+  behavior exactly, byte-for-byte. Pass a different segment to compare a
+  reference from one segment against a target (file or entire segment) from
+  a different segment.
 - `--reference SELECTOR` (required) — a filename selector for the reference
   export (e.g. `template_v3.details.json`). Resolved against the reference
   segment's own `results/records/file_metadata.csv`, never against raw JSON.

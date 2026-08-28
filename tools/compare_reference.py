@@ -82,6 +82,7 @@ MANIFEST_FILENAME = "reference_comparison_report.json"
 SUMMARY_FILENAME = "reference_comparison_summary.csv"
 DETAIL_FILENAME = "reference_comparison_detail.csv"
 DIAGNOSTICS_FILENAME = "reference_comparison_diagnostics.json"
+SEMANTIC_CHANGES_FILENAME = "reference_comparison_semantic_changes.csv"
 
 VALID_PURGE_VIEWS = ("all", "used")
 
@@ -145,6 +146,18 @@ REASON_STALE_MEMBERSHIP_MATRIX = "STALE_MEMBERSHIP_MATRIX"
 # Pure pre-flight/out-dir-safety failures -- raised before --out-dir can be
 # safely prepared at all, so no diagnostics file is ever written for these.
 REASON_OUT_DIR_UNSAFE = "OUT_DIR_UNSAFE"
+# Own namespace, same convention as the REASON_* codes above -- never reused
+# from tools/bundle_analysis/comparison_status.py. Recorded in the manifest
+# (never as a comparison_reason_codes value, since this fires at the whole-
+# run semantic-changes-file level, not per-domain) whenever same_segment is
+# False: reference_comparison_detail.csv's pattern_id values have already
+# been translated to the cross-segment-stable join_hash identity (see
+# resolve_cross_segment_pattern_identity()), and mapping a join_hash back to
+# a trustworthy per-segment name is a separate, harder problem (a join_hash
+# can correspond to multiple local pattern_ids via source_cluster_id, each
+# potentially resolving to a different pattern_label_human) -- not attempted
+# here.
+REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT = "SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT"
 
 _SUMMARY_FIELDNAMES = [
     "segment_id",
@@ -177,6 +190,27 @@ _DETAIL_FIELDNAMES = [
     "pattern_id",
     "comparison_class",
 ]
+
+_SEMANTIC_CHANGES_FIELDNAMES = [
+    "segment_id",
+    "purge_view",
+    "reference_bundle_id",
+    "analysis_run_id",
+    "target_export_run_id",
+    "domain",
+    "population_id",
+    "pattern_name",
+    "reference_pattern_id",
+    "target_pattern_id",
+    "semantic_change_class",
+    "name_match_basis",
+]
+
+# Never used as a match key: fallback labels are templated placeholders
+# (e.g. "Line Pattern (Variant 2 of 5)"), not observed values -- see
+# tools/label_synthesis/label_resolver.py::resolve_pattern_label.
+_FALLBACK_PATTERN_LABEL_SOURCE = "fallback"
+_NAME_MATCH_BASIS_PATTERN_LABEL_HUMAN = "pattern_label_human"
 
 # Suffixes checked most-specific first, matching tools/extractor.py's own
 # split-export/file-format convention, so a filename selector like
@@ -259,35 +293,50 @@ def resolve_export_run_id(
 # ---------------------------------------------------------------------------
 
 
-def resolve_segment(registry_file: Path, segments_root: Path, segment_id: str) -> Tuple[Path, str]:
-    """Resolve `segment_id` to its materialized segment_root, using
+def resolve_segment(registry_file: Path, segments_root: Path, segment_folder: str) -> Tuple[Path, str]:
+    """Resolve `segment_folder` to its materialized segment_root, using
     run_registry.csv (the authoritative per-segment completion signal --
     see tools/run_segment_orchestrator.py's own already_satisfied logic,
     which is exactly `status == "complete"`). Never treats file existence
     alone as proof of completeness.
+
+    Matched against run_registry.csv's own `output_folder` column -- the
+    normalized, filesystem-safe folder name (e.g.
+    "imperial_template_architectural") that
+    tools/build_segment_manifest.py::_sanitize_folder() derives from the
+    raw, pipe-delimited `segment_id` (e.g. "imperial|Template|Architectural")
+    -- rather than `segment_id` itself, so a caller never has to type or
+    shell-quote a pipe character on the command line. `output_folder` is
+    already the unique, on-disk identifier for a materialized segment (with
+    a "_2", "_3", ... suffix appended by _build_registry() on a folder-name
+    collision), so this is a strictly more usable selector, not a narrower
+    one -- a segment_id with no pipe in it (e.g. "enterprise_all") sanitizes
+    to itself, so existing simple selectors are unaffected.
     """
     if not registry_file.is_file():
         raise CompareReferenceError(REASON_SEGMENT_NOT_FOUND, f"--registry-file not found: {registry_file}")
     rows = read_csv_rows(registry_file)
-    matches = [r for r in rows if (r.get("segment_id", "") or "").strip() == segment_id]
+    matches = [r for r in rows if (r.get("output_folder", "") or "").strip() == segment_folder]
     if not matches:
-        raise CompareReferenceError(REASON_SEGMENT_NOT_FOUND, f"segment_id {segment_id!r} not found in {registry_file}")
+        raise CompareReferenceError(
+            REASON_SEGMENT_NOT_FOUND, f"segment folder {segment_folder!r} not found in {registry_file}"
+        )
     if len(matches) > 1:
         raise CompareReferenceError(
             REASON_SEGMENT_NOT_FOUND,
-            f"segment_id {segment_id!r} has {len(matches)} rows in {registry_file} (expected exactly one).",
+            f"segment folder {segment_folder!r} has {len(matches)} rows in {registry_file} (expected exactly one).",
         )
     row = matches[0]
     output_folder = (row.get("output_folder", "") or "").strip()
     status = (row.get("status", "") or "").strip()
     if not output_folder:
         raise CompareReferenceError(
-            REASON_SEGMENT_NOT_FOUND, f"segment_id {segment_id!r} has no output_folder recorded in {registry_file}."
+            REASON_SEGMENT_NOT_FOUND, f"segment folder {segment_folder!r} has no output_folder recorded in {registry_file}."
         )
     if status != "complete":
         raise CompareReferenceError(
             REASON_SEGMENT_MATERIALIZATION_INCOMPLETE,
-            f"segment_id {segment_id!r} run_registry.csv status={status!r} (expected 'complete'); "
+            f"segment {segment_folder!r} run_registry.csv status={status!r} (expected 'complete'); "
             "this segment's materialization is not known-complete.",
         )
     return segments_root / output_folder, status
@@ -972,6 +1021,118 @@ def _finalize_view(out_dir: Path, view: str, segment_id: str) -> Tuple[List[Dict
     return summary_rows, detail_out_rows
 
 
+def build_domain_pattern_name_maps(analysis_dir: Path, domains: Sequence[str]) -> Dict[str, Dict[str, str]]:
+    """Build {domain: {pattern_id: pattern_label_human}} from this segment's
+    own results/analysis/domain_patterns.csv, once (not per comparison
+    group). Excludes any row whose pattern_label_source == "fallback"
+    (templated placeholder, not an observed name -- see
+    tools/label_synthesis/label_resolver.py::resolve_pattern_label) and any
+    row with a blank pattern_id or a name that is empty after .strip().
+
+    Same-segment mode never requires domain_patterns.csv to exist (see
+    require_segment_artifacts()'s require_domain_patterns=False for that
+    mode) -- a missing file here simply yields an empty map per domain,
+    which flows through as "zero resolvable names", not an error.
+    """
+    name_maps: Dict[str, Dict[str, str]] = {dom: {} for dom in domains}
+    path = analysis_dir / "domain_patterns.csv"
+    if not path.is_file():
+        return name_maps
+    domain_set = set(domains)
+    for row in read_csv_rows(path):
+        dom = (row.get("domain", "") or "").strip()
+        if dom not in domain_set:
+            continue
+        if (row.get("pattern_label_source", "") or "").strip() == _FALLBACK_PATTERN_LABEL_SOURCE:
+            continue
+        pid = (row.get("pattern_id", "") or "").strip()
+        name = (row.get("pattern_label_human", "") or "").strip()
+        if not pid or not name:
+            continue
+        name_maps[dom][pid] = name
+    return name_maps
+
+
+def compute_semantic_changes_rows(
+    all_detail_rows: Sequence[Dict[str, str]], name_maps: Dict[str, Dict[str, str]]
+) -> List[Dict[str, str]]:
+    """Reclassify reference_only/target_only rows from `all_detail_rows`
+    (already-computed pattern-identity set membership -- no new comparison
+    math here) into likely renames/content-changes under a stable name,
+    grouped by the same (purge_view, domain, population_id,
+    target_export_run_id) key `all_detail_rows` is itself sorted by.
+    `pattern_id` values here are same-segment raw pattern_id (config/
+    sig_hash identity) -- never join_hash, since this is only ever called
+    when same_segment is True.
+    """
+    groups: Dict[Tuple[str, str, str, str], Dict[str, object]] = {}
+    for row in all_detail_rows:
+        comparison_class = row.get("comparison_class", "")
+        if comparison_class not in ("reference_only", "target_only"):
+            continue
+        key = (row.get("purge_view", ""), row.get("domain", ""), row.get("population_id", ""), row.get("target_export_run_id", ""))
+        group = groups.setdefault(
+            key,
+            {
+                "segment_id": row.get("segment_id", ""),
+                "reference_bundle_id": row.get("reference_bundle_id", ""),
+                "analysis_run_id": row.get("analysis_run_id", ""),
+                "reference_only": [],
+                "target_only": [],
+            },
+        )
+        group[comparison_class].append(row.get("pattern_id", ""))
+
+    out_rows: List[Dict[str, str]] = []
+    for (purge_view, domain, population_id, target_export_run_id), group in groups.items():
+        name_map = name_maps.get(domain, {})
+
+        reference_names_to_pids: Dict[str, List[str]] = {}
+        for pid in group["reference_only"]:
+            name = name_map.get(pid)
+            if name is not None:
+                reference_names_to_pids.setdefault(name, []).append(pid)
+        target_names_to_pids: Dict[str, List[str]] = {}
+        for pid in group["target_only"]:
+            name = name_map.get(pid)
+            if name is not None:
+                target_names_to_pids.setdefault(name, []).append(pid)
+
+        base_row = {
+            "segment_id": group["segment_id"],
+            "purge_view": purge_view,
+            "reference_bundle_id": group["reference_bundle_id"],
+            "analysis_run_id": group["analysis_run_id"],
+            "target_export_run_id": target_export_run_id,
+            "domain": domain,
+            "population_id": population_id,
+            "name_match_basis": _NAME_MATCH_BASIS_PATTERN_LABEL_HUMAN,
+        }
+
+        all_names = set(reference_names_to_pids) | set(target_names_to_pids)
+        for name in all_names:
+            ref_pids = sorted(reference_names_to_pids.get(name, []))
+            tgt_pids = sorted(target_names_to_pids.get(name, []))
+            if ref_pids and tgt_pids:
+                semantic_change_class = "changed" if len(ref_pids) == 1 and len(tgt_pids) == 1 else "ambiguous_name_match"
+            elif ref_pids:
+                semantic_change_class = "removed"
+            else:
+                semantic_change_class = "added"
+            out_rows.append(
+                {
+                    **base_row,
+                    "pattern_name": name,
+                    "reference_pattern_id": "|".join(ref_pids),
+                    "target_pattern_id": "|".join(tgt_pids),
+                    "semantic_change_class": semantic_change_class,
+                }
+            )
+
+    out_rows.sort(key=lambda r: (r["purge_view"], r["domain"], r["population_id"], r["target_export_run_id"], r["pattern_name"]))
+    return out_rows
+
+
 def assemble_final_outputs(
     out_dir: Path,
     segment_id: str,
@@ -983,6 +1144,7 @@ def assemble_final_outputs(
     target_export_run_id: Optional[str],
     extractor_schema_version: str,
     reference_segment_id: str,
+    same_segment: bool,
 ) -> Dict[str, object]:
     all_summary_rows: List[Dict[str, str]] = []
     all_detail_rows: List[Dict[str, str]] = []
@@ -997,6 +1159,20 @@ def assemble_final_outputs(
     )
     atomic_write_csv(out_dir / SUMMARY_FILENAME, _SUMMARY_FIELDNAMES, all_summary_rows)
     atomic_write_csv(out_dir / DETAIL_FILENAME, _DETAIL_FIELDNAMES, all_detail_rows)
+
+    # Same-segment only: reference_comparison_detail.csv's pattern_id values
+    # are raw, segment-local, directly-comparable identifiers there -- see
+    # REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT for why
+    # cross-segment mode (join_hash identity) is out of scope.
+    semantic_changes_skipped_reason = ""
+    output_files = [SUMMARY_FILENAME, DETAIL_FILENAME, DIAGNOSTICS_FILENAME]
+    if same_segment:
+        name_maps = build_domain_pattern_name_maps(segment_root / "results" / "analysis", domains)
+        semantic_changes_rows = compute_semantic_changes_rows(all_detail_rows, name_maps)
+        atomic_write_csv(out_dir / SEMANTIC_CHANGES_FILENAME, _SEMANTIC_CHANGES_FIELDNAMES, semantic_changes_rows)
+        output_files.append(SEMANTIC_CHANGES_FILENAME)
+    else:
+        semantic_changes_skipped_reason = REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT
 
     statuses_by_key: Dict[Tuple[str, str], List[str]] = {}
     reasons_by_key: Dict[Tuple[str, str], List[str]] = {}
@@ -1062,8 +1238,9 @@ def assemble_final_outputs(
         "extractor_schema_version": extractor_schema_version,
         "purge_views": list(views),
         "domains": list(domains),
-        "output_files": [SUMMARY_FILENAME, DETAIL_FILENAME, DIAGNOSTICS_FILENAME],
+        "output_files": output_files,
         "aggregate_comparison_status": run_status,
+        "semantic_changes_skipped_reason": semantic_changes_skipped_reason,
     }
     (out_dir / MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return manifest
@@ -1186,12 +1363,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--reference-segment",
         required=True,
-        help="segment_id the --reference selector and the reference pattern set are resolved against (matched against --registry-file).",
+        help="Normalized segment folder name (run_registry.csv's own output_folder column, e.g. "
+        "'imperial_template_architectural' -- not the raw pipe-delimited segment_id) the --reference "
+        "selector and the reference pattern set are resolved against (matched against --registry-file).",
     )
     ap.add_argument(
         "--target-segment",
         default=None,
-        help="segment_id the --target selector (or, if --target is omitted, the whole-segment comparison) is resolved against. "
+        help="Normalized segment folder name (see --reference-segment) the --target selector (or, if --target "
+        "is omitted, the whole-segment comparison) is resolved against. "
         "Default: the same segment as --reference-segment.",
     )
     ap.add_argument("--reference", required=True, help="Reference export filename selector, resolved against the reference segment's own file_metadata.csv.")
@@ -1390,6 +1570,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         target_export_run_id,
         extractor_schema_version,
         reference_segment_id,
+        same_segment,
     )
     print(f"[compare_reference] comparison_status={manifest['aggregate_comparison_status']}")
     print(f"[compare_reference] wrote outputs to {out_dir}")

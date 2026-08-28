@@ -166,7 +166,7 @@ Original one-way reference-coverage fields (semantics unchanged):
 | `patterns_required` | `len(reference)` |
 | `patterns_present` | `len(shared)` |
 | `patterns_missing` | `len(reference_only)` |
-| `gap_pattern_ids` | sorted `reference_only`, `\|`-joined |
+| `gap_pattern_ids` | sorted `reference_only`, `\|`-joined (see size note below) |
 | `coverage_pct` | `patterns_present / patterns_required`, `%.6f` |
 | `coverage_status` | `full` / `partial` / `none` / `NO_REFERENCE_DEFINED` |
 
@@ -180,9 +180,9 @@ Symmetric set-comparison fields (added):
 | `reference_only_count` | `len(reference_only)` |
 | `target_only_count` | `len(target_only)` |
 | `union_count` | `len(union)` |
-| `shared_pattern_ids` | sorted `shared`, `\|`-joined |
-| `reference_only_pattern_ids` | sorted `reference_only`, `\|`-joined (same set as `gap_pattern_ids`) |
-| `target_only_pattern_ids` | sorted `target_only`, `\|`-joined |
+| `shared_pattern_ids` | sorted `shared`, `\|`-joined (see size note below) |
+| `reference_only_pattern_ids` | sorted `reference_only`, `\|`-joined (same set as `gap_pattern_ids`; see size note below) |
+| `target_only_pattern_ids` | sorted `target_only`, `\|`-joined (see size note below) |
 | `reference_coverage_pct` | same value as `coverage_pct`, under the new field name |
 | `jaccard` | `shared_count / union_count`, `%.6f` |
 
@@ -191,6 +191,17 @@ A target that contains every reference pattern plus additional ones
 those additional patterns via `target_only_count`/`target_only_pattern_ids`
 — full reference coverage no longer causes target-only patterns to be
 dropped from the output.
+
+**Size note (all four `*_pattern_ids` columns above):** for a domain with a
+very large pattern population, the joined value can exceed a single CSV
+cell's practical size (Python's own `csv` field-size limit, and lower limits
+in consumers like Excel). Past `_MAX_INLINE_PATTERN_LIST_CHARS` (8000 chars,
+`step_compare.py`), the cell holds the literal marker
+`<see file_gap_detail.csv>` instead of the joined list — the exact same data
+is always available, one row per `pattern_id`, in `file_gap_detail.csv`
+(`comparison_class` in `{shared, reference_only, target_only}`), which never
+inlines a list into a single cell and so never hits this limit. Below the
+threshold (the common case), the literal `\|`-joined value is unchanged.
 
 **`NO_REFERENCE_DEFINED`** (the domain has no entry in the reference
 sidecar's `domains` map) is distinct from a defined reference containing

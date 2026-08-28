@@ -99,6 +99,26 @@ _TARGET_DERIVED_BLANK_ON_BLOCKED = [
 ]
 
 
+# Beyond this size, inlining the full pipe-joined pattern_id list into a
+# single file_gap_report.csv cell risks the exact field-size-limit crash
+# raising csv.field_size_limit() (tools/bundle_analysis/common.py) only
+# defends reading against, and is hostile to any consumer with its own
+# lower per-cell limit (e.g. Excel's ~32K character cell limit) -- for no
+# benefit, since file_gap_detail.csv already carries the identical data one
+# row per pattern_id, unconditionally, for every non-blocked row this module
+# emits. Below the threshold the literal joined value is unchanged from
+# before this fix (every pre-existing test stays comfortably under it).
+_MAX_INLINE_PATTERN_LIST_CHARS = 8000
+_LARGE_PATTERN_LIST_MARKER = "<see file_gap_detail.csv>"
+
+
+def _join_pattern_ids_or_defer(pattern_ids: List[str]) -> str:
+    joined = "|".join(pattern_ids)
+    if len(joined) > _MAX_INLINE_PATTERN_LIST_CHARS:
+        return _LARGE_PATTERN_LIST_MARKER
+    return joined
+
+
 def _safe_pct(value: object) -> float:
     try:
         return float(str(value))
@@ -313,7 +333,7 @@ def _compute_comparison_rows(
             "patterns_required": str(required_count),
             "patterns_present": str(present_count),
             "patterns_missing": str(missing_count),
-            "gap_pattern_ids": "|".join(missing),
+            "gap_pattern_ids": _join_pattern_ids_or_defer(missing),
             "coverage_pct": f"{coverage:.6f}",
             "coverage_status": status,
             "reference_pattern_count": str(required_count),
@@ -322,9 +342,9 @@ def _compute_comparison_rows(
             "reference_only_count": str(len(reference_only)),
             "target_only_count": str(len(target_only)),
             "union_count": str(union_count),
-            "shared_pattern_ids": "|".join(sorted(shared)),
-            "reference_only_pattern_ids": "|".join(sorted(reference_only)),
-            "target_only_pattern_ids": "|".join(sorted(target_only)),
+            "shared_pattern_ids": _join_pattern_ids_or_defer(sorted(shared)),
+            "reference_only_pattern_ids": _join_pattern_ids_or_defer(sorted(reference_only)),
+            "target_only_pattern_ids": _join_pattern_ids_or_defer(sorted(target_only)),
             "reference_coverage_pct": f"{coverage:.6f}",
             "jaccard": f"{jaccard:.6f}",
             "comparison_status": comparison_status,
