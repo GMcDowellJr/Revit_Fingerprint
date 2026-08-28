@@ -362,7 +362,7 @@ def _compute_fresh_entry(
     return entry, file_diag, lp_stats
 
 
-def run_incremental(
+def _run_incremental(
     exports_dir: Path,
     out_dir: Path,
     *,
@@ -644,7 +644,6 @@ def run_incremental(
 
     timings["consolidated_csv_writes_and_finalization"] = time.perf_counter() - csv_started
     total_seconds = time.perf_counter() - started
-    progress.close()
     progress.event("incremental processing complete", phase="complete", files=len(export_files), reused=files_reused,
                    recomputed=files_recomputed, records=record_count, basis_rows=basis_rows_written)
     return {
@@ -667,3 +666,45 @@ def run_incremental(
             "cache_invalidation_reason": state.invalidation_reason,
         },
     }
+
+
+def run_incremental(
+    exports_dir: Path,
+    out_dir: Path,
+    *,
+    cache_dir: Path,
+    sig_hash_policy_path: Optional[Path],
+    join_policy_path: Optional[Path],
+    file_id_mode: str = "basename",
+    force_full: bool = False,
+    sig_hash_domains: Optional[List[str]] = None,
+    progress: Optional[ProgressReporter] = None,
+) -> Dict[str, Any]:
+    """Run the incremental pass and always stop its heartbeat on every exit."""
+    reporter = progress or ProgressReporter()
+    try:
+        result = _run_incremental(
+            exports_dir,
+            out_dir,
+            cache_dir=cache_dir,
+            sig_hash_policy_path=sig_hash_policy_path,
+            join_policy_path=join_policy_path,
+            file_id_mode=file_id_mode,
+            force_full=force_full,
+            sig_hash_domains=sig_hash_domains,
+            progress=reporter,
+        )
+    except BaseException:
+        # BaseException deliberately includes KeyboardInterrupt/SystemExit: both
+        # must preserve their original outcome while terminating reporter state.
+        try:
+            reporter.event("incremental processing failed", phase="failed")
+        except Exception as reporting_error:
+            print(f"[WARN run-a] unable to emit failure progress: {reporting_error}", file=sys.stderr, flush=True)
+        try:
+            reporter.close()
+        except Exception as cleanup_error:
+            print(f"[WARN run-a] unable to close progress reporter: {cleanup_error}", file=sys.stderr, flush=True)
+        raise
+    reporter.close()
+    return result

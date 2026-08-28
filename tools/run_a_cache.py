@@ -154,6 +154,11 @@ def load_entry_diagnostic(cache_dir: Path, file_id: str) -> Tuple[Optional[Dict[
             data = json.load(f)
     except json.JSONDecodeError:
         return None, "invalid_json"
+    except UnicodeDecodeError:
+        # The file was opened successfully but cannot be decoded as the cache's
+        # required UTF-8 text format. Treat this as unreadable cache data and
+        # retain the established safe-recompute fallback.
+        return None, "unreadable"
     except OSError:
         return None, "unreadable"
     if not isinstance(data, dict) or data.get("file_id") != file_id:

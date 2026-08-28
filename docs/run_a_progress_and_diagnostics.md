@@ -16,6 +16,10 @@ heartbeats, not warnings or final summaries. Heartbeats during opaque operations
 are best effort: interpreter scheduling, the GIL, and blocked I/O can delay them;
 no percentage is claimed.
 
+Invalid UTF-8 cache payloads are classified as unreadable and safely recomputed.
+The heartbeat is stopped and joined after success, processing failure,
+`SystemExit`, or interruption; the original failure remains the process outcome.
+
 `extract_all.report.json` retains existing keys and adds versioned
 `performance_diagnostics`, including combined and phase durations, candidate and
 accepted reuse counts, entry loads/fallbacks, actual source files/bytes hashed,
