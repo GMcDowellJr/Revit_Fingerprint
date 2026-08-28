@@ -293,7 +293,7 @@ def resolve_export_run_id(
 # ---------------------------------------------------------------------------
 
 
-def resolve_segment(registry_file: Path, segments_root: Path, segment_folder: str) -> Tuple[Path, str]:
+def resolve_segment(registry_file: Path, segments_root: Path, segment_folder: str) -> Tuple[Path, str, str]:
     """Resolve `segment_folder` to its materialized segment_root, using
     run_registry.csv (the authoritative per-segment completion signal --
     see tools/run_segment_orchestrator.py's own already_satisfied logic,
@@ -312,6 +312,16 @@ def resolve_segment(registry_file: Path, segments_root: Path, segment_folder: st
     collision), so this is a strictly more usable selector, not a narrower
     one -- a segment_id with no pipe in it (e.g. "enterprise_all") sanitizes
     to itself, so existing simple selectors are unaffected.
+
+    Returns (segment_root, status, canonical_segment_id) -- the matched
+    row's own `segment_id` column, which differs from the `segment_folder`
+    selector whenever the segment_id itself contains a pipe. Callers must
+    use this canonical segment_id -- never the folder-name selector -- for
+    any output field (reference_comparison_summary.csv/_detail.csv, the
+    manifest, or diagnostics), so those outputs keep joining to
+    segment_manifest.csv/run_registry.csv by segment_id (Codex review, PR
+    #475): the folder selector is a lookup convenience only, not a
+    replacement identifier.
     """
     if not registry_file.is_file():
         raise CompareReferenceError(REASON_SEGMENT_NOT_FOUND, f"--registry-file not found: {registry_file}")
@@ -329,9 +339,14 @@ def resolve_segment(registry_file: Path, segments_root: Path, segment_folder: st
     row = matches[0]
     output_folder = (row.get("output_folder", "") or "").strip()
     status = (row.get("status", "") or "").strip()
+    canonical_segment_id = (row.get("segment_id", "") or "").strip()
     if not output_folder:
         raise CompareReferenceError(
             REASON_SEGMENT_NOT_FOUND, f"segment folder {segment_folder!r} has no output_folder recorded in {registry_file}."
+        )
+    if not canonical_segment_id:
+        raise CompareReferenceError(
+            REASON_SEGMENT_NOT_FOUND, f"segment folder {segment_folder!r} has no segment_id recorded in {registry_file}."
         )
     if status != "complete":
         raise CompareReferenceError(
@@ -339,7 +354,7 @@ def resolve_segment(registry_file: Path, segments_root: Path, segment_folder: st
             f"segment {segment_folder!r} run_registry.csv status={status!r} (expected 'complete'); "
             "this segment's materialization is not known-complete.",
         )
-    return segments_root / output_folder, status
+    return segments_root / output_folder, status, canonical_segment_id
 
 
 def require_segment_artifacts(
@@ -1391,14 +1406,30 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     out_dir = Path(args.out_dir).resolve()
     views: List[str] = list(VALID_PURGE_VIEWS) if args.purge_view == "both" else [args.purge_view]
 
-    reference_segment_id = args.reference_segment
-    target_segment_id = args.target_segment if args.target_segment else args.reference_segment
+    # Raw CLI selectors (normalized folder names -- see resolve_segment()),
+    # used only for segment lookup and the same-segment check below, and as
+    # the best-effort label in the pre-resolution-failure output path
+    # (write_top_level_blocked, in the except block): if resolution itself
+    # fails, there is no canonical segment_id to report instead.
+    reference_segment_selector = args.reference_segment
+    target_segment_selector = args.target_segment if args.target_segment else args.reference_segment
     # Same-segment invocations must reproduce the tool's pre-cross-segment
     # behavior byte-for-byte: every branch below reuses the reference
     # segment's already-resolved root/paths/rows instead of re-resolving or
     # re-reading, and the new cross-segment compatibility gate
     # (resolve_cross_segment_compatibility) is never invoked in this case.
-    same_segment = target_segment_id == reference_segment_id
+    # Comparing the raw folder selectors (rather than resolved canonical
+    # segment_ids) is correct here: output_folder is already the unique,
+    # on-disk identifier for a materialized segment, so two equal selectors
+    # always mean the same segment and two different ones never do.
+    same_segment = target_segment_selector == reference_segment_selector
+    # Fallback labels for the pre-flight-failure output path below
+    # (write_top_level_blocked, in the except block), in case resolve_segment()
+    # itself fails before either canonical segment_id is known. Each is
+    # overwritten with the real canonical segment_id immediately after its
+    # own successful resolve_segment() call.
+    reference_segment_id = reference_segment_selector
+    target_segment_id = target_segment_selector
 
     try:
         check_out_dir_safety(out_dir, segments_root, registry_file)
@@ -1408,7 +1439,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
 
     try:
-        reference_segment_root, _ref_status = resolve_segment(registry_file, segments_root, reference_segment_id)
+        # reference_segment_id/target_segment_id (reassigned below, once
+        # resolution succeeds) are each segment's own canonical segment_id
+        # from run_registry.csv -- NOT the folder-name selector above -- so
+        # every output field downstream (summary/detail CSVs, manifest,
+        # diagnostics) keeps joining to segment_manifest.csv/run_registry.csv
+        # by segment_id, exactly as before this tool accepted a folder-name
+        # selector (Codex review, PR #475).
+        reference_segment_root, _ref_status, reference_segment_id = resolve_segment(
+            registry_file, segments_root, reference_segment_selector
+        )
         reference_paths = require_segment_artifacts(
             reference_segment_root, views, require_domain_patterns=not same_segment
         )
@@ -1416,10 +1456,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         if same_segment:
             target_segment_root = reference_segment_root
+            target_segment_id = reference_segment_id
             target_paths = reference_paths
             target_file_metadata_rows = reference_file_metadata_rows
         else:
-            target_segment_root, _tgt_status = resolve_segment(registry_file, segments_root, target_segment_id)
+            target_segment_root, _tgt_status, target_segment_id = resolve_segment(
+                registry_file, segments_root, target_segment_selector
+            )
             target_paths = require_segment_artifacts(target_segment_root, views, require_domain_patterns=True)
             target_file_metadata_rows = read_csv_rows(target_paths["records_dir"] / "file_metadata.csv")
 

@@ -124,8 +124,21 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   raw pipe-delimited selector stops resolving (it must be replaced with the
   normalized folder name -- `REASON_SEGMENT_NOT_FOUND`, not a new reason
   code). `docs/reference_comparison_tool.md` and the CLI `--help` text
-  updated accordingly. New coverage:
-  `tests/test_compare_reference.py::test_segment_lookup_uses_normalized_output_folder_not_raw_segment_id`.
+  updated accordingly. **Output fields still carry the canonical
+  `segment_id`, not the folder-name selector** (Codex review, PR #475):
+  `resolve_segment()` now returns `(segment_root, status,
+  canonical_segment_id)` -- the matched registry row's own `segment_id`
+  column -- and `main()` uses that (not the CLI-supplied folder selector)
+  for every `segment_id`/`reference_segment_id` value written into
+  `reference_comparison_summary.csv`/`_detail.csv`, the manifest, and
+  diagnostics, so those outputs keep joining to
+  `segment_manifest.csv`/`run_registry.csv` by `segment_id` exactly as
+  before. The folder selector is retained only for the pre-resolution-
+  failure output path (`write_top_level_blocked`), where no canonical id
+  was ever resolved. New coverage:
+  `tests/test_compare_reference.py::test_segment_lookup_uses_normalized_output_folder_not_raw_segment_id`
+  (now also asserts the canonical `segment_id` -- not the folder selector --
+  appears in every output field).
 - **`arrowheads`: the five style-specific fields are no longer discarded
   for non-owning record classes — extract-always / gate-hash-separately
   (D-049).** `domains/arrowheads.py` previously computed

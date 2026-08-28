@@ -503,6 +503,22 @@ def test_segment_lookup_uses_normalized_output_folder_not_raw_segment_id(tmp_pat
     summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
     assert summary and summary[0]["comparison_status"] == COMPARISON_STATUS_OK
 
+    # Output fields must carry the canonical (pipe-delimited) segment_id --
+    # not the folder-name selector that was actually typed on the command
+    # line -- so reference_comparison_summary.csv/_detail.csv and the
+    # manifest keep joining to segment_manifest.csv/run_registry.csv by
+    # segment_id (Codex review, PR #475).
+    assert summary[0]["segment_id"] == raw_segment_id
+    assert normalized_folder not in {r["segment_id"] for r in summary}
+    detail = _read_csv(out_dir / cr.DETAIL_FILENAME)
+    assert detail and all(r["segment_id"] == raw_segment_id for r in detail)
+    manifest = json.loads((out_dir / cr.MANIFEST_FILENAME).read_text())
+    assert manifest["segment_id"] == raw_segment_id
+    assert manifest["reference_segment_id"] == raw_segment_id
+    diagnostics = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
+    assert diagnostics["segment_id"] == raw_segment_id
+    assert diagnostics["reference_segment_id"] == raw_segment_id
+
     # The raw, pipe-delimited segment_id must no longer resolve at all.
     rc2, out_dir2 = _run(
         tmp_path, ctx, out_name="out2", reference_segment=raw_segment_id, target="target.json", purge_view="all"
