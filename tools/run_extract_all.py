@@ -749,7 +749,8 @@ def _enforce_policy_gate(rows: List[Dict[str, str]], diagnostics_dir: Path, doma
         sys.stderr.write("!" * 80 + "\n\n")
 
 
-def main() -> None:
+def _run_main(progress_reporters: List[Any]) -> None:
+    total_started = time.perf_counter()
     stage_names = ["flatten", "sig_hash", "discover", "apply", "placeholders", "authority", "patterns", "split", "flat_tables"]
     ap = argparse.ArgumentParser(
         description=(
@@ -845,7 +846,15 @@ def main() -> None:
              "export file, then rebuild the cache fresh. Use after a change the cache "
              "can't detect on its own, or to recover from a suspected stale/corrupt cache.",
     )
+    from progress_reporter import DEFAULT_INTERVAL_SECONDS, ProgressReporter, positive_finite
+    ap.add_argument("--progress-interval-seconds", type=positive_finite, default=DEFAULT_INTERVAL_SECONDS,
+                    help="Run A progress heartbeat interval; positive finite seconds (default: 10).")
+    ap.add_argument("--quiet-progress", action="store_true",
+                    help="Suppress periodic Run A heartbeats; warnings and final summaries remain.")
     args = ap.parse_args()
+    progress = ProgressReporter(args.progress_interval_seconds, args.quiet_progress)
+    progress_reporters.append(progress)
+    progress.start_heartbeat()
 
     allow_sig_hash_join_key = args.allow_sig_hash_join_key
     require_join_policy = True
@@ -895,6 +904,8 @@ def main() -> None:
     flat_tables_dir = v21_root / "flat_tables"
 
     _ensure_dir(out_root)
+    progress.event("startup/domain inference started", phase="startup_domain_inference")
+    startup_started = time.perf_counter()
     surfaces = _detect_surfaces(exports_dir)
 
     if args.domains and str(args.domains).strip():
@@ -902,6 +913,7 @@ def main() -> None:
     else:
         domains = _infer_domains(exports_dir)
     active_domains = [d for d in domains if d not in SUPPRESSED_DOWNSTREAM_DOMAINS]
+    startup_seconds = time.perf_counter() - startup_started
     suppressed_domains = sorted(set(domains) - set(active_domains))
     if suppressed_domains:
         sys.stderr.write(
@@ -969,6 +981,7 @@ def main() -> None:
             # _apply_sig_hash_to_phase0() below -- keeps suppressed/--domains-
             # narrowed domains untouched by sig_hash in both code paths.
             sig_hash_domains=active_domains or domains,
+            progress=progress,
         )
         print(
             f"[extract_all] incremental flatten+sig_hash+apply complete: "
@@ -1001,7 +1014,13 @@ def main() -> None:
         # written successfully -- a mid-run failure above raises before this point,
         # so a partially-written cache entry never gets treated as reusable on the
         # next invocation (tools/run_a_cache.py's finalize_manifest docstring).
+        progress.event("manifest publication started", phase="manifest_publication")
+        manifest_started = time.perf_counter()
         run_a_cache.finalize_manifest(inc_report["run_state"])
+        manifest_seconds = time.perf_counter() - manifest_started
+        inc_report["performance"]["phase_seconds"]["manifest_publication"] = manifest_seconds
+        report["performance_diagnostics"] = inc_report["performance"]
+        report["performance_diagnostics"]["startup_domain_inference_seconds"] = startup_seconds
         report["commands"].append({
             "stage": "flatten+sig_hash+apply", "incremental": True, "out": str(v21_phase0_dir),
             "diagnostics": str(diag_path), "files_reused": inc_report["files_reused"],
@@ -1094,13 +1113,16 @@ def main() -> None:
         _run(cmd_apply, env=env)
 
     if "placeholders" in selected_stages:
-        print("[extract_all] Stage placeholders (T2b): generating placeholder exclusion CSVs...", flush=True)
+        print("[extract_all] Stage placeholders (T2b full-population work): generating placeholder exclusion CSVs...", flush=True)
+        placeholders_started = time.perf_counter()
         cmd_ph = [sys.executable, "tools/bundle_analysis/placeholder_exclusions.py", "--phase0-dir", str(v21_phase0_dir), "--policies-dir", "policies", "--out-dir", str(v21_root / "placeholder_exclusions"), "--file-metadata-path", str(v21_phase0_dir / "file_metadata.csv")]
         report["commands"].append({"stage": "placeholders", "cmd": cmd_ph})
         try:
             _run(cmd_ph, env=env)
         except Exception as e:
             sys.stderr.write("[WARN extract_all] placeholders stage failed; continuing: {}\n".format(e))
+        placeholders_seconds = time.perf_counter() - placeholders_started
+        print(f"[extract_all] Stage placeholders full-population work complete: elapsed_seconds={placeholders_seconds:.3f}", flush=True)
 
     if "authority" in selected_stages or "patterns" in selected_stages:
         _t_patterns_stage_start = time.perf_counter()
@@ -1357,10 +1379,22 @@ def main() -> None:
         _run(cmd_flat, env=env)
         print(f"[extract_all] Stage flat_tables complete: out={flat_tables_dir}", flush=True)
 
+    report.setdefault("performance_diagnostics", {"schema_version": 1})
+    report["performance_diagnostics"]["placeholders_seconds"] = locals().get("placeholders_seconds", 0.0)
+    report["performance_diagnostics"]["run_extract_all_total_seconds"] = time.perf_counter() - total_started
     report_path = out_root / "extract_all.report.json"
     with report_path.open("w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, sort_keys=True)
     print(f"Wrote: {report_path}")
+
+
+def main() -> None:
+    progress_reporters: List[Any] = []
+    try:
+        _run_main(progress_reporters)
+    finally:
+        for reporter in progress_reporters:
+            reporter.close()
 
 
 if __name__ == "__main__":

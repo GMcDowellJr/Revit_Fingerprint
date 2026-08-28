@@ -83,6 +83,7 @@ from core.sig_hash_policy import get_domain_sig_hash_policy, load_sig_hash_polic
 from core.sig_hash_builder import build_sig_hash_from_policy  # noqa: E402
 
 import run_a_cache  # noqa: E402
+from progress_reporter import ProgressReporter  # noqa: E402
 
 # Matches `_apply_sig_hash_to_phase0`'s fieldname extension exactly: flatten's own
 # _RECORD_FIELDS has no "status_reasons" column (status_reasons live in the separate
@@ -361,7 +362,7 @@ def _compute_fresh_entry(
     return entry, file_diag, lp_stats
 
 
-def run_incremental(
+def _run_incremental(
     exports_dir: Path,
     out_dir: Path,
     *,
@@ -371,6 +372,7 @@ def run_incremental(
     file_id_mode: str = "basename",
     force_full: bool = False,
     sig_hash_domains: Optional[List[str]] = None,
+    progress: Optional[ProgressReporter] = None,
 ) -> Dict[str, Any]:
     """Run Run A's flatten+sig_hash+apply as one cache-aware pass.
 
@@ -392,6 +394,11 @@ def run_incremental(
     changed filter forces a full recompute instead of reusing entries computed
     under a different filter.
     """
+    started = time.perf_counter()
+    progress = progress or ProgressReporter()
+    progress.start_heartbeat()
+    progress.event("startup and export discovery started", phase="discovery_setup")
+    timings = {k: 0.0 for k in ("discovery_setup", "source_signature_scan", "cache_entry_reads", "fresh_parse_flatten_signature_join", "cache_entry_writes", "consolidated_csv_writes_and_finalization")}
     dom_filter = set(sig_hash_domains) if sig_hash_domains else None
 
     export_files = _iter_export_files(exports_dir)
@@ -417,6 +424,11 @@ def run_incremental(
             raise SystemExit("Invalid policy format: missing domains")
 
     tool_version = _get_tool_version()
+    progress.event("cache setup complete", phase="discovery_setup", selected_exports=len(export_files), tool_version=tool_version)
+    if tool_version == "0.0.0+nogit":
+        print("[WARN run-a] tool_version=0.0.0+nogit weakens code-change cache invalidation", file=sys.stderr, flush=True)
+    timings["discovery_setup"] = time.perf_counter() - started
+    scan_started = time.perf_counter()
     state = run_a_cache.compute_run_state(
         cache_dir=cache_dir,
         file_id_to_paths=file_id_to_paths,
@@ -425,7 +437,11 @@ def run_incremental(
         tool_version=tool_version,
         sig_hash_domains=sig_hash_domains,
         force_full=force_full,
+        progress=progress,
     )
+    timings["source_signature_scan"] = time.perf_counter() - scan_started
+    progress.event("cache validity known", phase="cache_setup", cache_was_valid=state.cache_was_valid,
+                   invalidation_reason=state.invalidation_reason or "none", reuse_candidates=len(state.reuse_candidate_file_ids))
 
     exported_utc = _utc_now_iso()
     governance_rules = _load_governance_role_rules()
@@ -477,6 +493,10 @@ def run_incremental(
     total_diag = {"records_processed": 0, "records_hashed": 0, "records_blocked": 0, "records_degraded": 0, "basis_items_written": 0}
     lp_total = {"total": 0, "ok": 0, "missing": 0}
     active_domains: set = set()
+    entry_loads = 0
+    fallback_reasons: Dict[str, int] = {}
+    basis_rows_written = 0
+    csv_started = time.perf_counter()
 
     with (
         _tmp["records"].open("w", newline="", encoding="utf-8") as _rec_f,
@@ -495,11 +515,16 @@ def run_incremental(
         for _w in (_rec_w, _lbl_w, _rsn_w, _par_w, _basis_w, _fail_w):
             _w.writeheader()
 
-        for _, primary, secondary in export_files:
+        for completed, (_, primary, secondary) in enumerate(export_files):
             file_id = _file_id(primary, file_id_mode)
             entry: Optional[Dict[str, Any]] = None
-            if file_id in state.unchanged_file_ids:
-                entry = run_a_cache.load_entry(cache_dir, file_id)
+            if file_id in state.reuse_candidate_file_ids:
+                progress.update(phase="candidate_cache_load", current=file_id, completed=completed, total=len(export_files), reused=files_reused, recomputed=files_recomputed, records=record_count, basis_rows=basis_rows_written)
+                t = time.perf_counter(); entry, reason = run_a_cache.load_entry_diagnostic(cache_dir, file_id)
+                timings["cache_entry_reads"] += time.perf_counter() - t; entry_loads += 1
+                if entry is None:
+                    fallback_reasons[reason] = fallback_reasons.get(reason, 0) + 1
+                    print(f"[WARN run-a] cache reuse fallback file={file_id} reason={reason}", file=sys.stderr, flush=True)
             if entry is not None:
                 files_reused += 1
                 for k in total_diag:
@@ -509,17 +534,22 @@ def run_incremental(
                     lp_total[k] += lp.get(k, 0)
             else:
                 files_recomputed += 1
+                progress.update(phase="fresh_parse_flatten_signature_join", current=file_id, completed=completed, total=len(export_files), reused=files_reused, recomputed=files_recomputed)
+                t = time.perf_counter()
                 entry, file_diag, lp_stats = _compute_fresh_entry(
                     primary, secondary, file_id_mode, tool_version, exported_utc,
                     governance_rules, sig_hash_policies, join_policy_domains, dom_filter,
                 )
+                timings["fresh_parse_flatten_signature_join"] += time.perf_counter() - t
                 entry["sig_hash_diag"] = file_diag
                 entry["line_pattern_stats"] = lp_stats
                 for k in total_diag:
                     total_diag[k] += file_diag[k]
                 for k in lp_total:
                     lp_total[k] += lp_stats[k]
-                run_a_cache.save_entry(cache_dir, file_id, entry)
+                progress.update(phase="cache_entry_write", current=file_id)
+                t = time.perf_counter(); run_a_cache.save_entry(cache_dir, file_id, entry)
+                timings["cache_entry_writes"] += time.perf_counter() - t
 
             meta_row = _merge_meta_row(entry["meta_core"], existing_annotations, annotation_columns, governance_rules)
             meta_rows.append(meta_row)
@@ -545,10 +575,15 @@ def run_incremental(
                     item_shard_writers[domain].writerow(row)
             for row in entry["sig_basis_rows"]:
                 _basis_w.writerow(row)
+                basis_rows_written += 1
             for row in entry["join_failure_rows"]:
                 _fail_w.writerow(row)
             # `entry` (and any large per-domain row lists it held) is now free to
             # be garbage-collected before the next export file is processed.
+            progress.update(phase="consolidated_csv_output", current=file_id, completed=completed + 1,
+                            total=len(export_files), reused=files_reused, recomputed=files_recomputed,
+                            records=record_count, basis_rows=basis_rows_written)
+            entry = None
 
     for _fp in item_shard_handles.values():
         _fp.close()
@@ -576,6 +611,7 @@ def run_incremental(
     # succeeds, matching extractor.emit_records()'s own .tmp-then-replace
     # convention -- a mid-loop failure leaves the previous complete output
     # intact instead of a half-written records.csv.
+    progress.event("output promotion started", phase="output_finalization")
     for stem in _streaming_stems:
         _tmp[stem].replace(out_dir / f"{stem}.csv")
     _join_failures_tmp.replace(diag_dir / "join_policy_failures.csv")
@@ -606,6 +642,10 @@ def run_incremental(
     if total_diag["basis_items_written"]:
         sig_hash_diag["sig_basis_items_written"] = total_diag["basis_items_written"]
 
+    timings["consolidated_csv_writes_and_finalization"] = time.perf_counter() - csv_started
+    total_seconds = time.perf_counter() - started
+    progress.event("incremental processing complete", phase="complete", files=len(export_files), reused=files_reused,
+                   recomputed=files_recomputed, records=record_count, basis_rows=basis_rows_written)
     return {
         "files_total": len(export_files),
         "files_reused": files_reused,
@@ -616,4 +656,55 @@ def run_incremental(
         "cache_was_valid": state.cache_was_valid,
         "cache_invalidation_reason": state.invalidation_reason,
         "run_state": state,
+        "performance": {
+            "schema_version": 1, "timing_scope": "phase durations are inclusive within the combined incremental total; fresh parse/flatten/signature/join is intentionally combined",
+            "phase_seconds": timings, "combined_incremental_seconds": total_seconds,
+            "cache_entry_loads": entry_loads, "reuse_candidates": len(state.reuse_candidate_file_ids),
+            "fallback_reasons": fallback_reasons, "source_files_hashed": state.source_files_hashed,
+            "source_bytes_hashed": state.source_bytes_hashed, "records_emitted": record_count,
+            "basis_rows_emitted": basis_rows_written, "effective_tool_version": tool_version,
+            "cache_invalidation_reason": state.invalidation_reason,
+        },
     }
+
+
+def run_incremental(
+    exports_dir: Path,
+    out_dir: Path,
+    *,
+    cache_dir: Path,
+    sig_hash_policy_path: Optional[Path],
+    join_policy_path: Optional[Path],
+    file_id_mode: str = "basename",
+    force_full: bool = False,
+    sig_hash_domains: Optional[List[str]] = None,
+    progress: Optional[ProgressReporter] = None,
+) -> Dict[str, Any]:
+    """Run the incremental pass and always stop its heartbeat on every exit."""
+    reporter = progress or ProgressReporter()
+    try:
+        result = _run_incremental(
+            exports_dir,
+            out_dir,
+            cache_dir=cache_dir,
+            sig_hash_policy_path=sig_hash_policy_path,
+            join_policy_path=join_policy_path,
+            file_id_mode=file_id_mode,
+            force_full=force_full,
+            sig_hash_domains=sig_hash_domains,
+            progress=reporter,
+        )
+    except BaseException:
+        # BaseException deliberately includes KeyboardInterrupt/SystemExit: both
+        # must preserve their original outcome while terminating reporter state.
+        try:
+            reporter.event("incremental processing failed", phase="failed")
+        except Exception as reporting_error:
+            print(f"[WARN run-a] unable to emit failure progress: {reporting_error}", file=sys.stderr, flush=True)
+        try:
+            reporter.close()
+        except Exception as cleanup_error:
+            print(f"[WARN run-a] unable to close progress reporter: {cleanup_error}", file=sys.stderr, flush=True)
+        raise
+    reporter.close()
+    return result

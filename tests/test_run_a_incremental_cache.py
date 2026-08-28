@@ -619,3 +619,117 @@ def test_malformed_join_policy_hard_fails_like_apply_join_policy(tmp_path: Path)
 
     with pytest.raises(SystemExit, match="Invalid policy format"):
         _run_incremental(tmp_path, exports, tmp_path / "results", sig_pol, join_pol)
+
+
+def test_warm_cache_deserializes_each_candidate_once(tmp_path: Path, monkeypatch) -> None:
+    exports = tmp_path / "exports"
+    _write_corpus(exports, 3)
+    sig_pol = tmp_path / "sig.json"; join_pol = tmp_path / "join.json"
+    _write_json(sig_pol, _UNITS_SIG_HASH_POLICY); _write_json(join_pol, _UNITS_JOIN_POLICY)
+    results_root = tmp_path / "results"
+    _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol)
+    calls = 0
+    original = run_a_cache.load_entry_diagnostic
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+    monkeypatch.setattr(run_a_incremental.run_a_cache, "load_entry_diagnostic", counted)
+    report, _ = _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol)
+    assert calls == report["files_total"] == 3
+    assert report["performance"]["cache_entry_loads"] == 3
+    assert report["files_reused"] == 3
+    assert report["performance"]["source_files_hashed"] == 0
+
+
+def test_non_utf8_cache_entry_is_unreadable_fallback(tmp_path: Path) -> None:
+    exports = tmp_path / "exports"
+    _write_corpus(exports, 1)
+    sig_pol = tmp_path / "sig.json"
+    join_pol = tmp_path / "join.json"
+    _write_json(sig_pol, _UNITS_SIG_HASH_POLICY)
+    _write_json(join_pol, _UNITS_JOIN_POLICY)
+    results_root = tmp_path / "results"
+    _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol)
+
+    cache_dir = run_a_cache.cache_root(results_root)
+    entry_path = next((cache_dir / "entries").glob("*.json"))
+    entry_path.write_bytes(b"\xff\xfe\x80")
+
+    report, _ = _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol)
+    assert report["files_reused"] == 0
+    assert report["files_recomputed"] == 1
+    assert report["performance"]["fallback_reasons"] == {"unreadable": 1}
+
+
+def test_failed_run_stops_heartbeat(tmp_path: Path) -> None:
+    import io
+    from tools.progress_reporter import ProgressReporter
+
+    exports = tmp_path / "exports"
+    _write_corpus(exports, 1)
+    sig_pol = tmp_path / "sig.json"
+    join_pol = tmp_path / "join.json"
+    _write_json(sig_pol, _UNITS_SIG_HASH_POLICY)
+    _write_json(join_pol, {"not_domains": {}})
+    reporter = ProgressReporter(interval=60, stream=io.StringIO())
+
+    with pytest.raises(SystemExit, match="Invalid policy format"):
+        run_a_incremental.run_incremental(
+            exports,
+            tmp_path / "results" / "records",
+            cache_dir=tmp_path / "results" / ".run_a_cache",
+            sig_hash_policy_path=sig_pol,
+            join_policy_path=join_pol,
+            progress=reporter,
+        )
+
+    assert reporter._thread is None
+    assert reporter._stop.is_set()
+
+
+def test_over_limit_integer_cache_entry_is_invalid_json_fallback(tmp_path: Path) -> None:
+    exports = tmp_path / "exports"
+    _write_corpus(exports, 1)
+    sig_pol = tmp_path / "sig.json"
+    join_pol = tmp_path / "join.json"
+    _write_json(sig_pol, _UNITS_SIG_HASH_POLICY)
+    _write_json(join_pol, _UNITS_JOIN_POLICY)
+    results_root = tmp_path / "results"
+    _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol)
+
+    cache_dir = run_a_cache.cache_root(results_root)
+    entry_path = next((cache_dir / "entries").glob("*.json"))
+    entry_path.write_text('{"file_id":"ignored","n":' + ("9" * 5000) + "}", encoding="utf-8")
+
+    report, _ = _run_incremental(tmp_path, exports, results_root, sig_pol, join_pol)
+    assert report["files_reused"] == 0
+    assert report["files_recomputed"] == 1
+    assert report["performance"]["fallback_reasons"] == {"invalid_json": 1}
+
+
+def test_extract_all_starts_and_closes_heartbeat_before_domain_inference(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import threading
+
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    observed_running = False
+
+    def fail_during_startup(_exports_dir):
+        nonlocal observed_running
+        observed_running = any(t.name == "run-a-progress" and t.is_alive() for t in threading.enumerate())
+        raise RuntimeError("startup failure")
+
+    monkeypatch.setattr(run_extract_all, "_detect_surfaces", fail_during_startup)
+    monkeypatch.setattr(sys, "argv", [
+        "run_extract_all.py", str(exports), "--out-root", str(tmp_path / "out"),
+        "--progress-interval-seconds", "60",
+    ])
+
+    with pytest.raises(RuntimeError, match="startup failure"):
+        run_extract_all.main()
+
+    assert observed_running is True
+    assert not any(t.name == "run-a-progress" and t.is_alive() for t in threading.enumerate())

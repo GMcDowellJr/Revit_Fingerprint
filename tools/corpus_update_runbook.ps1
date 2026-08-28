@@ -14,6 +14,9 @@ param(
     [string]$Run = "",
     [switch]$ForceAll,
     [switch]$NameKey,
+    [ValidateRange(0.001, [double]::MaxValue)]
+    [double]$ProgressIntervalSeconds = 10,
+    [switch]$QuietProgress,
     # Opt-in (default OFF): run Run B's authority,patterns stage plus its
     # patch_all_domain_patterns.py follow-up. Confirmed (audit_results/
     # audit_17_abc_reprocessing_scope_investigation.md) that no governance
@@ -125,6 +128,7 @@ if ($Run -eq "") {
 }
 
 if ($Run -eq "A") {
+    $RunAStarted = [System.Diagnostics.Stopwatch]::StartNew()
     Write-Host "=== RUN A: Flatten / Apply / Placeholders ===" -ForegroundColor Green
 
     # --incremental: skip re-parsing an export file whose content and both policy
@@ -145,10 +149,13 @@ if ($Run -eq "A") {
         --sig-hash-policy $SIG_POL `
         --join-policy $JOIN_POL `
         --incremental `
+        --progress-interval-seconds $ProgressIntervalSeconds `
+        $(if ($QuietProgress) { '--quiet-progress' }) `
         @runAForceArg
     Invoke-Checked -StepName "Run A: flatten/apply/placeholders"
 
     if ($NameKey) {
+        $NameKeyStarted = [System.Diagnostics.Stopwatch]::StartNew()
         Write-Host ""
         Write-Host "--- A-NameKey: parse exports for name-identity projection (join_key_name_identity) ---" -ForegroundColor Cyan
         python tools\apply_name_key_policy.py `
@@ -156,8 +163,12 @@ if ($Run -eq "A") {
             --name-key-policy $NAME_KEY_POL `
             --out $NAME_KEY_CSV
         Invoke-Checked -StepName "Run A-NameKey: apply_name_key_policy.py"
+        $NameKeyStarted.Stop()
+        Write-Host ("  NameKey complete: elapsed_seconds={0:N3}; runs after extract_all.report.json and is not included in that report total" -f $NameKeyStarted.Elapsed.TotalSeconds)
         Write-Host "  wrote $NAME_KEY_CSV" -ForegroundColor Cyan
     }
+    $RunAStarted.Stop()
+    Write-Host ("Run A runbook total elapsed_seconds={0:N3} (includes optional NameKey when requested)" -f $RunAStarted.Elapsed.TotalSeconds)
 
     Write-Host ""
     Write-Host "=== RUN A COMPLETE ===" -ForegroundColor Yellow
