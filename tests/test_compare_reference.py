@@ -1115,3 +1115,108 @@ def test_same_segment_schema_mismatch_check_never_runs(tmp_path):
     assert rc == 0
     diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
     assert cr.REASON_CROSS_SEGMENT_SCHEMA_MISMATCH not in diag["run_comparison_reason_codes"]
+
+
+# ---------------------------------------------------------------------------
+# Second round of Codex review findings (PR #471, post-merge): missing
+# membership-matrix handling, cross-segment export_run_id namespace
+# collision, and target-only domains being incorrectly blocked.
+# ---------------------------------------------------------------------------
+
+
+def test_cross_segment_missing_target_membership_matrix_is_input_invalid_not_ok(tmp_path):
+    # Target's real membership_matrix.csv for a domain/view is missing (e.g.
+    # bundle_analysis never touched this domain for this view). Materializing
+    # an empty translated copy would make run_compare_for_domain see "zero
+    # target patterns" (an ok/none result) instead of the missing-file
+    # COMPARISON_INPUT_INVALID the untranslated same-segment path already
+    # reports for an identical situation (Codex review, PR #471).
+    ctx2 = _build_two_segments(
+        tmp_path,
+        presence_a={"ref.json": ["A"]},
+        presence_b={"target.json": ["A"]},
+    )
+    (ctx2["segment_b_root"] / "results" / "bundle_analysis" / "all" / DOMAIN / "membership_matrix.csv").unlink()
+    ctx = {"registry_file": ctx2["registry_file"], "segments_root": ctx2["segments_root"]}
+
+    rc, out_dir = _run(
+        tmp_path,
+        ctx,
+        reference_segment="seg_a",
+        target_segment="seg_b",
+        reference="ref.json",
+        target="target.json",
+        purge_view="all",
+    )
+    assert rc == 0  # domain-level block, not a process failure
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert len(summary) == 1
+    assert summary[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert "COMPARISON_INPUT_INVALID" in summary[0]["comparison_reason_codes"]
+    assert summary[0]["shared_count"] == ""
+
+
+def test_cross_segment_export_run_id_collision_is_not_reference_exclusion(tmp_path):
+    # Reference segment and target segment each have a file named
+    # "shared_name.json" -- unrelated files that merely share a string in two
+    # independent segments' export_run_id namespaces. Whole-segment cross-
+    # segment comparison must not silently drop the target's own
+    # "shared_name.json" just because it textually matches the reference's
+    # selector (Codex review, PR #471) -- that exclusion is only meaningful
+    # in same-segment mode, where reference and target share one real
+    # namespace.
+    ctx2 = _build_two_segments(
+        tmp_path,
+        presence_a={"shared_name.json": ["A"]},
+        presence_b={"shared_name.json": ["A"], "other.json": ["B"]},
+    )
+    ctx = {"registry_file": ctx2["registry_file"], "segments_root": ctx2["segments_root"]}
+
+    rc, out_dir = _run(
+        tmp_path,
+        ctx,
+        reference_segment="seg_a",
+        target_segment="seg_b",
+        reference="shared_name.json",
+        purge_view="all",
+    )
+    assert rc == 0
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    targets = {r["target_export_run_id"] for r in summary}
+    assert targets == {"shared_name.json", "other.json"}
+    by_target = {r["target_export_run_id"]: r for r in summary}
+    assert by_target["shared_name.json"]["comparison_status"] == COMPARISON_STATUS_OK
+    assert by_target["shared_name.json"]["shared_count"] == "1"
+
+
+def test_cross_segment_target_only_domain_is_reference_undefined_not_blocked(tmp_path):
+    # "line_styles" exists only in the target segment (the reference segment
+    # never touched it at all) -- an entirely ordinary situation when
+    # domains default from the target's own population. This must surface as
+    # the comparator's own existing ok/REFERENCE_DOMAIN_UNDEFINED outcome, not
+    # a false CROSS_SEGMENT_JOIN_POLICY_MISMATCH block (Codex review, PR #471).
+    domain2 = "line_styles"
+    ctx_a = _build_multidomain_segment(tmp_path, {DOMAIN: {"ref.json": ["A"]}}, segment_id="seg_a")
+    ctx_b = _build_multidomain_segment(
+        tmp_path,
+        {DOMAIN: {"target.json": ["A"]}, domain2: {"target.json": ["X"]}},
+        segment_id="seg_b",
+        other_registry_rows=[ctx_a["registry_row"]],
+    )
+    ctx = {"registry_file": ctx_b["registry_file"], "segments_root": ctx_b["segments_root"]}
+
+    rc, out_dir = _run(
+        tmp_path,
+        ctx,
+        reference_segment="seg_a",
+        target_segment="seg_b",
+        reference="ref.json",
+        target="target.json",
+        purge_view="all",
+    )
+    assert rc == 0
+    summary = {r["domain"]: r for r in _read_csv(out_dir / cr.SUMMARY_FILENAME)}
+    assert summary[DOMAIN]["comparison_status"] == COMPARISON_STATUS_OK
+    assert summary[domain2]["comparison_status"] == COMPARISON_STATUS_OK
+    assert cr.REASON_CROSS_SEGMENT_JOIN_POLICY_MISMATCH not in summary[domain2]["comparison_reason_codes"]
+    assert "REFERENCE_DOMAIN_UNDEFINED" in summary[domain2]["comparison_reason_codes"]

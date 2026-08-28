@@ -62,6 +62,12 @@ and non-blank -- `CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH` otherwise, mirroring
 (`join_hash` values for the same logical pattern differ between unit
 systems because behavioral hashes include unit-bearing values).
 
+`export_run_id` values are likewise independent namespaces per segment:
+a target file's `export_run_id` string happening to match the reference's
+is not treated as "the target is the reference" in cross-segment mode --
+that self-exclusion only applies within a single segment, where reference
+and target genuinely share one file-identity namespace.
+
 ## What a "reference" is (and is not)
 
 A reference file is a **comparison anchor**. It is not automatically a
@@ -225,7 +231,7 @@ comparator's)
 | `REQUIRED_ANALYSIS_ARTIFACT_MISSING` | `records.csv`/`file_metadata.csv`/`pattern_presence_file.csv`, or a requested `--purge-view` directory, is missing despite `status=complete`; in cross-segment mode, `domain_patterns.csv` (needed for `join_hash` resolution) missing on either segment also fires this code |
 | `REFERENCE_NOT_MATERIALIZED` / `TARGET_NOT_MATERIALIZED` | the selector resolves to zero export_run_ids in its segment |
 | `REFERENCE_AMBIGUOUS` / `TARGET_AMBIGUOUS` | the selector resolves to more than one export_run_id |
-| `NO_COMPARISON_TARGETS` | after excluding the reference itself, no comparison target remains (an explicit `--target` resolved to the same export_run_id as `--reference`, or the target segment has no other materialized file at all) |
+| `NO_COMPARISON_TARGETS` | no comparison target remains: in same-segment mode, after excluding the reference itself (an explicit `--target` resolved to the same export_run_id as `--reference`, or the segment has no other materialized file at all); in cross-segment mode there is no reference-exclusion step at all (the two segments' `export_run_id` values are independent namespaces -- see **Cross-segment pattern identity**), so this fires only when the target segment has zero materialized files |
 | `REFERENCE_HAS_NO_PATTERNS` | the resolved reference has zero `pattern_id` evidence across every domain in its segment's `pattern_presence_file.csv` — mirrors `reference_bundle.py::write_sidecar`'s own rejection of a globally empty reference |
 | `CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH` | only possible when `--reference-segment` != `--target-segment`: the reference segment's and target segment's `unit_system` (from each segment's own `file_metadata.csv`) don't agree, either is absent, or either isn't uniform across that segment's own files — mirrors `docs/cross_segment_comparison.md`'s "No cross-unit-system pairs" rule; `join_hash` values for the same logical pattern differ between unit systems because behavioral hashes include unit-bearing values |
 | `CROSS_SEGMENT_SCHEMA_MISMATCH` | only possible when `--reference-segment` != `--target-segment`: the reference segment's and target segment's `extractor_schema_version` (from each segment's own `corpus_manifest.csv`) don't agree, or either is absent — mirrors `reference_bundle.py::load_and_validate`'s own sidecar-vs-current `extractor_schema_version` rejection; without it, two segments materialized under different extractor schema versions that happen to share the same join-key tuple would pass the join-policy gate and report `ok` metrics across pattern evidence that isn't actually comparable |
@@ -251,7 +257,18 @@ that a row/domain-level blocked outcome is not a process failure.
 A domain the caller explicitly requested via `--domains` that this segment
 never observed at all is not a new reason code: it surfaces as the
 comparator's own existing `COMPARISON_INPUT_INVALID`
-(missing `membership_matrix.csv`), reused rather than duplicated.
+(missing `membership_matrix.csv`), reused rather than duplicated. This holds
+identically in cross-segment mode: a missing target `membership_matrix.csv`
+for a domain/view is never translated into an empty (present) file, so it
+still surfaces as `COMPARISON_INPUT_INVALID` rather than a misleadingly
+trustworthy `ok`/zero-patterns result.
+
+A domain the target segment has but the reference segment never defines at
+all (an ordinary outcome when `--domains` defaults from the target's own
+population) is not blocked by either cross-segment gate above -- it passes
+through to the comparator's own existing `ok`/`REFERENCE_DOMAIN_UNDEFINED`
+outcome, exactly as a same-segment domain the reference doesn't cover
+already does.
 
 ## Overwrite / resume behavior
 

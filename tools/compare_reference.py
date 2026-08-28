@@ -492,6 +492,7 @@ def resolve_cross_segment_compatibility(
     target_compatibility: Dict[str, Dict[str, object]],
     reference_compatibility: Dict[str, Dict[str, object]],
     domains: Sequence[str],
+    reference_domains: Dict[str, List[str]],
 ) -> Dict[str, Dict[str, object]]:
     """Cross-segment join-policy compatibility gate. Only ever called when
     --reference-segment != --target-segment (the same-segment path uses
@@ -506,9 +507,26 @@ def resolve_cross_segment_compatibility(
     both ok but disagreeing) blocks the domain via
     REASON_CROSS_SEGMENT_JOIN_POLICY_MISMATCH rather than comparing pattern_id
     sets that were produced under different join policies.
+
+    `reference_domains` is `reference["domains"]` as built by build_reference()
+    (pre-join_hash-translation) -- a domain absent from it (or mapped to an
+    empty list) has NO reference pattern set at all, which is an entirely
+    ordinary outcome when `domains` defaults from the *target* segment's own
+    population (the reference may legitimately not define every domain the
+    target has). check_domain_compatibility() would otherwise report the
+    reference side "unproven" for such a domain purely because its records.csv
+    has zero rows there, which is a records.csv-provenance signal, not a
+    join-policy disagreement -- forcing CROSS_SEGMENT_JOIN_POLICY_MISMATCH
+    here would incorrectly block a comparison the comparator's own existing
+    REFERENCE_DOMAIN_UNDEFINED outcome already handles correctly and
+    non-blockingly. Such domains are passed through as "ok" here, deferring
+    entirely to that existing behavior (Codex review, PR #471).
     """
     result: Dict[str, Dict[str, object]] = {}
     for dom in domains:
+        if not reference_domains.get(dom):
+            result[dom] = {"status": "ok", "values": target_compatibility[dom]["values"]}
+            continue
         target = target_compatibility[dom]
         reference = reference_compatibility[dom]
         if target["status"] == "ok" and reference["status"] == "ok" and target["values"] == reference["values"]:
@@ -586,15 +604,31 @@ def resolve_cross_segment_pattern_identity(
     the translated target membership below) compares join_hash to join_hash.
 
     Returns (identity_status, target_jh_maps): identity_status[domain] is
-    {"status": "ok"} or {"status": "unresolved", "detail": ...};
-    target_jh_maps[domain] is the target segment's own {pattern_id:
-    join_hash} map, needed later to translate each requested view's real
-    membership_matrix.csv before it reaches run_compare_for_domain (see
-    _write_translated_membership_matrix()).
+    {"status": "ok"}, {"status": "reference_undefined"} (this domain has no
+    reference pattern set at all -- see below), or {"status": "unresolved",
+    "detail": ...}; target_jh_maps[domain] is the target segment's own
+    {pattern_id: join_hash} map, needed later to translate each requested
+    view's real membership_matrix.csv before it reaches run_compare_for_domain
+    (see _write_translated_membership_matrix()).
+
+    A domain absent from `reference_domains` (or mapped to an empty list) has
+    no reference pattern set to translate at all -- an ordinary outcome when
+    `domains` defaults from the target segment's own population (mirrors the
+    identical skip in resolve_cross_segment_compatibility(), Codex review,
+    PR #471). run_compare_for_domain's own NO_REFERENCE_DEFINED shortcut never
+    reads target membership data when the reference pattern set is empty, so
+    such a domain is marked "reference_undefined" here without even touching
+    domain_patterns.csv -- run_comparisons() skips translation for it and
+    compares directly against the real (untranslated) target bundle_dir,
+    which is exactly as harmless as it is for a domain with no reference
+    definition today.
     """
     identity_status: Dict[str, Dict[str, object]] = {}
     target_jh_maps: Dict[str, Dict[str, str]] = {}
     for dom in domains:
+        if not reference_domains.get(dom):
+            identity_status[dom] = {"status": "reference_undefined"}
+            continue
         reference_jh_map, reference_resolved = load_domain_pattern_join_hash_map(reference_segment_root, dom)
         target_jh_map, target_resolved = load_domain_pattern_join_hash_map(target_segment_root, dom)
         target_jh_maps[dom] = target_jh_map
@@ -713,8 +747,19 @@ def _write_translated_membership_matrix(src_path: Path, dest_path: Path, jh_map:
     inconsistency between this segment's own membership_matrix.csv and
     domain_patterns.csv -- returning False here lets the caller block that
     (domain, view) explicitly rather than silently dropping the row.
+
+    A missing `src_path` is NOT translated into an empty `dest_path`: writing
+    an empty-but-present file would make the downstream read see "zero
+    target patterns" (an `ok`/`none` result) instead of the missing-file
+    condition run_compare_for_domain's own try/except already turns into
+    `COMPARISON_INPUT_INVALID` for the untranslated same-segment path --
+    materializing an empty file here would silently suppress that signal
+    (Codex review, PR #471). Leaving `dest_path` absent lets the same
+    FileNotFoundError propagate identically in cross-segment mode.
     """
-    rows = read_csv_rows(src_path) if src_path.is_file() else []
+    if not src_path.is_file():
+        return True
+    rows = read_csv_rows(src_path)
     out_rows: List[Dict[str, str]] = []
     fully_resolved = True
     for row in rows:
@@ -757,6 +802,26 @@ def run_comparisons(
     eligible = {target_export_run_id} if target_export_run_id else set(all_export_run_ids)
     cross_segment = pattern_identity_status is not None
 
+    # Cross-segment only: the comparator's own seed_export_run_id exclusion
+    # (tools/bundle_analysis/step_compare.py::_compute_comparison_rows, never
+    # modified here) drops any target export_run_id string equal to
+    # reference["seed_export_run_id"] -- correct in same-segment mode (the
+    # reference genuinely is one of the segment's own files), but wrong
+    # cross-segment: reference and target export_run_id strings come from two
+    # independent segments' namespaces, so an accidental string collision
+    # would silently exclude an unrelated, legitimate target file. Blanking
+    # seed_export_run_id (falsy -- the comparator's own `if seed_export_run_id
+    # and ...` guard then never fires) neutralizes that exclusion for the
+    # actual comparison call. `reference_bundle_id`/`effective_date` (the
+    # fields that actually appear in output rows) are untouched, and the real
+    # reference dict (with its true seed_export_run_id, used for manifest/
+    # diagnostics output) is never mutated -- only this local copy differs
+    # (Codex review, PR #471).
+    comparator_reference = reference
+    if cross_segment:
+        comparator_reference = dict(reference)
+        comparator_reference["seed_export_run_id"] = ""
+
     for view in views:
         compare_out_dir = out_dir / f"compare_{view}"
         view_summaries: List[Dict[str, str]] = []
@@ -780,7 +845,7 @@ def run_comparisons(
                 )
                 view_summaries.append(_synthesized_blocked_summary(reference, run_id, dom, reason_code, detail))
                 continue
-            if cross_segment and pattern_identity_status[dom]["status"] != "ok":
+            if cross_segment and pattern_identity_status[dom]["status"] == "unresolved":
                 reason_code = REASON_CROSS_SEGMENT_PATTERN_IDENTITY_UNRESOLVED
                 detail = str(pattern_identity_status[dom]["detail"])
                 write_blocked_gap_placeholder(
@@ -795,7 +860,11 @@ def run_comparisons(
                 )
                 view_summaries.append(_synthesized_blocked_summary(reference, run_id, dom, REASON_STALE_MEMBERSHIP_MATRIX, detail))
                 continue
-            if cross_segment:
+            if cross_segment and pattern_identity_status[dom]["status"] == "ok":
+                # This domain has a real reference pattern set that was
+                # successfully translated to join_hash -- the target's real
+                # membership_matrix.csv must likewise be translated before
+                # the comparator ever reads it.
                 translated_dir = out_dir / "_xseg_translated_membership" / view
                 real_path = bundle_dir / view / dom / "membership_matrix.csv"
                 translated_path = translated_dir / dom / "membership_matrix.csv"
@@ -826,16 +895,23 @@ def run_comparisons(
                 summary = run_compare_for_domain(
                     analysis_dir,
                     translated_dir,
-                    reference,
+                    comparator_reference,
                     dom,
                     compare_out_dir=compare_out_dir,
                     eligible_export_run_ids=eligible,
                 )
             else:
+                # Same-segment mode, or a cross-segment domain with no
+                # reference pattern set at all ("reference_undefined" --
+                # run_compare_for_domain's own NO_REFERENCE_DEFINED shortcut
+                # never needs join_hash-translated target data for those, so
+                # comparing directly against the real, untranslated target
+                # bundle_dir is exactly as harmless as it is today for a
+                # same-segment domain the reference doesn't define).
                 summary = run_compare_for_domain(
                     analysis_dir,
                     bundle_dir / view,
-                    reference,
+                    comparator_reference,
                     dom,
                     compare_out_dir=compare_out_dir,
                     eligible_export_run_ids=eligible,
@@ -1237,7 +1313,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             compatibility = target_compatibility
         else:
             reference_compatibility = check_domain_compatibility(reference_paths["records_dir"] / "records.csv", domains)
-            compatibility = resolve_cross_segment_compatibility(target_compatibility, reference_compatibility, domains)
+            compatibility = resolve_cross_segment_compatibility(
+                target_compatibility, reference_compatibility, domains, reference["domains"]
+            )
             # pattern_id is segment-local; translate both sides to the
             # cross-segment-stable join_hash identity before any domain is
             # compared. Mutates reference["domains"] in place for every
@@ -1255,9 +1333,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
 
         requested_targets = {target_export_run_id} if target_export_run_id else set(all_export_run_ids)
-        if not (requested_targets - {reference_export_run_id}):
-            # Either --target resolved to the reference itself, or the
-            # target segment (after excluding the reference) has no other
+        # The reference-itself exclusion only makes sense in same-segment
+        # mode, where reference_export_run_id and the target's export_run_id
+        # values share one real namespace (the reference genuinely can BE one
+        # of the segment's own files). In cross-segment mode the two
+        # identifiers come from two independent segments -- subtracting
+        # reference_export_run_id there would incorrectly drop a legitimate
+        # target file whose export_run_id string merely happens to collide
+        # with the reference's (Codex review, PR #471); this tool's own
+        # comparator call already neutralizes the analogous exclusion inside
+        # run_compare_for_domain for the same reason (see run_comparisons's
+        # comparator_reference).
+        effective_targets = (requested_targets - {reference_export_run_id}) if same_segment else requested_targets
+        if not effective_targets:
+            # Either --target resolved to the reference itself (same-segment
+            # only), or the target segment has no (other, for same-segment)
             # materialized files at all. The comparator's own
             # seed_export_run_id exclusion would silently produce zero gap
             # rows for every domain in this case -- which must never
@@ -1265,8 +1355,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             # nothing to compare, so the run blocks explicitly instead.
             raise CompareReferenceError(
                 REASON_NO_COMPARISON_TARGETS,
-                "no comparison target remains after excluding the reference itself "
-                f"(reference={reference_export_run_id!r}, requested targets={sorted(requested_targets)!r}).",
+                "no comparison target remains"
+                + (" after excluding the reference itself" if same_segment else "")
+                + f" (reference={reference_export_run_id!r}, requested targets={sorted(requested_targets)!r}).",
             )
     except CompareReferenceError as exc:
         write_top_level_blocked(out_dir, exc.reason_code, str(exc), reference_segment_id, target_segment_id, args.target or "")
