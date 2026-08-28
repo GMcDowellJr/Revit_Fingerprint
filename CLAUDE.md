@@ -205,6 +205,15 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                             triggering (re)extraction. Reshapes the comparator's own output into a stable
                             consumable package (reference_comparison_summary.csv/_detail.csv/
                             _diagnostics.json/_report.json). See docs/reference_comparison_tool.md.
+                            Opt-in `--include-name-overlap` (Step 1 Part B) additionally writes
+                            reference_comparison_name_overlap.csv (counts/classification only --
+                            name_sets_identical/overlap/disjoint, or name_evidence_excluded/missing) plus
+                            reference_comparison_name_overlap_names.csv (the actual per-side name-hash
+                            values, one row per (pattern, side, name_hash) -- never pipe-joined into a
+                            cell, which overflows Excel's per-cell limit for a heavily-fragmented pattern)
+                            via tools/name_key_rollup.py;
+                            fail-soft if either side's name-key data isn't materialized/is stale -- see
+                            docs/namekey_crosssegment_step0_findings.md.
 
   export_to_flat_tables.py   Phase-0: Flatten record.v2 details → CSV tables (records, identity_items, etc.)
   discover_join_policy.py / apply_join_policy.py   Join-key policy discovery/apply (T1/T2 stages). Sampling
@@ -224,6 +233,18 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                             needed); generate_name_key_patterns.py parameterizes pattern generation over
                             `--comparison-target {config,name,both}` so it can run against either the
                             existing join_hash or the name-identity projection
+  name_key_rollup.py       Step 1 shared helper: joins a segment's records.csv (config join_hash per
+                            record) to its own name_key_results.csv (name-key join_hash per record) on
+                            (normalize_export_run_id(...), record_id), rolling up to a per-(domain,
+                            config join_hash) set of distinct name-key join_hash values. Consumed by
+                            generate_pattern_name_fragmentation.py and compare_reference.py's
+                            --include-name-overlap; not a CLI entry point itself.
+  generate_pattern_name_fragmentation.py   Step 1 Part A: same-segment name-fragmentation metric.
+                            Writes results/analysis/pattern_name_fragmentation.csv (one row per
+                            (pattern_id, name_hash) pair) and pattern_name_fragmentation_summary.csv
+                            (per-domain multiplicity stats) for one already-materialized segment.
+                            Wired as the per-segment orchestrator's Step 3c (opt-in, same
+                            -NameKey/--comparison-target gating as Step 2b).
   join_key_discovery/     Greedy/scored join-key candidate search shared by discover_join_policy.py and
                             discover_hash_policy.py (eval.py, greedy.py)
   join_key_derivation.py, compute_governance_thresholds.py, compute_latent_purgeable.py
