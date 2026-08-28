@@ -850,6 +850,15 @@ def _filter_name_key_csv_to_segment(
 
     Returns the number of rows written.
 
+    The written `out_csv`'s mtime is set to match `name_key_results_csv`'s own mtime
+    (os.utime()), not "now" -- a plain write would stamp the segment-local copy fresh on
+    every Step 2b run regardless of whether the corpus-wide source itself is stale, silently
+    defeating any downstream staleness check (e.g. tools/compare_reference.py's
+    --include-name-overlap freshness gate, or corpus_update_runbook.ps1's own Run-C guard)
+    that compares this file's mtime against records.csv's: the copy would always read as
+    "just refreshed" even when fed a name_key_results.csv that predates new exports added to
+    records.csv (PR #476 review, second round).
+
     --- trace ---
     reads: `name_key_results_csv` -- Path to the corpus-wide name_key_results.csv
         (tools/apply_name_key_policy.py's output, e.g. from --name-key-results-csv),
@@ -858,15 +867,16 @@ def _filter_name_key_csv_to_segment(
         export_run_ids set.
     calls: nested _in_segment() (per row); normalize_export_run_id()
         (tools/bundle_analysis/name_projection_adapter.py, imported at module top), via
-        _in_segment().
+        _in_segment(); os.utime() (propagates name_key_results_csv's own mtime onto
+        out_csv after writing).
     thresholds: none named -- membership is tested against `allowed_ids` itself (this
         segment's real population), not a hardcoded list.
     returns: int rows written; raises FileNotFoundError if `name_key_results_csv` is
         missing. Writes `out_csv` with the same fieldnames as the corpus-wide input,
-        filtered to rows whose (normalized-or-raw) export_file is in `allowed_ids`.
-        Consumed by _run_one_segment(), which then invokes
-        tools/generate_name_key_patterns.py --comparison-target name against this
-        filtered file.
+        filtered to rows whose (normalized-or-raw) export_file is in `allowed_ids`, then
+        stamps out_csv's mtime to match the source file's (see above). Consumed by
+        _run_one_segment(), which then invokes tools/generate_name_key_patterns.py
+        --comparison-target name against this filtered file.
     """
     if not name_key_results_csv.is_file():
         raise FileNotFoundError(f"--name-key-results-csv not found: {name_key_results_csv}")
@@ -899,6 +909,8 @@ def _filter_name_key_csv_to_segment(
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+    source_mtime = name_key_results_csv.stat().st_mtime
+    os.utime(out_csv, (source_mtime, source_mtime))
     return len(rows)
 
 
@@ -1074,8 +1086,11 @@ def _segment_has_name_leg_output(out_root: Path, run_type: str) -> bool:
 
     --- trace ---
     reads: `out_root` -- this segment's output root; checks
-        `out_root/results/analysis/pattern_name_fragmentation.csv` for existence always, and
-        (only when `run_type == "bundle"`) also
+        `out_root/results/analysis/pattern_name_fragmentation.csv` AND
+        `..._summary.csv` for existence always (generate_pattern_name_fragmentation.py's
+        main() always writes both together -- see PR #476 review, second round: checking
+        only the detail file let a partial/deleted artifact set still read as satisfied),
+        and (only when `run_type == "bundle"`) also
         `out_root/results/bundle_analysis/name_all/bundle_provenance.csv`; `run_type` --
         caller's own reg_row["run_type"], since the bundle_provenance.csv requirement only
         applies to a "bundle" segment (a "reference" segment never produces Step 3b output
@@ -1086,7 +1101,11 @@ def _segment_has_name_leg_output(out_root: Path, run_type: str) -> bool:
         loops) to decide `already_satisfied` for a segment whose registry status is
         already "complete" but comparison_target requests the name leg.
     """
-    fragmentation_ok = (out_root / "results" / "analysis" / "pattern_name_fragmentation.csv").is_file()
+    analysis_dir = out_root / "results" / "analysis"
+    fragmentation_ok = (
+        (analysis_dir / "pattern_name_fragmentation.csv").is_file()
+        and (analysis_dir / "pattern_name_fragmentation_summary.csv").is_file()
+    )
     if run_type != "bundle":
         return fragmentation_ok
     bundle_ok = (out_root / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv").is_file()

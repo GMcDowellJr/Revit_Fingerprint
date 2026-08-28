@@ -488,3 +488,32 @@ def test_name_overlap_omitted_by_default(tmp_path):
     manifest = __import__("json").loads((out_dir / cr.MANIFEST_FILENAME).read_text(encoding="utf-8"))
     assert manifest["name_overlap_included"] is False
     assert manifest["name_overlap_known_gaps"] == []
+
+
+def test_name_overlap_keys_present_on_preflight_blocked_manifest(tmp_path):
+    """PR #476 review (P2, second round): name_overlap_included/name_overlap_known_gaps must
+    never simply be absent just because the run blocked in pre-flight (segment not found,
+    reference unresolved, etc.) before ever reaching assemble_final_outputs() -- a consumer
+    relying on those keys always being present would otherwise get a KeyError on every
+    blocked run made with --include-name-overlap."""
+    segments_root = tmp_path / "segments"
+    registry_file = tmp_path / "corpus" / "records" / "run_registry.csv"
+    _write_csv(registry_file, _REGISTRY_FIELDNAMES, [])  # no segments registered at all
+
+    out_dir = tmp_path / "out"
+    argv = [
+        "--segments-root", str(segments_root),
+        "--registry-file", str(registry_file),
+        "--reference-segment", "seg_does_not_exist",
+        "--reference", "ref.json",
+        "--out-dir", str(out_dir),
+        "--include-name-overlap",
+    ]
+    rc = cr.main(argv)
+    assert rc == 2
+
+    assert not (out_dir / cr.NAME_OVERLAP_FILENAME).is_file()
+    manifest = __import__("json").loads((out_dir / cr.MANIFEST_FILENAME).read_text(encoding="utf-8"))
+    assert manifest["aggregate_comparison_status"] == "blocked"
+    assert manifest["name_overlap_included"] is False
+    assert manifest["name_overlap_known_gaps"] == [cr.REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED]

@@ -90,6 +90,30 @@ class TestFilterNameKeyCsvToSegment:
         with pytest.raises(FileNotFoundError):
             _filter_name_key_csv_to_segment(tmp_path / "missing.csv", tmp_path / "out.csv", {"f1.json"})
 
+    def test_out_csv_mtime_matches_source_not_write_time(self, tmp_path):
+        # PR #476 review (P2, second round): a plain write stamps the segment-local copy
+        # "now" on every Step 2b run regardless of whether the corpus-wide source itself is
+        # stale, which silently defeats any downstream freshness check (e.g.
+        # tools/compare_reference.py's --include-name-overlap gate) that compares this
+        # file's mtime against records.csv's. out_csv must carry the SOURCE file's mtime,
+        # not the write time.
+        import os
+        import time
+
+        corpus_csv = tmp_path / "name_key_results.csv"
+        _write_csv(corpus_csv, NAME_KEY_FIELDS, [
+            {"export_file": "f1.json", "domain": "materials", "record_id": "r1", "label_display": "Concrete", "join_key_schema": "s", "join_hash": "h1", "status": "ok", "missing_required": ""},
+        ])
+        # Backdate the corpus-wide source file to simulate a stale -NameKey run, well before
+        # "now" (the moment the filter itself actually writes out_csv).
+        stale_mtime = time.time() - 10_000
+        os.utime(corpus_csv, (stale_mtime, stale_mtime))
+
+        out_csv = tmp_path / "segment" / "name_key_results.csv"
+        _filter_name_key_csv_to_segment(corpus_csv, out_csv, {"f1.json"})
+
+        assert out_csv.stat().st_mtime == pytest.approx(stale_mtime, abs=1.0)
+
     def test_preserves_details_only_export_with_no_index_sibling(self, tmp_path):
         # PR #390 review: for a details-only export (no matching *.index.json),
         # tools/extractor.py's _iter_export_files() keeps the *.details.json name itself
@@ -234,22 +258,33 @@ class TestSegmentHasNameLegOutput:
         provenance.write_text("analysis_run_id,comparison_target\n", encoding="utf-8")
         assert _segment_has_name_leg_output(tmp_path, "bundle") is False
 
+    def test_false_when_fragmentation_detail_present_but_summary_missing(self, tmp_path):
+        # PR #476 review (P2, second round): generate_pattern_name_fragmentation.py's main()
+        # always writes both files together -- a detail-only artifact set (partial copy,
+        # accidental deletion) must not read as satisfied either.
+        fragmentation = tmp_path / "results" / "analysis" / "pattern_name_fragmentation.csv"
+        fragmentation.parent.mkdir(parents=True)
+        fragmentation.write_text("domain,pattern_id\n", encoding="utf-8")
+        assert _segment_has_name_leg_output(tmp_path, "reference") is False
+
     def test_true_when_both_provenance_and_fragmentation_present(self, tmp_path):
         provenance = tmp_path / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv"
         provenance.parent.mkdir(parents=True)
         provenance.write_text("analysis_run_id,comparison_target\n", encoding="utf-8")
-        fragmentation = tmp_path / "results" / "analysis" / "pattern_name_fragmentation.csv"
-        fragmentation.parent.mkdir(parents=True)
-        fragmentation.write_text("domain,pattern_id\n", encoding="utf-8")
+        analysis_dir = tmp_path / "results" / "analysis"
+        analysis_dir.mkdir(parents=True)
+        (analysis_dir / "pattern_name_fragmentation.csv").write_text("domain,pattern_id\n", encoding="utf-8")
+        (analysis_dir / "pattern_name_fragmentation_summary.csv").write_text("domain,total_patterns\n", encoding="utf-8")
         assert _segment_has_name_leg_output(tmp_path, "bundle") is True
 
     def test_reference_run_type_only_requires_fragmentation(self, tmp_path):
         # A "reference" segment never produces bundle_provenance.csv (Step 3b is
         # run_type=="bundle"-gated) but does get Step 3c -- requiring bundle_provenance.csv
         # for it too would make a reference segment's name leg permanently unsatisfiable.
-        fragmentation = tmp_path / "results" / "analysis" / "pattern_name_fragmentation.csv"
-        fragmentation.parent.mkdir(parents=True)
-        fragmentation.write_text("domain,pattern_id\n", encoding="utf-8")
+        analysis_dir = tmp_path / "results" / "analysis"
+        analysis_dir.mkdir(parents=True)
+        (analysis_dir / "pattern_name_fragmentation.csv").write_text("domain,pattern_id\n", encoding="utf-8")
+        (analysis_dir / "pattern_name_fragmentation_summary.csv").write_text("domain,total_patterns\n", encoding="utf-8")
         assert _segment_has_name_leg_output(tmp_path, "reference") is True
 
 
@@ -359,16 +394,18 @@ class TestCompleteSegmentSkipHonorsNameTarget:
 
         segments_root = tmp_path / "segments"
         if with_name_leg_output:
-            # _segment_has_name_leg_output() now requires pattern_name_fragmentation.csv
-            # (Step 3c) always, plus bundle_provenance.csv (Step 3b) only for a "bundle"
-            # segment -- write whichever combination makes this run_type read as satisfied.
+            # _segment_has_name_leg_output() now requires BOTH pattern_name_fragmentation.csv
+            # and its _summary.csv (Step 3c) always, plus bundle_provenance.csv (Step 3b)
+            # only for a "bundle" segment -- write whichever combination makes this
+            # run_type read as satisfied.
             if run_type == "bundle":
                 provenance = segments_root / "seg1" / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv"
                 provenance.parent.mkdir(parents=True)
                 provenance.write_text("analysis_run_id,comparison_target\n", encoding="utf-8")
-            fragmentation = segments_root / "seg1" / "results" / "analysis" / "pattern_name_fragmentation.csv"
-            fragmentation.parent.mkdir(parents=True, exist_ok=True)
-            fragmentation.write_text("domain,pattern_id\n", encoding="utf-8")
+            analysis_dir = segments_root / "seg1" / "results" / "analysis"
+            analysis_dir.mkdir(parents=True, exist_ok=True)
+            (analysis_dir / "pattern_name_fragmentation.csv").write_text("domain,pattern_id\n", encoding="utf-8")
+            (analysis_dir / "pattern_name_fragmentation_summary.csv").write_text("domain,total_patterns\n", encoding="utf-8")
 
         return {
             "manifest_file": manifest_file,

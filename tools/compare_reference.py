@@ -1569,6 +1569,7 @@ def write_top_level_blocked(
     target_segment_id: str,
     target_selector: str,
     same_segment: bool,
+    include_name_overlap: bool = False,
 ) -> Dict[str, object]:
     """Written when a comparison could not even be attempted (segment not
     found, materialization incomplete, reference/target unresolved). Still
@@ -1590,6 +1591,14 @@ def write_top_level_blocked(
     (consistent with every other per-run field here -- domains_total="0"
     etc. -- being explained by run_comparison_status=blocked, not by a
     field-specific reason of its own).
+
+    `include_name_overlap` populates `name_overlap_included`/
+    `name_overlap_known_gaps` the same way assemble_final_outputs() does, for the same
+    reason: those two manifest keys must never simply be absent just because this
+    pre-flight path fired instead of reaching assemble_final_outputs() (PR #476 review,
+    second round). `name_overlap_included` is always False here regardless of what was
+    requested -- nothing was actually produced on a blocked run, and that field's contract
+    is "was the file written," not "was it requested."
     """
     atomic_write_csv(out_dir / SUMMARY_FILENAME, _SUMMARY_FIELDNAMES, [])
     atomic_write_csv(out_dir / DETAIL_FILENAME, _DETAIL_FIELDNAMES, [])
@@ -1618,6 +1627,10 @@ def write_top_level_blocked(
         "output_files": [SUMMARY_FILENAME, DETAIL_FILENAME, DIAGNOSTICS_FILENAME],
         "aggregate_comparison_status": COMPARISON_STATUS_BLOCKED,
         "semantic_changes_skipped_reason": "" if same_segment else REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT,
+        "name_overlap_included": False,
+        "name_overlap_known_gaps": (
+            [REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED] if include_name_overlap else []
+        ),
     }
     (out_dir / MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return manifest
@@ -1909,7 +1922,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             )
     except CompareReferenceError as exc:
         write_top_level_blocked(
-            out_dir, exc.reason_code, str(exc), reference_segment_id, target_segment_id, args.target or "", same_segment
+            out_dir, exc.reason_code, str(exc), reference_segment_id, target_segment_id, args.target or "", same_segment,
+            include_name_overlap=args.include_name_overlap,
         )
         print(f"[compare_reference][error] {exc.reason_code}: {exc}", file=sys.stderr)
         return 2

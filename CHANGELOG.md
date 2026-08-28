@@ -501,6 +501,33 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   row per `(pattern, side, name_hash)` -- `compute_name_overlap_rows()` now returns
   `(out_rows, name_rows)` instead of a single list. `assemble_final_outputs()` writes both
   files under `--include-name-overlap` and lists both in the manifest's `output_files`.
+
+  **Three more fixes from a second round of PR #476 review, before merge:**
+  - `_segment_has_name_leg_output()` (the orchestrator's registry-driven skip check) only
+    checked `pattern_name_fragmentation.csv`'s existence, not `..._summary.csv`'s --
+    `generate_pattern_name_fragmentation.py`'s `main()` always writes both together, so a
+    partial artifact set (deletion, incomplete copy) with only the detail file present would
+    still read as satisfied and be skipped, permanently missing the summary without
+    `--force`. Now requires both files.
+  - `run_segment_orchestrator.py`'s `_filter_name_key_csv_to_segment()` wrote the
+    segment-local `name_key_results.csv` copy with a fresh "now" mtime on every Step 2b run,
+    regardless of whether the corpus-wide `--name-key-results-csv` source itself was stale --
+    silently defeating any downstream freshness check that compares this file's mtime
+    against `records.csv`'s (`tools/compare_reference.py`'s own `_name_key_side_status()`
+    included), since the copy always looked "just refreshed" even when fed source data that
+    predated new exports. The write now stamps `out_csv`'s mtime to match the source file's
+    (`os.utime()`) instead of leaving it at write time.
+  - `write_top_level_blocked()` (the pre-flight-failure output path) never wrote
+    `name_overlap_included`/`name_overlap_known_gaps` at all -- a run that blocked before
+    reaching `assemble_final_outputs()` (segment not found, reference unresolved, etc.) with
+    `--include-name-overlap` produced a manifest missing both keys, breaking a consumer that
+    relies on them always being present. Now takes `include_name_overlap` and always emits
+    both (`name_overlap_included` is always `False` here, since nothing was actually
+    produced on a blocked run regardless of what was requested).
+
+  New coverage: `test_false_when_fragmentation_detail_present_but_summary_missing`,
+  `test_out_csv_mtime_matches_source_not_write_time`,
+  `test_name_overlap_keys_present_on_preflight_blocked_manifest`.
 - **`loaded_family_types` domain: `can_have_structural_section`/`has_thermal_properties`
   identity fields (Audit 16 §2 / PR2, Tier 1 capability flags only).**
   `domains/loaded_family_types.py`'s existing per-family loop now also reads
