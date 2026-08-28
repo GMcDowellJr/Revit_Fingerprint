@@ -206,9 +206,12 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                             consumable package (reference_comparison_summary.csv/_detail.csv/
                             _diagnostics.json/_report.json). See docs/reference_comparison_tool.md.
                             Opt-in `--include-name-overlap` (Step 1 Part B) additionally writes
-                            reference_comparison_name_overlap.csv, classifying each pattern's reference-
-                            vs-target name-key join_hash SET relationship (name_sets_identical/overlap/
-                            disjoint, or name_evidence_excluded/missing) via tools/name_key_rollup.py;
+                            reference_comparison_name_overlap.csv (counts/classification only --
+                            name_sets_identical/overlap/disjoint, or name_evidence_excluded/missing) plus
+                            reference_comparison_name_overlap_names.csv (the actual per-side name-hash
+                            values, one row per (pattern, side, name_hash) -- never pipe-joined into a
+                            cell, which overflows Excel's per-cell limit for a heavily-fragmented pattern)
+                            via tools/name_key_rollup.py;
                             fail-soft if either side's name-key data isn't materialized/is stale -- see
                             docs/namekey_crosssegment_step0_findings.md.
 

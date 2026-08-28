@@ -86,6 +86,7 @@ DETAIL_FILENAME = "reference_comparison_detail.csv"
 DIAGNOSTICS_FILENAME = "reference_comparison_diagnostics.json"
 SEMANTIC_CHANGES_FILENAME = "reference_comparison_semantic_changes.csv"
 NAME_OVERLAP_FILENAME = "reference_comparison_name_overlap.csv"
+NAME_OVERLAP_NAMES_FILENAME = "reference_comparison_name_overlap_names.csv"
 
 VALID_PURGE_VIEWS = ("all", "used")
 
@@ -261,8 +262,24 @@ _NAME_OVERLAP_FIELDNAMES = [
     "reference_name_hash_count",
     "target_name_hash_count",
     "shared_name_hash_count",
-    "reference_name_hashes",
-    "target_name_hashes",
+]
+
+# Sidecar to _NAME_OVERLAP_FIELDNAMES above: one row per (pattern, side, name_hash), never a
+# pipe-joined list column. A pattern can carry thousands of distinct name-hashes (real corpus
+# data: max 5904 for one line_patterns pattern) -- a single CSV cell holding that many
+# pipe-joined values overflows Excel's per-cell limit and corrupts the surrounding rows on
+# import. Mirrors pattern_name_fragmentation.csv's one-row-per-value design (A1).
+_NAME_OVERLAP_NAMES_FIELDNAMES = [
+    "segment_id",
+    "purge_view",
+    "reference_bundle_id",
+    "analysis_run_id",
+    "target_export_run_id",
+    "domain",
+    "population_id",
+    "pattern_id",
+    "side",
+    "name_hash",
 ]
 
 # Never used as a match key: fallback labels are templated placeholders
@@ -1261,11 +1278,20 @@ def compute_name_overlap_rows(
     target_segment_root: Path,
     same_segment: bool,
     reference_export_run_id: str,
-) -> List[Dict[str, str]]:
+) -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
     """Reclassify every all_detail_rows row (shared/reference_only/target_only -- the same
     already-computed config-identity set membership compute_semantic_changes_rows() reuses)
     by the SET relationship between the reference side's and target side's name-key
     join_hash sets for that same pattern identity.
+
+    Returns (out_rows, name_rows). `out_rows` is the one-row-per-pattern summary (counts and
+    classification only). `name_rows` is one row per (pattern, side, name_hash) -- the actual
+    hash values live ONLY here, never pipe-joined into an `out_rows` cell: a pattern can carry
+    thousands of distinct name-hashes (real corpus data: max 5904 for one `line_patterns`
+    pattern), and a single CSV cell holding that many pipe-joined values overflows Excel's
+    per-cell limit and corrupts the surrounding rows on import (PR #476 follow-up). Mirrors
+    Part A's `pattern_name_fragmentation.csv` design (A1): one row per value, never a
+    concatenated list column.
 
     `row["pattern_id"]` is same-segment raw pattern_id when `same_segment` is True, or
     already the cross-segment-stable join_hash when False (resolve_cross_segment_pattern_
@@ -1302,6 +1328,7 @@ def compute_name_overlap_rows(
             same_segment_jh_maps[dom] = jh_map
 
     out_rows: List[Dict[str, str]] = []
+    name_rows: List[Dict[str, str]] = []
     for row in all_detail_rows:
         comparison_class = row.get("comparison_class", "")
         if comparison_class not in ("shared", "reference_only", "target_only"):
@@ -1331,8 +1358,6 @@ def compute_name_overlap_rows(
                 "reference_name_hash_count": "0",
                 "target_name_hash_count": "0",
                 "shared_name_hash_count": "0",
-                "reference_name_hashes": "",
-                "target_name_hashes": "",
             })
             continue
 
@@ -1349,8 +1374,6 @@ def compute_name_overlap_rows(
                 "reference_name_hash_count": "0",
                 "target_name_hash_count": "0",
                 "shared_name_hash_count": "0",
-                "reference_name_hashes": "",
-                "target_name_hashes": "",
             })
             continue
 
@@ -1379,14 +1402,26 @@ def compute_name_overlap_rows(
             "reference_name_hash_count": str(len(ref_names)),
             "target_name_hash_count": str(len(tgt_names)),
             "shared_name_hash_count": str(len(ref_names & tgt_names)),
-            "reference_name_hashes": "|".join(sorted(ref_names)),
-            "target_name_hashes": "|".join(sorted(tgt_names)),
         })
+        name_base = {k: base_row[k] for k in (
+            "segment_id", "purge_view", "reference_bundle_id", "analysis_run_id",
+            "target_export_run_id", "domain", "population_id", "pattern_id",
+        )}
+        for name_hash in sorted(ref_names):
+            name_rows.append({**name_base, "side": "reference", "name_hash": name_hash})
+        for name_hash in sorted(tgt_names):
+            name_rows.append({**name_base, "side": "target", "name_hash": name_hash})
 
     out_rows.sort(
         key=lambda r: (r["purge_view"], r["domain"], r["population_id"], r["target_export_run_id"], r["pattern_id"])
     )
-    return out_rows
+    name_rows.sort(
+        key=lambda r: (
+            r["purge_view"], r["domain"], r["population_id"], r["target_export_run_id"],
+            r["pattern_id"], r["side"], r["name_hash"],
+        )
+    )
+    return out_rows, name_rows
 
 
 def assemble_final_outputs(
@@ -1437,7 +1472,7 @@ def assemble_final_outputs(
     # compute_semantic_changes_rows() above) -- see compute_name_overlap_rows()'s own
     # docstring and the NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED known-gap note above.
     if include_name_overlap:
-        name_overlap_rows = compute_name_overlap_rows(
+        name_overlap_rows, name_overlap_name_rows = compute_name_overlap_rows(
             all_detail_rows,
             domains,
             reference_segment_root or segment_root,
@@ -1446,7 +1481,9 @@ def assemble_final_outputs(
             str(reference.get("seed_export_run_id", "")),
         )
         atomic_write_csv(out_dir / NAME_OVERLAP_FILENAME, _NAME_OVERLAP_FIELDNAMES, name_overlap_rows)
+        atomic_write_csv(out_dir / NAME_OVERLAP_NAMES_FILENAME, _NAME_OVERLAP_NAMES_FIELDNAMES, name_overlap_name_rows)
         output_files.append(NAME_OVERLAP_FILENAME)
+        output_files.append(NAME_OVERLAP_NAMES_FILENAME)
 
     statuses_by_key: Dict[Tuple[str, str], List[str]] = {}
     reasons_by_key: Dict[Tuple[str, str], List[str]] = {}

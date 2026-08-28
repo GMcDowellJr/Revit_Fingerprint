@@ -81,6 +81,14 @@ def _detail_row(domain: str, pattern_id: str, comparison_class: str, target_expo
     }
 
 
+def _names(name_rows, domain, pattern_id, side, target_export_run_id=None):
+    return sorted(
+        r["name_hash"] for r in name_rows
+        if r["domain"] == domain and r["pattern_id"] == pattern_id and r["side"] == side
+        and (target_export_run_id is None or r["target_export_run_id"] == target_export_run_id)
+    )
+
+
 def test_cross_segment_overlap_and_target_only_and_excluded(tmp_path):
     ref_root = tmp_path / "ref"
     tgt_root = tmp_path / "tgt"
@@ -123,7 +131,7 @@ def test_cross_segment_overlap_and_target_only_and_excluded(tmp_path):
         _detail_row("arrowheads", "cfgB", "target_only"),
         _detail_row("line_styles", "cfgLS", "shared"),
     ]
-    rows = cr.compute_name_overlap_rows(
+    rows, name_rows = cr.compute_name_overlap_rows(
         all_detail_rows, ["arrowheads", "line_styles"], ref_root, tgt_root, same_segment=False,
         reference_export_run_id="r1.details.json",
     )
@@ -131,22 +139,22 @@ def test_cross_segment_overlap_and_target_only_and_excluded(tmp_path):
 
     shared_row = by_pattern[("arrowheads", "cfgA")]
     assert shared_row["name_set_classification"] == cr.NAME_SETS_OVERLAP
-    assert shared_row["reference_name_hashes"] == "nameX"
-    assert shared_row["target_name_hashes"] == "nameX|nameY"
+    assert _names(name_rows, "arrowheads", "cfgA", "reference") == ["nameX"]
+    assert _names(name_rows, "arrowheads", "cfgA", "target") == ["nameX", "nameY"]
     assert shared_row["reference_name_hash_count"] == "1"
     assert shared_row["target_name_hash_count"] == "2"
     assert shared_row["shared_name_hash_count"] == "1"
 
     target_only_row = by_pattern[("arrowheads", "cfgB")]
     assert target_only_row["name_set_classification"] == cr.NAME_EVIDENCE_MISSING
-    assert target_only_row["reference_name_hashes"] == ""
-    assert target_only_row["target_name_hashes"] == "nameZ"
+    assert _names(name_rows, "arrowheads", "cfgB", "reference") == []
+    assert _names(name_rows, "arrowheads", "cfgB", "target") == ["nameZ"]
 
     excluded_row = by_pattern[("line_styles", "cfgLS")]
     assert excluded_row["name_set_classification"] == cr.NAME_EVIDENCE_EXCLUDED
     assert excluded_row["exclusion_reason"] == "no_name_like_key"
-    assert excluded_row["reference_name_hashes"] == ""
-    assert excluded_row["target_name_hashes"] == ""
+    assert _names(name_rows, "line_styles", "cfgLS", "reference") == []
+    assert _names(name_rows, "line_styles", "cfgLS", "target") == []
 
 
 def test_same_segment_identical_sets_translates_pattern_id_via_domain_patterns(tmp_path):
@@ -166,13 +174,14 @@ def test_same_segment_identical_sets_translates_pattern_id_via_domain_patterns(t
         ],
     )
     all_detail_rows = [_detail_row("arrowheads", "pat_x", "shared")]
-    rows = cr.compute_name_overlap_rows(
+    rows, name_rows = cr.compute_name_overlap_rows(
         all_detail_rows, ["arrowheads"], seg_root, seg_root, same_segment=True,
         reference_export_run_id="t1.details.json",
     )
     assert len(rows) == 1
     assert rows[0]["name_set_classification"] == cr.NAME_SETS_IDENTICAL
-    assert rows[0]["reference_name_hashes"] == rows[0]["target_name_hashes"] == "nameX|nameY"
+    assert _names(name_rows, "arrowheads", "pat_x", "reference") == ["nameX", "nameY"]
+    assert _names(name_rows, "arrowheads", "pat_x", "target") == ["nameX", "nameY"]
 
 
 def test_same_segment_two_different_files_are_not_falsely_identical(tmp_path):
@@ -197,14 +206,14 @@ def test_same_segment_two_different_files_are_not_falsely_identical(tmp_path):
         ],
     )
     all_detail_rows = [_detail_row("arrowheads", "pat_x", "shared", target_export_run_id="new.details.json")]
-    rows = cr.compute_name_overlap_rows(
+    rows, name_rows = cr.compute_name_overlap_rows(
         all_detail_rows, ["arrowheads"], seg_root, seg_root, same_segment=True,
         reference_export_run_id="old.details.json",
     )
     assert len(rows) == 1
     assert rows[0]["name_set_classification"] == cr.NAME_SETS_DISJOINT
-    assert rows[0]["reference_name_hashes"] == "nameOld"
-    assert rows[0]["target_name_hashes"] == "nameNew"
+    assert _names(name_rows, "arrowheads", "pat_x", "reference") == ["nameOld"]
+    assert _names(name_rows, "arrowheads", "pat_x", "target") == ["nameNew"]
 
 
 def test_cross_segment_two_target_files_do_not_contaminate_each_other(tmp_path):
@@ -235,18 +244,18 @@ def test_cross_segment_two_target_files_do_not_contaminate_each_other(tmp_path):
         _detail_row("arrowheads", "cfgA", "shared", target_export_run_id="t1.details.json"),
         _detail_row("arrowheads", "cfgA", "shared", target_export_run_id="t2.details.json"),
     ]
-    rows = cr.compute_name_overlap_rows(
+    rows, name_rows = cr.compute_name_overlap_rows(
         all_detail_rows, ["arrowheads"], ref_root, tgt_root, same_segment=False,
         reference_export_run_id="r1.details.json",
     )
     by_target = {r["target_export_run_id"]: r for r in rows}
 
     t1_row = by_target["t1.details.json"]
-    assert t1_row["target_name_hashes"] == "nameT1"
+    assert _names(name_rows, "arrowheads", "cfgA", "target", "t1.details.json") == ["nameT1"]
     assert t1_row["name_set_classification"] == cr.NAME_SETS_IDENTICAL
 
     t2_row = by_target["t2.details.json"]
-    assert t2_row["target_name_hashes"] == "nameT2"
+    assert _names(name_rows, "arrowheads", "cfgA", "target", "t2.details.json") == ["nameT2"]
     assert t2_row["name_set_classification"] == cr.NAME_SETS_DISJOINT
 
 
@@ -266,7 +275,7 @@ def test_disjoint_name_sets_for_same_config_identity(tmp_path):
         name_key_rows=[{"export_file": "t1.details.json", "domain": "text_types", "record_id": "tt:9", "label_display": "Standard - Renamed", "join_hash": "nameNew", "status": "ok"}],
     )
     all_detail_rows = [_detail_row("text_types", "cfgA", "shared")]
-    rows = cr.compute_name_overlap_rows(
+    rows, _name_rows = cr.compute_name_overlap_rows(
         all_detail_rows, ["text_types"], ref_root, tgt_root, same_segment=False,
         reference_export_run_id="r1.details.json",
     )
@@ -292,7 +301,7 @@ def test_fail_soft_reference_name_key_not_materialized(tmp_path):
         name_key_rows=[{"export_file": "t1.details.json", "domain": "arrowheads", "record_id": "a:9", "label_display": "Arrow", "join_hash": "nameX", "status": "ok"}],
     )
     all_detail_rows = [_detail_row("arrowheads", "cfgA", "shared")]
-    rows = cr.compute_name_overlap_rows(
+    rows, _name_rows = cr.compute_name_overlap_rows(
         all_detail_rows, ["arrowheads"], ref_root, tgt_root, same_segment=False,
         reference_export_run_id="r1.details.json",
     )
@@ -313,12 +322,12 @@ def test_split_export_normalization_reused_not_reimplemented(tmp_path):
         name_key_rows=[{"export_file": "model.details.json", "domain": "arrowheads", "record_id": "a:1", "label_display": "Arrow", "join_hash": "nameX", "status": "ok"}],
     )
     all_detail_rows = [_detail_row("arrowheads", "pat_x", "shared", target_export_run_id="model.index.json")]
-    rows = cr.compute_name_overlap_rows(
+    rows, name_rows = cr.compute_name_overlap_rows(
         all_detail_rows, ["arrowheads"], seg_root, seg_root, same_segment=True,
         reference_export_run_id="model.index.json",
     )
     assert rows[0]["name_set_classification"] == cr.NAME_SETS_IDENTICAL
-    assert rows[0]["reference_name_hashes"] == "nameX"
+    assert _names(name_rows, "arrowheads", "pat_x", "reference") == ["nameX"]
 
 
 # ---------------------------------------------------------------------------
@@ -414,10 +423,20 @@ def test_end_to_end_include_name_overlap_flag_writes_sidecar(tmp_path):
     assert len(rows) == 1
     assert rows[0]["name_set_classification"] == cr.NAME_SETS_IDENTICAL
     assert rows[0]["domain"] == domain
+    # Hash values themselves must never appear as a column here -- see the dedicated
+    # names sidecar below.
+    assert "reference_name_hashes" not in rows[0]
+    assert "target_name_hashes" not in rows[0]
+
+    names_path = out_dir / cr.NAME_OVERLAP_NAMES_FILENAME
+    assert names_path.is_file()
+    name_rows = _read_csv(names_path)
+    assert {(r["side"], r["name_hash"]) for r in name_rows} == {("reference", "N1"), ("target", "N1")}
 
     manifest = __import__("json").loads((out_dir / cr.MANIFEST_FILENAME).read_text(encoding="utf-8"))
     assert manifest["name_overlap_included"] is True
     assert cr.NAME_OVERLAP_FILENAME in manifest["output_files"]
+    assert cr.NAME_OVERLAP_NAMES_FILENAME in manifest["output_files"]
     assert manifest["name_overlap_known_gaps"] == [cr.REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED]
 
 
@@ -465,6 +484,7 @@ def test_name_overlap_omitted_by_default(tmp_path):
     rc = cr.main(argv)
     assert rc == 0
     assert not (out_dir / cr.NAME_OVERLAP_FILENAME).is_file()
+    assert not (out_dir / cr.NAME_OVERLAP_NAMES_FILENAME).is_file()
     manifest = __import__("json").loads((out_dir / cr.MANIFEST_FILENAME).read_text(encoding="utf-8"))
     assert manifest["name_overlap_included"] is False
     assert manifest["name_overlap_known_gaps"] == []

@@ -487,6 +487,20 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
     `results/analysis/pattern_name_fragmentation.csv`, and the skip check's `needs_name_leg`
     is no longer `run_type == "bundle"`-gated (Step 3c applies to every run_type, unlike
     Step 3b).
+
+  **Third fix, real-corpus follow-up (post-merge report):** `reference_comparison_name_overlap
+  .csv`'s `reference_name_hashes`/`target_name_hashes` columns pipe-joined every distinct
+  name-hash for a pattern into one CSV cell -- exactly the marginalization anti-pattern A1
+  above was written to avoid, just reintroduced on the Part B side. On real corpus data a
+  pattern can carry thousands of distinct name-hashes (max 5904 for one `line_patterns`
+  pattern observed against `imperial_project_architectural`), and a cell that large overflows
+  Excel's per-cell limit and visibly corrupts the surrounding rows on import. Those two columns
+  are removed from `reference_comparison_name_overlap.csv` (which keeps only the
+  `reference_name_hash_count`/`target_name_hash_count`/`shared_name_hash_count` scalars); the
+  actual hash values move to a new sidecar, `reference_comparison_name_overlap_names.csv`, one
+  row per `(pattern, side, name_hash)` -- `compute_name_overlap_rows()` now returns
+  `(out_rows, name_rows)` instead of a single list. `assemble_final_outputs()` writes both
+  files under `--include-name-overlap` and lists both in the manifest's `output_files`.
 - **`loaded_family_types` domain: `can_have_structural_section`/`has_thermal_properties`
   identity fields (Audit 16 §2 / PR2, Tier 1 capability flags only).**
   `domains/loaded_family_types.py`'s existing per-family loop now also reads

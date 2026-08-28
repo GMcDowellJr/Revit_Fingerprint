@@ -211,6 +211,7 @@ Every run writes exactly these files directly under `--out-dir`:
 | `reference_comparison_report.json` | Run manifest: resolved reference/target identities, target segment (`segment_id`), reference segment (`reference_segment_id`), analysis run id, aggregate status |
 | `reference_comparison_semantic_changes.csv` | **Same-segment mode only.** Reclassifies `reference_only`/`target_only` rows by resolved pattern name -- see below. Not written in cross-segment mode; the manifest's `semantic_changes_skipped_reason` explains why (`""` when the file was written, `SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT` otherwise -- always present, even on a pre-flight-blocked run that never got far enough to attempt it) |
 | `reference_comparison_name_overlap.csv` | **Opt-in (`--include-name-overlap`), both modes.** Classifies each pattern's reference-vs-target name-key `join_hash` set relationship -- see below. Only written when the flag is passed; the manifest's `name_overlap_included` (bool) and `name_overlap_known_gaps` (list) fields record whether it ran and any known limitations |
+| `reference_comparison_name_overlap_names.csv` | **Opt-in, both modes.** The actual name-key `join_hash` values behind `reference_comparison_name_overlap.csv`'s counts -- one row per `(pattern, side, name_hash)`, never a pipe-joined list column (a pattern can carry thousands of distinct name-hashes; a single CSV cell holding that many overflows Excel's per-cell limit and corrupts the surrounding rows on import). See below |
 
 `--out-dir` also retains the raw intermediate `compare_all/`/`compare_used/`
 directories (`file_gap_report.csv`/`file_gap_detail.csv`, written directly
@@ -273,6 +274,9 @@ still visible, unaffected, in `reference_comparison_detail.csv`).
   (`reference_pattern_id` blank).
 
 Name comparison is exact string match after `.strip()`, case-sensitive.
+`name_match_basis` is currently always the literal `pattern_label_human`
+(reserved for a future `name_all`-based literal-identity basis without a
+schema change).
 
 ### `reference_comparison_name_overlap.csv` columns (opt-in, `--include-name-overlap`)
 
@@ -280,15 +284,20 @@ Name comparison is exact string match after `.strip()`, case-sensitive.
 target_export_run_id, domain, population_id, pattern_id, comparison_class,
 name_set_classification, exclusion_reason, reference_name_key_status,
 target_name_key_status, reference_name_hash_count, target_name_hash_count,
-shared_name_hash_count, reference_name_hashes, target_name_hashes`
+shared_name_hash_count`
 
 One row per `reference_comparison_detail.csv` row (`pattern_id` carries the
 same value: same-segment raw `pattern_id`, or the cross-segment-stable
-`join_hash` in cross-segment mode). `reference_name_hashes`/
-`target_name_hashes` are pipe-joined, sorted name-key `join_hash` values
-(not human labels -- join to that segment's own
-`results/analysis/pattern_name_fragmentation.csv`, Step 1 Part A, via
-`name_hash` for a representative display label per hash). `name_set_classification` is one of:
+`join_hash` in cross-segment mode). The actual name-key `join_hash` values
+are **not** columns here -- only their counts -- to avoid a pipe-joined list
+cell that can grow into the thousands of entries (real corpus data: max 5904
+distinct name-hashes for one `line_patterns` pattern) and overflow Excel's
+per-cell limit on import. Join to
+**`reference_comparison_name_overlap_names.csv`** (below) on
+`(purge_view, domain, population_id, target_export_run_id, pattern_id)` for
+the actual hash list per side, and from there to that segment's own
+`results/analysis/pattern_name_fragmentation.csv` (Step 1 Part A) via
+`name_hash` for a representative display label per hash. `name_set_classification` is one of:
 - `name_sets_identical` -- the reference and target name-hash sets are equal.
 - `name_sets_overlap` -- non-empty intersection, but not equal.
 - `name_sets_disjoint` -- no shared name-hash at all (closest to a genuine
@@ -316,9 +325,19 @@ segment-specific state (see
 incomparable hashes between segments extracted before/after that edit, with
 no gate to catch it. Deferred to a follow-up PR
 (`REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED`).
-`name_match_basis` is currently always the literal `pattern_label_human`
-(reserved for a future `name_all`-based literal-identity basis without a
-schema change).
+
+### `reference_comparison_name_overlap_names.csv` columns (opt-in, `--include-name-overlap`)
+
+`segment_id, purge_view, reference_bundle_id, analysis_run_id,
+target_export_run_id, domain, population_id, pattern_id, side, name_hash`
+
+One row per `(pattern, side, name_hash)` -- `side` is `reference` or
+`target`; a name-hash present on both sides gets two rows, one per side (so
+`shared_name_hash_count` from the parent file is recoverable by grouping on
+`name_hash` and counting distinct `side` values, without needing a separate
+join). Same key columns as `reference_comparison_name_overlap.csv` --
+`(purge_view, domain, population_id, target_export_run_id, pattern_id)` --
+so the two files join directly.
 
 ## Statuses: `ok` / `degraded` / `blocked`
 
