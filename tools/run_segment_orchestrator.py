@@ -1371,8 +1371,9 @@ def _run_one_segment(
         --workers flag; `comparison_target`/`name_key_results_csv` -- from
         args.comparison_target/args.name_key_results_csv.
     calls: _clear_stale_name_all_before_run(); _write_segment_records();
-        run_step_log() (x4: patterns, bundle, and -- gated on comparison_target --
-        name patterns, name bundle); _filter_name_key_csv_to_segment();
+        run_step_log() (x5: patterns, bundle, and -- gated on comparison_target --
+        name patterns, name-fragmentation (Step 1 Part A), name bundle);
+        _filter_name_key_csv_to_segment();
         _build_patterns_missing_notes(); _active_domains_from_presence_csv();
         _active_domains_from_name_patterns(); merge_bi_outputs();
         annotate_name_target_combined_files()
@@ -1394,9 +1395,9 @@ def _run_one_segment(
         results_registry.csv reflect this segment's outcome immediately, not only
         after the whole run completes.
     notes: (mechanical-extraction risk) `step_failed`/`failure_notes` accumulate
-        through 7 sequential try/except-guarded steps (clear_stale_name_all, prepare,
-        patterns, patterns_name, bundle, bundle_name, bi_merge/bi_merge_name), each
-        gated on `step_failed is None` from the previous step --
+        through 8 sequential try/except-guarded steps (clear_stale_name_all, prepare,
+        patterns, patterns_name, patterns_name_fragmentation, bundle, bundle_name,
+        bi_merge/bi_merge_name), each gated on `step_failed is None` from the previous step --
         sequential-control-flow-as-policy: which steps actually execute for a given
         segment depends on run_type and comparison_target, evaluated fresh at each
         gate, not declared as a single up-front plan. `registry` (the list) and
@@ -1576,6 +1577,31 @@ def _run_one_segment(
                 failure_notes = f"step=patterns_name error={exc}"
             t_patterns_name = int(time.monotonic() - t_step2b_start)
             log(f"[orchestrator]   step 2b name-patterns elapsed={t_patterns_name}s")
+
+        # Step 3c — Same-segment name-fragmentation metric (opt-in, comparison_target in
+        # {name, both}; Step 1 Part A). Gated identically to Step 2b (not run_type-gated --
+        # a "reference" segment gets this too, same as a "bundle" segment) and runs
+        # immediately after it, reusing Step 2b's already-filtered segment_name_key_csv --
+        # no new opt-in surface, no extra JSON re-parse.
+        if step_failed is None and comparison_target in ("name", "both"):
+            log(f"[orchestrator]   step 3c name-fragmentation...")
+            t_step3c_start = time.monotonic()
+            frag_cmd = [
+                sys.executable,
+                str(repo_root / "tools" / "generate_pattern_name_fragmentation.py"),
+                "--records-csv", str(out_root / "results" / "records" / "records.csv"),
+                "--domain-patterns-csv", str(out_root / "results" / "analysis" / "domain_patterns.csv"),
+                "--name-key-csv", str(segment_name_key_csv),
+                "--out-dir", str(out_root / "results" / "analysis"),
+            ]
+            rc, tail, _frag_content = run_step_log(
+                frag_cmd, out_root / "name_fragmentation.log", cwd=str(repo_root)
+            )
+            if rc != 0:
+                step_failed = "patterns_name_fragmentation"
+                failure_notes = f"step=patterns_name_fragmentation returncode={rc}\n{tail}"
+            t_name_fragmentation = int(time.monotonic() - t_step3c_start)
+            log(f"[orchestrator]   step 3c name-fragmentation elapsed={t_name_fragmentation}s")
 
         # Step 3 — Bundle stage
         if step_failed is None and run_type == "bundle":
@@ -1951,6 +1977,15 @@ def run_orchestrator(args: argparse.Namespace) -> int:
                 ]
                 print(f"  step 2b: filter {args.name_key_results_csv} -> {segment_name_key_csv}")
                 print(f"  step 2b: {' '.join(name_patterns_cmd[1:])}")
+                frag_cmd = [
+                    sys.executable,
+                    str(repo_root / "tools" / "generate_pattern_name_fragmentation.py"),
+                    "--records-csv", str(out_root / "results" / "records" / "records.csv"),
+                    "--domain-patterns-csv", str(out_root / "results" / "analysis" / "domain_patterns.csv"),
+                    "--name-key-csv", str(segment_name_key_csv),
+                    "--out-dir", str(out_root / "results" / "analysis"),
+                ]
+                print(f"  step 3c: {' '.join(frag_cmd[1:])}")
             if run_type == "bundle":
                 bundle_cmd = [
                     sys.executable,

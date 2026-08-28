@@ -404,6 +404,63 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `tools/bundle_analysis/comparison_status.py`,
   `tools/build_segment_manifest.py`, or `tools/compare_cross_segment.py`.
   New coverage in `tests/test_compare_reference.py`.
+- **Step 1: `tools/generate_pattern_name_fragmentation.py` (new script) and
+  `tools/compare_reference.py --include-name-overlap` (new opt-in flag), backed by a new
+  shared module `tools/name_key_rollup.py`.** Real corpus data (`imperial_project_architectural`
+  segment, per `docs/namekey_crosssegment_step0_findings.md`'s Step 0 investigation) confirmed
+  a config-identical pattern's name identity is a SET, not a scalar: 44% of `arrowheads`
+  patterns and 25% of `text_types` patterns have more than one distinct name-key `join_hash`
+  (max observed: 78 distinct names for one `text_types` pattern). Both new capabilities are
+  built on a shared join: `results/records/records.csv` (config `join_hash` per record) to a
+  segment's own `results/name_key/name_key_results.csv` (`tools/apply_name_key_policy.py`'s
+  output, segment-filtered by `tools/run_segment_orchestrator.py`'s Step 2b) on
+  `(normalize_export_run_id(export_run_id_or_export_file, known_ids), record_id)` --
+  `normalize_export_run_id()` (`tools/bundle_analysis/name_projection_adapter.py`) is reused,
+  not reimplemented, because `records.csv`'s `export_run_id` and `name_key_results.csv`'s
+  `export_file` disagree for any split-export model (the `.index.json` name vs. the
+  `.details.json` name for the same file).
+  - **Part A** (`generate_pattern_name_fragmentation.py`, wired as the per-segment
+    orchestrator's new **Step 3c**, gated identically to Step 2b -- opt-in via
+    `-NameKey`/`--comparison-target name|both`, not `run_type`-gated): for every eligible
+    domain (`core/name_key_coverage.py::ELIGIBLE_DOMAINS`) in one segment, writes
+    `results/analysis/pattern_name_fragmentation.csv` (one row per `(pattern_id, name_hash)`
+    pair -- never a concatenated/pipe-joined label list, which would marginalize away the
+    exact co-occurrence data this metric exists to surface) and
+    `pattern_name_fragmentation_summary.csv` (one row per domain:
+    `total_patterns`/`patterns_with_multiplicity`/`multiplicity_pct`/
+    `max_distinct_names_observed`). A domain outside `ELIGIBLE_DOMAINS` still gets one row per
+    its own `pattern_id` (`status=excluded_no_name_evidence`); an eligible domain's pattern
+    with zero resolved name evidence gets one row (`status=no_name_evidence_resolved`) --
+    never silently absent.
+  - **Part B** (`compare_reference.py --include-name-overlap`, off by default): writes
+    `reference_comparison_name_overlap.csv`, reclassifying every `reference_comparison_detail.csv`
+    row (`shared`/`reference_only`/`target_only` -- the same already-computed pattern-identity
+    set membership `compute_semantic_changes_rows()` reuses) by the SET relationship between
+    the reference side's and target side's name-key `join_hash` sets for that pattern
+    identity: `name_sets_identical` / `name_sets_overlap` / `name_sets_disjoint` (equal /
+    overlapping-not-equal / no shared hash), `name_evidence_excluded` (domain outside
+    `ELIGIBLE_DOMAINS`), or `name_evidence_missing` (no `status=="ok"` name-key rows resolved
+    for this pattern on one or both sides -- covers both "the config pattern doesn't exist on
+    that side at all" and "name-key data for that side isn't materialized/is stale"). Unlike
+    `compute_semantic_changes_rows()` (same-segment-only, exact-string-matched on
+    `pattern_label_human`), this works in cross-segment mode too, since cross-segment identity
+    is already `join_hash`-based (`resolve_cross_segment_pattern_identity()`'s existing
+    translation is reused as-is, not reimplemented) and the classification never assumes a
+    single "the" name for a pattern. Fail-soft, not fail-hard: a segment missing name-key
+    materialization on either side degrades that side's patterns to `name_evidence_missing`
+    (with a `reference_name_key_status`/`target_name_key_status` of `not_materialized` or
+    `stale`, mirroring `corpus_update_runbook.ps1`'s own Run-C staleness guard) rather than
+    blocking the whole comparison -- the existing config-identity comparison is unaffected
+    either way. **Known gap, not silently assumed away:** unlike the config `join_hash`
+    (`join_key_policy_version` column + `CROSS_SEGMENT_JOIN_POLICY_MISMATCH` gate), the
+    name-key hash has no policy-version field or cross-segment mismatch gate yet -- safe today
+    only because `core/record_v2.py::canonicalize_str()` is a pure function with no
+    segment-specific state; a `CROSS_SEGMENT_NAME_KEY_POLICY_MISMATCH`-equivalent gate is
+    deferred to a follow-up PR (`REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED`, recorded
+    in the manifest's new `name_overlap_known_gaps` field whenever the flag is used).
+  No changes to `tools/build_segment_manifest.py` or `tools/compare_cross_segment.py`. New
+  coverage in `tests/test_generate_pattern_name_fragmentation.py` and
+  `tests/test_compare_reference_name_overlap.py`.
 - **`loaded_family_types` domain: `can_have_structural_section`/`has_thermal_properties`
   identity fields (Audit 16 §2 / PR2, Tier 1 capability flags only).**
   `domains/loaded_family_types.py`'s existing per-family loop now also reads

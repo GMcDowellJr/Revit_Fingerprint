@@ -119,6 +119,20 @@ configuration is approved, required, or compliant.
   bundle-analysis view(s) to compare against. `all`/`used` populations are
   never collapsed into one another; `both` runs and reports each
   separately, distinguished by the `purge_view` column.
+- `--include-name-overlap` (opt-in, default off) — also write
+  `reference_comparison_name_overlap.csv` (Step 1 Part B): for every pattern
+  in `reference_comparison_detail.csv`, classify the relationship between
+  the reference side's and target side's name-key `join_hash` **sets**
+  (never a single "the" name — see
+  `docs/namekey_crosssegment_step0_findings.md`, real corpus data shows
+  25–44% of patterns in an eligible domain have more than one distinct
+  name-hash). Works in both same-segment and cross-segment mode, unlike
+  `reference_comparison_semantic_changes.csv` below. Fail-soft: a segment
+  missing name-key materialization (`-NameKey` never run, or stale relative
+  to `records.csv`) degrades that side's patterns to
+  `name_evidence_missing` rather than blocking the comparison. See
+  **`reference_comparison_name_overlap.csv` columns** below for the full
+  classification enum and known gaps.
 
 ## Filename resolution
 
@@ -196,6 +210,7 @@ Every run writes exactly these files directly under `--out-dir`:
 | `reference_comparison_diagnostics.json` | Machine-readable status/failure/degradation information |
 | `reference_comparison_report.json` | Run manifest: resolved reference/target identities, target segment (`segment_id`), reference segment (`reference_segment_id`), analysis run id, aggregate status |
 | `reference_comparison_semantic_changes.csv` | **Same-segment mode only.** Reclassifies `reference_only`/`target_only` rows by resolved pattern name -- see below. Not written in cross-segment mode; the manifest's `semantic_changes_skipped_reason` explains why (`""` when the file was written, `SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT` otherwise -- always present, even on a pre-flight-blocked run that never got far enough to attempt it) |
+| `reference_comparison_name_overlap.csv` | **Opt-in (`--include-name-overlap`), both modes.** Classifies each pattern's reference-vs-target name-key `join_hash` set relationship -- see below. Only written when the flag is passed; the manifest's `name_overlap_included` (bool) and `name_overlap_known_gaps` (list) fields record whether it ran and any known limitations |
 
 `--out-dir` also retains the raw intermediate `compare_all/`/`compare_used/`
 directories (`file_gap_report.csv`/`file_gap_detail.csv`, written directly
@@ -258,6 +273,49 @@ still visible, unaffected, in `reference_comparison_detail.csv`).
   (`reference_pattern_id` blank).
 
 Name comparison is exact string match after `.strip()`, case-sensitive.
+
+### `reference_comparison_name_overlap.csv` columns (opt-in, `--include-name-overlap`)
+
+`segment_id, purge_view, reference_bundle_id, analysis_run_id,
+target_export_run_id, domain, population_id, pattern_id, comparison_class,
+name_set_classification, exclusion_reason, reference_name_key_status,
+target_name_key_status, reference_name_hash_count, target_name_hash_count,
+shared_name_hash_count, reference_name_hashes, target_name_hashes`
+
+One row per `reference_comparison_detail.csv` row (`pattern_id` carries the
+same value: same-segment raw `pattern_id`, or the cross-segment-stable
+`join_hash` in cross-segment mode). `reference_name_hashes`/
+`target_name_hashes` are pipe-joined, sorted name-key `join_hash` values
+(not human labels -- join to that segment's own
+`results/analysis/pattern_name_fragmentation.csv`, Step 1 Part A, via
+`name_hash` for a representative display label per hash). `name_set_classification` is one of:
+- `name_sets_identical` -- the reference and target name-hash sets are equal.
+- `name_sets_overlap` -- non-empty intersection, but not equal.
+- `name_sets_disjoint` -- no shared name-hash at all (closest to a genuine
+  rename, but -- unlike `semantic_change_class=changed` above -- not backed
+  by a 1:1 pairing guarantee, since either side's set can have more than one
+  member).
+- `name_evidence_excluded` -- `domain` is outside
+  `core/name_key_coverage.py::ELIGIBLE_DOMAINS` (`exclusion_reason` explains
+  why -- e.g. `no_name_like_key`); no name-key hash can ever exist for it.
+- `name_evidence_missing` -- `domain` is eligible, but no `status=="ok"`
+  name-key rows resolved for this pattern on one or both sides. Covers both
+  "this config pattern has no records at all on that side" (an ordinary
+  `reference_only`/`target_only` outcome) and "that side's name-key data
+  isn't materialized or is stale" -- `reference_name_key_status`/
+  `target_name_key_status` (`ok` / `not_materialized` / `stale`) disambiguate.
+
+**Known gap:** unlike the config `join_hash` (which has a
+`join_key_policy_version` column plus the `CROSS_SEGMENT_JOIN_POLICY_MISMATCH`
+gate above), the name-key hash has no policy-version field or cross-segment
+mismatch gate yet. This is safe in practice today only because
+`core/record_v2.py::canonicalize_str()` is a pure function with no
+segment-specific state (see
+`docs/namekey_crosssegment_step0_findings.md` D.10) -- a future
+`policies/domain_name_key_policies.json` edit could still silently produce
+incomparable hashes between segments extracted before/after that edit, with
+no gate to catch it. Deferred to a follow-up PR
+(`REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED`).
 `name_match_basis` is currently always the literal `pattern_label_human`
 (reserved for a future `name_all`-based literal-identity basis without a
 schema change).

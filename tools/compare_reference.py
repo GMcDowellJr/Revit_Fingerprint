@@ -77,12 +77,15 @@ from bundle_analysis.comparison_status import (  # noqa: E402
     split_reason_codes,
 )
 from bundle_analysis.step_compare import run_compare_for_domain, write_blocked_gap_placeholder  # noqa: E402
+from core.name_key_coverage import ELIGIBLE_DOMAINS, exclusion_reason  # noqa: E402
+from name_key_rollup import build_domain_name_hash_facets  # noqa: E402
 
 MANIFEST_FILENAME = "reference_comparison_report.json"
 SUMMARY_FILENAME = "reference_comparison_summary.csv"
 DETAIL_FILENAME = "reference_comparison_detail.csv"
 DIAGNOSTICS_FILENAME = "reference_comparison_diagnostics.json"
 SEMANTIC_CHANGES_FILENAME = "reference_comparison_semantic_changes.csv"
+NAME_OVERLAP_FILENAME = "reference_comparison_name_overlap.csv"
 
 VALID_PURGE_VIEWS = ("all", "used")
 
@@ -159,6 +162,41 @@ REASON_OUT_DIR_UNSAFE = "OUT_DIR_UNSAFE"
 # here.
 REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT = "SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT"
 
+# --- Name-set-overlap classification (Step 1 Part B, --include-name-overlap) ---------------
+#
+# Unlike compute_semantic_changes_rows() above (same-segment-only, string-matched on
+# pattern_label_human), this classifies the relationship between the reference side's and
+# target side's *name-key join_hash sets* for each pattern identity -- sound in both
+# same-segment and cross-segment mode, since it never depends on a single "the" name for a
+# pattern (docs/namekey_crosssegment_step0_findings.md's Step 1 premise: 44% of arrowheads
+# patterns and 25% of text_types patterns in a real corpus segment have more than one
+# distinct name-hash -- a pattern's name identity is a SET, never a scalar).
+NAME_SETS_IDENTICAL = "name_sets_identical"
+NAME_SETS_OVERLAP = "name_sets_overlap"
+NAME_SETS_DISJOINT = "name_sets_disjoint"
+NAME_EVIDENCE_EXCLUDED = "name_evidence_excluded"
+NAME_EVIDENCE_MISSING = "name_evidence_missing"
+
+NAME_KEY_STATUS_OK = "ok"
+NAME_KEY_STATUS_NOT_MATERIALIZED = "not_materialized"
+NAME_KEY_STATUS_STALE = "stale"
+
+# KNOWN GAP (Step 1 Part B design decision B4, do not silently resolve without discussion):
+# unlike the config join_hash, which has BOTH a join_key_policy_version column (records.csv)
+# AND a CROSS_SEGMENT_JOIN_POLICY_MISMATCH gate (resolve_cross_segment_compatibility() above)
+# to detect two segments compared under different join-key policies, the name-key hash has
+# NEITHER today (docs/namekey_crosssegment_step0_findings.md D.9:
+# policies/domain_name_key_policies.json carries no version field, and
+# tools/apply_name_key_policy.py's output has no policy-id/version column to compare). This
+# is safe in practice only because core/record_v2.py::canonicalize_str() is a pure function
+# with no segment-specific state (Step 0 D.10) -- so today's cross-segment name-hash
+# comparisons ARE sound -- but there is no structural protection against a future
+# domain_name_key_policies.json edit silently producing incomparable hashes between segments
+# extracted before/after that edit, the way CROSS_SEGMENT_JOIN_POLICY_MISMATCH already
+# protects the config side. Adding an equivalent CROSS_SEGMENT_NAME_KEY_POLICY_MISMATCH gate
+# is deferred to a follow-up PR, not silently assumed away here.
+REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED = "NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED"
+
 _SUMMARY_FIELDNAMES = [
     "segment_id",
     "purge_view",
@@ -204,6 +242,27 @@ _SEMANTIC_CHANGES_FIELDNAMES = [
     "target_pattern_id",
     "semantic_change_class",
     "name_match_basis",
+]
+
+_NAME_OVERLAP_FIELDNAMES = [
+    "segment_id",
+    "purge_view",
+    "reference_bundle_id",
+    "analysis_run_id",
+    "target_export_run_id",
+    "domain",
+    "population_id",
+    "pattern_id",
+    "comparison_class",
+    "name_set_classification",
+    "exclusion_reason",
+    "reference_name_key_status",
+    "target_name_key_status",
+    "reference_name_hash_count",
+    "target_name_hash_count",
+    "shared_name_hash_count",
+    "reference_name_hashes",
+    "target_name_hashes",
 ]
 
 # Never used as a match key: fallback labels are templated placeholders
@@ -1148,6 +1207,170 @@ def compute_semantic_changes_rows(
     return out_rows
 
 
+# ---------------------------------------------------------------------------
+# Name-set-overlap classification (Step 1 Part B, --include-name-overlap).
+# ---------------------------------------------------------------------------
+
+
+def _name_key_side_status(segment_root: Path) -> Tuple[str, Optional[Path], Optional[Path], Optional[Path]]:
+    """Resolve one segment's own records.csv / domain_patterns.csv / name_key_results.csv
+    paths and an availability status for the name-key side specifically.
+
+    Returns (status, records_csv, domain_patterns_csv, name_key_csv). `status` is
+    NAME_KEY_STATUS_OK, NAME_KEY_STATUS_NOT_MATERIALIZED (name_key_results.csv absent --
+    e.g. -NameKey / --comparison-target name|both was never run for this segment; see
+    docs/namekey_crosssegment_step0_findings.md A.1/A.2), or NAME_KEY_STATUS_STALE
+    (name_key_results.csv exists but is older than this segment's own records.csv --
+    mirrors tools/corpus_update_runbook.ps1's own Run-C staleness guard, lines 291-301).
+    B2 design decision: this is a fail-soft per-domain/per-pattern signal, never a hard
+    failure of the whole comparison -- a segment missing name-key materialization still
+    gets its ordinary config-identity comparison; only the name-overlap columns degrade.
+    """
+    records_csv = segment_root / "results" / "records" / "records.csv"
+    domain_patterns_csv = segment_root / "results" / "analysis" / "domain_patterns.csv"
+    name_key_csv = segment_root / "results" / "name_key" / "name_key_results.csv"
+    if not records_csv.is_file() or not domain_patterns_csv.is_file():
+        return NAME_KEY_STATUS_NOT_MATERIALIZED, None, None, None
+    if not name_key_csv.is_file():
+        return NAME_KEY_STATUS_NOT_MATERIALIZED, records_csv, domain_patterns_csv, None
+    if name_key_csv.stat().st_mtime < records_csv.stat().st_mtime:
+        return NAME_KEY_STATUS_STALE, records_csv, domain_patterns_csv, name_key_csv
+    return NAME_KEY_STATUS_OK, records_csv, domain_patterns_csv, name_key_csv
+
+
+def _load_side_facets(segment_root: Path):
+    """Load one side's DomainNameHashFacets (empty if not materialized/stale -- see
+    _name_key_side_status()) plus its own {domain: {pattern_id: join_hash}} map (needed
+    only in same-segment mode, to translate reference_comparison_detail.csv's raw
+    pattern_id into the join_hash identity facets are keyed by; unused/harmless to build in
+    cross-segment mode too, since load_domain_pattern_join_hash_map() only ever reads that
+    segment's own domain_patterns.csv)."""
+    status, records_csv, domain_patterns_csv, name_key_csv = _name_key_side_status(segment_root)
+    if status != NAME_KEY_STATUS_OK:
+        return status, build_domain_name_hash_facets([], [], [])
+    records_rows = read_csv_rows(records_csv)
+    domain_patterns_rows = read_csv_rows(domain_patterns_csv)
+    name_key_rows = read_csv_rows(name_key_csv)
+    return status, build_domain_name_hash_facets(records_rows, domain_patterns_rows, name_key_rows)
+
+
+def compute_name_overlap_rows(
+    all_detail_rows: Sequence[Dict[str, str]],
+    domains: Sequence[str],
+    reference_segment_root: Path,
+    target_segment_root: Path,
+    same_segment: bool,
+) -> List[Dict[str, str]]:
+    """Reclassify every all_detail_rows row (shared/reference_only/target_only -- the same
+    already-computed config-identity set membership compute_semantic_changes_rows() reuses)
+    by the SET relationship between the reference side's and target side's name-key
+    join_hash sets for that same pattern identity.
+
+    `row["pattern_id"]` is same-segment raw pattern_id when `same_segment` is True, or
+    already the cross-segment-stable join_hash when False (resolve_cross_segment_pattern_
+    identity() translates and mutates reference["domains"]/the target membership matrix into
+    join_hash terms before run_compare_for_domain ever runs -- see that function's own
+    docstring above). Same-segment mode translates pattern_id -> join_hash itself, via the
+    existing load_domain_pattern_join_hash_map() (this file, above) -- one call per domain,
+    reused for both sides since reference_segment_root == target_segment_root there.
+    """
+    reference_status, reference_facets = _load_side_facets(reference_segment_root)
+    if same_segment:
+        target_status, target_facets = reference_status, reference_facets
+    else:
+        target_status, target_facets = _load_side_facets(target_segment_root)
+
+    # Same-segment only: pattern_id -> join_hash per domain, built once, reused across every
+    # row for that domain (load_domain_pattern_join_hash_map() re-reads domain_patterns.csv
+    # per call, so caching here avoids re-reading it once per row).
+    same_segment_jh_maps: Dict[str, Dict[str, str]] = {}
+    if same_segment:
+        for dom in domains:
+            jh_map, _resolved = load_domain_pattern_join_hash_map(target_segment_root, dom)
+            same_segment_jh_maps[dom] = jh_map
+
+    out_rows: List[Dict[str, str]] = []
+    for row in all_detail_rows:
+        comparison_class = row.get("comparison_class", "")
+        if comparison_class not in ("shared", "reference_only", "target_only"):
+            continue
+        domain = row.get("domain", "")
+        raw_pattern_id = row.get("pattern_id", "")
+
+        base_row = {
+            "segment_id": row.get("segment_id", ""),
+            "purge_view": row.get("purge_view", ""),
+            "reference_bundle_id": row.get("reference_bundle_id", ""),
+            "analysis_run_id": row.get("analysis_run_id", ""),
+            "target_export_run_id": row.get("target_export_run_id", ""),
+            "domain": domain,
+            "population_id": row.get("population_id", ""),
+            "pattern_id": raw_pattern_id,
+            "comparison_class": comparison_class,
+            "reference_name_key_status": reference_status,
+            "target_name_key_status": target_status,
+        }
+
+        if domain not in ELIGIBLE_DOMAINS:
+            out_rows.append({
+                **base_row,
+                "name_set_classification": NAME_EVIDENCE_EXCLUDED,
+                "exclusion_reason": exclusion_reason(domain),
+                "reference_name_hash_count": "0",
+                "target_name_hash_count": "0",
+                "shared_name_hash_count": "0",
+                "reference_name_hashes": "",
+                "target_name_hashes": "",
+            })
+            continue
+
+        if same_segment:
+            identity_join_hash = same_segment_jh_maps.get(domain, {}).get(raw_pattern_id)
+        else:
+            identity_join_hash = raw_pattern_id or None
+
+        if not identity_join_hash:
+            out_rows.append({
+                **base_row,
+                "name_set_classification": NAME_EVIDENCE_MISSING,
+                "exclusion_reason": "pattern_identity_unresolved",
+                "reference_name_hash_count": "0",
+                "target_name_hash_count": "0",
+                "shared_name_hash_count": "0",
+                "reference_name_hashes": "",
+                "target_name_hashes": "",
+            })
+            continue
+
+        ref_names = set(reference_facets.name_hashes_for(domain, identity_join_hash).keys())
+        tgt_names = set(target_facets.name_hashes_for(domain, identity_join_hash).keys())
+
+        if not ref_names or not tgt_names:
+            classification = NAME_EVIDENCE_MISSING
+        elif ref_names == tgt_names:
+            classification = NAME_SETS_IDENTICAL
+        elif ref_names & tgt_names:
+            classification = NAME_SETS_OVERLAP
+        else:
+            classification = NAME_SETS_DISJOINT
+
+        out_rows.append({
+            **base_row,
+            "name_set_classification": classification,
+            "exclusion_reason": "",
+            "reference_name_hash_count": str(len(ref_names)),
+            "target_name_hash_count": str(len(tgt_names)),
+            "shared_name_hash_count": str(len(ref_names & tgt_names)),
+            "reference_name_hashes": "|".join(sorted(ref_names)),
+            "target_name_hashes": "|".join(sorted(tgt_names)),
+        })
+
+    out_rows.sort(
+        key=lambda r: (r["purge_view"], r["domain"], r["population_id"], r["target_export_run_id"], r["pattern_id"])
+    )
+    return out_rows
+
+
 def assemble_final_outputs(
     out_dir: Path,
     segment_id: str,
@@ -1160,6 +1383,8 @@ def assemble_final_outputs(
     extractor_schema_version: str,
     reference_segment_id: str,
     same_segment: bool,
+    reference_segment_root: Optional[Path] = None,
+    include_name_overlap: bool = False,
 ) -> Dict[str, object]:
     all_summary_rows: List[Dict[str, str]] = []
     all_detail_rows: List[Dict[str, str]] = []
@@ -1188,6 +1413,21 @@ def assemble_final_outputs(
         output_files.append(SEMANTIC_CHANGES_FILENAME)
     else:
         semantic_changes_skipped_reason = REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT
+
+    # Opt-in (--include-name-overlap), Step 1 Part B: set-based name-hash overlap
+    # classification, sound in both same-segment and cross-segment mode (unlike
+    # compute_semantic_changes_rows() above) -- see compute_name_overlap_rows()'s own
+    # docstring and the NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED known-gap note above.
+    if include_name_overlap:
+        name_overlap_rows = compute_name_overlap_rows(
+            all_detail_rows,
+            domains,
+            reference_segment_root or segment_root,
+            segment_root,
+            same_segment,
+        )
+        atomic_write_csv(out_dir / NAME_OVERLAP_FILENAME, _NAME_OVERLAP_FIELDNAMES, name_overlap_rows)
+        output_files.append(NAME_OVERLAP_FILENAME)
 
     statuses_by_key: Dict[Tuple[str, str], List[str]] = {}
     reasons_by_key: Dict[Tuple[str, str], List[str]] = {}
@@ -1256,6 +1496,10 @@ def assemble_final_outputs(
         "output_files": output_files,
         "aggregate_comparison_status": run_status,
         "semantic_changes_skipped_reason": semantic_changes_skipped_reason,
+        "name_overlap_included": include_name_overlap,
+        "name_overlap_known_gaps": (
+            [REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED] if include_name_overlap else []
+        ),
     }
     (out_dir / MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return manifest
@@ -1408,6 +1652,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--overwrite", action="store_true", help="Allow clearing --out-dir even if it wasn't produced by a prior run of this tool.")
     ap.add_argument("--domains", default=None, help="Comma-separated domain list. Default: every domain present in the target segment's pattern_presence_file.csv.")
     ap.add_argument("--purge-view", choices=["all", "used", "both"], default="both", help="Which segment-local bundle-analysis view(s) to compare against. Default: both.")
+    ap.add_argument(
+        "--include-name-overlap",
+        action="store_true",
+        help="Also write reference_comparison_name_overlap.csv: for each pattern, classify "
+        "the relationship between the reference side's and target side's name-key join_hash "
+        "sets (name_sets_identical/overlap/disjoint, or name_evidence_excluded/missing). "
+        "Opt-in and fail-soft: a segment missing name-key materialization (see "
+        "tools/apply_name_key_policy.py / the -NameKey runbook switch) still gets its "
+        "ordinary config-identity comparison; only the name-overlap file degrades to "
+        "name_evidence_missing rows for the affected side. See "
+        "docs/namekey_crosssegment_step0_findings.md.",
+    )
     return ap
 
 
@@ -1629,6 +1885,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         extractor_schema_version,
         reference_segment_id,
         same_segment,
+        reference_segment_root=reference_segment_root,
+        include_name_overlap=args.include_name_overlap,
     )
     print(f"[compare_reference] comparison_status={manifest['aggregate_comparison_status']}")
     print(f"[compare_reference] wrote outputs to {out_dir}")
