@@ -72,10 +72,10 @@ def _write_side(
 # ---------------------------------------------------------------------------
 
 
-def _detail_row(domain: str, pattern_id: str, comparison_class: str) -> Dict[str, str]:
+def _detail_row(domain: str, pattern_id: str, comparison_class: str, target_export_run_id: str = "t1.details.json") -> Dict[str, str]:
     return {
         "purge_view": "all", "domain": domain, "population_id": "p1",
-        "target_export_run_id": "t1.details.json", "pattern_id": pattern_id,
+        "target_export_run_id": target_export_run_id, "pattern_id": pattern_id,
         "comparison_class": comparison_class, "segment_id": "tgt",
         "reference_bundle_id": "rb1", "analysis_run_id": "run1",
     }
@@ -123,7 +123,10 @@ def test_cross_segment_overlap_and_target_only_and_excluded(tmp_path):
         _detail_row("arrowheads", "cfgB", "target_only"),
         _detail_row("line_styles", "cfgLS", "shared"),
     ]
-    rows = cr.compute_name_overlap_rows(all_detail_rows, ["arrowheads", "line_styles"], ref_root, tgt_root, same_segment=False)
+    rows = cr.compute_name_overlap_rows(
+        all_detail_rows, ["arrowheads", "line_styles"], ref_root, tgt_root, same_segment=False,
+        reference_export_run_id="r1.details.json",
+    )
     by_pattern = {(r["domain"], r["pattern_id"]): r for r in rows}
 
     shared_row = by_pattern[("arrowheads", "cfgA")]
@@ -163,10 +166,88 @@ def test_same_segment_identical_sets_translates_pattern_id_via_domain_patterns(t
         ],
     )
     all_detail_rows = [_detail_row("arrowheads", "pat_x", "shared")]
-    rows = cr.compute_name_overlap_rows(all_detail_rows, ["arrowheads"], seg_root, seg_root, same_segment=True)
+    rows = cr.compute_name_overlap_rows(
+        all_detail_rows, ["arrowheads"], seg_root, seg_root, same_segment=True,
+        reference_export_run_id="t1.details.json",
+    )
     assert len(rows) == 1
     assert rows[0]["name_set_classification"] == cr.NAME_SETS_IDENTICAL
     assert rows[0]["reference_name_hashes"] == rows[0]["target_name_hashes"] == "nameX|nameY"
+
+
+def test_same_segment_two_different_files_are_not_falsely_identical(tmp_path):
+    """Regression for PR #476 review (P1): comparing two DIFFERENT files within the same
+    segment must scope each side to its own file's names, never the segment-wide aggregate --
+    otherwise, since reference_facets and target_facets are the same object in same-segment
+    mode, every same-segment comparison would collapse to name_sets_identical regardless of
+    what the two files actually contain."""
+    seg_root = tmp_path / "seg"
+    _write_side(
+        seg_root,
+        records_rows=[
+            {"export_run_id": "old.details.json", "domain": "arrowheads", "record_id": "a:1", "join_hash": "cfgA"},
+            {"export_run_id": "new.details.json", "domain": "arrowheads", "record_id": "a:2", "join_hash": "cfgA"},
+        ],
+        domain_patterns_rows=[
+            {"domain": "arrowheads", "pattern_id": "pat_x", "source_cluster_id": "arrowheads|cfg.schema.v1|cfgA"},
+        ],
+        name_key_rows=[
+            {"export_file": "old.details.json", "domain": "arrowheads", "record_id": "a:1", "label_display": "Old Name", "join_hash": "nameOld", "status": "ok"},
+            {"export_file": "new.details.json", "domain": "arrowheads", "record_id": "a:2", "label_display": "New Name", "join_hash": "nameNew", "status": "ok"},
+        ],
+    )
+    all_detail_rows = [_detail_row("arrowheads", "pat_x", "shared", target_export_run_id="new.details.json")]
+    rows = cr.compute_name_overlap_rows(
+        all_detail_rows, ["arrowheads"], seg_root, seg_root, same_segment=True,
+        reference_export_run_id="old.details.json",
+    )
+    assert len(rows) == 1
+    assert rows[0]["name_set_classification"] == cr.NAME_SETS_DISJOINT
+    assert rows[0]["reference_name_hashes"] == "nameOld"
+    assert rows[0]["target_name_hashes"] == "nameNew"
+
+
+def test_cross_segment_two_target_files_do_not_contaminate_each_other(tmp_path):
+    """Regression for PR #476 review (P1): when the target segment has multiple files under
+    the same config pattern with different names, each all_detail_rows row (one per target
+    file) must see only that file's own names, not the segment-wide union."""
+    ref_root = tmp_path / "ref"
+    tgt_root = tmp_path / "tgt"
+    _write_side(
+        ref_root,
+        records_rows=[{"export_run_id": "r1.details.json", "domain": "arrowheads", "record_id": "a:1", "join_hash": "cfgA"}],
+        domain_patterns_rows=[{"domain": "arrowheads", "pattern_id": "pat_r", "source_cluster_id": "arrowheads|cfg.schema.v1|cfgA"}],
+        name_key_rows=[{"export_file": "r1.details.json", "domain": "arrowheads", "record_id": "a:1", "label_display": "T1Name", "join_hash": "nameT1", "status": "ok"}],
+    )
+    _write_side(
+        tgt_root,
+        records_rows=[
+            {"export_run_id": "t1.details.json", "domain": "arrowheads", "record_id": "a:10", "join_hash": "cfgA"},
+            {"export_run_id": "t2.details.json", "domain": "arrowheads", "record_id": "a:20", "join_hash": "cfgA"},
+        ],
+        domain_patterns_rows=[{"domain": "arrowheads", "pattern_id": "pat_t", "source_cluster_id": "arrowheads|cfg.schema.v1|cfgA"}],
+        name_key_rows=[
+            {"export_file": "t1.details.json", "domain": "arrowheads", "record_id": "a:10", "label_display": "T1Name", "join_hash": "nameT1", "status": "ok"},
+            {"export_file": "t2.details.json", "domain": "arrowheads", "record_id": "a:20", "label_display": "T2Name", "join_hash": "nameT2", "status": "ok"},
+        ],
+    )
+    all_detail_rows = [
+        _detail_row("arrowheads", "cfgA", "shared", target_export_run_id="t1.details.json"),
+        _detail_row("arrowheads", "cfgA", "shared", target_export_run_id="t2.details.json"),
+    ]
+    rows = cr.compute_name_overlap_rows(
+        all_detail_rows, ["arrowheads"], ref_root, tgt_root, same_segment=False,
+        reference_export_run_id="r1.details.json",
+    )
+    by_target = {r["target_export_run_id"]: r for r in rows}
+
+    t1_row = by_target["t1.details.json"]
+    assert t1_row["target_name_hashes"] == "nameT1"
+    assert t1_row["name_set_classification"] == cr.NAME_SETS_IDENTICAL
+
+    t2_row = by_target["t2.details.json"]
+    assert t2_row["target_name_hashes"] == "nameT2"
+    assert t2_row["name_set_classification"] == cr.NAME_SETS_DISJOINT
 
 
 def test_disjoint_name_sets_for_same_config_identity(tmp_path):
@@ -185,7 +266,10 @@ def test_disjoint_name_sets_for_same_config_identity(tmp_path):
         name_key_rows=[{"export_file": "t1.details.json", "domain": "text_types", "record_id": "tt:9", "label_display": "Standard - Renamed", "join_hash": "nameNew", "status": "ok"}],
     )
     all_detail_rows = [_detail_row("text_types", "cfgA", "shared")]
-    rows = cr.compute_name_overlap_rows(all_detail_rows, ["text_types"], ref_root, tgt_root, same_segment=False)
+    rows = cr.compute_name_overlap_rows(
+        all_detail_rows, ["text_types"], ref_root, tgt_root, same_segment=False,
+        reference_export_run_id="r1.details.json",
+    )
     assert rows[0]["name_set_classification"] == cr.NAME_SETS_DISJOINT
     assert rows[0]["shared_name_hash_count"] == "0"
 
@@ -208,7 +292,10 @@ def test_fail_soft_reference_name_key_not_materialized(tmp_path):
         name_key_rows=[{"export_file": "t1.details.json", "domain": "arrowheads", "record_id": "a:9", "label_display": "Arrow", "join_hash": "nameX", "status": "ok"}],
     )
     all_detail_rows = [_detail_row("arrowheads", "cfgA", "shared")]
-    rows = cr.compute_name_overlap_rows(all_detail_rows, ["arrowheads"], ref_root, tgt_root, same_segment=False)
+    rows = cr.compute_name_overlap_rows(
+        all_detail_rows, ["arrowheads"], ref_root, tgt_root, same_segment=False,
+        reference_export_run_id="r1.details.json",
+    )
     assert rows[0]["name_set_classification"] == cr.NAME_EVIDENCE_MISSING
     assert rows[0]["reference_name_key_status"] == cr.NAME_KEY_STATUS_NOT_MATERIALIZED
     assert rows[0]["target_name_key_status"] == cr.NAME_KEY_STATUS_OK
@@ -225,8 +312,11 @@ def test_split_export_normalization_reused_not_reimplemented(tmp_path):
         domain_patterns_rows=[{"domain": "arrowheads", "pattern_id": "pat_x", "source_cluster_id": "arrowheads|cfg.schema.v1|cfgA"}],
         name_key_rows=[{"export_file": "model.details.json", "domain": "arrowheads", "record_id": "a:1", "label_display": "Arrow", "join_hash": "nameX", "status": "ok"}],
     )
-    all_detail_rows = [_detail_row("arrowheads", "pat_x", "shared")]
-    rows = cr.compute_name_overlap_rows(all_detail_rows, ["arrowheads"], seg_root, seg_root, same_segment=True)
+    all_detail_rows = [_detail_row("arrowheads", "pat_x", "shared", target_export_run_id="model.index.json")]
+    rows = cr.compute_name_overlap_rows(
+        all_detail_rows, ["arrowheads"], seg_root, seg_root, same_segment=True,
+        reference_export_run_id="model.index.json",
+    )
     assert rows[0]["name_set_classification"] == cr.NAME_SETS_IDENTICAL
     assert rows[0]["reference_name_hashes"] == "nameX"
 

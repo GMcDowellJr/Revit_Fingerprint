@@ -1051,31 +1051,46 @@ def _active_domains_from_name_patterns(name_patterns_dir: Path) -> Optional[froz
         )
 
 
-def _segment_has_name_leg_output(out_root: Path) -> bool:
-    """Whether this segment's name-projection leg (step 2b/3b/BI-merge-name) has already
-    completed at least once. emit_name_target_provenance() (tools/bundle_analysis's
-    --comparison-target name path) always writes bundle_provenance.csv on a successful run,
-    even when the segment's name-target pattern set comes back empty -- so its presence is
-    a reliable "name leg already ran" marker, independent of run_registry.csv's single
-    whole-segment `status` column, which has no notion of per-leg completion. Used so a
-    segment already marked complete under a config-only run isn't skipped once the operator
-    later asks for --comparison-target name/both -- see PR #390 review.
+def _segment_has_name_leg_output(out_root: Path, run_type: str) -> bool:
+    """Whether this segment's name-projection leg (step 2b/3c, plus 3b/BI-merge-name for a
+    "bundle" segment) has already completed at least once. emit_name_target_provenance()
+    (tools/bundle_analysis's --comparison-target name path) always writes
+    bundle_provenance.csv on a successful run, even when the segment's name-target pattern
+    set comes back empty -- so its presence is a reliable "bundle name leg already ran"
+    marker, independent of run_registry.csv's single whole-segment `status` column, which
+    has no notion of per-leg completion. Used so a segment already marked complete under a
+    config-only run (or, for pattern_name_fragmentation.csv specifically, one already marked
+    complete before Step 1 Part A existed) isn't skipped once the operator later asks for
+    --comparison-target name/both -- see PR #390 review, and PR #476 review (Step 1 Part A's
+    fragmentation artifacts weren't originally included in this check, so an
+    already-complete segment would silently never produce them without --force).
 
     bundle_provenance.csv lives at bundle_analysis/name_all/ (the flat, single-path-segment
     BI-facing output location -- see run_bundle_analysis_for_target()'s docstring), not
-    under the internal bundle_analysis/name/ staging path.
+    under the internal bundle_analysis/name/ staging path. pattern_name_fragmentation.csv is
+    Step 3c's own output, gated identically to Step 2b (not run_type-gated -- a "reference"
+    segment gets it too, unlike Step 3b's bundle_provenance.csv, which only a "bundle"
+    segment ever produces at all).
 
     --- trace ---
     reads: `out_root` -- this segment's output root; checks
-        `out_root/results/bundle_analysis/name_all/bundle_provenance.csv` for
-        existence.
+        `out_root/results/analysis/pattern_name_fragmentation.csv` for existence always, and
+        (only when `run_type == "bundle"`) also
+        `out_root/results/bundle_analysis/name_all/bundle_provenance.csv`; `run_type` --
+        caller's own reg_row["run_type"], since the bundle_provenance.csv requirement only
+        applies to a "bundle" segment (a "reference" segment never produces Step 3b output
+        regardless of comparison_target).
     calls: none (Path.is_file()).
     thresholds: none.
     returns: bool; consumed by run_orchestrator() (dry-run and live-run skip-check
         loops) to decide `already_satisfied` for a segment whose registry status is
         already "complete" but comparison_target requests the name leg.
     """
-    return (out_root / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv").is_file()
+    fragmentation_ok = (out_root / "results" / "analysis" / "pattern_name_fragmentation.csv").is_file()
+    if run_type != "bundle":
+        return fragmentation_ok
+    bundle_ok = (out_root / "results" / "bundle_analysis" / "name_all" / "bundle_provenance.csv").is_file()
+    return fragmentation_ok and bundle_ok
 
 
 def merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozenset] = None) -> dict:
@@ -1925,11 +1940,12 @@ def run_orchestrator(args: argparse.Namespace) -> int:
             # skip check -- a segment already marked complete under a prior config-only
             # run still needs (re)processing if this run additionally requests the name
             # leg and that leg hasn't produced output for this segment yet (PR #390 review).
-            # run_type == "bundle" is required too -- see the matching comment in the
-            # live-run skip-check loop below for why "reference" rows must be excluded.
-            needs_name_leg = args.comparison_target in ("name", "both") and run_type == "bundle"
+            # Not run_type-gated: Step 3c (pattern_name_fragmentation.csv) applies to every
+            # run_type, not just "bundle" -- see the matching comment in the live-run
+            # skip-check loop below and _segment_has_name_leg_output()'s own docstring.
+            needs_name_leg = args.comparison_target in ("name", "both")
             already_satisfied = status == "complete" and (
-                not needs_name_leg or _segment_has_name_leg_output(out_root)
+                not needs_name_leg or _segment_has_name_leg_output(out_root, run_type)
             )
             skip = already_satisfied and not args.force
 
@@ -2085,15 +2101,16 @@ def run_orchestrator(args: argparse.Namespace) -> int:
         # --comparison-target name/both silently produces nothing for already-complete
         # segments unless the operator also remembers --force (which would needlessly
         # redo the config leg for every segment, not just the ones missing the name leg).
-        # run_type == "bundle" is required too: step 3/3b (both legs) are gated on
-        # run_type == "bundle", so a "reference" row can never produce a name-leg marker
-        # regardless of comparison_target -- without this gate, reference rows would never
-        # be recognized as satisfied under name/both and would be needlessly reprocessed
-        # (prepare/patterns/name-patterns) on every run instead of honoring the existing
-        # registry-driven skip.
-        needs_name_leg = args.comparison_target in ("name", "both") and run_type == "bundle"
+        # NOT run_type-gated (PR #476 review): step 3/3b (the bundle name leg) are gated on
+        # run_type == "bundle", but Step 3c (pattern_name_fragmentation.csv, Step 1 Part A)
+        # is not -- a "reference" row gets Step 2b/3c the same as a "bundle" row does, so a
+        # "reference" segment must be re-checked for the name leg too, not treated as
+        # automatically satisfied. _segment_has_name_leg_output() itself only requires
+        # bundle_provenance.csv when run_type == "bundle", so a "reference" segment is never
+        # needlessly reprocessed for output it can't produce.
+        needs_name_leg = args.comparison_target in ("name", "both")
         already_satisfied = status == "complete" and (
-            not needs_name_leg or _segment_has_name_leg_output(out_root)
+            not needs_name_leg or _segment_has_name_leg_output(out_root, run_type)
         )
         if already_satisfied and not args.force:
             print(f"[orchestrator] skip segment={sid} (status=complete; use --force to re-run)")

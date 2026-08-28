@@ -461,6 +461,32 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   No changes to `tools/build_segment_manifest.py` or `tools/compare_cross_segment.py`. New
   coverage in `tests/test_generate_pattern_name_fragmentation.py` and
   `tests/test_compare_reference_name_overlap.py`.
+
+  **Two correctness fixes from the PR #476 review, before merge:**
+  - `compute_name_overlap_rows()`'s facet lookups were scoped to `(domain, config
+    join_hash)` only -- segment-wide, not to the one specific export each side of a
+    comparison actually is. In same-segment mode this made every comparison collapse to
+    `name_sets_identical` (reference and target facets are the same aggregated object for
+    the same key, regardless of what the two files actually contained); in cross-segment
+    mode it let names from unrelated target files contaminate a row about one specific
+    target file. `tools/name_key_rollup.py`'s `DomainNameHashFacets` now also tracks
+    per-`(domain, config_join_hash, export_run_id)` facets
+    (`name_hashes_for_export()`), and `compute_name_overlap_rows()` (now taking a
+    `reference_export_run_id` parameter) scopes each side's lookup to the one export
+    actually being compared. New regression coverage:
+    `test_same_segment_two_different_files_are_not_falsely_identical`,
+    `test_cross_segment_two_target_files_do_not_contaminate_each_other`.
+  - `run_segment_orchestrator.py`'s registry-driven skip check treated a segment as
+    "name-leg satisfied" purely from `bundle_analysis/name_all/bundle_provenance.csv`
+    (Step 3b's own marker) and only ever re-checked a `run_type == "bundle"` segment for
+    it at all -- so upgrading an existing corpus, a segment already marked complete before
+    Step 3c existed (or any `run_type == "reference"` segment, regardless of when it was
+    last processed) would be skipped forever under `--comparison-target name/both` without
+    ever producing `pattern_name_fragmentation.csv`, unless the operator remembered
+    `--force`. `_segment_has_name_leg_output()` now also requires
+    `results/analysis/pattern_name_fragmentation.csv`, and the skip check's `needs_name_leg`
+    is no longer `run_type == "bundle"`-gated (Step 3c applies to every run_type, unlike
+    Step 3b).
 - **`loaded_family_types` domain: `can_have_structural_section`/`has_thermal_properties`
   identity fields (Audit 16 §2 / PR2, Tier 1 capability flags only).**
   `domains/loaded_family_types.py`'s existing per-family loop now also reads

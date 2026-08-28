@@ -1260,6 +1260,7 @@ def compute_name_overlap_rows(
     reference_segment_root: Path,
     target_segment_root: Path,
     same_segment: bool,
+    reference_export_run_id: str,
 ) -> List[Dict[str, str]]:
     """Reclassify every all_detail_rows row (shared/reference_only/target_only -- the same
     already-computed config-identity set membership compute_semantic_changes_rows() reuses)
@@ -1273,6 +1274,17 @@ def compute_name_overlap_rows(
     docstring above). Same-segment mode translates pattern_id -> join_hash itself, via the
     existing load_domain_pattern_join_hash_map() (this file, above) -- one call per domain,
     reused for both sides since reference_segment_root == target_segment_root there.
+
+    Each side's name-hash lookup MUST be scoped to the one specific export actually being
+    compared in this row -- `reference_export_run_id` (the single resolved reference file,
+    constant across every row) for the reference side, `row["target_export_run_id"]` (that
+    row's own target file) for the target side -- via `name_hashes_for_export()`, never the
+    segment-wide aggregate `name_hashes_for()`. The aggregate mixes in names from every other
+    file in the segment that happens to share the same config identity: in same-segment mode
+    it made every comparison collapse to `name_sets_identical` (reference and target facets
+    are literally the same aggregated object for the same key), and in cross-segment mode it
+    let names from unrelated target files contaminate a row about one specific target file
+    (PR #476 review).
     """
     reference_status, reference_facets = _load_side_facets(reference_segment_root)
     if same_segment:
@@ -1342,8 +1354,14 @@ def compute_name_overlap_rows(
             })
             continue
 
-        ref_names = set(reference_facets.name_hashes_for(domain, identity_join_hash).keys())
-        tgt_names = set(target_facets.name_hashes_for(domain, identity_join_hash).keys())
+        ref_names = set(
+            reference_facets.name_hashes_for_export(domain, identity_join_hash, reference_export_run_id).keys()
+        )
+        tgt_names = set(
+            target_facets.name_hashes_for_export(
+                domain, identity_join_hash, row.get("target_export_run_id", "")
+            ).keys()
+        )
 
         if not ref_names or not tgt_names:
             classification = NAME_EVIDENCE_MISSING
@@ -1425,6 +1443,7 @@ def assemble_final_outputs(
             reference_segment_root or segment_root,
             segment_root,
             same_segment,
+            str(reference.get("seed_export_run_id", "")),
         )
         atomic_write_csv(out_dir / NAME_OVERLAP_FILENAME, _NAME_OVERLAP_FIELDNAMES, name_overlap_rows)
         output_files.append(NAME_OVERLAP_FILENAME)

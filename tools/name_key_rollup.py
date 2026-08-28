@@ -97,6 +97,17 @@ class DomainNameHashFacets:
 
     def __init__(self) -> None:
         self.facets: Dict[Tuple[str, str], Dict[str, Dict[str, object]]] = {}
+        # Same shape as `facets`, but keyed one level finer: (domain, config_join_hash,
+        # export_run_id). `facets` aggregates across every export in the segment (what Part A's
+        # same-segment fragmentation metric wants); a caller comparing two SPECIFIC files
+        # (Part B's compare_reference.py --include-name-overlap, one reference export vs one
+        # target export) must use this instead -- looking a pattern's name-hash set up in the
+        # aggregate `facets` would silently mix in names from every other file that also
+        # happens to carry this same config identity, which is wrong for a file-scoped
+        # comparison (PR #476 review: in same-segment mode this bug made every comparison
+        # report name_sets_identical, since both sides queried the same segment-wide
+        # aggregate for the same key).
+        self.facets_by_export: Dict[Tuple[str, str, str], Dict[str, Dict[str, object]]] = {}
         # Every (domain, config_join_hash) this segment's own domain_patterns.csv defines,
         # whether or not any name evidence resolved for it -- callers use this for the
         # "never silently absent" guarantee (CLAUDE.md Fail-Soft Policy).
@@ -107,15 +118,30 @@ class DomainNameHashFacets:
         self.domains_observed.add(domain)
         self.all_pattern_join_hashes.setdefault(domain, set()).add(join_hash)
 
-    def record_name(self, domain: str, config_join_hash: str, name_join_hash: str, label_display: str) -> None:
+    def record_name(
+        self, domain: str, config_join_hash: str, export_run_id: str, name_join_hash: str, label_display: str
+    ) -> None:
         key = (domain, config_join_hash)
         bucket = self.facets.setdefault(key, {})
         entry = bucket.setdefault(name_join_hash, {"record_count": 0, "label_counts": Counter()})
         entry["record_count"] += 1
         entry["label_counts"][label_display] += 1
 
+        export_key = (domain, config_join_hash, export_run_id)
+        export_bucket = self.facets_by_export.setdefault(export_key, {})
+        export_entry = export_bucket.setdefault(name_join_hash, {"record_count": 0, "label_counts": Counter()})
+        export_entry["record_count"] += 1
+        export_entry["label_counts"][label_display] += 1
+
     def name_hashes_for(self, domain: str, config_join_hash: str) -> Dict[str, Dict[str, object]]:
+        """Segment-wide aggregate across every export -- Part A's fragmentation metric."""
         return self.facets.get((domain, config_join_hash), {})
+
+    def name_hashes_for_export(self, domain: str, config_join_hash: str, export_run_id: str) -> Dict[str, Dict[str, object]]:
+        """Scoped to one specific export -- Part B's name-overlap classifier, where the
+        reference side and target side must each see only their own compared file's names,
+        never the rest of the segment's."""
+        return self.facets_by_export.get((domain, config_join_hash, export_run_id), {})
 
 
 def build_domain_name_hash_facets(
@@ -182,7 +208,7 @@ def build_domain_name_hash_facets(
             # pattern to attach this name evidence to.
             continue
         label_display = (row.get("label_display") or "").strip()
-        result.record_name(domain, config_join_hash, name_join_hash, label_display)
+        result.record_name(domain, config_join_hash, normalized, name_join_hash, label_display)
 
     return result
 
