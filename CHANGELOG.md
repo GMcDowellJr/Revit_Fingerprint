@@ -75,6 +75,25 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   in the codebase at either corpus or segment scope.
 
 ### Fixed
+- **`tools/compare_reference.py`'s `semantic_changes_skipped_reason` manifest
+  key is no longer simply absent on a pre-flight-blocked run.**
+  `write_top_level_blocked()` (segment not found, materialization incomplete,
+  reference/target unresolved, cross-segment unit-system/schema mismatch --
+  any failure caught before `assemble_final_outputs()` is ever reached) now
+  takes a `same_segment` parameter and populates the key the same way
+  `assemble_final_outputs()` does: `REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_
+  CROSS_SEGMENT` when `same_segment` is False (cross-segment mode always
+  skips the file, regardless of why the run failed), `""` when True
+  (consistent with every other per-run field in this blocked manifest --
+  `domains_total="0"` etc. -- being explained by `run_comparison_status=
+  blocked`, not by a field-specific reason of its own). Previously a
+  consumer checking this key on every manifest could hit a missing key on
+  this path despite the contract stating it's always recorded. New
+  coverage: `tests/test_compare_reference.py::
+  test_semantic_changes_skipped_reason_present_on_same_segment_preflight_failure`
+  / `::test_semantic_changes_skipped_reason_present_on_cross_segment_preflight_failure`.
+  Addresses PR review feedback on
+  GMcDowellJr/Revit_Fingerprint#475.
 - **`tools/bundle_analysis/common.py::read_csv_rows` no longer crashes on a
   field larger than Python csv's default 131072-byte limit.** A domain with a
   very large pattern population could push a single pipe-joined

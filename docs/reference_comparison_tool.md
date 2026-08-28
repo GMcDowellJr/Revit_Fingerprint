@@ -195,10 +195,20 @@ Every run writes exactly these files directly under `--out-dir`:
 | `reference_comparison_detail.csv` | One row per classified pattern (`shared` / `reference_only` / `target_only`) |
 | `reference_comparison_diagnostics.json` | Machine-readable status/failure/degradation information |
 | `reference_comparison_report.json` | Run manifest: resolved reference/target identities, target segment (`segment_id`), reference segment (`reference_segment_id`), analysis run id, aggregate status |
+| `reference_comparison_semantic_changes.csv` | **Same-segment mode only.** Reclassifies `reference_only`/`target_only` rows by resolved pattern name -- see below. Not written in cross-segment mode; the manifest's `semantic_changes_skipped_reason` explains why (`""` when the file was written, `SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT` otherwise -- always present, even on a pre-flight-blocked run that never got far enough to attempt it) |
 
 `--out-dir` also retains the raw intermediate `compare_all/`/`compare_used/`
 directories (`file_gap_report.csv`/`file_gap_detail.csv`, written directly
-by the authoritative comparator) for drill-down or debugging.
+by the authoritative comparator) for drill-down or debugging, and, in
+cross-segment mode only, a `_xseg_translated_membership/<view>/<domain>/
+membership_matrix.csv` scratch tree: a copy of the target segment's real
+membership data with `pattern_id` rewritten to `join_hash` (see
+[Cross-segment pattern identity](#cross-segment-pattern-identity-join_hash)
+above), materialized purely so the untouched comparator can be pointed at
+it instead of the real bundle_dir. It is not part of the documented output
+contract (no schema, not listed in the manifest's `output_files`), is safe
+to ignore or delete, and is wiped along with the rest of `--out-dir` on the
+next run against the same directory regardless.
 
 ### `reference_comparison_summary.csv` columns
 
@@ -217,6 +227,40 @@ onward) is blank rather than a fabricated zero.
 target_export_run_id, domain, population_id, pattern_id, comparison_class`
 where `comparison_class` is one of `shared` / `reference_only` /
 `target_only`.
+
+### `reference_comparison_semantic_changes.csv` columns (same-segment only)
+
+`segment_id, purge_view, reference_bundle_id, analysis_run_id,
+target_export_run_id, domain, population_id, pattern_name,
+reference_pattern_id, target_pattern_id, semantic_change_class,
+name_match_basis`
+
+Reclassifies `reference_comparison_detail.csv`'s `reference_only`/
+`target_only` rows for the same `(purge_view, domain, population_id,
+target_export_run_id)` group by resolved `pattern_label_human` name (from
+that segment's own `results/analysis/domain_patterns.csv`, excluding any
+row whose `pattern_label_source == "fallback"` -- a templated placeholder
+like "Line Pattern (Variant 2 of 5)", never an observed name). No new
+comparison mathematics: `shared`/`reference_only`/`target_only` set
+membership is unchanged and reused as-is. A `pattern_id` with no
+resolvable non-fallback name simply doesn't appear in this file (it is
+still visible, unaffected, in `reference_comparison_detail.csv`).
+
+`semantic_change_class` is one of:
+- `changed` -- exactly one `pattern_id` per side shares this name; likely a
+  rename or content change under a stable name.
+- `ambiguous_name_match` -- more than one `pattern_id` on either side
+  shares this name; `reference_pattern_id`/`target_pattern_id` hold every
+  candidate, pipe-joined (no specific pairing is guessed).
+- `removed` -- the name appears only on the reference side
+  (`target_pattern_id` blank).
+- `added` -- the name appears only on the target side
+  (`reference_pattern_id` blank).
+
+Name comparison is exact string match after `.strip()`, case-sensitive.
+`name_match_basis` is currently always the literal `pattern_label_human`
+(reserved for a future `name_all`-based literal-identity basis without a
+schema change).
 
 ## Statuses: `ok` / `degraded` / `blocked`
 

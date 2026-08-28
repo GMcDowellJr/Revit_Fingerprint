@@ -1268,6 +1268,7 @@ def write_top_level_blocked(
     reference_segment_id: str,
     target_segment_id: str,
     target_selector: str,
+    same_segment: bool,
 ) -> Dict[str, object]:
     """Written when a comparison could not even be attempted (segment not
     found, materialization incomplete, reference/target unresolved). Still
@@ -1278,6 +1279,17 @@ def write_top_level_blocked(
     case (mirroring the prior single `segment_id` value byte-for-byte); they
     differ only in cross-segment mode, where the failure could originate on
     either side.
+
+    `same_segment` populates `semantic_changes_skipped_reason` the same way
+    assemble_final_outputs() does, so the manifest key is never simply
+    absent when this pre-flight path fires instead (Codex review, PR #475):
+    cross-segment mode always skips reference_comparison_semantic_changes.csv
+    regardless of *why* the run failed, so that case gets the same
+    REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT value
+    assemble_final_outputs() would have used; the same-segment case gets ""
+    (consistent with every other per-run field here -- domains_total="0"
+    etc. -- being explained by run_comparison_status=blocked, not by a
+    field-specific reason of its own).
     """
     atomic_write_csv(out_dir / SUMMARY_FILENAME, _SUMMARY_FIELDNAMES, [])
     atomic_write_csv(out_dir / DETAIL_FILENAME, _DETAIL_FIELDNAMES, [])
@@ -1305,6 +1317,7 @@ def write_top_level_blocked(
         "resolved_target_export_run_id": target_selector or "",
         "output_files": [SUMMARY_FILENAME, DETAIL_FILENAME, DIAGNOSTICS_FILENAME],
         "aggregate_comparison_status": COMPARISON_STATUS_BLOCKED,
+        "semantic_changes_skipped_reason": "" if same_segment else REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT,
     }
     (out_dir / MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return manifest
@@ -1583,7 +1596,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 + f" (reference={reference_export_run_id!r}, requested targets={sorted(requested_targets)!r}).",
             )
     except CompareReferenceError as exc:
-        write_top_level_blocked(out_dir, exc.reason_code, str(exc), reference_segment_id, target_segment_id, args.target or "")
+        write_top_level_blocked(
+            out_dir, exc.reason_code, str(exc), reference_segment_id, target_segment_id, args.target or "", same_segment
+        )
         print(f"[compare_reference][error] {exc.reason_code}: {exc}", file=sys.stderr)
         return 2
 
