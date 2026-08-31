@@ -150,19 +150,6 @@ REASON_STALE_MEMBERSHIP_MATRIX = "STALE_MEMBERSHIP_MATRIX"
 # Pure pre-flight/out-dir-safety failures -- raised before --out-dir can be
 # safely prepared at all, so no diagnostics file is ever written for these.
 REASON_OUT_DIR_UNSAFE = "OUT_DIR_UNSAFE"
-# Own namespace, same convention as the REASON_* codes above -- never reused
-# from tools/bundle_analysis/comparison_status.py. Recorded in the manifest
-# (never as a comparison_reason_codes value, since this fires at the whole-
-# run semantic-changes-file level, not per-domain) whenever same_segment is
-# False: reference_comparison_detail.csv's pattern_id values have already
-# been translated to the cross-segment-stable join_hash identity (see
-# resolve_cross_segment_pattern_identity()), and mapping a join_hash back to
-# a trustworthy per-segment name is a separate, harder problem (a join_hash
-# can correspond to multiple local pattern_ids via source_cluster_id, each
-# potentially resolving to a different pattern_label_human) -- not attempted
-# here.
-REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT = "SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT"
-
 # --- Name-set-overlap classification (Step 1 Part B, --include-name-overlap) ---------------
 #
 # Unlike compute_semantic_changes_rows() above (same-segment-only, string-matched on
@@ -228,7 +215,21 @@ _DETAIL_FIELDNAMES = [
     "population_id",
     "pattern_id",
     "comparison_class",
+    "reference_revit_name",
+    "reference_revit_name_status",
+    "reference_revit_name_count",
+    "target_revit_name",
+    "target_revit_name_status",
+    "target_revit_name_count",
 ]
+
+REVIT_NAME_STATUS_OK = "ok"
+REVIT_NAME_STATUS_MISSING = "missing"
+REVIT_NAME_STATUS_UNREADABLE = "unreadable"
+REVIT_NAME_STATUS_AMBIGUOUS = "ambiguous"
+REVIT_NAME_STATUS_BLOCKED = "blocked"
+_USABLE_LABEL_QUALITIES = {"human", "system"}
+_UNREADABLE_LABEL_QUALITIES = {"placeholder_unreadable", "placeholder_unsupported"}
 
 _SEMANTIC_CHANGES_FIELDNAMES = [
     "segment_id",
@@ -243,6 +244,10 @@ _SEMANTIC_CHANGES_FIELDNAMES = [
     "target_pattern_id",
     "semantic_change_class",
     "name_match_basis",
+    "reference_revit_name",
+    "reference_revit_name_status",
+    "target_revit_name",
+    "target_revit_name_status",
 ]
 
 _NAME_OVERLAP_FIELDNAMES = [
@@ -1112,6 +1117,95 @@ def _finalize_view(out_dir: Path, view: str, segment_id: str) -> Tuple[List[Dict
     return summary_rows, detail_out_rows
 
 
+def build_revit_name_lookup(
+    segment_root: Path,
+    identity_maps: Optional[Dict[str, Dict[str, str]]] = None,
+) -> Tuple[str, Dict[Tuple[str, str, str], Dict[str, str]]]:
+    """Index observed labels at (export, domain, comparison identity) grain.
+
+    The authoritative linkage is record_pattern_membership.record_pk to
+    records.record_pk.  ``identity_maps`` translates segment-local pattern_id
+    to join_hash in cross-segment mode; names remain evidence and never enter
+    comparison identity or set arithmetic.
+    """
+    records_path = segment_root / "results" / "records" / "records.csv"
+    membership_path = segment_root / "results" / "analysis" / "record_pattern_membership.csv"
+    if not records_path.is_file() or not membership_path.is_file():
+        return REVIT_NAME_STATUS_BLOCKED, {}
+    try:
+        records = read_csv_rows(records_path)
+        memberships = read_csv_rows(membership_path)
+    except (OSError, UnicodeError, csv.Error):
+        return REVIT_NAME_STATUS_BLOCKED, {}
+    if records and not {"record_pk", "label_display", "label_quality"}.issubset(records[0]):
+        return REVIT_NAME_STATUS_BLOCKED, {}
+    if memberships and not {"export_run_id", "domain", "record_pk", "pattern_id"}.issubset(memberships[0]):
+        return REVIT_NAME_STATUS_BLOCKED, {}
+
+    record_labels: Dict[str, List[Tuple[str, str]]] = {}
+    for row in records:
+        record_pk = (row.get("record_pk", "") or "").strip()
+        if record_pk:
+            record_labels.setdefault(record_pk, []).append(
+                ((row.get("label_display", "") or "").strip(), (row.get("label_quality", "") or "").strip())
+            )
+
+    evidence: Dict[Tuple[str, str, str], List[Tuple[str, str]]] = {}
+    for row in memberships:
+        export_id = (row.get("export_run_id", "") or "").strip()
+        domain = (row.get("domain", "") or "").strip()
+        local_pid = (row.get("pattern_id", "") or "").strip()
+        identity = identity_maps.get(domain, {}).get(local_pid, "") if identity_maps is not None else local_pid
+        if not export_id or not domain or not identity:
+            continue
+        evidence.setdefault((export_id, domain, identity), []).extend(
+            record_labels.get((row.get("record_pk", "") or "").strip(), [])
+        )
+
+    lookup: Dict[Tuple[str, str, str], Dict[str, str]] = {}
+    for key, labels in evidence.items():
+        usable = sorted({name for name, quality in labels if name and quality in _USABLE_LABEL_QUALITIES})
+        has_unreadable = any(quality in _UNREADABLE_LABEL_QUALITIES for _name, quality in labels)
+        if len(usable) == 1:
+            lookup[key] = {"name": usable[0], "status": REVIT_NAME_STATUS_OK, "count": "1"}
+        elif len(usable) > 1:
+            lookup[key] = {
+                "name": json.dumps(usable, ensure_ascii=False, separators=(",", ":")),
+                "status": REVIT_NAME_STATUS_AMBIGUOUS,
+                "count": str(len(usable)),
+            }
+        elif has_unreadable:
+            lookup[key] = {"name": "", "status": REVIT_NAME_STATUS_UNREADABLE, "count": "0"}
+        else:
+            lookup[key] = {"name": "", "status": REVIT_NAME_STATUS_MISSING, "count": "0"}
+    return REVIT_NAME_STATUS_OK, lookup
+
+
+def add_revit_names(
+    rows: Sequence[Dict[str, str]],
+    reference_export_run_id: str,
+    reference_source_status: str,
+    reference_lookup: Dict[Tuple[str, str, str], Dict[str, str]],
+    target_source_status: str,
+    target_lookup: Dict[Tuple[str, str, str], Dict[str, str]],
+) -> None:
+    """Attach per-file descriptive name evidence without changing row identity."""
+    blocked = {"name": "", "status": REVIT_NAME_STATUS_BLOCKED, "count": "0"}
+    missing = {"name": "", "status": REVIT_NAME_STATUS_MISSING, "count": "0"}
+    for row in rows:
+        domain, identity = row.get("domain", ""), row.get("pattern_id", "")
+        ref = blocked if reference_source_status != REVIT_NAME_STATUS_OK else reference_lookup.get(
+            (reference_export_run_id, domain, identity), missing
+        )
+        tgt = blocked if target_source_status != REVIT_NAME_STATUS_OK else target_lookup.get(
+            (row.get("target_export_run_id", ""), domain, identity), missing
+        )
+        for side, result in (("reference", ref), ("target", tgt)):
+            row[f"{side}_revit_name"] = result["name"]
+            row[f"{side}_revit_name_status"] = result["status"]
+            row[f"{side}_revit_name_count"] = result["count"]
+
+
 def build_domain_pattern_name_maps(analysis_dir: Path, domains: Sequence[str]) -> Dict[str, Dict[str, str]]:
     """Build {domain: {pattern_id: pattern_label_human}} from this segment's
     own results/analysis/domain_patterns.csv, once (not per comparison
@@ -1221,6 +1315,74 @@ def compute_semantic_changes_rows(
             )
 
     out_rows.sort(key=lambda r: (r["purge_view"], r["domain"], r["population_id"], r["target_export_run_id"], r["pattern_name"]))
+    return out_rows
+
+
+def compute_cross_segment_semantic_changes_rows(
+    all_detail_rows: Sequence[Dict[str, str]],
+) -> List[Dict[str, str]]:
+    """Produce the existing name-based change report from file-observed names.
+
+    Cross-segment detail ``pattern_id`` is already join_hash.  This function
+    only groups the comparator's already-established reference_only and
+    target_only identities by independently resolved, usable names; it never
+    uses a name to alter those comparison classes.
+    """
+    groups: Dict[Tuple[str, str, str, str], Dict[str, object]] = {}
+    for row in all_detail_rows:
+        comparison_class = row.get("comparison_class", "")
+        if comparison_class not in ("reference_only", "target_only"):
+            continue
+        key = (
+            row.get("purge_view", ""), row.get("domain", ""),
+            row.get("population_id", ""), row.get("target_export_run_id", ""),
+        )
+        group = groups.setdefault(key, {"base": row, "reference_only": [], "target_only": []})
+        side = "reference" if comparison_class == "reference_only" else "target"
+        if row.get(f"{side}_revit_name_status") == REVIT_NAME_STATUS_OK:
+            group[comparison_class].append((row.get(f"{side}_revit_name", ""), row.get("pattern_id", "")))
+
+    out_rows: List[Dict[str, str]] = []
+    for key, group in groups.items():
+        purge_view, domain, population_id, target_export_run_id = key
+        base = group["base"]
+        ref_by_name: Dict[str, List[str]] = {}
+        tgt_by_name: Dict[str, List[str]] = {}
+        for name, identity in group["reference_only"]:
+            ref_by_name.setdefault(name, []).append(identity)
+        for name, identity in group["target_only"]:
+            tgt_by_name.setdefault(name, []).append(identity)
+        for name in sorted(set(ref_by_name) | set(tgt_by_name)):
+            ref_ids = sorted(ref_by_name.get(name, []))
+            tgt_ids = sorted(tgt_by_name.get(name, []))
+            if ref_ids and tgt_ids:
+                change_class = "changed" if len(ref_ids) == len(tgt_ids) == 1 else "ambiguous_name_match"
+            elif ref_ids:
+                change_class = "removed"
+            else:
+                change_class = "added"
+            out_rows.append({
+                "segment_id": base.get("segment_id", ""),
+                "purge_view": purge_view,
+                "reference_bundle_id": base.get("reference_bundle_id", ""),
+                "analysis_run_id": base.get("analysis_run_id", ""),
+                "target_export_run_id": target_export_run_id,
+                "domain": domain,
+                "population_id": population_id,
+                "pattern_name": name,
+                "reference_pattern_id": "|".join(ref_ids),
+                "target_pattern_id": "|".join(tgt_ids),
+                "semantic_change_class": change_class,
+                "name_match_basis": "revit_observed_label_display",
+                "reference_revit_name": name if ref_ids else "",
+                "reference_revit_name_status": REVIT_NAME_STATUS_OK if ref_ids else REVIT_NAME_STATUS_MISSING,
+                "target_revit_name": name if tgt_ids else "",
+                "target_revit_name_status": REVIT_NAME_STATUS_OK if tgt_ids else REVIT_NAME_STATUS_MISSING,
+            })
+    out_rows.sort(key=lambda row: (
+        row["purge_view"], row["domain"], row["population_id"],
+        row["target_export_run_id"], row["pattern_name"],
+    ))
     return out_rows
 
 
@@ -1450,22 +1612,44 @@ def assemble_final_outputs(
     all_detail_rows.sort(
         key=lambda r: (r["purge_view"], r["domain"], r["population_id"], r["target_export_run_id"], r["pattern_id"])
     )
+    reference_identity_maps = None
+    target_identity_maps = None
+    if not same_segment:
+        reference_identity_maps = {
+            dom: load_domain_pattern_join_hash_map(reference_segment_root or segment_root, dom)[0]
+            for dom in domains
+        }
+        target_identity_maps = {
+            dom: load_domain_pattern_join_hash_map(segment_root, dom)[0]
+            for dom in domains
+        }
+    reference_name_status, reference_name_lookup = build_revit_name_lookup(
+        reference_segment_root or segment_root, reference_identity_maps
+    )
+    if same_segment:
+        target_name_status, target_name_lookup = reference_name_status, reference_name_lookup
+    else:
+        target_name_status, target_name_lookup = build_revit_name_lookup(segment_root, target_identity_maps)
+    add_revit_names(
+        all_detail_rows,
+        str(reference.get("seed_export_run_id", "")),
+        reference_name_status,
+        reference_name_lookup,
+        target_name_status,
+        target_name_lookup,
+    )
     atomic_write_csv(out_dir / SUMMARY_FILENAME, _SUMMARY_FIELDNAMES, all_summary_rows)
     atomic_write_csv(out_dir / DETAIL_FILENAME, _DETAIL_FIELDNAMES, all_detail_rows)
 
-    # Same-segment only: reference_comparison_detail.csv's pattern_id values
-    # are raw, segment-local, directly-comparable identifiers there -- see
-    # REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT for why
-    # cross-segment mode (join_hash identity) is out of scope.
     semantic_changes_skipped_reason = ""
     output_files = [SUMMARY_FILENAME, DETAIL_FILENAME, DIAGNOSTICS_FILENAME]
     if same_segment:
         name_maps = build_domain_pattern_name_maps(segment_root / "results" / "analysis", domains)
         semantic_changes_rows = compute_semantic_changes_rows(all_detail_rows, name_maps)
-        atomic_write_csv(out_dir / SEMANTIC_CHANGES_FILENAME, _SEMANTIC_CHANGES_FIELDNAMES, semantic_changes_rows)
-        output_files.append(SEMANTIC_CHANGES_FILENAME)
     else:
-        semantic_changes_skipped_reason = REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT
+        semantic_changes_rows = compute_cross_segment_semantic_changes_rows(all_detail_rows)
+    atomic_write_csv(out_dir / SEMANTIC_CHANGES_FILENAME, _SEMANTIC_CHANGES_FIELDNAMES, semantic_changes_rows)
+    output_files.append(SEMANTIC_CHANGES_FILENAME)
 
     # Opt-in (--include-name-overlap), Step 1 Part B: set-based name-hash overlap
     # classification, sound in both same-segment and cross-segment mode (unlike
@@ -1533,6 +1717,15 @@ def assemble_final_outputs(
         "domains_blocked": str(status_counts.get(COMPARISON_STATUS_BLOCKED, 0)),
         "domain_summaries": domain_summaries,
         "target_diagnostics": target_diagnostics,
+        "revit_name_resolution": {
+            "reference_status": reference_name_status,
+            "target_status": target_name_status,
+            "status_counts": dict(sorted(Counter(
+                value
+                for row in all_detail_rows
+                for value in (row["reference_revit_name_status"], row["target_revit_name_status"])
+            ).items())),
+        },
     }
     (out_dir / DIAGNOSTICS_FILENAME).write_text(json.dumps(diagnostics, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -1581,16 +1774,9 @@ def write_top_level_blocked(
     differ only in cross-segment mode, where the failure could originate on
     either side.
 
-    `same_segment` populates `semantic_changes_skipped_reason` the same way
-    assemble_final_outputs() does, so the manifest key is never simply
-    absent when this pre-flight path fires instead (Codex review, PR #475):
-    cross-segment mode always skips reference_comparison_semantic_changes.csv
-    regardless of *why* the run failed, so that case gets the same
-    REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT value
-    assemble_final_outputs() would have used; the same-segment case gets ""
-    (consistent with every other per-run field here -- domains_total="0"
-    etc. -- being explained by run_comparison_status=blocked, not by a
-    field-specific reason of its own).
+    `semantic_changes_skipped_reason` remains present and empty on this
+    pre-flight path. Cross-segment semantic reporting is supported; the
+    top-level comparison failure itself explains why no rows were produced.
 
     `include_name_overlap` populates `name_overlap_included`/
     `name_overlap_known_gaps` the same way assemble_final_outputs() does, for the same
@@ -1626,7 +1812,7 @@ def write_top_level_blocked(
         "resolved_target_export_run_id": target_selector or "",
         "output_files": [SUMMARY_FILENAME, DETAIL_FILENAME, DIAGNOSTICS_FILENAME],
         "aggregate_comparison_status": COMPARISON_STATUS_BLOCKED,
-        "semantic_changes_skipped_reason": "" if same_segment else REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT,
+        "semantic_changes_skipped_reason": "",
         "name_overlap_included": False,
         "name_overlap_known_gaps": (
             [REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED] if include_name_overlap else []

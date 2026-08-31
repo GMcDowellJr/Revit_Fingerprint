@@ -1384,7 +1384,7 @@ def test_semantic_changes_missing_domain_patterns_csv_yields_zero_rows_not_error
     assert cr.SEMANTIC_CHANGES_FILENAME in manifest["output_files"]
 
 
-def test_semantic_changes_not_written_cross_segment(tmp_path):
+def test_semantic_changes_written_cross_segment(tmp_path):
     ctx2 = _build_two_segments(
         tmp_path,
         presence_a={"ref.json": ["A", "B"]},
@@ -1401,10 +1401,10 @@ def test_semantic_changes_not_written_cross_segment(tmp_path):
         purge_view="all",
     )
     assert rc == 0
-    assert not (out_dir / cr.SEMANTIC_CHANGES_FILENAME).exists()
+    assert (out_dir / cr.SEMANTIC_CHANGES_FILENAME).is_file()
     manifest = json.loads((out_dir / cr.MANIFEST_FILENAME).read_text())
-    assert manifest["semantic_changes_skipped_reason"] == cr.REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT
-    assert cr.SEMANTIC_CHANGES_FILENAME not in manifest["output_files"]
+    assert manifest["semantic_changes_skipped_reason"] == ""
+    assert cr.SEMANTIC_CHANGES_FILENAME in manifest["output_files"]
 
 
 # ---------------------------------------------------------------------------
@@ -1447,7 +1447,7 @@ def test_semantic_changes_skipped_reason_present_on_cross_segment_preflight_fail
     diag = json.loads((out_dir / cr.DIAGNOSTICS_FILENAME).read_text())
     assert diag["run_comparison_reason_codes"] == [cr.REASON_CROSS_SEGMENT_UNIT_SYSTEM_MISMATCH]
     manifest = json.loads((out_dir / cr.MANIFEST_FILENAME).read_text())
-    assert manifest["semantic_changes_skipped_reason"] == cr.REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT
+    assert manifest["semantic_changes_skipped_reason"] == ""
 
 
 def test_semantic_changes_case_sensitive_names_do_not_match(tmp_path):
