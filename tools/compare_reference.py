@@ -150,19 +150,6 @@ REASON_STALE_MEMBERSHIP_MATRIX = "STALE_MEMBERSHIP_MATRIX"
 # Pure pre-flight/out-dir-safety failures -- raised before --out-dir can be
 # safely prepared at all, so no diagnostics file is ever written for these.
 REASON_OUT_DIR_UNSAFE = "OUT_DIR_UNSAFE"
-# Own namespace, same convention as the REASON_* codes above -- never reused
-# from tools/bundle_analysis/comparison_status.py. Recorded in the manifest
-# (never as a comparison_reason_codes value, since this fires at the whole-
-# run semantic-changes-file level, not per-domain) whenever same_segment is
-# False: reference_comparison_detail.csv's pattern_id values have already
-# been translated to the cross-segment-stable join_hash identity (see
-# resolve_cross_segment_pattern_identity()), and mapping a join_hash back to
-# a trustworthy per-segment name is a separate, harder problem (a join_hash
-# can correspond to multiple local pattern_ids via source_cluster_id, each
-# potentially resolving to a different pattern_label_human) -- not attempted
-# here.
-REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT = "SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT"
-
 # --- Name-set-overlap classification (Step 1 Part B, --include-name-overlap) ---------------
 #
 # Unlike compute_semantic_changes_rows() above (same-segment-only, string-matched on
@@ -257,6 +244,10 @@ _SEMANTIC_CHANGES_FIELDNAMES = [
     "target_pattern_id",
     "semantic_change_class",
     "name_match_basis",
+    "reference_revit_name",
+    "reference_revit_name_status",
+    "target_revit_name",
+    "target_revit_name_status",
 ]
 
 _NAME_OVERLAP_FIELDNAMES = [
@@ -1327,6 +1318,74 @@ def compute_semantic_changes_rows(
     return out_rows
 
 
+def compute_cross_segment_semantic_changes_rows(
+    all_detail_rows: Sequence[Dict[str, str]],
+) -> List[Dict[str, str]]:
+    """Produce the existing name-based change report from file-observed names.
+
+    Cross-segment detail ``pattern_id`` is already join_hash.  This function
+    only groups the comparator's already-established reference_only and
+    target_only identities by independently resolved, usable names; it never
+    uses a name to alter those comparison classes.
+    """
+    groups: Dict[Tuple[str, str, str, str], Dict[str, object]] = {}
+    for row in all_detail_rows:
+        comparison_class = row.get("comparison_class", "")
+        if comparison_class not in ("reference_only", "target_only"):
+            continue
+        key = (
+            row.get("purge_view", ""), row.get("domain", ""),
+            row.get("population_id", ""), row.get("target_export_run_id", ""),
+        )
+        group = groups.setdefault(key, {"base": row, "reference_only": [], "target_only": []})
+        side = "reference" if comparison_class == "reference_only" else "target"
+        if row.get(f"{side}_revit_name_status") == REVIT_NAME_STATUS_OK:
+            group[comparison_class].append((row.get(f"{side}_revit_name", ""), row.get("pattern_id", "")))
+
+    out_rows: List[Dict[str, str]] = []
+    for key, group in groups.items():
+        purge_view, domain, population_id, target_export_run_id = key
+        base = group["base"]
+        ref_by_name: Dict[str, List[str]] = {}
+        tgt_by_name: Dict[str, List[str]] = {}
+        for name, identity in group["reference_only"]:
+            ref_by_name.setdefault(name, []).append(identity)
+        for name, identity in group["target_only"]:
+            tgt_by_name.setdefault(name, []).append(identity)
+        for name in sorted(set(ref_by_name) | set(tgt_by_name)):
+            ref_ids = sorted(ref_by_name.get(name, []))
+            tgt_ids = sorted(tgt_by_name.get(name, []))
+            if ref_ids and tgt_ids:
+                change_class = "changed" if len(ref_ids) == len(tgt_ids) == 1 else "ambiguous_name_match"
+            elif ref_ids:
+                change_class = "removed"
+            else:
+                change_class = "added"
+            out_rows.append({
+                "segment_id": base.get("segment_id", ""),
+                "purge_view": purge_view,
+                "reference_bundle_id": base.get("reference_bundle_id", ""),
+                "analysis_run_id": base.get("analysis_run_id", ""),
+                "target_export_run_id": target_export_run_id,
+                "domain": domain,
+                "population_id": population_id,
+                "pattern_name": name,
+                "reference_pattern_id": "|".join(ref_ids),
+                "target_pattern_id": "|".join(tgt_ids),
+                "semantic_change_class": change_class,
+                "name_match_basis": "revit_observed_label_display",
+                "reference_revit_name": name if ref_ids else "",
+                "reference_revit_name_status": REVIT_NAME_STATUS_OK if ref_ids else REVIT_NAME_STATUS_MISSING,
+                "target_revit_name": name if tgt_ids else "",
+                "target_revit_name_status": REVIT_NAME_STATUS_OK if tgt_ids else REVIT_NAME_STATUS_MISSING,
+            })
+    out_rows.sort(key=lambda row: (
+        row["purge_view"], row["domain"], row["population_id"],
+        row["target_export_run_id"], row["pattern_name"],
+    ))
+    return out_rows
+
+
 # ---------------------------------------------------------------------------
 # Name-set-overlap classification (Step 1 Part B, --include-name-overlap).
 # ---------------------------------------------------------------------------
@@ -1582,19 +1641,15 @@ def assemble_final_outputs(
     atomic_write_csv(out_dir / SUMMARY_FILENAME, _SUMMARY_FIELDNAMES, all_summary_rows)
     atomic_write_csv(out_dir / DETAIL_FILENAME, _DETAIL_FIELDNAMES, all_detail_rows)
 
-    # Same-segment only: reference_comparison_detail.csv's pattern_id values
-    # are raw, segment-local, directly-comparable identifiers there -- see
-    # REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT for why
-    # cross-segment mode (join_hash identity) is out of scope.
     semantic_changes_skipped_reason = ""
     output_files = [SUMMARY_FILENAME, DETAIL_FILENAME, DIAGNOSTICS_FILENAME]
     if same_segment:
         name_maps = build_domain_pattern_name_maps(segment_root / "results" / "analysis", domains)
         semantic_changes_rows = compute_semantic_changes_rows(all_detail_rows, name_maps)
-        atomic_write_csv(out_dir / SEMANTIC_CHANGES_FILENAME, _SEMANTIC_CHANGES_FIELDNAMES, semantic_changes_rows)
-        output_files.append(SEMANTIC_CHANGES_FILENAME)
     else:
-        semantic_changes_skipped_reason = REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT
+        semantic_changes_rows = compute_cross_segment_semantic_changes_rows(all_detail_rows)
+    atomic_write_csv(out_dir / SEMANTIC_CHANGES_FILENAME, _SEMANTIC_CHANGES_FIELDNAMES, semantic_changes_rows)
+    output_files.append(SEMANTIC_CHANGES_FILENAME)
 
     # Opt-in (--include-name-overlap), Step 1 Part B: set-based name-hash overlap
     # classification, sound in both same-segment and cross-segment mode (unlike
@@ -1719,16 +1774,9 @@ def write_top_level_blocked(
     differ only in cross-segment mode, where the failure could originate on
     either side.
 
-    `same_segment` populates `semantic_changes_skipped_reason` the same way
-    assemble_final_outputs() does, so the manifest key is never simply
-    absent when this pre-flight path fires instead (Codex review, PR #475):
-    cross-segment mode always skips reference_comparison_semantic_changes.csv
-    regardless of *why* the run failed, so that case gets the same
-    REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT value
-    assemble_final_outputs() would have used; the same-segment case gets ""
-    (consistent with every other per-run field here -- domains_total="0"
-    etc. -- being explained by run_comparison_status=blocked, not by a
-    field-specific reason of its own).
+    `semantic_changes_skipped_reason` remains present and empty on this
+    pre-flight path. Cross-segment semantic reporting is supported; the
+    top-level comparison failure itself explains why no rows were produced.
 
     `include_name_overlap` populates `name_overlap_included`/
     `name_overlap_known_gaps` the same way assemble_final_outputs() does, for the same
@@ -1764,7 +1812,7 @@ def write_top_level_blocked(
         "resolved_target_export_run_id": target_selector or "",
         "output_files": [SUMMARY_FILENAME, DETAIL_FILENAME, DIAGNOSTICS_FILENAME],
         "aggregate_comparison_status": COMPARISON_STATUS_BLOCKED,
-        "semantic_changes_skipped_reason": "" if same_segment else REASON_SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT,
+        "semantic_changes_skipped_reason": "",
         "name_overlap_included": False,
         "name_overlap_known_gaps": (
             [REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED] if include_name_overlap else []

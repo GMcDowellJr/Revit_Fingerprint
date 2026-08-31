@@ -2,8 +2,9 @@
 
 ## Behavior-change note: file-observed Revit names
 
-**What changed.** `compare_reference` now exposes Revit-observed names from
-materialized file records for both sides of file-level pattern comparisons.
+**What changed.** `compare_reference` can now resolve actual Revit-observed
+pattern names when the reference and target files belong to the same or
+different segments.
 `reference_comparison_detail.csv` adds `reference_revit_name`,
 `reference_revit_name_status`, `reference_revit_name_count`, and the equivalent
 three `target_*` fields. Ambiguous names are emitted as a compact, sorted JSON
@@ -12,15 +13,28 @@ status. If `record_pattern_membership.csv` or its records lookup is unavailable
 or invalid, the affected side reports `blocked` while comparison metrics remain
 available.
 
-**Why.** Previously displayed synthesized pattern labels could describe a
-variation without showing the actual name used in the compared RVT.
+**Why.** Cross-segment comparison already matched patterns using a canonical
+cross-segment identity, but trustworthy file-specific names were previously
+unavailable across segment-local pattern ID spaces. Previously displayed
+synthesized labels could also describe a variation without showing the actual
+name used in the compared RVT.
 
-**Downstream expectation.** Consumers may use these fields for human inspection
-and reporting. Pattern identity, comparison classifications, and numerical
-comparison metrics remain based on the existing canonical pattern identities,
-not names. Resolution reads only `results/analysis/record_pattern_membership.csv`
+**Downstream expectation.** Cross-segment comparison and semantic-change
+outputs may contain the actual names used in each compared RVT. Consumers may
+use these fields for human inspection and reporting. Pattern identity,
+comparison classifications, and numerical comparison metrics remain based on
+the existing canonical pattern identities, not names. Resolution reads only
+`results/analysis/record_pattern_membership.csv`
 and `results/records/records.csv`; it does not require `pattern_names.csv`,
 `export_bundle_pattern_detail.py`, or raw extraction JSON.
+
+Cross-segment comparisons resolve each side through its own local
+`pattern_id → join_hash` materialization before indexing names at
+`(export_run_id, domain, join_hash)` grain. Thus different local pattern IDs
+can expose different file-observed names while the comparison continues to
+match exclusively on `join_hash`. Cross-segment semantic-change output uses
+those independently resolved names; it does not use names to revise the
+comparator's shared/reference-only/target-only decisions.
 
 A standalone, deliberately-invoked workflow for comparing one reference
 fingerprint export against a single target export, or an entire
@@ -231,7 +245,7 @@ Every run writes exactly these files directly under `--out-dir`:
 | `reference_comparison_detail.csv` | One row per classified pattern (`shared` / `reference_only` / `target_only`) |
 | `reference_comparison_diagnostics.json` | Machine-readable status/failure/degradation information |
 | `reference_comparison_report.json` | Run manifest: resolved reference/target identities, target segment (`segment_id`), reference segment (`reference_segment_id`), analysis run id, aggregate status |
-| `reference_comparison_semantic_changes.csv` | **Same-segment mode only.** Reclassifies `reference_only`/`target_only` rows by resolved pattern name -- see below. Not written in cross-segment mode; the manifest's `semantic_changes_skipped_reason` explains why (`""` when the file was written, `SEMANTIC_CHANGES_NOT_SUPPORTED_CROSS_SEGMENT` otherwise -- always present, even on a pre-flight-blocked run that never got far enough to attempt it) |
+| `reference_comparison_semantic_changes.csv` | Reclassifies `reference_only`/`target_only` rows by resolved pattern name. Same-segment mode retains its existing synthesized-label behavior; cross-segment mode uses file-observed Revit names resolved through each segment's local pattern-to-`join_hash` mapping. |
 | `reference_comparison_name_overlap.csv` | **Opt-in (`--include-name-overlap`), both modes.** Classifies each pattern's reference-vs-target name-key `join_hash` set relationship -- see below. Only written when the flag is passed; the manifest's `name_overlap_included` (bool) and `name_overlap_known_gaps` (list) fields record whether it ran and any known limitations |
 | `reference_comparison_name_overlap_names.csv` | **Opt-in, both modes.** The actual name-key `join_hash` values behind `reference_comparison_name_overlap.csv`'s counts -- one row per `(pattern, side, name_hash)`, never a pipe-joined list column (a pattern can carry thousands of distinct name-hashes; a single CSV cell holding that many overflows Excel's per-cell limit and corrupts the surrounding rows on import). See below |
 
@@ -262,23 +276,27 @@ onward) is blank rather than a fabricated zero.
 ### `reference_comparison_detail.csv` columns
 
 `segment_id, purge_view, reference_bundle_id, analysis_run_id,
-target_export_run_id, domain, population_id, pattern_id, comparison_class`
+target_export_run_id, domain, population_id, pattern_id, comparison_class,
+reference_revit_name, reference_revit_name_status, reference_revit_name_count,
+target_revit_name, target_revit_name_status, target_revit_name_count`
 where `comparison_class` is one of `shared` / `reference_only` /
 `target_only`.
 
-### `reference_comparison_semantic_changes.csv` columns (same-segment only)
+### `reference_comparison_semantic_changes.csv` columns
 
 `segment_id, purge_view, reference_bundle_id, analysis_run_id,
 target_export_run_id, domain, population_id, pattern_name,
 reference_pattern_id, target_pattern_id, semantic_change_class,
-name_match_basis`
+name_match_basis, reference_revit_name, reference_revit_name_status,
+target_revit_name, target_revit_name_status`
 
 Reclassifies `reference_comparison_detail.csv`'s `reference_only`/
 `target_only` rows for the same `(purge_view, domain, population_id,
-target_export_run_id)` group by resolved `pattern_label_human` name (from
-that segment's own `results/analysis/domain_patterns.csv`, excluding any
-row whose `pattern_label_source == "fallback"` -- a templated placeholder
-like "Line Pattern (Variant 2 of 5)", never an observed name). No new
+target_export_run_id)` group. Same-segment mode retains the existing resolved
+`pattern_label_human` basis. Cross-segment mode uses only usable
+`records.csv.label_display` evidence independently resolved for each file;
+missing, unreadable, ambiguous, or blocked names are not guessed into a
+match. No new
 comparison mathematics: `shared`/`reference_only`/`target_only` set
 membership is unchanged and reused as-is. A `pattern_id` with no
 resolvable non-fallback name simply doesn't appear in this file (it is
@@ -296,9 +314,8 @@ still visible, unaffected, in `reference_comparison_detail.csv`).
   (`reference_pattern_id` blank).
 
 Name comparison is exact string match after `.strip()`, case-sensitive.
-`name_match_basis` is currently always the literal `pattern_label_human`
-(reserved for a future `name_all`-based literal-identity basis without a
-schema change).
+`name_match_basis` is `pattern_label_human` in same-segment mode and
+`revit_observed_label_display` in cross-segment mode.
 
 ### `reference_comparison_name_overlap.csv` columns (opt-in, `--include-name-overlap`)
 
