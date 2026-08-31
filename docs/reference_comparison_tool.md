@@ -1,5 +1,27 @@
 # Reference Comparison Tool (`tools/compare_reference.py`)
 
+## Behavior-change note: file-observed Revit names
+
+**What changed.** `compare_reference` now exposes Revit-observed names from
+materialized file records for both sides of file-level pattern comparisons.
+`reference_comparison_detail.csv` adds `reference_revit_name`,
+`reference_revit_name_status`, `reference_revit_name_count`, and the equivalent
+three `target_*` fields. Ambiguous names are emitted as a compact, sorted JSON
+array; missing and unreadable values remain blank and are distinguished by
+status. If `record_pattern_membership.csv` or its records lookup is unavailable
+or invalid, the affected side reports `blocked` while comparison metrics remain
+available.
+
+**Why.** Previously displayed synthesized pattern labels could describe a
+variation without showing the actual name used in the compared RVT.
+
+**Downstream expectation.** Consumers may use these fields for human inspection
+and reporting. Pattern identity, comparison classifications, and numerical
+comparison metrics remain based on the existing canonical pattern identities,
+not names. Resolution reads only `results/analysis/record_pattern_membership.csv`
+and `results/records/records.csv`; it does not require `pattern_names.csv`,
+`export_bundle_pattern_detail.py`, or raw extraction JSON.
+
 A standalone, deliberately-invoked workflow for comparing one reference
 fingerprint export against a single target export, or an entire
 already-materialized segment, producing a stable package of consumable

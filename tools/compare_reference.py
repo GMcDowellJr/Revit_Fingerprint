@@ -228,7 +228,21 @@ _DETAIL_FIELDNAMES = [
     "population_id",
     "pattern_id",
     "comparison_class",
+    "reference_revit_name",
+    "reference_revit_name_status",
+    "reference_revit_name_count",
+    "target_revit_name",
+    "target_revit_name_status",
+    "target_revit_name_count",
 ]
+
+REVIT_NAME_STATUS_OK = "ok"
+REVIT_NAME_STATUS_MISSING = "missing"
+REVIT_NAME_STATUS_UNREADABLE = "unreadable"
+REVIT_NAME_STATUS_AMBIGUOUS = "ambiguous"
+REVIT_NAME_STATUS_BLOCKED = "blocked"
+_USABLE_LABEL_QUALITIES = {"human", "system"}
+_UNREADABLE_LABEL_QUALITIES = {"placeholder_unreadable", "placeholder_unsupported"}
 
 _SEMANTIC_CHANGES_FIELDNAMES = [
     "segment_id",
@@ -1112,6 +1126,95 @@ def _finalize_view(out_dir: Path, view: str, segment_id: str) -> Tuple[List[Dict
     return summary_rows, detail_out_rows
 
 
+def build_revit_name_lookup(
+    segment_root: Path,
+    identity_maps: Optional[Dict[str, Dict[str, str]]] = None,
+) -> Tuple[str, Dict[Tuple[str, str, str], Dict[str, str]]]:
+    """Index observed labels at (export, domain, comparison identity) grain.
+
+    The authoritative linkage is record_pattern_membership.record_pk to
+    records.record_pk.  ``identity_maps`` translates segment-local pattern_id
+    to join_hash in cross-segment mode; names remain evidence and never enter
+    comparison identity or set arithmetic.
+    """
+    records_path = segment_root / "results" / "records" / "records.csv"
+    membership_path = segment_root / "results" / "analysis" / "record_pattern_membership.csv"
+    if not records_path.is_file() or not membership_path.is_file():
+        return REVIT_NAME_STATUS_BLOCKED, {}
+    try:
+        records = read_csv_rows(records_path)
+        memberships = read_csv_rows(membership_path)
+    except (OSError, UnicodeError, csv.Error):
+        return REVIT_NAME_STATUS_BLOCKED, {}
+    if records and not {"record_pk", "label_display", "label_quality"}.issubset(records[0]):
+        return REVIT_NAME_STATUS_BLOCKED, {}
+    if memberships and not {"export_run_id", "domain", "record_pk", "pattern_id"}.issubset(memberships[0]):
+        return REVIT_NAME_STATUS_BLOCKED, {}
+
+    record_labels: Dict[str, List[Tuple[str, str]]] = {}
+    for row in records:
+        record_pk = (row.get("record_pk", "") or "").strip()
+        if record_pk:
+            record_labels.setdefault(record_pk, []).append(
+                ((row.get("label_display", "") or "").strip(), (row.get("label_quality", "") or "").strip())
+            )
+
+    evidence: Dict[Tuple[str, str, str], List[Tuple[str, str]]] = {}
+    for row in memberships:
+        export_id = (row.get("export_run_id", "") or "").strip()
+        domain = (row.get("domain", "") or "").strip()
+        local_pid = (row.get("pattern_id", "") or "").strip()
+        identity = identity_maps.get(domain, {}).get(local_pid, "") if identity_maps is not None else local_pid
+        if not export_id or not domain or not identity:
+            continue
+        evidence.setdefault((export_id, domain, identity), []).extend(
+            record_labels.get((row.get("record_pk", "") or "").strip(), [])
+        )
+
+    lookup: Dict[Tuple[str, str, str], Dict[str, str]] = {}
+    for key, labels in evidence.items():
+        usable = sorted({name for name, quality in labels if name and quality in _USABLE_LABEL_QUALITIES})
+        has_unreadable = any(quality in _UNREADABLE_LABEL_QUALITIES for _name, quality in labels)
+        if len(usable) == 1:
+            lookup[key] = {"name": usable[0], "status": REVIT_NAME_STATUS_OK, "count": "1"}
+        elif len(usable) > 1:
+            lookup[key] = {
+                "name": json.dumps(usable, ensure_ascii=False, separators=(",", ":")),
+                "status": REVIT_NAME_STATUS_AMBIGUOUS,
+                "count": str(len(usable)),
+            }
+        elif has_unreadable:
+            lookup[key] = {"name": "", "status": REVIT_NAME_STATUS_UNREADABLE, "count": "0"}
+        else:
+            lookup[key] = {"name": "", "status": REVIT_NAME_STATUS_MISSING, "count": "0"}
+    return REVIT_NAME_STATUS_OK, lookup
+
+
+def add_revit_names(
+    rows: Sequence[Dict[str, str]],
+    reference_export_run_id: str,
+    reference_source_status: str,
+    reference_lookup: Dict[Tuple[str, str, str], Dict[str, str]],
+    target_source_status: str,
+    target_lookup: Dict[Tuple[str, str, str], Dict[str, str]],
+) -> None:
+    """Attach per-file descriptive name evidence without changing row identity."""
+    blocked = {"name": "", "status": REVIT_NAME_STATUS_BLOCKED, "count": "0"}
+    missing = {"name": "", "status": REVIT_NAME_STATUS_MISSING, "count": "0"}
+    for row in rows:
+        domain, identity = row.get("domain", ""), row.get("pattern_id", "")
+        ref = blocked if reference_source_status != REVIT_NAME_STATUS_OK else reference_lookup.get(
+            (reference_export_run_id, domain, identity), missing
+        )
+        tgt = blocked if target_source_status != REVIT_NAME_STATUS_OK else target_lookup.get(
+            (row.get("target_export_run_id", ""), domain, identity), missing
+        )
+        for side, result in (("reference", ref), ("target", tgt)):
+            row[f"{side}_revit_name"] = result["name"]
+            row[f"{side}_revit_name_status"] = result["status"]
+            row[f"{side}_revit_name_count"] = result["count"]
+
+
 def build_domain_pattern_name_maps(analysis_dir: Path, domains: Sequence[str]) -> Dict[str, Dict[str, str]]:
     """Build {domain: {pattern_id: pattern_label_human}} from this segment's
     own results/analysis/domain_patterns.csv, once (not per comparison
@@ -1450,6 +1553,32 @@ def assemble_final_outputs(
     all_detail_rows.sort(
         key=lambda r: (r["purge_view"], r["domain"], r["population_id"], r["target_export_run_id"], r["pattern_id"])
     )
+    reference_identity_maps = None
+    target_identity_maps = None
+    if not same_segment:
+        reference_identity_maps = {
+            dom: load_domain_pattern_join_hash_map(reference_segment_root or segment_root, dom)[0]
+            for dom in domains
+        }
+        target_identity_maps = {
+            dom: load_domain_pattern_join_hash_map(segment_root, dom)[0]
+            for dom in domains
+        }
+    reference_name_status, reference_name_lookup = build_revit_name_lookup(
+        reference_segment_root or segment_root, reference_identity_maps
+    )
+    if same_segment:
+        target_name_status, target_name_lookup = reference_name_status, reference_name_lookup
+    else:
+        target_name_status, target_name_lookup = build_revit_name_lookup(segment_root, target_identity_maps)
+    add_revit_names(
+        all_detail_rows,
+        str(reference.get("seed_export_run_id", "")),
+        reference_name_status,
+        reference_name_lookup,
+        target_name_status,
+        target_name_lookup,
+    )
     atomic_write_csv(out_dir / SUMMARY_FILENAME, _SUMMARY_FIELDNAMES, all_summary_rows)
     atomic_write_csv(out_dir / DETAIL_FILENAME, _DETAIL_FIELDNAMES, all_detail_rows)
 
@@ -1533,6 +1662,15 @@ def assemble_final_outputs(
         "domains_blocked": str(status_counts.get(COMPARISON_STATUS_BLOCKED, 0)),
         "domain_summaries": domain_summaries,
         "target_diagnostics": target_diagnostics,
+        "revit_name_resolution": {
+            "reference_status": reference_name_status,
+            "target_status": target_name_status,
+            "status_counts": dict(sorted(Counter(
+                value
+                for row in all_detail_rows
+                for value in (row["reference_revit_name_status"], row["target_revit_name_status"])
+            ).items())),
+        },
     }
     (out_dir / DIAGNOSTICS_FILENAME).write_text(json.dumps(diagnostics, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
