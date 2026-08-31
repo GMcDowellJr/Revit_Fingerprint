@@ -2103,6 +2103,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             target_paths = require_segment_artifacts(target_segment_root, views, require_domain_patterns=True)
             target_file_metadata_rows = read_csv_rows(target_paths["records_dir"] / "file_metadata.csv")
 
+        # Validate file_metadata.csv's export_run_id uniqueness up front:
+        # build_file_metadata_label_lookup() raises
+        # FILE_METADATA_LABEL_JOIN_AMBIGUOUS on a duplicate export_run_id with
+        # disagreeing label values. Doing this here, inside this try block,
+        # gives that failure the same clean write_top_level_blocked + exit-2
+        # handling as every other CompareReferenceError, instead of letting it
+        # escape as an uncaught traceback from inside assemble_final_outputs()
+        # (called after this try/except, once comparisons have already run) --
+        # PR #478 review. assemble_final_outputs() re-runs the same lookup
+        # build on this already-validated data, redundantly but harmlessly.
+        build_file_metadata_label_lookup(reference_file_metadata_rows)
+        if not same_segment:
+            build_file_metadata_label_lookup(target_file_metadata_rows)
+
         if not same_segment:
             reference_unit_system = read_segment_unit_system(reference_file_metadata_rows)
             target_unit_system = read_segment_unit_system(target_file_metadata_rows)
