@@ -2734,3 +2734,80 @@ four fields beyond `fill_tick`.
   (`tools/probes/probe_arrowheads.py` with `per_style_limit` raised) should
   resolve this before any decision to widen sig_hash/join_key coverage for
   these fields.
+
+## D-050 — `mapping/` fill_patterns Revit mapping utility (both partitions, one entry point)
+
+### Status
+Accepted (2026-08-21)
+
+### Decision
+Extend `mapping/` with the same join_hash-verified, model-writing pattern
+D-038 established for `line_patterns`, this time covering the `fill_patterns`
+domain family's two D-015 partitions: `fill_patterns_drafting` and
+`fill_patterns_model`. Both partitions are handled by ONE Dynamo entry point
+(`mapping/create_fill_pattern_mappings.py`), not two -- their reconstruction,
+verification, and creation logic is identical; only the expected
+`fill_pattern.target` value ("Drafting" vs "Model") and which join-key policy
+entry applies differ, and both partitions' evidence lives in the same
+`tools/export_bundle_pattern_detail.py` export directory. A second entry
+point would be pure duplication for no isolation benefit (a single document
+open in Revit is the shared FillPatternElement namespace either way).
+
+Unlike `line_patterns` (D-017/D-038), `fill_patterns.join_hash` is NOT derived
+from a `run_extract_all.py`-flatten-stage synthetic augmentation --
+`domains/fill_patterns.py` computes `fill_pattern.grids_def_hash` inline at
+extraction time, from the ordered per-grid identity items (`grid_count` +
+each `fill_pattern.grid[NNN].*` item, in a fixed insertion order the domain
+never sorts). `mapping/fill_pattern_reconstruction.py::compute_grids_def_hash`
+reconstructs that exact algorithm (deliberately not imported, per the same
+"independent reimplementation" precedent as
+`mapping/line_pattern_reconstruction.py::compute_segments_norm_hash` and
+`tools/pattern_id_utils.py`), cross-checked in
+`tests/test_fill_pattern_mapping_reconstruction.py` against a hand-copied
+reference implementation of the same token algorithm.
+
+`fill_patterns_drafting`/`fill_patterns_model`'s join-key policy requires
+THREE items (`fill_pattern.target`, `fill_pattern.grid_count`,
+`fill_pattern.grids_def_hash`), not one -- so `core/join_key_builder.py`'s
+single-`_def_hash`-item passthrough shortcut (the mechanism that makes
+`line_patterns`' `join_hash` literally equal `segments_norm_hash`) does NOT
+apply here. `join_hash` is computed via `phase2_join_hash` over all three
+items and is NOT equal to `grids_def_hash` alone, nor to `sig_hash` (which
+hashes the full, sorted `identity_basis.items` list, not the three-item
+summary) -- verification uses `join_hash` via the real
+`fill_patterns_drafting`/`fill_patterns_model` join-key policy
+(`core/join_key_builder.py` + `core/join_key_policy.py`), same as D-038.
+
+Construction uses `Autodesk.Revit.DB.FillPattern(name, target,
+FillPatternHostOrientation)` + `FillGrid` (`Origin`/`Angle`/`Offset`/`Shift`)
++ `FillPattern.SetFillGrids()` + `FillPatternElement.Create(doc, fillPattern)`,
+confirmed against Autodesk's own CreateFillPattern SDK sample. Two required
+Revit API construction parameters have no identity evidence to reconstruct
+them from -- `FillPatternHostOrientation` and each `FillGrid`'s dash
+`Segments` are not captured anywhere in `domains/fill_patterns.py`'s identity
+items, `join_key`, or `sig_hash` -- so they are set to a fixed default
+(`ToHost`, empty segments) rather than inferred; neither affects `join_hash`
+reproduction, but a created mapping element's grid lines are always
+continuous even if the original pattern used a dashed line style.
+
+### Rationale
+Same as D-038: existing extraction/analysis hash and join-key semantics are
+reused verbatim (no hash-affecting change to any domain or policy). The only
+new rule is the same downstream-only Revit element-name sanitizer pattern
+(re-implemented per-domain, consistent with D-038's own decision not to
+share a naming helper across domain mapping modules).
+
+### Consequences
+- No existing extraction, join-key, bundle-analysis, or
+  `export_bundle_pattern_detail.py` behavior changes; this remains purely
+  additive and downstream.
+- `mapping/fill_pattern_reconstruction.py` and
+  `mapping/fill_pattern_revit_apply.py` are self-contained (mirroring D-038's
+  own decision not to introduce a shared "materialize-a-domain-into-Revit"
+  abstraction) but both build on `mapping/_dynamo_bootstrap.py`, the shared
+  Dynamo bootstrap module every mapping entry point now uses.
+- A future mapping PR for any other domain (e.g. a `line_styles` mapping that
+  needs to resolve its `line_patterns` UID references) must still redo its
+  own domain-specific reconstruction/naming/verification and address
+  cross-domain dependency resolution independently -- neither D-038 nor this
+  decision introduces a generalized mechanism for it.

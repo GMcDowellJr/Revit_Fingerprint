@@ -620,6 +620,24 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   exception. No existing extraction, join-key, bundle-analysis, or
   `export_bundle_pattern_detail.py` semantics change -- this is purely
   additive. See `docs/line_pattern_mapping.md` and D-038.
+- **`mapping/` fill_patterns Revit mapping utility (D-050).** Same
+  join_hash-verified, model-writing pattern as D-038, covering both D-015
+  partitions (`fill_patterns_drafting`/`fill_patterns_model`) through one
+  Dynamo entry point (`mapping/create_fill_pattern_mappings.py`). Creates
+  `FillPatternElement` objects via `FillPattern`/`FillGrid`/`SetFillGrids`/
+  `FillPatternElement.Create`, each inside its own `Transaction`, verified
+  against the requested `join_hash` (via the real
+  `fill_patterns_drafting`/`fill_patterns_model` join-key policy -- NOT
+  `sig_hash`, and NOT equal to bare `fill_pattern.grids_def_hash` either,
+  since this domain's join-key policy hashes three required items together
+  rather than passing a single `_def_hash` item through) before commit,
+  with rollback on any mismatch or exception. `FillPatternHostOrientation`
+  and per-grid dash `Segments` are required Revit API construction
+  parameters this domain does not capture as identity; both are set to a
+  fixed default rather than inferred, which cannot affect `join_hash`
+  reproduction. No existing extraction, join-key, bundle-analysis, or
+  `export_bundle_pattern_detail.py` semantics change -- this is purely
+  additive. See `docs/fill_pattern_mapping.md` and D-050.
 
 ### Added
 - **Five fields promoted from phase2-only buckets into `identity_basis.items`, visible
