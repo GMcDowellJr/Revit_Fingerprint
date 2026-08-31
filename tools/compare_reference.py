@@ -150,6 +150,37 @@ REASON_STALE_MEMBERSHIP_MATRIX = "STALE_MEMBERSHIP_MATRIX"
 # Pure pre-flight/out-dir-safety failures -- raised before --out-dir can be
 # safely prepared at all, so no diagnostics file is ever written for these.
 REASON_OUT_DIR_UNSAFE = "OUT_DIR_UNSAFE"
+# export_run_id is documented (tools/build_segment_manifest.py's own
+# docstring, line ~311) as a unique join key into file_metadata.csv, and
+# resolve_export_run_id() above already depends on that for --reference/
+# --target selector resolution. build_file_metadata_label_lookup() below
+# re-verifies uniqueness itself rather than trusting the doc comment --
+# two rows sharing an export_run_id with disagreeing label values would
+# otherwise be silently resolved by picking one arbitrarily, which is
+# exactly the kind of silent partial join this tool's fail-loudly
+# convention forbids.
+REASON_FILE_METADATA_LABEL_JOIN_AMBIGUOUS = "FILE_METADATA_LABEL_JOIN_AMBIGUOUS"
+
+# Governance/organizational label columns carried straight through from
+# file_metadata.csv onto every summary/detail/semantic-changes/name-overlap
+# output row (once for the reference file, once for the target file), so
+# Jon's Power BI model can slice comparison results by client, discipline,
+# BC, etc. without a separate manual join step. file_metadata.csv is the
+# canonical source for these values elsewhere in the pipeline (see
+# tools/build_segment_manifest.py's REQUIRED_ROW_FIELDS/MANIFEST_FIELDNAMES);
+# this only reads columns that already exist there, it defines none of them.
+_FILE_METADATA_LABEL_FIELDS = [
+    "governance_role",
+    "client_label",
+    "discipline_label",
+    "business_center_label",
+    "collection_label",
+    "project_label",
+]
+
+
+def _file_metadata_label_fieldnames(prefix: str) -> List[str]:
+    return [f"{prefix}_{field}" for field in _FILE_METADATA_LABEL_FIELDS]
 # --- Name-set-overlap classification (Step 1 Part B, --include-name-overlap) ---------------
 #
 # Unlike compute_semantic_changes_rows() above (same-segment-only, string-matched on
@@ -189,8 +220,10 @@ _SUMMARY_FIELDNAMES = [
     "segment_id",
     "purge_view",
     "reference_bundle_id",
+    *_file_metadata_label_fieldnames("reference"),
     "analysis_run_id",
     "target_export_run_id",
+    *_file_metadata_label_fieldnames("target"),
     "domain",
     "population_id",
     "comparison_status",
@@ -209,8 +242,10 @@ _DETAIL_FIELDNAMES = [
     "segment_id",
     "purge_view",
     "reference_bundle_id",
+    *_file_metadata_label_fieldnames("reference"),
     "analysis_run_id",
     "target_export_run_id",
+    *_file_metadata_label_fieldnames("target"),
     "domain",
     "population_id",
     "pattern_id",
@@ -235,8 +270,10 @@ _SEMANTIC_CHANGES_FIELDNAMES = [
     "segment_id",
     "purge_view",
     "reference_bundle_id",
+    *_file_metadata_label_fieldnames("reference"),
     "analysis_run_id",
     "target_export_run_id",
+    *_file_metadata_label_fieldnames("target"),
     "domain",
     "population_id",
     "pattern_name",
@@ -254,8 +291,10 @@ _NAME_OVERLAP_FIELDNAMES = [
     "segment_id",
     "purge_view",
     "reference_bundle_id",
+    *_file_metadata_label_fieldnames("reference"),
     "analysis_run_id",
     "target_export_run_id",
+    *_file_metadata_label_fieldnames("target"),
     "domain",
     "population_id",
     "pattern_id",
@@ -1206,6 +1245,64 @@ def add_revit_names(
             row[f"{side}_revit_name_count"] = result["count"]
 
 
+def build_file_metadata_label_lookup(
+    file_metadata_rows: Sequence[Dict[str, str]],
+) -> Dict[str, Dict[str, str]]:
+    """One {label_field: value} dict per export_run_id, read straight from a
+    segment's own file_metadata.csv -- the same rows resolve_export_run_id()
+    already reads, so every target_export_run_id / reference
+    seed_export_run_id used elsewhere in this module is guaranteed present
+    here under normal operation. Raises REASON_FILE_METADATA_LABEL_JOIN_AMBIGUOUS
+    rather than silently keeping the first-seen row if export_run_id turns out
+    not to be unique with disagreeing label values (fail-loudly convention).
+    """
+    lookup: Dict[str, Dict[str, str]] = {}
+    for row in file_metadata_rows:
+        export_id = (row.get("export_run_id", "") or "").strip()
+        if not export_id:
+            continue
+        values = {field: (row.get(field, "") or "").strip() for field in _FILE_METADATA_LABEL_FIELDS}
+        existing = lookup.get(export_id)
+        if existing is not None and existing != values:
+            raise CompareReferenceError(
+                REASON_FILE_METADATA_LABEL_JOIN_AMBIGUOUS,
+                f"file_metadata.csv has more than one row for export_run_id={export_id!r} with "
+                f"disagreeing label values ({existing!r} vs {values!r}) -- export_run_id is documented "
+                "as a unique join key (tools/build_segment_manifest.py); refusing to silently pick one.",
+            )
+        lookup[export_id] = values
+    return lookup
+
+
+def add_file_metadata_labels(
+    rows: Sequence[Dict[str, str]],
+    target_lookup: Dict[str, Dict[str, str]],
+    reference_export_run_id: str,
+    reference_lookup: Dict[str, Dict[str, str]],
+) -> None:
+    """Attach file_metadata.csv governance/organizational labels for BI
+    slicing, in place, mirroring add_revit_names()'s row-mutation pattern.
+
+    reference_export_run_id is the same value for every row produced by one
+    invocation (one reference file per run), so its label lookup is resolved
+    once here rather than per row; target_export_run_id varies per row. A
+    lookup miss (e.g. a synthesized blocked-domain placeholder row with no
+    single target file behind it) degrades to blank labels rather than
+    raising -- the same convention add_revit_names() uses for its own
+    per-row "missing" fallback -- since a miss here reflects the row's own
+    provenance, not a file_metadata.csv defect (that's already caught by
+    build_file_metadata_label_lookup() above).
+    """
+    blank = {field: "" for field in _FILE_METADATA_LABEL_FIELDS}
+    ref_values = reference_lookup.get(reference_export_run_id, blank)
+    for row in rows:
+        for field in _FILE_METADATA_LABEL_FIELDS:
+            row[f"reference_{field}"] = ref_values[field]
+        tgt_values = target_lookup.get(row.get("target_export_run_id", ""), blank)
+        for field in _FILE_METADATA_LABEL_FIELDS:
+            row[f"target_{field}"] = tgt_values[field]
+
+
 def build_domain_pattern_name_maps(analysis_dir: Path, domains: Sequence[str]) -> Dict[str, Dict[str, str]]:
     """Build {domain: {pattern_id: pattern_label_human}} from this segment's
     own results/analysis/domain_patterns.csv, once (not per comparison
@@ -1598,6 +1695,8 @@ def assemble_final_outputs(
     extractor_schema_version: str,
     reference_segment_id: str,
     same_segment: bool,
+    reference_file_metadata_rows: Sequence[Dict[str, str]],
+    target_file_metadata_rows: Sequence[Dict[str, str]],
     reference_segment_root: Optional[Path] = None,
     include_name_overlap: bool = False,
 ) -> Dict[str, object]:
@@ -1638,6 +1737,18 @@ def assemble_final_outputs(
         target_name_status,
         target_name_lookup,
     )
+
+    # BI-slicer labels (client/discipline/BC/governance-role/etc.), joined
+    # from each segment's own file_metadata.csv onto every output row --
+    # see build_file_metadata_label_lookup()/add_file_metadata_labels() above.
+    reference_export_run_id = str(reference.get("seed_export_run_id", ""))
+    reference_label_lookup = build_file_metadata_label_lookup(reference_file_metadata_rows)
+    target_label_lookup = (
+        reference_label_lookup if same_segment else build_file_metadata_label_lookup(target_file_metadata_rows)
+    )
+    add_file_metadata_labels(all_summary_rows, target_label_lookup, reference_export_run_id, reference_label_lookup)
+    add_file_metadata_labels(all_detail_rows, target_label_lookup, reference_export_run_id, reference_label_lookup)
+
     atomic_write_csv(out_dir / SUMMARY_FILENAME, _SUMMARY_FIELDNAMES, all_summary_rows)
     atomic_write_csv(out_dir / DETAIL_FILENAME, _DETAIL_FIELDNAMES, all_detail_rows)
 
@@ -1648,6 +1759,7 @@ def assemble_final_outputs(
         semantic_changes_rows = compute_semantic_changes_rows(all_detail_rows, name_maps)
     else:
         semantic_changes_rows = compute_cross_segment_semantic_changes_rows(all_detail_rows)
+    add_file_metadata_labels(semantic_changes_rows, target_label_lookup, reference_export_run_id, reference_label_lookup)
     atomic_write_csv(out_dir / SEMANTIC_CHANGES_FILENAME, _SEMANTIC_CHANGES_FIELDNAMES, semantic_changes_rows)
     output_files.append(SEMANTIC_CHANGES_FILENAME)
 
@@ -1664,6 +1776,7 @@ def assemble_final_outputs(
             same_segment,
             str(reference.get("seed_export_run_id", "")),
         )
+        add_file_metadata_labels(name_overlap_rows, target_label_lookup, reference_export_run_id, reference_label_lookup)
         atomic_write_csv(out_dir / NAME_OVERLAP_FILENAME, _NAME_OVERLAP_FIELDNAMES, name_overlap_rows)
         atomic_write_csv(out_dir / NAME_OVERLAP_NAMES_FILENAME, _NAME_OVERLAP_NAMES_FIELDNAMES, name_overlap_name_rows)
         output_files.append(NAME_OVERLAP_FILENAME)
@@ -1990,6 +2103,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             target_paths = require_segment_artifacts(target_segment_root, views, require_domain_patterns=True)
             target_file_metadata_rows = read_csv_rows(target_paths["records_dir"] / "file_metadata.csv")
 
+        # Validate file_metadata.csv's export_run_id uniqueness up front:
+        # build_file_metadata_label_lookup() raises
+        # FILE_METADATA_LABEL_JOIN_AMBIGUOUS on a duplicate export_run_id with
+        # disagreeing label values. Doing this here, inside this try block,
+        # gives that failure the same clean write_top_level_blocked + exit-2
+        # handling as every other CompareReferenceError, instead of letting it
+        # escape as an uncaught traceback from inside assemble_final_outputs()
+        # (called after this try/except, once comparisons have already run) --
+        # PR #478 review. assemble_final_outputs() re-runs the same lookup
+        # build on this already-validated data, redundantly but harmlessly.
+        build_file_metadata_label_lookup(reference_file_metadata_rows)
+        if not same_segment:
+            build_file_metadata_label_lookup(target_file_metadata_rows)
+
         if not same_segment:
             reference_unit_system = read_segment_unit_system(reference_file_metadata_rows)
             target_unit_system = read_segment_unit_system(target_file_metadata_rows)
@@ -2141,6 +2268,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         extractor_schema_version,
         reference_segment_id,
         same_segment,
+        reference_file_metadata_rows,
+        target_file_metadata_rows,
         reference_segment_root=reference_segment_root,
         include_name_overlap=args.include_name_overlap,
     )

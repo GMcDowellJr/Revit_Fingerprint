@@ -262,12 +262,32 @@ contract (no schema, not listed in the manifest's `output_files`), is safe
 to ignore or delete, and is wiped along with the rest of `--out-dir` on the
 next run against the same directory regardless.
 
+Every one of the four files below also carries `reference_governance_role,
+reference_client_label, reference_discipline_label,
+reference_business_center_label, reference_collection_label,
+reference_project_label` (right after `reference_bundle_id`) and the same six
+fields `target_`-prefixed (right after `target_export_run_id`) -- the
+reference/target file's own `file_metadata.csv` row, carried through
+unmodified so downstream BI can slice comparison output by client/
+discipline/business-center/etc. without a separate manual join. `reference_*`
+is constant across every row in a run (one reference file per invocation);
+`target_*` varies per row's own `target_export_run_id`. A lookup miss (no
+`file_metadata.csv` row for that `export_run_id`) degrades to blank labels.
+`reference_comparison_name_overlap_names.csv` is deliberately excluded --
+join back to `reference_comparison_name_overlap.csv` on the shared key
+columns for its labels instead.
+
 ### `reference_comparison_summary.csv` columns
 
-`segment_id, purge_view, reference_bundle_id, analysis_run_id,
-target_export_run_id, domain, population_id, comparison_status,
-comparison_reason_codes, reference_pattern_count, target_pattern_count,
-shared_count, reference_only_count, target_only_count, union_count,
+`segment_id, purge_view, reference_bundle_id, reference_governance_role,
+reference_client_label, reference_discipline_label,
+reference_business_center_label, reference_collection_label,
+reference_project_label, analysis_run_id, target_export_run_id,
+target_governance_role, target_client_label, target_discipline_label,
+target_business_center_label, target_collection_label, target_project_label,
+domain, population_id, comparison_status, comparison_reason_codes,
+reference_pattern_count, target_pattern_count, shared_count,
+reference_only_count, target_only_count, union_count,
 reference_coverage_pct, jaccard`
 
 On a `blocked` row, every target-derived field (`target_pattern_count`
@@ -275,20 +295,30 @@ onward) is blank rather than a fabricated zero.
 
 ### `reference_comparison_detail.csv` columns
 
-`segment_id, purge_view, reference_bundle_id, analysis_run_id,
-target_export_run_id, domain, population_id, pattern_id, comparison_class,
-reference_revit_name, reference_revit_name_status, reference_revit_name_count,
-target_revit_name, target_revit_name_status, target_revit_name_count`
+`segment_id, purge_view, reference_bundle_id, reference_governance_role,
+reference_client_label, reference_discipline_label,
+reference_business_center_label, reference_collection_label,
+reference_project_label, analysis_run_id, target_export_run_id,
+target_governance_role, target_client_label, target_discipline_label,
+target_business_center_label, target_collection_label, target_project_label,
+domain, population_id, pattern_id, comparison_class, reference_revit_name,
+reference_revit_name_status, reference_revit_name_count, target_revit_name,
+target_revit_name_status, target_revit_name_count`
 where `comparison_class` is one of `shared` / `reference_only` /
 `target_only`.
 
 ### `reference_comparison_semantic_changes.csv` columns
 
-`segment_id, purge_view, reference_bundle_id, analysis_run_id,
-target_export_run_id, domain, population_id, pattern_name,
-reference_pattern_id, target_pattern_id, semantic_change_class,
-name_match_basis, reference_revit_name, reference_revit_name_status,
-target_revit_name, target_revit_name_status`
+`segment_id, purge_view, reference_bundle_id, reference_governance_role,
+reference_client_label, reference_discipline_label,
+reference_business_center_label, reference_collection_label,
+reference_project_label, analysis_run_id, target_export_run_id,
+target_governance_role, target_client_label, target_discipline_label,
+target_business_center_label, target_collection_label, target_project_label,
+domain, population_id, pattern_name, reference_pattern_id,
+target_pattern_id, semantic_change_class, name_match_basis,
+reference_revit_name, reference_revit_name_status, target_revit_name,
+target_revit_name_status`
 
 Reclassifies `reference_comparison_detail.csv`'s `reference_only`/
 `target_only` rows for the same `(purge_view, domain, population_id,
@@ -319,8 +349,13 @@ Name comparison is exact string match after `.strip()`, case-sensitive.
 
 ### `reference_comparison_name_overlap.csv` columns (opt-in, `--include-name-overlap`)
 
-`segment_id, purge_view, reference_bundle_id, analysis_run_id,
-target_export_run_id, domain, population_id, pattern_id, comparison_class,
+`segment_id, purge_view, reference_bundle_id, reference_governance_role,
+reference_client_label, reference_discipline_label,
+reference_business_center_label, reference_collection_label,
+reference_project_label, analysis_run_id, target_export_run_id,
+target_governance_role, target_client_label, target_discipline_label,
+target_business_center_label, target_collection_label, target_project_label,
+domain, population_id, pattern_id, comparison_class,
 name_set_classification, exclusion_reason, reference_name_key_status,
 target_name_key_status, reference_name_hash_count, target_name_hash_count,
 shared_name_hash_count`
