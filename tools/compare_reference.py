@@ -1245,6 +1245,24 @@ def add_revit_names(
             row[f"{side}_revit_name_count"] = result["count"]
 
 
+def _normalize_business_center_label(raw: str) -> str:
+    """Left-zero-pad a purely-numeric business_center_label shorter than 4
+    digits (e.g. "796" -> "0796") -- the same rule and rationale as
+    tools/build_segment_manifest.py::_normalize_rows() (Excel reinterprets a
+    leading-zero business_center_label as a number and drops the zeros on
+    save). Deliberately reimplemented here rather than imported: that
+    function is a private (`_`-prefixed), segment-manifest-build-specific
+    helper that also does corpus-wide first-seen-casing folds this module has
+    no equivalent population-scan for; only the stateless zero-pad rule
+    applies one row at a time and is safe to duplicate. Without this, a
+    segment whose file_metadata.csv still has the un-padded value would show
+    a different business_center_label here than segment_manifest.csv/the
+    governance narrative already show for the same file (Greg, PR #478
+    follow-up).
+    """
+    return raw.zfill(4) if raw.isdigit() and len(raw) < 4 else raw
+
+
 def build_file_metadata_label_lookup(
     file_metadata_rows: Sequence[Dict[str, str]],
 ) -> Dict[str, Dict[str, str]]:
@@ -1262,6 +1280,8 @@ def build_file_metadata_label_lookup(
         if not export_id:
             continue
         values = {field: (row.get(field, "") or "").strip() for field in _FILE_METADATA_LABEL_FIELDS}
+        if "business_center_label" in values:
+            values["business_center_label"] = _normalize_business_center_label(values["business_center_label"])
         existing = lookup.get(export_id)
         if existing is not None and existing != values:
             raise CompareReferenceError(
