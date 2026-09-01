@@ -37,9 +37,9 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
-import time
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -359,12 +359,34 @@ def read_child_manifest(out_dir: Path) -> Optional[Dict[str, object]]:
         return None
 
 
+def clear_stale_combo_output(out_dir: Path) -> None:
+    """Remove any pre-existing content at a combo's --out-dir before its
+    child subprocess is even submitted, so anything found there AFTER the
+    run (summary CSV, manifest, detail CSV, ...) is guaranteed to have been
+    produced by THIS invocation -- never a leftover from an earlier one into
+    the same --out-root.
+
+    This replaces an earlier wall-clock-mtime-based staleness check that was
+    itself unsound both directions: a genuinely fresh file's mtime can be
+    truncated by filesystem timestamp-resolution rounding to appear to
+    predate the run, and a genuinely stale file from a run that finished
+    less than the check's own tolerance-buffer before this run started would
+    still pass it. Not trusting timestamps for this at all -- clearing
+    first, so presence after the run is itself the freshness signal -- has
+    neither failure mode. compare_reference.py's own prepare_out_dir() would
+    perform an equivalent clear on a successful run anyway (see
+    audit_results/compare_reference_multi_step0_findings.md finding #3); the
+    gap this closes is specifically the child crashing before reaching that
+    point (a launch failure, or the process being killed mid-run), which
+    would otherwise leave an untouched, stale directory behind.
+    """
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+
+
 def aggregate_summaries(
-    combos: Sequence[Combo],
-    report_entries: Sequence[Dict[str, object]],
-    out_root: Path,
-    run_started_at: float,
-) -> Tuple[Path, int, int, List[str]]:
+    combos: Sequence[Combo], report_entries: Sequence[Dict[str, object]], out_root: Path
+) -> Tuple[Optional[Path], int, int, List[str]]:
     """Union every combo's own reference_comparison_summary.csv into one
     multi_reference_comparison_summary.csv, tagging each row with the
     driving `reference` selector and the child manifest's
@@ -381,18 +403,21 @@ def aggregate_summaries(
     skipped and noted, not treated as an aggregation failure -- a combo that
     blocked cleanly (returncode 2) still writes a header-only summary CSV
     and is not "missing" in that sense; it simply contributes zero rows.
+    Every combo's out_dir is cleared before its child is submitted (see
+    clear_stale_combo_output()), so a summary file found here is always
+    current-run data, never a stale leftover.
 
-    A summary file that DOES exist but predates `run_started_at` (minus a
-    small buffer for filesystem timestamp granularity) is treated the same
-    as missing, not read. This covers a rerun into an --out-root a prior
-    invocation already populated: if a combo's child subprocess crashes
-    before reaching compare_reference.py's own prepare_out_dir() clear (a
-    launch failure, or the process being killed mid-run), that combo's
-    out_dir still holds a now-stale summary CSV from an earlier run rather
-    than one produced by this run -- including it would silently mix rows
-    from two different runs into one aggregate.
+    Returns out_path=None (and combos_included=0, rows=0) when literally no
+    combo produced a summary file at all. This is NOT itself an error: every
+    combo could be legitimately, cleanly blocked (returncode 2) yet still
+    write no summary, in the rare case where compare_reference.py's own
+    pre-flight out-dir-safety check refuses before reaching
+    write_top_level_blocked (see the Step 0 findings doc, finding #2) --
+    that is a normal "blocked", not a "crashed", outcome, and must not
+    prevent the driver's own exit code from correctly reflecting zero
+    crashed combos. main()'s own combos_crashed count (not whether this
+    function found any data) is what determines the driver's exit code.
     """
-    STALE_MTIME_BUFFER_SECONDS = 1.0
     entry_by_combo_key = {entry["combo_key"]: entry for entry in report_entries}
     base_fieldnames: Optional[List[str]] = None
     all_rows: List[Dict[str, str]] = []
@@ -402,9 +427,6 @@ def aggregate_summaries(
     for combo in combos:
         summary_path = combo.out_dir / CHILD_SUMMARY_FILENAME
         if not summary_path.is_file():
-            combos_skipped.append(combo.combo_key)
-            continue
-        if summary_path.stat().st_mtime < run_started_at - STALE_MTIME_BUFFER_SECONDS:
             combos_skipped.append(combo.combo_key)
             continue
         combos_included += 1
@@ -422,11 +444,7 @@ def aggregate_summaries(
             all_rows.append(tagged)
 
     if base_fieldnames is None:
-        raise SystemExit(
-            f"[compare_reference_multi][error] no combo produced a {CHILD_SUMMARY_FILENAME} file "
-            "at all -- every child run appears to have crashed before writing any output. Check "
-            f"{RUN_REPORT_FILENAME}."
-        )
+        return None, 0, 0, combos_skipped
 
     fieldnames = ["reference", "reference_segment_id"] + base_fieldnames
     out_path = out_root / MULTI_SUMMARY_FILENAME
@@ -486,10 +504,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    # Captured before any child subprocess is submitted, so any summary CSV
-    # a child of THIS run writes is guaranteed to have mtime >= this value --
-    # see aggregate_summaries()'s stale-summary check.
-    run_started_at = time.time()
     args = build_arg_parser().parse_args(argv)
 
     segments_root = Path(args.segments_root).resolve()
@@ -505,6 +519,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     combos = build_combos(references, target_segments, out_root)
 
     out_root.mkdir(parents=True, exist_ok=True)
+
+    # Clear each combo's out_dir before its child is ever submitted -- see
+    # clear_stale_combo_output()'s own docstring for why this is done
+    # unconditionally here rather than relying on wall-clock timestamps.
+    for combo in combos:
+        clear_stale_combo_output(combo.out_dir)
 
     print(
         f"[compare_reference_multi] running {len(combos)} combo(s) "
@@ -584,25 +604,32 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     }
     (out_root / RUN_REPORT_FILENAME).write_text(json.dumps(run_report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    summary_path, rows_written, combos_included, combos_skipped = aggregate_summaries(
-        combos, report_entries, out_root, run_started_at
-    )
+    summary_path, rows_written, combos_included, combos_skipped = aggregate_summaries(combos, report_entries, out_root)
 
     print(
         f"[compare_reference_multi] wrote {RUN_REPORT_FILENAME} "
         f"(ok={run_report['combos_ok']} blocked={run_report['combos_blocked']} crashed={run_report['combos_crashed']})"
     )
-    print(
-        f"[compare_reference_multi] wrote {summary_path} "
-        f"({rows_written} rows from {combos_included}/{len(combos)} combo(s))"
-    )
+    if summary_path is not None:
+        print(
+            f"[compare_reference_multi] wrote {summary_path} "
+            f"({rows_written} rows from {combos_included}/{len(combos)} combo(s))"
+        )
+    else:
+        print(
+            f"[compare_reference_multi] no combo produced a {CHILD_SUMMARY_FILENAME} to aggregate -- "
+            f"{MULTI_SUMMARY_FILENAME} was not written. Check {RUN_REPORT_FILENAME}."
+        )
     if combos_skipped:
         print(
-            f"[compare_reference_multi] {len(combos_skipped)} combo(s) had no current-run "
-            f"{CHILD_SUMMARY_FILENAME} to aggregate (missing, or a stale file left over from an "
-            f"earlier run into this --out-root): {combos_skipped}"
+            f"[compare_reference_multi] {len(combos_skipped)} combo(s) had no "
+            f"{CHILD_SUMMARY_FILENAME} to aggregate (crashed before writing output, or cleanly "
+            f"blocked at a pre-flight stage that itself writes no output): {combos_skipped}"
         )
 
+    # Exit code reflects combos_crashed only -- an all-cleanly-blocked grid
+    # (every child returned 2, none crashed) is still a clean run, even if
+    # aggregate_summaries() had nothing to write (see its own docstring).
     return 0 if status_counts.get(COMBO_STATUS_CRASHED, 0) == 0 else 1
 
 

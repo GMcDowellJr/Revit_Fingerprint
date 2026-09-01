@@ -17,9 +17,7 @@ from __future__ import annotations
 
 import csv
 import json
-import os
 import sys
-import time
 from pathlib import Path
 from typing import Dict, List, Sequence
 
@@ -354,44 +352,60 @@ def test_classify_combo_status():
     assert crm.classify_combo_status(-1) == crm.COMBO_STATUS_CRASHED
 
 
-def test_aggregate_summaries_excludes_stale_summary(tmp_path):
-    """A reference_comparison_summary.csv left over from an earlier
-    invocation into the same --out-root (e.g. a combo that crashed before
-    its own child reached compare_reference.py's output-writing code on
-    THIS run, but had produced output on a PRIOR run) must not be picked up
-    as if it were current-run data.
+def test_clear_stale_combo_output_removes_existing_directory(tmp_path):
+    out_dir = tmp_path / "combo_out"
+    (out_dir / "sub").mkdir(parents=True)
+    (out_dir / crm.CHILD_SUMMARY_FILENAME).write_text("stale content", encoding="utf-8")
+    assert out_dir.exists()
+
+    crm.clear_stale_combo_output(out_dir)
+    assert not out_dir.exists()
+
+
+def test_clear_stale_combo_output_noop_when_absent(tmp_path):
+    out_dir = tmp_path / "does_not_exist"
+    crm.clear_stale_combo_output(out_dir)  # must not raise
+    assert not out_dir.exists()
+
+
+def test_aggregate_summaries_no_data_returns_none_not_error(tmp_path):
+    """Every combo either crashed or was cleanly blocked before writing any
+    output at all (e.g. compare_reference.py's own pre-flight out-dir-safety
+    refusal, which writes no summary/manifest -- see the Step 0 findings
+    doc's finding #2). This must not be treated as an aggregation failure:
+    the driver's own exit code depends only on main()'s combos_crashed
+    count, not on whether aggregate_summaries() found any data.
     """
     out_root = tmp_path / "out_root"
-    stale_combo = crm.Combo(reference_segment="seg_a", reference="ref1", target_segment="tgt1", out_dir=out_root / "combo_stale")
-    fresh_combo = crm.Combo(reference_segment="seg_b", reference="ref2", target_segment="tgt2", out_dir=out_root / "combo_fresh")
-    fieldnames = ["segment_id", "purge_view", "domain"]
-
-    stale_combo.out_dir.mkdir(parents=True)
-    stale_summary = stale_combo.out_dir / crm.CHILD_SUMMARY_FILENAME
-    _write_csv(stale_summary, fieldnames, [{"segment_id": "seg_stale_target", "purge_view": "used", "domain": "object_styles_model"}])
-    old_time = time.time() - 3600
-    os.utime(stale_summary, (old_time, old_time))
-
-    run_started_at = time.time()
-
-    fresh_combo.out_dir.mkdir(parents=True)
-    fresh_summary = fresh_combo.out_dir / crm.CHILD_SUMMARY_FILENAME
-    _write_csv(fresh_summary, fieldnames, [{"segment_id": "seg_fresh_target", "purge_view": "used", "domain": "object_styles_model"}])
-
-    report_entries = [
-        {"combo_key": stale_combo.combo_key, "reference_segment_id": "seg_a"},
-        {"combo_key": fresh_combo.combo_key, "reference_segment_id": "seg_b"},
-    ]
-
+    combo = crm.Combo(reference_segment="seg_a", reference="ref1", target_segment="tgt1", out_dir=out_root / "combo_a")
+    # combo.out_dir deliberately never created -- no summary file anywhere.
     summary_path, rows_written, combos_included, combos_skipped = crm.aggregate_summaries(
-        [stale_combo, fresh_combo], report_entries, out_root, run_started_at
+        [combo], [{"combo_key": combo.combo_key, "reference_segment_id": "seg_a"}], out_root
     )
-    assert combos_included == 1
+    assert summary_path is None
+    assert rows_written == 0
+    assert combos_included == 0
+    assert combos_skipped == [combo.combo_key]
+
+
+def test_aggregate_summaries_reads_current_data(tmp_path):
+    out_root = tmp_path / "out_root"
+    combo = crm.Combo(reference_segment="seg_b", reference="ref2", target_segment="tgt2", out_dir=out_root / "combo_fresh")
+    fieldnames = ["segment_id", "purge_view", "domain"]
+    combo.out_dir.mkdir(parents=True)
+    _write_csv(
+        combo.out_dir / crm.CHILD_SUMMARY_FILENAME,
+        fieldnames,
+        [{"segment_id": "seg_fresh_target", "purge_view": "used", "domain": "object_styles_model"}],
+    )
+    summary_path, rows_written, combos_included, combos_skipped = crm.aggregate_summaries(
+        [combo], [{"combo_key": combo.combo_key, "reference_segment_id": "seg_b"}], out_root
+    )
+    assert summary_path is not None
     assert rows_written == 1
-    assert stale_combo.combo_key in combos_skipped
-    assert fresh_combo.combo_key not in combos_skipped
+    assert combos_included == 1
+    assert combos_skipped == []
     rows = _read_csv(summary_path)
-    assert len(rows) == 1
     assert rows[0]["segment_id"] == "seg_fresh_target"
     assert rows[0]["reference"] == "ref2"
     assert rows[0]["reference_segment_id"] == "seg_b"
@@ -523,3 +537,57 @@ def test_end_to_end_grid_inline_target_segments(tmp_path):
     rows = _read_csv(out_root / crm.MULTI_SUMMARY_FILENAME)
     assert len(rows) > 0
     assert {row["segment_id"] for row in rows} == {"synthetic_container_a", "synthetic_project_a"}
+
+
+def test_end_to_end_rerun_does_not_leak_stale_summary(tmp_path):
+    """A combo's out_dir pre-populated with foreign/stale content (as if left
+    behind by an earlier, since-interrupted invocation into this same
+    --out-root) must not leak into the aggregate, and must not cause the
+    child to block on compare_reference.py's own foreign-directory refusal
+    either -- clear_stale_combo_output() removes it before the child is ever
+    submitted.
+    """
+    corpus = _build_synthetic_corpus(tmp_path)
+    references_csv = tmp_path / "references.csv"
+    _write_references_csv(
+        references_csv,
+        [{"reference_segment": "synthetic_template_a", "reference": "synthetic_ref_export_alpha"}],
+    )
+    target_segments_txt = tmp_path / "targets.txt"
+    target_segments_txt.write_text("synthetic_container_a\n", encoding="utf-8")
+    out_root = tmp_path / "multi_out"
+
+    # Seed the combo's deterministic out_dir with foreign content (no
+    # manifest -- compare_reference.py's own prepare_out_dir() would refuse
+    # to clear this without --overwrite, absent the driver's own pre-clear).
+    references = crm.read_references_csv(references_csv)
+    target_segments = crm.read_target_segments(str(target_segments_txt))
+    combos = crm.build_combos(references, target_segments, out_root)
+    assert len(combos) == 1
+    stale_out_dir = combos[0].out_dir
+    stale_out_dir.mkdir(parents=True)
+    _write_csv(
+        stale_out_dir / crm.CHILD_SUMMARY_FILENAME,
+        ["segment_id", "purge_view", "domain"],
+        [{"segment_id": "STALE_FROM_PRIOR_RUN", "purge_view": "used", "domain": "object_styles_model"}],
+    )
+
+    rc = crm.main(
+        [
+            "--segments-root", str(corpus["segments_root"]),
+            "--registry-file", str(corpus["registry_file"]),
+            "--references", str(references_csv),
+            "--target-segments", str(target_segments_txt),
+            "--out-root", str(out_root),
+            "--workers", "1",
+        ]
+    )
+    assert rc == 0
+    run_report = json.loads((out_root / crm.RUN_REPORT_FILENAME).read_text(encoding="utf-8"))
+    assert run_report["combos_ok"] == 1
+    assert run_report["combos_crashed"] == 0
+
+    rows = _read_csv(out_root / crm.MULTI_SUMMARY_FILENAME)
+    assert len(rows) > 0
+    assert all(row["segment_id"] != "STALE_FROM_PRIOR_RUN" for row in rows)
+    assert all(row["segment_id"] == "synthetic_container_a" for row in rows)
