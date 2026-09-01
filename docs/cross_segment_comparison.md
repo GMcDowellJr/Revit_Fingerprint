@@ -418,7 +418,7 @@ High values (close to 1.0) mean most of what the project does comes from the tem
 
 - High a_in_b + high b_in_a: tight, well-governed alignment
 - High a_in_b + low b_in_a: project uses the template but also extends heavily
-- Low a_in_b + high b_in_a: project is tiny and contains almost nothing from the template
+- Low a_in_b + high b_in_a: project is narrow — it touches only a small slice of the full mandate — but faithful within that slice: what little it has closely tracks the template
 - Low a_in_b + low b_in_a: project has drifted and is inventing independently (**governance failure**)
 
 ### Sibling Jaccard (sibling_templates, sibling_projects)
@@ -437,7 +437,7 @@ Within-project Jaccard measures how consistent files from the same named project
 
 ### attribution_gap concept
 
-For a directed comparison, `attribution_gap = 1.0 - containment_a_in_b_mean`. It represents the fraction of the reference mandate that target bundles do not cover. An attribution gap above 0.3 warrants investigation.
+For a directed comparison, `attribution_gap = 1.0 - containment_b_in_a_mean`. It represents the fraction of the target's own patterns that are absent from the reference mandate (matching the Section 1 definition: "the fraction of project-bundle join_hashes that do not appear in the reference template union" — locally invented, non-governed patterns). An attribution gap above 0.3 warrants investigation.
 
 ### phantom_governance concept
 
