@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, Sequence
 
@@ -331,11 +333,68 @@ def test_build_combos_collision_raises(tmp_path):
     assert "same --out-dir" in str(excinfo.value)
 
 
+def test_build_combos_collision_raises_case_insensitive(tmp_path):
+    # "Ref1" and "ref1" sanitize to two distinct (case-differing) strings,
+    # but resolve to the same directory on a case-insensitive filesystem
+    # (Windows, default macOS) -- must still be rejected, not just an exact
+    # raw-string match.
+    references = [
+        crm.ReferenceRow(reference_segment="seg_a", reference="Ref1"),
+        crm.ReferenceRow(reference_segment="seg_a", reference="ref1"),
+    ]
+    with pytest.raises(SystemExit) as excinfo:
+        crm.build_combos(references, ["tgt1"], tmp_path / "out")
+    assert "same --out-dir" in str(excinfo.value)
+
+
 def test_classify_combo_status():
     assert crm.classify_combo_status(0) == crm.COMBO_STATUS_OK
     assert crm.classify_combo_status(2) == crm.COMBO_STATUS_BLOCKED
     assert crm.classify_combo_status(1) == crm.COMBO_STATUS_CRASHED
     assert crm.classify_combo_status(-1) == crm.COMBO_STATUS_CRASHED
+
+
+def test_aggregate_summaries_excludes_stale_summary(tmp_path):
+    """A reference_comparison_summary.csv left over from an earlier
+    invocation into the same --out-root (e.g. a combo that crashed before
+    its own child reached compare_reference.py's output-writing code on
+    THIS run, but had produced output on a PRIOR run) must not be picked up
+    as if it were current-run data.
+    """
+    out_root = tmp_path / "out_root"
+    stale_combo = crm.Combo(reference_segment="seg_a", reference="ref1", target_segment="tgt1", out_dir=out_root / "combo_stale")
+    fresh_combo = crm.Combo(reference_segment="seg_b", reference="ref2", target_segment="tgt2", out_dir=out_root / "combo_fresh")
+    fieldnames = ["segment_id", "purge_view", "domain"]
+
+    stale_combo.out_dir.mkdir(parents=True)
+    stale_summary = stale_combo.out_dir / crm.CHILD_SUMMARY_FILENAME
+    _write_csv(stale_summary, fieldnames, [{"segment_id": "seg_stale_target", "purge_view": "used", "domain": "object_styles_model"}])
+    old_time = time.time() - 3600
+    os.utime(stale_summary, (old_time, old_time))
+
+    run_started_at = time.time()
+
+    fresh_combo.out_dir.mkdir(parents=True)
+    fresh_summary = fresh_combo.out_dir / crm.CHILD_SUMMARY_FILENAME
+    _write_csv(fresh_summary, fieldnames, [{"segment_id": "seg_fresh_target", "purge_view": "used", "domain": "object_styles_model"}])
+
+    report_entries = [
+        {"combo_key": stale_combo.combo_key, "reference_segment_id": "seg_a"},
+        {"combo_key": fresh_combo.combo_key, "reference_segment_id": "seg_b"},
+    ]
+
+    summary_path, rows_written, combos_included, combos_skipped = crm.aggregate_summaries(
+        [stale_combo, fresh_combo], report_entries, out_root, run_started_at
+    )
+    assert combos_included == 1
+    assert rows_written == 1
+    assert stale_combo.combo_key in combos_skipped
+    assert fresh_combo.combo_key not in combos_skipped
+    rows = _read_csv(summary_path)
+    assert len(rows) == 1
+    assert rows[0]["segment_id"] == "seg_fresh_target"
+    assert rows[0]["reference"] == "ref2"
+    assert rows[0]["reference_segment_id"] == "seg_b"
 
 
 # ---------------------------------------------------------------------------

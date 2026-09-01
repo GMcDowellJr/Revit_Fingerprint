@@ -39,6 +39,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -246,7 +247,12 @@ def build_combos(references: Sequence[ReferenceRow], target_segments: Sequence[s
       is ever called directly with un-deduplicated data.
     - Two DISTINCT combos whose sanitized selectors happen to collide on the
       same directory name (e.g. two references differing only in characters
-      _sanitize_path_component() collapses).
+      _sanitize_path_component() collapses, or differing only in case --
+      collision detection compares case-folded paths specifically so this is
+      still caught on a case-insensitive filesystem, i.e. Windows or a
+      default macOS volume, where "Ref.rvt" and "ref.rvt" would otherwise
+      resolve to the same on-disk directory despite sanitizing to different
+      strings).
     """
     combos: List[Combo] = []
     for ref_row in references:
@@ -276,13 +282,16 @@ def build_combos(references: Sequence[ReferenceRow], target_segments: Sequence[s
             )
         seen_combo_keys[combo_key] = combo_key
 
-        out_dir_key = str(combo.out_dir)
+        # Case-folded, not raw str(): two out_dir paths differing only in
+        # case are the same directory on Windows/case-insensitive macOS, and
+        # must be caught here even though they're distinct Python strings.
+        out_dir_key = str(combo.out_dir).casefold()
         if out_dir_key in seen_out_dirs and seen_out_dirs[out_dir_key] != combo_key:
             raise SystemExit(
                 f"[compare_reference_multi][error] two distinct combos sanitize to the same "
-                f"--out-dir {out_dir_key!r}: {seen_out_dirs[out_dir_key]!r} and {combo_key!r}. Rename "
-                "one of the conflicting reference_segment/reference/target-segment values to "
-                "disambiguate."
+                f"--out-dir (case-insensitively) {out_dir_key!r}: {seen_out_dirs[out_dir_key]!r} and "
+                f"{combo_key!r}. Rename one of the conflicting reference_segment/reference/"
+                "target-segment values to disambiguate."
             )
         seen_out_dirs[out_dir_key] = combo_key
     return combos
@@ -351,7 +360,10 @@ def read_child_manifest(out_dir: Path) -> Optional[Dict[str, object]]:
 
 
 def aggregate_summaries(
-    combos: Sequence[Combo], report_entries: Sequence[Dict[str, object]], out_root: Path
+    combos: Sequence[Combo],
+    report_entries: Sequence[Dict[str, object]],
+    out_root: Path,
+    run_started_at: float,
 ) -> Tuple[Path, int, int, List[str]]:
     """Union every combo's own reference_comparison_summary.csv into one
     multi_reference_comparison_summary.csv, tagging each row with the
@@ -369,7 +381,18 @@ def aggregate_summaries(
     skipped and noted, not treated as an aggregation failure -- a combo that
     blocked cleanly (returncode 2) still writes a header-only summary CSV
     and is not "missing" in that sense; it simply contributes zero rows.
+
+    A summary file that DOES exist but predates `run_started_at` (minus a
+    small buffer for filesystem timestamp granularity) is treated the same
+    as missing, not read. This covers a rerun into an --out-root a prior
+    invocation already populated: if a combo's child subprocess crashes
+    before reaching compare_reference.py's own prepare_out_dir() clear (a
+    launch failure, or the process being killed mid-run), that combo's
+    out_dir still holds a now-stale summary CSV from an earlier run rather
+    than one produced by this run -- including it would silently mix rows
+    from two different runs into one aggregate.
     """
+    STALE_MTIME_BUFFER_SECONDS = 1.0
     entry_by_combo_key = {entry["combo_key"]: entry for entry in report_entries}
     base_fieldnames: Optional[List[str]] = None
     all_rows: List[Dict[str, str]] = []
@@ -379,6 +402,9 @@ def aggregate_summaries(
     for combo in combos:
         summary_path = combo.out_dir / CHILD_SUMMARY_FILENAME
         if not summary_path.is_file():
+            combos_skipped.append(combo.combo_key)
+            continue
+        if summary_path.stat().st_mtime < run_started_at - STALE_MTIME_BUFFER_SECONDS:
             combos_skipped.append(combo.combo_key)
             continue
         combos_included += 1
@@ -460,6 +486,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    # Captured before any child subprocess is submitted, so any summary CSV
+    # a child of THIS run writes is guaranteed to have mtime >= this value --
+    # see aggregate_summaries()'s stale-summary check.
+    run_started_at = time.time()
     args = build_arg_parser().parse_args(argv)
 
     segments_root = Path(args.segments_root).resolve()
@@ -554,7 +584,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     }
     (out_root / RUN_REPORT_FILENAME).write_text(json.dumps(run_report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    summary_path, rows_written, combos_included, combos_skipped = aggregate_summaries(combos, report_entries, out_root)
+    summary_path, rows_written, combos_included, combos_skipped = aggregate_summaries(
+        combos, report_entries, out_root, run_started_at
+    )
 
     print(
         f"[compare_reference_multi] wrote {RUN_REPORT_FILENAME} "
@@ -566,8 +598,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     if combos_skipped:
         print(
-            f"[compare_reference_multi] {len(combos_skipped)} combo(s) had no "
-            f"{CHILD_SUMMARY_FILENAME} to aggregate (crashed before writing output): {combos_skipped}"
+            f"[compare_reference_multi] {len(combos_skipped)} combo(s) had no current-run "
+            f"{CHILD_SUMMARY_FILENAME} to aggregate (missing, or a stale file left over from an "
+            f"earlier run into this --out-root): {combos_skipped}"
         )
 
     return 0 if status_counts.get(COMBO_STATUS_CRASHED, 0) == 0 else 1
