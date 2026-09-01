@@ -2734,3 +2734,135 @@ four fields beyond `fill_tick`.
   (`tools/probes/probe_arrowheads.py` with `per_style_limit` raised) should
   resolve this before any decision to widen sig_hash/join_key coverage for
   these fields.
+
+## D-050 — `compare_directed_file()`: fix the a_in_b/b_in_a containment inversion
+
+### Status
+Accepted (2026-09-01)
+
+### Context
+`tools/compare_cross_segment.py` has two comparison engines that both emit
+the same-named summary fields, `all_pairwise_containment_a_in_b_mean` /
+`all_pairwise_containment_b_in_a_mean` (and their `_min` siblings):
+`compare_symmetric_file()` (used for `sibling_*`/`cross_client`/
+`within_project` rows) and `compare_directed_file()` (used for every
+`comparison_type` in `DIRECTED_TYPES` — `generic_to_template/container/
+project`, `template_to_container`, `container_to_project`,
+`template_to_project`/`parent_sibling_roles`, `enterprise_to_project`,
+`bc_to_project`, `enterprise_to_bc`, `enterprise_to_client`; `governance_chain`
+is a member of `DIRECTED_TYPES` but is never actually assigned as a
+`comparison_type` anywhere — dead entry).
+
+`compare_symmetric_file()`/`_union_similarity()` define the convention
+unambiguously: `containment_a_in_b = shared/|A|` (how much of A is found in
+B), `containment_b_in_a = shared/|B|` (how much of B is found in A).
+`compare_directed_file()` populated the same-named output fields with the
+opposite assignment: `all_pairwise_containment_a_in_b_mean` held
+`shared/|target_file|` (target-relative — what the symmetric convention
+would call `b_in_a`), and `all_pairwise_containment_b_in_a_mean` held
+`shared/|reference_union|` (reference-relative — what the symmetric
+convention would call `a_in_b`).
+
+Verified with real code execution against a synthetic 7-item reference /
+8-item target / 5-shared set: pre-fix, `compare_directed_file()` reported
+`all_pairwise_containment_a_in_b_mean = 0.625` (`5/8`, target-relative)
+where `compare_symmetric_file()` on the identical sets reports
+`all_pairwise_containment_a_in_b_mean = 0.714286` (`5/7`, reference-relative)
+— the same field name, same underlying sets, opposite quantity depending on
+which engine computed it.
+
+The inversion was uniform: one call site (`run_pair()`), no per-type
+branching, `files_a`/`seg_a` is always the reference/"from" role at every
+`pairs.append((seg_a, seg_b, comparison_type))` site across all emitted
+directed types — no type was accidentally correct via a reversed argument
+order. `_build_pooled_row()` (the N-1 pooled path) was never affected — it
+uses unambiguous field names (`all_containment_focal_in_pool`/
+`all_containment_pool_in_focal`) and never reuses `a_in_b`/`b_in_a`.
+`compare_directed_file()` never emits a jaccard field at all (only
+`compare_symmetric_file()` does) — unaffected by this fix.
+
+**Impact on already-shipped output**: `tools/generate_governance_narrative.py`
+reads `containment_a_in_b_mean` (via its `alias()` normalization of
+`all_pairwise_containment_a_in_b_mean` and older pre-rename names) at every
+Group 1/2/3 read site in `build_cascade()` — ~15 sites, and *only*
+`a_in_b_mean`; `containment_b_in_a_mean` is aliased but never read anywhere
+in that file, confirming no local workaround existed to remove. Per
+`build_cascade()`'s own docstring (`tc: template->container
+containment_a_in_b_mean`, etc.), the field is read under the assumption
+that it is reference-relative — correct only after this fix. Concretely:
+- `tc`/`cp`/`tp` (Group 1) were wrong in the "Domain Governance
+  Classification" table (`T→Container`/`T→Project`/`C→Project` columns)
+  **and** fed `assign_tier()`'s `primary` input (`d["tp"] if ... else
+  d["cp"]`) directly — the domain tier classification itself (Strong
+  Baseline / Investigate / High Fragmentation / etc.) was computed from the
+  wrong-direction number for every domain in every shipped run.
+- `gt`/`gc`/`gp` (Group 2) were wrong in the same table's `G→Template/
+  Container/Project` columns and in prose (e.g. "G→T = {pct(gt)}").
+- `eb`/`ec` (Group 3) were wrong in the "Enterprise Overview" section's
+  explicit reference-relative prose ("Enterprise standard reach into
+  business centers"/"...client-wide standards").
+- `ep`/`bp` (Group 3) were wrong in the underlying data structure but never
+  written to any CSV column or rendered in narrative text — no reader-facing
+  impact prior to this fix.
+
+`tools/compare_governance_populations.py` calls `compare_directed_file()`
+directly and writes its return dict straight through to
+`governance_cross_comparisons.csv` with no reinterpretation — a pure
+passthrough that self-corrects with this fix, requiring no code change of
+its own. `tools/governance_evidence_package.py` only references
+`compare_cross_segment.py` in docstrings/attribution strings — not an
+independent consumer of these fields.
+
+`docs/cross_segment_comparison.md` was found to be internally
+self-contradictory: its Section 5 ("Directed pairs — reference union
+semantics") and Section 8 Interpretation Guide documented the pre-fix
+(buggy) meaning, while its Section 1 intro (`phantom_governance` example)
+and Section 6 column table documented the post-fix (intended,
+symmetric-consistent) meaning. Reconciled toward the intended meaning in
+the same change as this fix (see the doc's own edit history for the
+specifics); its stale "migration note" claiming
+`generate_governance_narrative.py` still reads pre-rename blank-value field
+names was removed — the `alias()` mechanism already resolved that
+separately.
+
+Full investigation record: findings-only Step 0 audit (per-type
+intended-vs-actual mismatch table, call-site trace, workaround check,
+full-repo consumer sweep) preceded this fix and was reviewed and
+explicitly authorized before any code changed; see the session's own
+conversation record for the complete table (not reproduced here — this
+entry summarizes the conclusions that motivate the fix, not the audit
+process itself).
+
+### Decision
+Swap the internal value assignment inside `compare_directed_file()` so
+`a_in_b` (and its `_min` list) computes `shared/|reference_union|`, and
+`b_in_a` (and its `_min` list) computes `shared/|target_file|` — i.e. make
+the two lists compute what their names already mean on symmetric rows,
+matching `compare_symmetric_file()`'s convention exactly. This is a value
+fix inside one function; no field is renamed, no column is added or
+removed, and no downstream consumer's read logic changed as a result
+(`generate_governance_narrative.py`'s `alias()`/read sites are unchanged;
+`compare_governance_populations.py` needed no edit).
+
+### Consequences
+- **Hash-unrelated; comparison-output-breaking.** This does not touch
+  `sig_hash`/`join_hash`/extraction in any way — it only changes the value
+  of two derived summary columns (`all_pairwise_containment_a_in_b_mean`/
+  `_b_in_a_mean` and their `_min` siblings) in `cross_segment_summary.csv`
+  and `governance_cross_comparisons.csv` for directed `comparison_type`
+  rows. Any previously-generated `cross_segment_summary.csv`,
+  `governance_domain_summary.csv`, or rendered `governance_narrative_
+  context.md` from before this fix reports the wrong-direction containment
+  value (and, for `tc`/`cp`/`tp`-primary domains, a potentially wrong tier
+  classification) for the 8 of 10 emitted directed types that are actually
+  rendered/tiered. Re-running `compare_cross_segment.py` and
+  `generate_governance_narrative.py` on any corpus segment already analyzed
+  is required to get corrected output — this is not a golden-file
+  regeneration, it is new evidence.
+- Whether/how to flag any specific previously-delivered governance
+  narrative as having stated a materially wrong conclusion is a
+  case-by-case business decision outside the scope of this code fix.
+- `ep`/`bp` (Group 3, captured-only) now compute the corrected reference-
+  relative value in the `cascade` dict, but remain unrendered/unwritten to
+  any CSV — this fix has no visible effect on them until a future change
+  renders them.

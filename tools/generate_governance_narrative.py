@@ -2515,6 +2515,16 @@ def build_client_summary(
     # tc/cp/tp convention where the bare name is all-view.
     xc_by_client = defaultdict(list)
     xc_by_client_all = defaultdict(list)
+    # Novelty axis (observability signal, symmetric/pooled rows only -- directed
+    # rows emit no jaccard field to pair with a containment field at all): for
+    # each cross_client/sibling_projects row, DIVIDE(all_union_jaccard,
+    # all_union_containment_a_in_b). Union-level family specifically (not the
+    # *_pairwise_* mean family, which does not preserve the clean |A|/union
+    # identity all_union_jaccard/all_union_containment_a_in_b do: for a union
+    # pair, jaccard = shared/union and containment_a_in_b = shared/|A|, so this
+    # ratio reduces to |A|/union -- how much of A's own footprint the union
+    # comprises, i.e. how diluted A's footprint is by content unique to B).
+    novelty_by_client = defaultdict(list)
     for r in summary_rows:
         if r["comparison_type"] not in ("sibling_projects", "cross_client"):
             continue
@@ -2534,6 +2544,11 @@ def build_client_summary(
         if v_all is not None:
             xc_by_client_all[ca].append(v_all)
             xc_by_client_all[cb].append(v_all)
+        c_all = pf(_col(r, "all_union_containment_a_in_b"))
+        if v_all is not None and c_all:
+            novelty = v_all / c_all
+            novelty_by_client[ca].append(novelty)
+            novelty_by_client[cb].append(novelty)
 
     # Within-project coherence. Gated on governance_role_a == "Project" for the
     # same reason as the all_clients fallback above -- within_project rows exist
@@ -2612,6 +2627,8 @@ def build_client_summary(
         xc_mean = statistics.mean(xc_vals) if xc_vals else None
         xc_vals_all = xc_by_client_all.get(client, [])
         xc_mean_all = statistics.mean(xc_vals_all) if xc_vals_all else None
+        novelty_vals = novelty_by_client.get(client, [])
+        novelty_mean = statistics.mean(novelty_vals) if novelty_vals else None
         wp_vals = wp_by_client.get(client, [])
         wp_mean = statistics.mean(wp_vals) if wp_vals else None
         wp_vals_all = wp_by_client_all.get(client, [])
@@ -2663,6 +2680,7 @@ def build_client_summary(
             "tier": tier,
             "xc_mean": xc_mean,
             "xc_mean_all": xc_mean_all,
+            "novelty_mean": novelty_mean,
             "wp_mean": wp_mean,
             "wp_mean_all": wp_mean_all,
             "confidence_note": conf,
@@ -3986,6 +4004,19 @@ def render_client_section(client_rows: list[dict]) -> str:
                 f"{DOMAIN_LABELS.get(d, d)} ({pct(v)})" for d, v in r["weakest"]
             )
             lines.append(f"Weakest alignment domains: {weak_str}.\n")
+        # Novelty axis (observability signal, not a recommendation): how much of
+        # this client's own footprint is diluted by content unique to its peer
+        # comparisons. Derived from union-level jaccard/containment, not the
+        # pairwise mean -- see build_client_summary()'s novelty_by_client comment.
+        novelty_mean = r.get("novelty_mean")
+        if novelty_mean is not None:
+            lines.append(
+                f"Footprint novelty: {fmt(novelty_mean)}. This is how much of "
+                f"this client's own all-view footprint the client-pair union "
+                f"comprises, on average across its peer comparisons — a lower "
+                f"value means more of the combined footprint is content unique "
+                f"to the other client, not shared with this one.\n"
+            )
         # Only note a different sector when it's actually KNOWN (not "unknown") --
         # an unclassified client must not be presented as confirmed non-healthcare.
         if r.get("sector", "unknown") not in ("unknown", "healthcare"):

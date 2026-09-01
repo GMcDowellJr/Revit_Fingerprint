@@ -1781,13 +1781,20 @@ def compare_directed_file(
     if not ref_union:
         return {}
 
-    b_in_a: List[float] = []
+    # a_in_b = fraction of the reference (A) found in each target file (B) =
+    # shared/|ref_union| ("how much of the mandate reached this target").
+    # b_in_a = fraction of each target file (B) found in the reference (A) =
+    # shared/|target_file| ("how much of this target's own content traces to
+    # the mandate"). This matches compare_symmetric_file()'s convention
+    # (containment_a_in_b = shared/|A|, containment_b_in_a = shared/|B|) --
+    # see DECISIONS.md D-050 for the inversion this corrects.
     a_in_b: List[float] = []
+    b_in_a: List[float] = []
 
     for jhs in tgt_files.values():
         shared = len(jhs & ref_union)
-        b_in_a.append(shared / len(ref_union))
-        a_in_b.append(shared / len(jhs) if jhs else 0.0)
+        a_in_b.append(shared / len(ref_union))
+        b_in_a.append(shared / len(jhs) if jhs else 0.0)
 
     all_b: Set[str] = set()
     for jhs in tgt_files.values():
