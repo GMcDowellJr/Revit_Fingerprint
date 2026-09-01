@@ -229,14 +229,41 @@ def test_read_references_csv_blank_value_row(tmp_path):
     assert "blank" in str(excinfo.value)
 
 
+def test_read_references_csv_duplicate_row_deduped(tmp_path):
+    path = tmp_path / "references.csv"
+    _write_references_csv(
+        path,
+        [
+            {"reference_segment": "seg_a", "reference": "ref1"},
+            {"reference_segment": "seg_b", "reference": "ref2"},
+            {"reference_segment": "seg_a", "reference": "ref1"},  # exact duplicate of row 1
+        ],
+    )
+    rows = crm.read_references_csv(path)
+    assert rows == [
+        crm.ReferenceRow(reference_segment="seg_a", reference="ref1"),
+        crm.ReferenceRow(reference_segment="seg_b", reference="ref2"),
+    ]
+
+
 def test_read_target_segments_from_file(tmp_path):
     path = tmp_path / "targets.txt"
     path.write_text("# comment\nseg_1\n\nseg_2\n", encoding="utf-8")
     assert crm.read_target_segments(str(path)) == ["seg_1", "seg_2"]
 
 
+def test_read_target_segments_from_file_deduped(tmp_path):
+    path = tmp_path / "targets.txt"
+    path.write_text("seg_1\nseg_2\nseg_1\n", encoding="utf-8")
+    assert crm.read_target_segments(str(path)) == ["seg_1", "seg_2"]
+
+
 def test_read_target_segments_inline_list():
     assert crm.read_target_segments("seg_1, seg_2 ,seg_3") == ["seg_1", "seg_2", "seg_3"]
+
+
+def test_read_target_segments_inline_list_deduped():
+    assert crm.read_target_segments("seg_1,seg_2,seg_1") == ["seg_1", "seg_2"]
 
 
 def test_read_target_segments_empty_inline_list():
@@ -249,6 +276,31 @@ def test_sanitize_path_component_collapses_unsafe_characters():
     assert crm._sanitize_path_component("Central File (v3).rvt") == "Central_File_v3_.rvt"
     assert crm._sanitize_path_component("a/b\\c") == "a_b_c"
     assert crm._sanitize_path_component("") == "_"
+
+
+def test_sanitize_path_component_bounds_long_values():
+    long_value = "x" * 400
+    sanitized = crm._sanitize_path_component(long_value)
+    assert len(sanitized) == crm._MAX_COMPONENT_LENGTH + 1 + 8  # truncated + "_" + 8-hex digest
+    assert sanitized.startswith("x" * crm._MAX_COMPONENT_LENGTH)
+
+    # two different long values sharing a long common prefix must not collide
+    long_value_b = ("x" * 300) + "DIFFERENT_TAIL"
+    sanitized_b = crm._sanitize_path_component(long_value_b)
+    assert sanitized != sanitized_b
+
+
+def test_build_combos_rejects_direct_duplicate(tmp_path):
+    # build_combos() itself must reject an exact duplicate combo even if
+    # called directly with un-deduplicated input (belt-and-suspenders on top
+    # of read_references_csv()/read_target_segments()'s own dedup).
+    references = [
+        crm.ReferenceRow(reference_segment="seg_a", reference="ref1"),
+        crm.ReferenceRow(reference_segment="seg_a", reference="ref1"),
+    ]
+    with pytest.raises(SystemExit) as excinfo:
+        crm.build_combos(references, ["tgt1"], tmp_path / "out")
+    assert "duplicate combo" in str(excinfo.value)
 
 
 def test_build_combos_cross_product(tmp_path):

@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import os
 import re
@@ -93,18 +94,34 @@ def resolve_worker_count(value: str, headroom: int = 2) -> int:
     return int(value)
 
 
+# Bounds each sanitized path component well under common filesystem
+# per-component limits (e.g. 255 bytes on ext4/NTFS): three components at
+# _MAX_COMPONENT_LENGTH + 1 ("_") + 8 (hash) chars each, joined by "__",
+# stays far short of that even before accounting for --out-root's own length.
+_MAX_COMPONENT_LENGTH = 60
+
+
 def _sanitize_path_component(value: str) -> str:
     """Make an arbitrary string (a --reference/segment selector) safe to use
     as one filesystem path component: collapse any run of characters outside
-    [A-Za-z0-9._-] to a single underscore, and strip leading/trailing dots or
-    underscores. --reference selectors are resolved against a segment's own
+    [A-Za-z0-9._-] to a single underscore, strip leading/trailing dots or
+    underscores, and bound the result to _MAX_COMPONENT_LENGTH characters
+    (appending an 8-hex-char digest of the original value when truncated, so
+    two different long values that happen to share a long common prefix
+    still sanitize to different components rather than colliding silently).
+    --reference selectors are resolved against a segment's own
     file_metadata.csv export_run_id (compare_reference.py::resolve_export_run_id),
     an unconstrained, often filename-derived string that can contain spaces,
     parentheses, or other characters unsafe as a bare directory-name
-    component.
+    component, and can in principle be long enough to overflow a filesystem's
+    per-component length limit once combined with the other two selectors.
     """
     sanitized = _SANITIZE_RE.sub("_", value).strip("._")
-    return sanitized or "_"
+    sanitized = sanitized or "_"
+    if len(sanitized) > _MAX_COMPONENT_LENGTH:
+        digest = hashlib.md5(value.encode("utf-8", errors="surrogateescape")).hexdigest()[:8]
+        sanitized = f"{sanitized[:_MAX_COMPONENT_LENGTH]}_{digest}"
+    return sanitized
 
 
 @dataclass(frozen=True)
@@ -117,7 +134,11 @@ def read_references_csv(path: Path) -> List[ReferenceRow]:
     """Read and validate --references. Fails fast (SystemExit) on a missing
     file, a header that isn't exactly ['reference_segment', 'reference']
     (no extra/reordered columns silently accepted), a malformed data row, or
-    zero data rows after the header.
+    zero data rows after the header. An exact duplicate (reference_segment,
+    reference) row is silently deduplicated (first occurrence kept, stable
+    order preserved) -- see build_combos()'s own docstring for why this
+    matters: without it, two identical Combo objects would race on the same
+    --out-dir under parallel workers.
     """
     if not path.is_file():
         raise SystemExit(f"[compare_reference_multi][error] --references file not found: {path}")
@@ -137,6 +158,7 @@ def read_references_csv(path: Path) -> List[ReferenceRow]:
                 "(no extra or reordered columns)."
             )
         rows: List[ReferenceRow] = []
+        seen_rows = set()
         for line_no, raw in enumerate(reader, start=2):
             if not raw or all(not (cell or "").strip() for cell in raw):
                 continue
@@ -151,6 +173,10 @@ def read_references_csv(path: Path) -> List[ReferenceRow]:
                     f"[compare_reference_multi][error] --references CSV {path} line {line_no} has a "
                     f"blank reference_segment or reference value: {raw!r}"
                 )
+            dedupe_key = (reference_segment, reference)
+            if dedupe_key in seen_rows:
+                continue
+            seen_rows.add(dedupe_key)
             rows.append(ReferenceRow(reference_segment=reference_segment, reference=reference))
     if not rows:
         raise SystemExit(
@@ -163,14 +189,25 @@ def read_references_csv(path: Path) -> List[ReferenceRow]:
 def read_target_segments(spec: str) -> List[str]:
     """--target-segments accepts either an existing newline-delimited file
     (blank lines and '#'-prefixed comment lines skipped) or a comma-separated
-    inline list. Fails fast on zero resulting segments either way.
+    inline list. Fails fast on zero resulting segments either way. An exact
+    duplicate segment name is silently deduplicated (first occurrence kept,
+    stable order preserved) -- same rationale as read_references_csv()'s own
+    dedup: avoids handing build_combos() two identical Combo objects that
+    would race on the same --out-dir.
     """
     path = Path(spec)
     if path.is_file():
         lines = path.read_text(encoding="utf-8-sig").splitlines()
-        segments = [ln.strip() for ln in lines if ln.strip() and not ln.strip().startswith("#")]
+        raw_segments = [ln.strip() for ln in lines if ln.strip() and not ln.strip().startswith("#")]
     else:
-        segments = [s.strip() for s in spec.split(",") if s.strip()]
+        raw_segments = [s.strip() for s in spec.split(",") if s.strip()]
+    segments: List[str] = []
+    seen = set()
+    for s in raw_segments:
+        if s in seen:
+            continue
+        seen.add(s)
+        segments.append(s)
     if not segments:
         raise SystemExit(
             f"[compare_reference_multi][error] --target-segments {spec!r} resolved to zero target "
@@ -195,9 +232,21 @@ def build_combos(references: Sequence[ReferenceRow], target_segments: Sequence[s
     """Cross-product every reference row with every target segment. Each
     combo's --out-dir is a deterministic path under out_root, derived from
     the sanitized (reference_segment, reference, target_segment) triple.
-    Fails fast if two distinct combos sanitize to the same directory name
-    (e.g. two references differing only in characters the sanitizer
-    collapses) rather than letting one silently overwrite the other's output.
+
+    Fails fast (SystemExit) rather than silently proceeding in two distinct
+    unsafe cases -- both would otherwise let two Combo objects share one
+    --out-dir, which under ProcessPoolExecutor's parallel workers means both
+    children can concurrently clear/write the same directory, and the
+    aggregator would double-count or silently drop one side's result
+    (worker_results is keyed by combo_key, so only the last write survives):
+
+    - Two IDENTICAL combos (same reference_segment, reference, and
+      target_segment) -- read_references_csv()/read_target_segments()
+      already dedupe their own inputs, so this only fires if build_combos()
+      is ever called directly with un-deduplicated data.
+    - Two DISTINCT combos whose sanitized selectors happen to collide on the
+      same directory name (e.g. two references differing only in characters
+      _sanitize_path_component() collapses).
     """
     combos: List[Combo] = []
     for ref_row in references:
@@ -214,16 +263,28 @@ def build_combos(references: Sequence[ReferenceRow], target_segments: Sequence[s
                     out_dir=out_root / dir_name,
                 )
             )
-    seen: Dict[str, str] = {}
+    seen_combo_keys: Dict[str, str] = {}
+    seen_out_dirs: Dict[str, str] = {}
     for combo in combos:
-        key = str(combo.out_dir)
-        if key in seen and seen[key] != combo.combo_key:
+        combo_key = combo.combo_key
+        if combo_key in seen_combo_keys:
+            raise SystemExit(
+                f"[compare_reference_multi][error] duplicate combo "
+                f"(reference_segment, reference, target_segment) = {combo_key!r} appears more than "
+                "once after deduplication -- this should not happen; if calling build_combos() "
+                "directly, deduplicate references/target_segments first."
+            )
+        seen_combo_keys[combo_key] = combo_key
+
+        out_dir_key = str(combo.out_dir)
+        if out_dir_key in seen_out_dirs and seen_out_dirs[out_dir_key] != combo_key:
             raise SystemExit(
                 f"[compare_reference_multi][error] two distinct combos sanitize to the same "
-                f"--out-dir {key!r}: {seen[key]!r} and {combo.combo_key!r}. Rename one of the "
-                "conflicting reference_segment/reference/target-segment values to disambiguate."
+                f"--out-dir {out_dir_key!r}: {seen_out_dirs[out_dir_key]!r} and {combo_key!r}. Rename "
+                "one of the conflicting reference_segment/reference/target-segment values to "
+                "disambiguate."
             )
-        seen[key] = combo.combo_key
+        seen_out_dirs[out_dir_key] = combo_key
     return combos
 
 
