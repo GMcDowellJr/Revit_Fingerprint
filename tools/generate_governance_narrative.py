@@ -2518,12 +2518,25 @@ def build_client_summary(
     # Novelty axis (observability signal, symmetric/pooled rows only -- directed
     # rows emit no jaccard field to pair with a containment field at all): for
     # each cross_client/sibling_projects row, DIVIDE(all_union_jaccard,
-    # all_union_containment_a_in_b). Union-level family specifically (not the
-    # *_pairwise_* mean family, which does not preserve the clean |A|/union
-    # identity all_union_jaccard/all_union_containment_a_in_b do: for a union
-    # pair, jaccard = shared/union and containment_a_in_b = shared/|A|, so this
-    # ratio reduces to |A|/union -- how much of A's own footprint the union
-    # comprises, i.e. how diluted A's footprint is by content unique to B).
+    # all_union_containment_a_in_b) for client A's own share of the union, and
+    # the B-side mirror DIVIDE(all_union_jaccard, all_union_containment_b_in_a)
+    # for client B's -- these are genuinely different values for an asymmetric
+    # pair and must not both read A's number (Codex review finding on this PR).
+    # Union-level family specifically (not the *_pairwise_* mean family, which
+    # does not preserve the clean |side|/union identity these do: for a union
+    # pair, jaccard = shared/union, containment_a_in_b = shared/|A|, and
+    # containment_b_in_a = shared/|B|, so jaccard/containment_a_in_b reduces to
+    # |A|/union and jaccard/containment_b_in_a reduces to |B|/union -- how much
+    # of that side's own footprint the union comprises, i.e. how diluted that
+    # side's footprint is by content unique to the other side).
+    #
+    # Disjoint-footprint edge case (Codex review finding on this PR): when the
+    # two footprints share nothing, jaccard and both containments are all
+    # 0.0/0.0 -- the division is undefined even though |side|/union is still
+    # well-defined (union = |A|+|B| when shared=0). Fall back to computing it
+    # directly from the raw population counts already on the row rather than
+    # dropping the observation for exactly the case (zero overlap) where the
+    # divergence signal is most useful.
     novelty_by_client = defaultdict(list)
     for r in summary_rows:
         if r["comparison_type"] not in ("sibling_projects", "cross_client"):
@@ -2544,11 +2557,37 @@ def build_client_summary(
         if v_all is not None:
             xc_by_client_all[ca].append(v_all)
             xc_by_client_all[cb].append(v_all)
-        c_all = pf(_col(r, "all_union_containment_a_in_b"))
-        if v_all is not None and c_all:
-            novelty = v_all / c_all
-            novelty_by_client[ca].append(novelty)
-            novelty_by_client[cb].append(novelty)
+        if v_all is not None:
+            c_ab_all = pf(_col(r, "all_union_containment_a_in_b"))
+            c_ba_all = pf(_col(r, "all_union_containment_b_in_a"))
+            n_a = pf(r.get("n_patterns_a"))
+            n_b = pf(r.get("n_patterns_b"))
+            n_shared = pf(r.get("n_shared_join_hash"))
+            union_n = (
+                n_a + n_b - n_shared
+                if n_a is not None and n_b is not None and n_shared is not None
+                else None
+            )
+
+            def _side_novelty(containment: Optional[float], side_n: Optional[float]) -> Optional[float]:
+                if containment:
+                    return v_all / containment
+                # containment == 0.0 (or missing): only a genuine zero-overlap
+                # pair reaches here without a real containment value, since
+                # containment is otherwise >0 whenever v_all (jaccard) is >0
+                # (shared>0 implies both are nonzero together). Derive
+                # |side|/union directly from raw counts instead of dropping
+                # the observation.
+                if union_n and side_n is not None:
+                    return side_n / union_n
+                return None
+
+            novelty_a = _side_novelty(c_ab_all, n_a)
+            novelty_b = _side_novelty(c_ba_all, n_b)
+            if novelty_a is not None:
+                novelty_by_client[ca].append(novelty_a)
+            if novelty_b is not None:
+                novelty_by_client[cb].append(novelty_b)
 
     # Within-project coherence. Gated on governance_role_a == "Project" for the
     # same reason as the all_clients fallback above -- within_project rows exist

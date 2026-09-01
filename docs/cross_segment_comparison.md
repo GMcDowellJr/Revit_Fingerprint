@@ -457,7 +457,7 @@ target_union_jh    = union of all join_hashes in the target segment
 delta_jh           = target_union_jh − reference_union_jh
 ```
 
-Each join_hash in `delta_jh` is a pattern present in the target that has no counterpart in the reference. Delta patterns are the explicit complement of template-in-project containment: a project with `containment_a_in_b_mean = 0.60` has delta patterns equal to 40% of the reference mandate, and `cross_segment_delta.csv` names every one of them.
+Each join_hash in `delta_jh` is a pattern present in the target that has no counterpart in the reference. Delta patterns are the explicit complement of `containment_b_in_a` (the fraction of the target's own patterns that trace back to the reference, `shared/|target|`) — NOT of `containment_a_in_b` (whose complement is missing reference-mandate coverage, a different set entirely: reference patterns absent from the target, not target patterns absent from the reference). A project with `containment_b_in_a_mean = 0.60` has delta patterns equal to 40% of the project's own patterns, and `cross_segment_delta.csv` names every one of them.
 
 Delta rows are only emitted for `template_to_project`, `template_to_container`, `container_to_project`, `enterprise_to_project`, and `bc_to_project` comparison types — the same shape of comparison (standard reference vs. Project/Container target) at different scope levels. `enterprise_to_bc` and `enterprise_to_client` are standard-to-standard comparisons and do not produce delta output, matching `generic_to_template`/`generic_to_container`. Symmetric types (`sibling_*`, `within_project`) and `parent_sibling_roles` do not produce delta output either.
 
