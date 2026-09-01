@@ -1,0 +1,10 @@
+# Example / synthetic target-segments list for tools/compare_reference_multi.py's
+# --target-segments flag (newline-delimited form). One target segment folder
+# name (run_registry.csv's output_folder column) per line; blank lines and
+# '#'-prefixed comment lines are ignored.
+#
+# These segment names are fictional (synthetic_*), for documentation and
+# testing only -- NOT real Stantec project/template names. See
+# docs/reference_comparison_tool.md.
+synthetic_container_a
+synthetic_project_a
