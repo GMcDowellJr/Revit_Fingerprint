@@ -505,3 +505,113 @@ unless you pass `--overwrite`.
   runs without being re-materialized, `--reference-run-id`/
   `--target-run-id` will need to become explicit, independent selectors
   rather than assuming segment choice is sufficient.
+- Reference-vs-many-references and multi-reference ranking are out of scope
+  for *this* tool specifically, but are covered by the companion fan-out
+  driver, `tools/compare_reference_multi.py` — see below.
+
+## Multi-reference fan-out driver (`tools/compare_reference_multi.py`)
+
+`tools/compare_reference_multi.py` is a separate, additive tool that fans
+this workflow out across an M×N grid: a small CSV of references crossed
+against a list of target segments. It never modifies, imports, or
+reimplements anything from `tools/compare_reference.py` — each
+(reference_segment, reference, target_segment) combination is run as its
+own `python tools/compare_reference.py` subprocess (mirroring the
+`subprocess.run([sys.executable, ...], cwd=repo_root)` convention already
+used by `tools/run_segment_orchestrator.py` to drive other `tools/*.py`
+scripts), and the driver's only comparison-shaped logic is aggregating each
+combo's own `reference_comparison_summary.csv` into one unioned table
+afterward.
+
+### CLI
+
+```
+python tools/compare_reference_multi.py \
+    --segments-root DIR \
+    --registry-file FILE \
+    --references FILE \
+    --target-segments FILE|LIST \
+    --out-root DIR \
+    [--workers N|auto] \
+    [--overwrite] \
+    [--domains DOMAIN1,DOMAIN2,...] \
+    [--purge-view all|used|both] \
+    [--include-name-overlap]
+```
+
+- `--segments-root` / `--registry-file` — passed through unchanged to every
+  child `compare_reference.py` call.
+- `--references` — a CSV whose header must be **exactly**
+  `reference_segment,reference` (no extra or reordered columns); one row
+  per reference to run. A malformed header or zero data rows fails fast
+  with a clear error naming the CSV path and the expected header.
+- `--target-segments` — either an existing newline-delimited file (blank
+  lines and `#`-comment lines skipped) or a comma-separated inline list of
+  target segment folder names (`run_registry.csv`'s own `output_folder`
+  column, same selector `--target-segment` takes on the single-pair tool).
+- `--out-root` — parent output directory. One subdirectory per combo is
+  created under it, named from the sanitized
+  `(reference_segment, reference, target_segment)` triple, and passed as
+  that combo's own `--out-dir`.
+- `--workers` — max parallel `compare_reference.py` subprocesses, default
+  `auto` (CPU count minus 2, capped at 61 on Windows) — the same convention
+  `tools/compare_cross_segment.py`'s own `--workers` uses.
+- `--overwrite`, `--domains`, `--purge-view`, `--include-name-overlap` —
+  passed through identically to every child call in the grid. There is no
+  per-combo override in this version.
+
+### Example (synthetic fixtures)
+
+`tools/examples/compare_reference_multi_references.example.csv` and
+`tools/examples/compare_reference_multi_target_segments.example.txt` are
+worked examples of both input files, referencing entirely fictional
+`synthetic_*` segment/reference names — **not real project or template
+data** — for documentation and test-fixture purposes only:
+
+```bash
+python tools/compare_reference_multi.py \
+    --segments-root /data/Fingerprint_Data/segments \
+    --registry-file /data/Fingerprint_Data/records/run_registry.csv \
+    --references tools/examples/compare_reference_multi_references.example.csv \
+    --target-segments tools/examples/compare_reference_multi_target_segments.example.txt \
+    --out-root /data/comparisons/multi_run_2026_09_01
+```
+
+### Outputs
+
+Written directly under `--out-root` (each combo's own full
+`reference_comparison_*` output set — summary/detail/diagnostics/manifest,
+and optionally the name-overlap files — still lands in that combo's own
+per-combo subdirectory, unchanged from what `compare_reference.py` always
+writes):
+
+- **`compare_reference_multi_run_report.json`** — every combo attempted:
+  its `reference_segment`/`reference`/`target_segment`, its `out_dir`, the
+  child subprocess's raw `returncode`, a driver-assigned `combo_status`
+  (`ok` for returncode 0, `blocked` for returncode 2 — a clean
+  `CompareReferenceError`-class block — or `crashed` for anything else,
+  which the child's own `main()` never returns deliberately and can only
+  arise from an uncaught exception or a subprocess that failed to launch),
+  and (when the child's own manifest is present) that combo's
+  `aggregate_comparison_status`, `reference_segment_id`,
+  `resolved_reference_export_run_id`, and `segment_id`.
+- **`multi_reference_comparison_summary.csv`** — every row from every
+  combo's own `reference_comparison_summary.csv` that was actually
+  produced, unioned together. Since the per-combo summary CSV carries the
+  *target* segment's `segment_id` but not the reference selector or
+  `reference_segment_id` (see
+  `audit_results/compare_reference_multi_step0_findings.md`), the
+  aggregator adds two columns of its own, `reference` (from the driving
+  `--references` CSV row) and `reference_segment_id` (from that combo's own
+  manifest JSON), ahead of every column the child summary CSV already
+  carries. A combo that blocked cleanly (returncode 2) still writes a
+  header-only summary CSV per `compare_reference.py`'s own
+  `write_top_level_blocked()` convention, so it contributes zero rows here,
+  not a missing file; only a combo that crashed before writing any output
+  is skipped (and noted in both the run report and the aggregator's console
+  output).
+
+`compare_reference_multi.py`'s own process exit code is `0` unless at least
+one combo `crashed`, in which case it exits `1` — a clean `blocked` combo
+never fails the driver's own exit code, since that is compare_reference.py
+running exactly as designed.
