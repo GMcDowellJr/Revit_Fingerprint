@@ -2515,6 +2515,29 @@ def build_client_summary(
     # tc/cp/tp convention where the bare name is all-view.
     xc_by_client = defaultdict(list)
     xc_by_client_all = defaultdict(list)
+    # Novelty axis (observability signal, symmetric/pooled rows only -- directed
+    # rows emit no jaccard field to pair with a containment field at all): for
+    # each cross_client/sibling_projects row, DIVIDE(all_union_jaccard,
+    # all_union_containment_a_in_b) for client A's own share of the union, and
+    # the B-side mirror DIVIDE(all_union_jaccard, all_union_containment_b_in_a)
+    # for client B's -- these are genuinely different values for an asymmetric
+    # pair and must not both read A's number (Codex review finding on this PR).
+    # Union-level family specifically (not the *_pairwise_* mean family, which
+    # does not preserve the clean |side|/union identity these do: for a union
+    # pair, jaccard = shared/union, containment_a_in_b = shared/|A|, and
+    # containment_b_in_a = shared/|B|, so jaccard/containment_a_in_b reduces to
+    # |A|/union and jaccard/containment_b_in_a reduces to |B|/union -- how much
+    # of that side's own footprint the union comprises, i.e. how diluted that
+    # side's footprint is by content unique to the other side).
+    #
+    # Disjoint-footprint edge case (Codex review finding on this PR): when the
+    # two footprints share nothing, jaccard and both containments are all
+    # 0.0/0.0 -- the division is undefined even though |side|/union is still
+    # well-defined (union = |A|+|B| when shared=0). Fall back to computing it
+    # directly from the raw population counts already on the row rather than
+    # dropping the observation for exactly the case (zero overlap) where the
+    # divergence signal is most useful.
+    novelty_by_client = defaultdict(list)
     for r in summary_rows:
         if r["comparison_type"] not in ("sibling_projects", "cross_client"):
             continue
@@ -2534,6 +2557,37 @@ def build_client_summary(
         if v_all is not None:
             xc_by_client_all[ca].append(v_all)
             xc_by_client_all[cb].append(v_all)
+        if v_all is not None:
+            c_ab_all = pf(_col(r, "all_union_containment_a_in_b"))
+            c_ba_all = pf(_col(r, "all_union_containment_b_in_a"))
+            n_a = pf(r.get("n_patterns_a"))
+            n_b = pf(r.get("n_patterns_b"))
+            n_shared = pf(r.get("n_shared_join_hash"))
+            union_n = (
+                n_a + n_b - n_shared
+                if n_a is not None and n_b is not None and n_shared is not None
+                else None
+            )
+
+            def _side_novelty(containment: Optional[float], side_n: Optional[float]) -> Optional[float]:
+                if containment:
+                    return v_all / containment
+                # containment == 0.0 (or missing): only a genuine zero-overlap
+                # pair reaches here without a real containment value, since
+                # containment is otherwise >0 whenever v_all (jaccard) is >0
+                # (shared>0 implies both are nonzero together). Derive
+                # |side|/union directly from raw counts instead of dropping
+                # the observation.
+                if union_n and side_n is not None:
+                    return side_n / union_n
+                return None
+
+            novelty_a = _side_novelty(c_ab_all, n_a)
+            novelty_b = _side_novelty(c_ba_all, n_b)
+            if novelty_a is not None:
+                novelty_by_client[ca].append(novelty_a)
+            if novelty_b is not None:
+                novelty_by_client[cb].append(novelty_b)
 
     # Within-project coherence. Gated on governance_role_a == "Project" for the
     # same reason as the all_clients fallback above -- within_project rows exist
@@ -2612,6 +2666,8 @@ def build_client_summary(
         xc_mean = statistics.mean(xc_vals) if xc_vals else None
         xc_vals_all = xc_by_client_all.get(client, [])
         xc_mean_all = statistics.mean(xc_vals_all) if xc_vals_all else None
+        novelty_vals = novelty_by_client.get(client, [])
+        novelty_mean = statistics.mean(novelty_vals) if novelty_vals else None
         wp_vals = wp_by_client.get(client, [])
         wp_mean = statistics.mean(wp_vals) if wp_vals else None
         wp_vals_all = wp_by_client_all.get(client, [])
@@ -2663,6 +2719,7 @@ def build_client_summary(
             "tier": tier,
             "xc_mean": xc_mean,
             "xc_mean_all": xc_mean_all,
+            "novelty_mean": novelty_mean,
             "wp_mean": wp_mean,
             "wp_mean_all": wp_mean_all,
             "confidence_note": conf,
@@ -3986,6 +4043,19 @@ def render_client_section(client_rows: list[dict]) -> str:
                 f"{DOMAIN_LABELS.get(d, d)} ({pct(v)})" for d, v in r["weakest"]
             )
             lines.append(f"Weakest alignment domains: {weak_str}.\n")
+        # Novelty axis (observability signal, not a recommendation): how much of
+        # this client's own footprint is diluted by content unique to its peer
+        # comparisons. Derived from union-level jaccard/containment, not the
+        # pairwise mean -- see build_client_summary()'s novelty_by_client comment.
+        novelty_mean = r.get("novelty_mean")
+        if novelty_mean is not None:
+            lines.append(
+                f"Footprint novelty: {fmt(novelty_mean)}. This is how much of "
+                f"this client's own all-view footprint the client-pair union "
+                f"comprises, on average across its peer comparisons — a lower "
+                f"value means more of the combined footprint is content unique "
+                f"to the other client, not shared with this one.\n"
+            )
         # Only note a different sector when it's actually KNOWN (not "unknown") --
         # an unclassified client must not be presented as confirmed non-healthcare.
         if r.get("sector", "unknown") not in ("unknown", "healthcare"):

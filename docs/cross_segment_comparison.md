@@ -49,13 +49,13 @@ All-view is the full configured vocabulary for a segment. Used-view is the vocab
 | `bc_to_project` | Directed | Bc-scoped Template/Container | Project segment in the same business center | `provided_to_configured_containment`; project `provided_to_used_containment` | Does a business center's standard reach the projects within that bc, across whichever clients happen to have work there? |
 | `enterprise_to_bc` | Directed | Enterprise-scoped Template/Container | Bc-scoped Template/Container (same role) | all-view `provided_to_configured_containment` | Has a business center's standard adapted the enterprise standard, before even looking at any project? |
 | `enterprise_to_client` | Directed | Enterprise-scoped Template/Container | Client-scoped Template/Container (same role) | all-view `provided_to_configured_containment` | Has a client's standard adapted the enterprise standard, before even looking at any project? |
-| `parent_sibling_roles` | Directed | Template-role level-2 | Project-role level-2 | `containment_b_in_a` | Template efficacy at peer level within the hierarchy |
+| `parent_sibling_roles` | Directed | Template-role level-2 | Project-role level-2 | `containment_a_in_b` | Template efficacy at peer level within the hierarchy |
 | `sibling_templates` | Symmetric | Template segment | Template segment | `jaccard_mean` | Are template siblings converging? |
 | `sibling_projects` | Symmetric | Project segment | Project segment | `jaccard_mean` | Are project siblings consistent? |
 | `cross_client` | Symmetric | Client's client-level pooled Project segment | Another client's client-level pooled Project segment (same unit_system) | `jaccard_mean` | Do different clients converge on the same patterns, independent of any shared segment lineage? |
 | `sibling_containers` | Symmetric | Container segment | Container segment | `jaccard_mean` | Are container siblings aligned? |
 | `within_project` | Symmetric | File within segment | File within segment | `jaccard_mean` | Are files from the same project consistent with each other? |
-| `governance_chain` | Directed | Template / Container | Project / Container | `containment_b_in_a` | End-to-end governance chain coverage |
+| `governance_chain` | Directed | Template / Container | Project / Container | `containment_a_in_b` | End-to-end governance chain coverage |
 
 Directed pairs use containment metrics; symmetric pairs use Jaccard. Both are always computed at the join_hash level, not pattern_id level.
 
@@ -138,8 +138,8 @@ The reference side (Template or Container) collapses all its bundles (or files) 
 
 Each target unit (bundle or file) is then scored individually:
 
-- `containment_b_in_a`: `|target_jh ∩ reference_union| / |reference_union|` — what fraction of the mandate appears in this target unit.
-- `containment_a_in_b`: `|target_jh ∩ reference_union| / |target_jh|` — what fraction of the target's patterns come from the reference mandate.
+- `containment_a_in_b`: `|target_jh ∩ reference_union| / |reference_union|` — what fraction of the mandate (A/reference) appears in this target (B) unit.
+- `containment_b_in_a`: `|target_jh ∩ reference_union| / |target_jh|` — what fraction of the target's (B) patterns come from the reference (A) mandate.
 
 Summary columns (`_mean`, `_min`) aggregate across all target units.
 
@@ -228,8 +228,6 @@ One row per (segment_id_a, segment_id_b, domain, comparison_type).
 | `executed_utc` | ISO-8601 UTC timestamp of the comparison run |
 
 Columns that do not apply to a comparison direction are emitted as blank strings. For directed pairs: `jaccard_*`/`*_union_*`/`*_file_mean_similarity_*`/`aggregation_method` columns are blank. For symmetric pairs: `reference_aggregation`/`target_aggregation`/`n_reference_files`/`reference_*_pattern_count`/`reference_core_share` columns are blank. Semantic columns (`reference_usage_interpretable`, `target_usage_interpretable`, `recommended_primary_view`, `comparison_role_semantics`) clarify when used-view scores are active-practice signals versus annotations.
-
-**Migration note**: `all_jaccard_mean`/`used_jaccard_mean`/`all_containment_a_in_b_mean`/`all_containment_b_in_a_mean`/`used_containment_a_in_b_mean`/`used_containment_b_in_a_mean` were renamed to their `*_pairwise_*` equivalents above. `tools/generate_governance_narrative.py` and `tools/compare_governance_populations.py` still read the pre-rename names as of this writing and will read blank values for these specific fields until migrated in a follow-up PR — see `CHANGELOG.md`.
 
 ### cross_segment_file_pairs.csv
 
@@ -404,7 +402,7 @@ python tools/compare_cross_segment.py \
 
 ## 8. Interpretation Guide
 
-### Template → Project (containment_b_in_a)
+### Template → Project (containment_a_in_b)
 
 | Value | Interpretation |
 |-------|----------------|
@@ -412,16 +410,16 @@ python tools/compare_cross_segment.py \
 | 0.70–0.89 | Partial adoption: significant gaps — investigate which patterns are missing |
 | < 0.70 | Weak adoption: project has drifted substantially from the template mandate |
 
-`containment_b_in_a_min` reveals the worst-performing project bundle. A high mean but low min signals one problematic bundle pulling down overall governance coverage.
+`containment_a_in_b_min` reveals the worst-performing project bundle. A high mean but low min signals one problematic bundle pulling down overall governance coverage.
 
-### Template → Project (containment_a_in_b)
+### Template → Project (containment_b_in_a)
 
-High values (close to 1.0) mean most of what the project does comes from the template — the project adds little locally. Low values mean the project has invented many patterns outside the template's scope. Neither is inherently bad, but the combination with `containment_b_in_a` tells the story:
+High values (close to 1.0) mean most of what the project does comes from the template — the project adds little locally. Low values mean the project has invented many patterns outside the template's scope. Neither is inherently bad, but the combination with `containment_a_in_b` tells the story:
 
-- High b_in_a + high a_in_b: tight, well-governed alignment
-- High b_in_a + low a_in_b: project uses the template but also extends heavily
-- Low b_in_a + high a_in_b: project is tiny and contains almost nothing from the template
-- Low b_in_a + low a_in_b: project has drifted and is inventing independently (**governance failure**)
+- High a_in_b + high b_in_a: tight, well-governed alignment
+- High a_in_b + low b_in_a: project uses the template but also extends heavily
+- Low a_in_b + high b_in_a: project is narrow — it touches only a small slice of the full mandate — but faithful within that slice: what little it has closely tracks the template
+- Low a_in_b + low b_in_a: project has drifted and is inventing independently (**governance failure**)
 
 ### Sibling Jaccard (sibling_templates, sibling_projects)
 
@@ -439,11 +437,11 @@ Within-project Jaccard measures how consistent files from the same named project
 
 ### attribution_gap concept
 
-For a directed comparison, `attribution_gap = 1.0 - containment_b_in_a_mean`. It represents the fraction of the reference mandate that target bundles do not cover. An attribution gap above 0.3 warrants investigation.
+For a directed comparison, `attribution_gap = 1.0 - containment_b_in_a_mean`. It represents the fraction of the target's own patterns that are absent from the reference mandate (matching the Section 1 definition: "the fraction of project-bundle join_hashes that do not appear in the reference template union" — locally invented, non-governed patterns). An attribution gap above 0.3 warrants investigation.
 
 ### phantom_governance concept
 
-When `containment_b_in_a_mean` (template coverage in project) is low but `n_patterns_a` is large, the template mandates many patterns that projects never adopt. These patterns exist in the governance structure but have no downstream effect — phantom governance. To distinguish phantom governance from genuine adoption gaps, compare the template segment's `n_patterns_a` to sibling templates: if the pattern count is an outlier, the template may have accumulated stale or over-specified patterns.
+When `containment_a_in_b_mean` (template coverage in project) is low but `n_patterns_a` is large, the template mandates many patterns that projects never adopt. These patterns exist in the governance structure but have no downstream effect — phantom governance. To distinguish phantom governance from genuine adoption gaps, compare the template segment's `n_patterns_a` to sibling templates: if the pattern count is an outlier, the template may have accumulated stale or over-specified patterns.
 
 ---
 
@@ -459,7 +457,7 @@ target_union_jh    = union of all join_hashes in the target segment
 delta_jh           = target_union_jh − reference_union_jh
 ```
 
-Each join_hash in `delta_jh` is a pattern present in the target that has no counterpart in the reference. Delta patterns are the explicit complement of template-in-project containment: a project with `containment_b_in_a_mean = 0.60` has delta patterns equal to 40% of the reference mandate, and `cross_segment_delta.csv` names every one of them.
+Each join_hash in `delta_jh` is a pattern present in the target that has no counterpart in the reference. Delta patterns are the explicit complement of `containment_b_in_a` (the fraction of the target's own patterns that trace back to the reference, `shared/|target|`) — NOT of `containment_a_in_b` (whose complement is missing reference-mandate coverage, a different set entirely: reference patterns absent from the target, not target patterns absent from the reference). A project with `containment_b_in_a_mean = 0.60` has delta patterns equal to 40% of the project's own patterns, and `cross_segment_delta.csv` names every one of them.
 
 Delta rows are only emitted for `template_to_project`, `template_to_container`, `container_to_project`, `enterprise_to_project`, and `bc_to_project` comparison types — the same shape of comparison (standard reference vs. Project/Container target) at different scope levels. `enterprise_to_bc` and `enterprise_to_client` are standard-to-standard comparisons and do not produce delta output, matching `generic_to_template`/`generic_to_container`. Symmetric types (`sibling_*`, `within_project`) and `parent_sibling_roles` do not produce delta output either.
 
