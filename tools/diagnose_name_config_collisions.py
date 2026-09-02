@@ -41,7 +41,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Set
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
@@ -50,7 +50,11 @@ if str(REPO_ROOT) not in sys.path:
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from core.name_key_coverage import ELIGIBLE_DOMAINS  # noqa: E402
+from core.name_key_coverage import (  # noqa: E402
+    COVERAGE_PHASES_REDUNDANT,
+    ELIGIBLE_DOMAINS,
+    coverage_class,
+)
 from name_config_collision import (  # noqa: E402
     NAME_KEY_STATUS_OK,
     find_within_side_name_ambiguities,
@@ -111,6 +115,13 @@ def _summarize_segment(segment_root: Path) -> List[Dict[str, object]]:
         summary_rows.append({
             "segment": str(segment_root),
             "domain": domain,
+            # core/name_key_coverage.py: Native/Widened name-key evidence is not directly
+            # comparable in kind, and `phases` is near-tautologically identical to its own
+            # config join_hash (both key off phase.name, D-010) -- pooling all three into
+            # one collision percentage would misrepresent the headline magnitude (PR #482
+            # review). Carried per-row here so a reader can see which class each domain
+            # belongs to; main() reports totals per class rather than pooling them.
+            "coverage_class": coverage_class(domain),
             "distinct_name_count": total_names,
             "names_with_gt1_config": len(collided),
             "collision_pct": pct,
@@ -121,7 +132,7 @@ def _summarize_segment(segment_root: Path) -> List[Dict[str, object]]:
 
 
 def _print_summary_table(all_summary_rows: List[Dict[str, object]]) -> None:
-    header = f"{'segment':<40} {'domain':<45} {'names':>8} {'collided':>10} {'pct':>7} {'max_cfg':>8}"
+    header = f"{'segment':<40} {'domain':<45} {'class':<17} {'names':>8} {'collided':>10} {'pct':>7} {'max_cfg':>8}"
     print(header)
     print("-" * len(header))
     for row in all_summary_rows:
@@ -129,7 +140,7 @@ def _print_summary_table(all_summary_rows: List[Dict[str, object]]) -> None:
         if len(seg_display) > 40:
             seg_display = "..." + seg_display[-37:]
         print(
-            f"{seg_display:<40} {row['domain']:<45} {row['distinct_name_count']:>8} "
+            f"{seg_display:<40} {row['domain']:<45} {row['coverage_class']:<17} {row['distinct_name_count']:>8} "
             f"{row['names_with_gt1_config']:>10} {row['collision_pct']:>6.2f}% {row['max_configs_per_name']:>8}"
         )
 
@@ -163,37 +174,66 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     args = build_arg_parser().parse_args(argv)
 
+    had_invalid_input = False
+    seen_roots: Set[Path] = set()
     segment_roots: List[Path] = []
     for arg_path in args.segment_root:
         if not arg_path.is_dir():
             print(f"[diagnose_name_config_collisions][error] not a directory: {arg_path}", file=sys.stderr)
+            had_invalid_input = True
             continue
         resolved = _resolve_segment_roots(arg_path)
         if not resolved:
             print(f"[diagnose_name_config_collisions][warn] {arg_path}: no results/records/records.csv found "
                   f"here or in any subdirectory -- not a segment root and not a container of any", file=sys.stderr)
+            had_invalid_input = True
             continue
         if resolved != [arg_path]:
             print(f"[diagnose_name_config_collisions] {arg_path}: container directory -- found {len(resolved)} "
                   f"segment(s) beneath it")
-        segment_roots.extend(resolved)
+        # Overlapping positional arguments (e.g. a container directory AND one of its own
+        # segments, passed together) must not double-count the same segment's names into the
+        # totals below (PR #482 review) -- dedupe while preserving first-seen order.
+        for root in resolved:
+            if root not in seen_roots:
+                seen_roots.add(root)
+                segment_roots.append(root)
 
     all_summary_rows: List[Dict[str, object]] = []
     for segment_root in segment_roots:
         all_summary_rows.extend(_summarize_segment(segment_root))
 
     if not all_summary_rows:
+        if had_invalid_input:
+            # Distinguish "scanned zero segments because every input was missing/mistyped"
+            # from a legitimate empty scan (PR #482 review) -- callers scripting this tool
+            # need a nonzero exit to detect the former.
+            print("[diagnose_name_config_collisions][error] no valid segment roots resolved from the given "
+                  "input(s) -- nothing was scanned.", file=sys.stderr)
+            return 2
         print("[diagnose_name_config_collisions] no eligible-domain name evidence found in any scanned segment.")
         return 0
 
     _print_summary_table(all_summary_rows)
 
-    total_names = sum(r["distinct_name_count"] for r in all_summary_rows)
-    total_collided = sum(r["names_with_gt1_config"] for r in all_summary_rows)
-    overall_pct = (100.0 * total_collided / total_names) if total_names else 0.0
     print()
-    print(f"[diagnose_name_config_collisions] TOTAL across {len(segment_roots)} segment(s): "
-          f"{total_names} distinct names scanned, {total_collided} ({overall_pct:.2f}%) map to >1 config.")
+    # Native/Widened name-key evidence is not directly comparable in kind, and `phases` is
+    # near-tautologically identical to its own config join_hash (core/name_key_coverage.py) --
+    # pooling all coverage classes into one headline percentage would misrepresent the
+    # magnitude (PR #482 review), so totals are reported per class instead.
+    by_class: Dict[str, List[Dict[str, object]]] = {}
+    for row in all_summary_rows:
+        by_class.setdefault(row["coverage_class"], []).append(row)
+    for cls in sorted(by_class):
+        rows = by_class[cls]
+        names = sum(r["distinct_name_count"] for r in rows)
+        collided = sum(r["names_with_gt1_config"] for r in rows)
+        pct = (100.0 * collided / names) if names else 0.0
+        note = ""
+        if cls == COVERAGE_PHASES_REDUNDANT:
+            note = " (near-tautological vs. its own config identity -- not comparable to native/widened totals)"
+        print(f"[diagnose_name_config_collisions] TOTAL [{cls}] across {len(segment_roots)} segment(s): "
+              f"{names} distinct names scanned, {collided} ({pct:.2f}%) map to >1 config.{note}")
 
     if args.detail:
         print()

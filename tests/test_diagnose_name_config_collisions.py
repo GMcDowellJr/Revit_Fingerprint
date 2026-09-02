@@ -113,10 +113,62 @@ def test_main_end_to_end_against_container_directory(tmp_path, capsys):
     assert "nameX" in out  # --detail spot-check row
 
 
-def test_main_reports_explicit_warning_for_container_with_no_segments(tmp_path, capsys):
+def test_main_returns_nonzero_when_every_input_is_invalid(tmp_path, capsys):
+    """PR #482 review: a scan that never ran (every supplied path missing/mistyped or
+    resolving to zero segments) must be distinguishable from a legitimate empty scan --
+    scripts invoking this tool need a nonzero exit code for the former."""
     empty_dir = tmp_path / "no_segments_here"
     empty_dir.mkdir()
     rc = dncc.main([str(empty_dir)])
-    assert rc == 0
+    assert rc == 2
     err = capsys.readouterr().err
     assert "not a segment root and not a container of any" in err
+    assert "nothing was scanned" in err
+
+
+def test_main_returns_nonzero_for_a_missing_path(tmp_path, capsys):
+    missing = tmp_path / "does_not_exist"
+    rc = dncc.main([str(missing)])
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "not a directory" in err
+
+
+def test_main_still_succeeds_when_only_some_inputs_are_invalid(tmp_path, capsys):
+    """A mix of one valid segment and one bad path should still scan the valid one and
+    return success -- the nonzero exit is reserved for 'nothing was scanned at all'."""
+    seg_root = tmp_path / "seg_ok"
+    _write_segment(seg_root)
+    missing = tmp_path / "does_not_exist"
+
+    rc = dncc.main([str(seg_root), str(missing)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "arrowheads" in out
+
+
+def test_main_dedupes_overlapping_segment_roots(tmp_path, capsys):
+    """PR #482 review: passing a container directory AND one of its own segments together
+    must not double-count that segment's names in the totals."""
+    segments_dir = tmp_path / "segments"
+    seg_root = segments_dir / "imperial_container"
+    _write_segment(seg_root)
+
+    rc = dncc.main([str(segments_dir), str(seg_root)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    # Exactly one scanned segment, not two -- the dedup keeps the arrowheads row's
+    # distinct_name_count from doubling (would be 2 instead of 1 if double-counted).
+    assert "TOTAL [widened] across 1 segment(s): 1 distinct names scanned" in out
+
+
+def test_main_reports_coverage_class_and_separates_headline_totals(tmp_path, capsys):
+    seg_root = tmp_path / "seg"
+    _write_segment(seg_root)  # arrowheads is a WIDENED domain
+    rc = dncc.main([str(seg_root)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "native" in out or "widened" in out
+    assert "TOTAL [widened]" in out
+    # No pooled cross-class line -- each coverage class gets its own TOTAL line.
+    assert "TOTAL across" not in out
