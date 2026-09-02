@@ -22,10 +22,19 @@ tools/compare_reference.py or tools/run_segment_orchestrator.py -- this is purel
 a human (Greg) to point at real corpus data and judge, by eye, whether this is a rare
 curiosity or a common governance hazard, before any follow-on PR decides on an output shape.
 
+Each positional argument may be either a segment root itself (a directory containing
+results/records/records.csv directly) OR a container directory holding many segment roots
+(e.g. Fingerprint_Data/segments, one subfolder per segment_id) -- a container is
+auto-detected (no results/records/records.csv of its own) and recursively searched for every
+results/records/records.csv beneath it, one segment per match. This mirrors how
+tools/run_segment_orchestrator.py/build_segment_manifest.py lay out segments on disk, so
+Greg can point this at the whole segments/ folder in one call instead of enumerating each
+segment_id by hand.
+
 Usage:
-    python tools/diagnose_name_config_collisions.py <segment_root> [<segment_root> ...]
-    python tools/diagnose_name_config_collisions.py <segment_root> --detail
-    python tools/diagnose_name_config_collisions.py <segment_root> --detail --detail-limit 100
+    python tools/diagnose_name_config_collisions.py <segment_root_or_container> [...]
+    python tools/diagnose_name_config_collisions.py <segments_dir> --detail
+    python tools/diagnose_name_config_collisions.py <segments_dir> --detail --detail-limit 100
 """
 from __future__ import annotations
 
@@ -50,6 +59,31 @@ from name_config_collision import (  # noqa: E402
 )
 
 _DEFAULT_DETAIL_LIMIT = 50
+
+
+def _is_segment_root(path: Path) -> bool:
+    return (path / "results" / "records" / "records.csv").is_file()
+
+
+def _resolve_segment_roots(path: Path) -> List[Path]:
+    """Resolve one CLI argument to a list of segment roots.
+
+    If `path` itself looks like a segment root (has results/records/records.csv directly),
+    it's used as-is -- no directory walk. Otherwise `path` is treated as a container (e.g.
+    the parent `segments/` folder holding one subdirectory per segment_id) and searched
+    recursively for every results/records/records.csv beneath it; each match's segment root
+    is `.../records.csv`'s grandparent (records.csv -> results/records -> results ->
+    segment_root). Recursive rather than one-level-only so nested segment layouts (segment
+    hierarchies with parent/child segments, per build_segment_manifest.py) are found too.
+    """
+    if _is_segment_root(path):
+        return [path]
+    found = sorted({
+        records_csv.parent.parent.parent
+        for records_csv in path.rglob("records.csv")
+        if records_csv.parent.name == "records" and records_csv.parent.parent.name == "results"
+    })
+    return found
 
 
 def _summarize_segment(segment_root: Path) -> List[Dict[str, object]]:
@@ -129,11 +163,23 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     args = build_arg_parser().parse_args(argv)
 
-    all_summary_rows: List[Dict[str, object]] = []
-    for segment_root in args.segment_root:
-        if not segment_root.is_dir():
-            print(f"[diagnose_name_config_collisions][error] not a directory: {segment_root}", file=sys.stderr)
+    segment_roots: List[Path] = []
+    for arg_path in args.segment_root:
+        if not arg_path.is_dir():
+            print(f"[diagnose_name_config_collisions][error] not a directory: {arg_path}", file=sys.stderr)
             continue
+        resolved = _resolve_segment_roots(arg_path)
+        if not resolved:
+            print(f"[diagnose_name_config_collisions][warn] {arg_path}: no results/records/records.csv found "
+                  f"here or in any subdirectory -- not a segment root and not a container of any", file=sys.stderr)
+            continue
+        if resolved != [arg_path]:
+            print(f"[diagnose_name_config_collisions] {arg_path}: container directory -- found {len(resolved)} "
+                  f"segment(s) beneath it")
+        segment_roots.extend(resolved)
+
+    all_summary_rows: List[Dict[str, object]] = []
+    for segment_root in segment_roots:
         all_summary_rows.extend(_summarize_segment(segment_root))
 
     if not all_summary_rows:
@@ -146,7 +192,7 @@ def main(argv=None) -> int:
     total_collided = sum(r["names_with_gt1_config"] for r in all_summary_rows)
     overall_pct = (100.0 * total_collided / total_names) if total_names else 0.0
     print()
-    print(f"[diagnose_name_config_collisions] TOTAL across {len(args.segment_root)} segment(s): "
+    print(f"[diagnose_name_config_collisions] TOTAL across {len(segment_roots)} segment(s): "
           f"{total_names} distinct names scanned, {total_collided} ({overall_pct:.2f}%) map to >1 config.")
 
     if args.detail:
