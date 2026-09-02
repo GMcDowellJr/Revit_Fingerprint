@@ -353,7 +353,7 @@ def _registry_row(segment_id: str) -> Dict[str, str]:
     }
 
 
-def test_end_to_end_include_name_overlap_flag_writes_sidecar(tmp_path):
+def test_end_to_end_name_overlap_sidecar_written(tmp_path):
     domain = "arrowheads"  # must be name-key ELIGIBLE (object_styles_model, used elsewhere in
     # this repo's compare_reference fixtures, is explicitly excluded -- no_name_like_key)
     segments_root = tmp_path / "segments"
@@ -640,7 +640,7 @@ def test_name_config_collisions_included_by_default(tmp_path):
     assert cr.NAME_CONFIG_COLLISION_FILENAME in manifest["output_files"]
     assert cr.NAME_CONFIG_COLLISION_CONFIGS_FILENAME in manifest["output_files"]
     assert manifest["name_config_collisions_known_gaps"] == [cr.REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED]
-    # --include-name-overlap's own flag is unaffected -- both are on by default independently.
+    # --no-name-overlap's own flag is unaffected -- both are on by default independently.
     assert manifest["name_overlap_included"] is True
 
 
@@ -719,6 +719,93 @@ def test_no_name_config_collisions_flag_suppresses_output(tmp_path):
     # --no-name-overlap's own default-on output is unaffected -- each flag is independent.
     assert (out_dir / cr.NAME_OVERLAP_FILENAME).is_file()
     assert manifest["name_overlap_included"] is True
+
+
+def test_name_config_collisions_still_scanned_when_domain_has_no_reference_defined(tmp_path):
+    """Codex review (PR #483): a requested domain absent from the reference's own
+    pattern_presence_file.csv hits step_compare.py's NO_REFERENCE_DEFINED shortcut -- a
+    summary/gap row per target file, but zero reference_comparison_detail.csv rows (see
+    step_compare.py's own "no detail rows are emitted" comment). Deriving the set of target
+    files to scan for name-config-collisions from all_detail_rows would silently drop that
+    target file from scanning entirely, even though its underlying name-key evidence is
+    otherwise valid -- the fix derives from all_summary_rows instead, which always carries
+    one row per (purge_view, target, domain) actually compared regardless of outcome."""
+    domain = "arrowheads"  # name-key ELIGIBLE
+    segments_root = tmp_path / "segments"
+    seg_root = segments_root / "seg_a"
+    corpus_records_dir = tmp_path / "corpus" / "records"
+    registry_file = corpus_records_dir / "run_registry.csv"
+    _write_csv(registry_file, _REGISTRY_FIELDNAMES, [_registry_row("seg_a")])
+
+    _write_csv(
+        seg_root / "results" / "records" / "file_metadata.csv",
+        ["export_run_id", "central_path", "governance_role", "unit_system"],
+        [
+            {"export_run_id": eid, "central_path": f"/x/{eid}", "governance_role": "Project", "unit_system": "imperial"}
+            for eid in ("ref.json", "target.json")
+        ],
+    )
+    _write_csv(
+        seg_root / "results" / "records" / "records.csv",
+        ["export_run_id", "domain", "join_key_schema", "join_key_policy_id", "join_key_policy_version", "record_id", "join_hash"],
+        [
+            {"export_run_id": eid, "domain": domain, "join_key_schema": f"{domain}.join_key.v1",
+             "join_key_policy_id": "p1", "join_key_policy_version": "1", "record_id": f"rec_{eid}", "join_hash": "A"}
+            for eid in ("ref.json", "target.json")
+        ],
+    )
+    # Deliberately NO presence rows for `domain` at all -- reference["domains"] (built from
+    # this segment's own pattern_presence_file.csv, scoped to the reference export) has no
+    # "arrowheads" key, so run_compare_for_domain's NO_REFERENCE_DEFINED shortcut fires for
+    # every target file under this domain. A dummy row for an unrelated domain establishes
+    # analysis_run_id (resolve_analysis_run_id requires at least one row) without giving
+    # "arrowheads" a reference pattern set.
+    presence_rows = [
+        {"analysis_run_id": "run1", "domain": "line_styles", "export_run_id": "ref.json", "pattern_id": "X", "pattern_share_pct": "1.000000"},
+    ]
+    _write_csv(seg_root / "results" / "analysis" / "pattern_presence_file.csv",
+               ["analysis_run_id", "domain", "export_run_id", "pattern_id", "pattern_share_pct"], presence_rows)
+    _write_csv(seg_root / "results" / "analysis" / "corpus_manifest.csv", ["schema_version"], [{"schema_version": "2.1.0"}])
+    _write_csv(
+        seg_root / "results" / "analysis" / "domain_patterns.csv",
+        ["schema_version", "analysis_run_id", "domain", "pattern_id", "source_cluster_id"],
+        [],
+    )
+    _write_csv(
+        seg_root / "results" / "name_key" / "name_key_results.csv",
+        ["export_file", "domain", "record_id", "label_display", "join_hash", "status"],
+        [
+            {"export_file": "ref.json", "domain": domain, "record_id": "rec_ref.json", "label_display": "Arrow", "join_hash": "N1", "status": "ok"},
+            {"export_file": "target.json", "domain": domain, "record_id": "rec_target.json", "label_display": "Arrow", "join_hash": "N1", "status": "ok"},
+        ],
+    )
+    _write_csv(seg_root / "results" / "bundle_analysis" / "all" / domain / "membership_matrix.csv",
+               ["analysis_run_id", "export_run_id", "pattern_id"], [])
+
+    out_dir = tmp_path / "out"
+    argv = [
+        "--segments-root", str(segments_root),
+        "--registry-file", str(registry_file),
+        "--reference-segment", "seg_a",
+        "--reference", "ref.json",
+        "--out-dir", str(out_dir),
+        "--purge-view", "all",
+        "--domains", domain,
+    ]
+    rc = cr.main(argv)
+    assert rc == 0
+
+    # No detail rows for this domain at all (confirms the NO_REFERENCE_DEFINED scenario
+    # actually fired, not some other unrelated reason this test would pass vacuously).
+    detail_rows = _read_csv(out_dir / cr.DETAIL_FILENAME)
+    assert [r for r in detail_rows if r["domain"] == domain] == []
+
+    collision_rows = _read_csv(out_dir / cr.NAME_CONFIG_COLLISION_FILENAME)
+    assert len(collision_rows) == 1
+    assert collision_rows[0]["domain"] == domain
+    assert collision_rows[0]["target_export_run_id"] == "target.json"
+    assert collision_rows[0]["name_config_classification"] == "config_sets_identical"
+    assert collision_rows[0]["name_hash"] == "N1"
 
 
 def test_name_overlap_keys_present_on_preflight_blocked_manifest(tmp_path):

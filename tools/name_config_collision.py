@@ -4,8 +4,8 @@
 
 tools/name_key_rollup.py::DomainNameHashFacets indexes name evidence config-first:
 `(domain, config_join_hash) -> {name_join_hash: {record_count, label_counts}}`. That answers
-"given the same config, do the names agree?" (tools/compare_reference.py's
---include-name-overlap / NAME_SETS_*). This module answers the inverse question: "given the
+"given the same config, do the names agree?" (tools/compare_reference.py's default-on
+name-overlap output / NAME_SETS_*). This module answers the inverse question: "given the
 same name, does the config agree?" -- the case where a naive person searching or reading by
 name alone would assume two things are the same governance object when they are not.
 

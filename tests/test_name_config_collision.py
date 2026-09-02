@@ -1,10 +1,10 @@
 # tests/test_name_config_collision.py
 #
-# Regression tests for tools/name_config_collision.py -- the Same-Name-Different-Config
-# Collision Detection prototype (Step 1 of the investigation described in the PR: given the
+# Regression tests for tools/name_config_collision.py -- Same-Name-Different-Config
+# Collision Detection (Step 1 of the investigation described in the PR: given the
 # same name, does the config agree?). This is the inverse question to
-# tools/compare_reference.py's --include-name-overlap (given the same config, do the names
-# agree?).
+# tools/compare_reference.py's default-on name-overlap output (given the same config, do the
+# names agree?).
 #
 # Use synthetic fixtures only. No Revit dependency. Fixture-construction style (helper
 # functions writing CSV rows under a segment_root, matching the exact records.csv/

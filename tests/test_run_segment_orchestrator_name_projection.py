@@ -94,7 +94,7 @@ class TestFilterNameKeyCsvToSegment:
         # PR #476 review (P2, second round): a plain write stamps the segment-local copy
         # "now" on every Step 2b run regardless of whether the corpus-wide source itself is
         # stale, which silently defeats any downstream freshness check (e.g.
-        # tools/compare_reference.py's --include-name-overlap gate) that compares this
+        # tools/compare_reference.py's default-on name-overlap gate) that compares this
         # file's mtime against records.csv's. out_csv must carry the SOURCE file's mtime,
         # not the write time.
         import os

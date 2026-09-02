@@ -10,7 +10,8 @@ display names (real, observed on real corpus data: up to 78 distinct names for o
 text_types pattern, 8 for one arrowheads pattern) is itself a fragmentation signal, entirely
 independent of any cross-segment comparison -- see
 docs/namekey_crosssegment_step0_findings.md and tools/compare_reference.py's
---include-name-overlap flag (Part B, the cross-segment-capable counterpart).
+name-overlap output, written by default (Part B, the cross-segment-capable counterpart;
+opt out with --no-name-overlap).
 
 Design decisions (see the Step 1 PR description for the full rationale):
   - A1: one row per (pattern_id, name_hash) pair in pattern_name_fragmentation.csv -- never

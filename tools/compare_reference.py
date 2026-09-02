@@ -184,7 +184,7 @@ _FILE_METADATA_LABEL_FIELDS = [
 
 def _file_metadata_label_fieldnames(prefix: str) -> List[str]:
     return [f"{prefix}_{field}" for field in _FILE_METADATA_LABEL_FIELDS]
-# --- Name-set-overlap classification (Step 1 Part B, --include-name-overlap) ---------------
+# --- Name-set-overlap classification (Step 1 Part B, default on; --no-name-overlap opts out) ---
 #
 # Unlike compute_semantic_changes_rows() above (same-segment-only, string-matched on
 # pattern_label_human), this classifies the relationship between the reference side's and
@@ -1543,7 +1543,7 @@ def compute_cross_segment_semantic_changes_rows(
 
 
 # ---------------------------------------------------------------------------
-# Name-set-overlap classification (Step 1 Part B, --include-name-overlap).
+# Name-set-overlap classification (Step 1 Part B, default on; --no-name-overlap opts out).
 # ---------------------------------------------------------------------------
 
 
@@ -1823,8 +1823,8 @@ def assemble_final_outputs(
     atomic_write_csv(out_dir / SEMANTIC_CHANGES_FILENAME, _SEMANTIC_CHANGES_FIELDNAMES, semantic_changes_rows)
     output_files.append(SEMANTIC_CHANGES_FILENAME)
 
-    # Opt-in (--include-name-overlap), Step 1 Part B: set-based name-hash overlap
-    # classification, sound in both same-segment and cross-segment mode (unlike
+    # Written by default (opt-out --no-name-overlap), Step 1 Part B: set-based name-hash
+    # overlap classification, sound in both same-segment and cross-segment mode (unlike
     # compute_semantic_changes_rows() above) -- see compute_name_overlap_rows()'s own
     # docstring and the NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED known-gap note above.
     if include_name_overlap:
@@ -1855,19 +1855,28 @@ def assemble_final_outputs(
     # classify_name_config_collisions() takes exactly ONE target_export_run_id per call
     # (unlike compute_name_overlap_rows(), which reclassifies each all_detail_rows row using
     # that row's own target_export_run_id) -- so a whole-segment target comparison (--target
-    # omitted) requires one call per distinct target file actually compared, derived from
-    # all_detail_rows the same way compute_name_overlap_rows() implicitly scopes per file.
-    # This re-loads each side's name-key CSVs once per target file rather than once per run
-    # -- a real, deliberately-accepted cost for whole-segment mode (a single-file --target
-    # run still pays exactly the one extra load Greg already approved). Not something to
-    # silently special-case away: an empty/aggregate target scope would reintroduce the
-    # exact cross-file name contamination PR #476 fixed for the name-overlap classifier.
+    # omitted) requires one call per distinct target file actually compared. Derived from
+    # all_summary_rows, NOT all_detail_rows: a target file whose domain(s) hit
+    # NO_REFERENCE_DEFINED (step_compare.py's own "no reference set exists for this domain at
+    # all" shortcut -- e.g. --domains selects a domain absent from the reference) still gets a
+    # summary/gap row per (view, target, domain) but zero detail rows (see step_compare.py's
+    # own comment: "no detail rows are emitted"), so deriving from all_detail_rows would drop
+    # that target file from name-config-collision scanning entirely even though its
+    # underlying name-key evidence is otherwise valid (Codex review, PR #483). all_summary_rows
+    # always carries one row per (purge_view, target, domain) actually compared, regardless of
+    # comparison outcome -- see _finalize_view()'s own gap_rows -> summary_rows mapping.
+    #
+    # This re-loads each side's name-key CSVs once per target file rather than once per run --
+    # a real, deliberately-accepted cost for whole-segment mode (a single-file --target run
+    # still pays exactly the one extra load Greg already approved). Not something to silently
+    # special-case away: an empty/aggregate target scope would reintroduce the exact
+    # cross-file name contamination PR #476 fixed for the name-overlap classifier.
     if include_name_config_collisions:
         name_config_collision_rows: List[Dict[str, str]] = []
         name_config_collision_config_rows: List[Dict[str, str]] = []
         target_export_run_ids_for_collisions = sorted({
             (row.get("target_export_run_id") or "").strip()
-            for row in all_detail_rows
+            for row in all_summary_rows
             if (row.get("target_export_run_id") or "").strip()
         }) or ([target_export_run_id] if target_export_run_id else [])
         for tgt_export_id in target_export_run_ids_for_collisions:
