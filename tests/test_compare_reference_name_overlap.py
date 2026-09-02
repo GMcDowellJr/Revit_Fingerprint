@@ -722,14 +722,18 @@ def test_no_name_config_collisions_flag_suppresses_output(tmp_path):
 
 
 def test_name_config_collisions_still_scanned_when_domain_has_no_reference_defined(tmp_path):
-    """Codex review (PR #483): a requested domain absent from the reference's own
-    pattern_presence_file.csv hits step_compare.py's NO_REFERENCE_DEFINED shortcut -- a
+    """Codex review (PR #483, first finding): a requested domain absent from the reference's
+    own pattern_presence_file.csv hits step_compare.py's NO_REFERENCE_DEFINED shortcut -- a
     summary/gap row per target file, but zero reference_comparison_detail.csv rows (see
     step_compare.py's own "no detail rows are emitted" comment). Deriving the set of target
     files to scan for name-config-collisions from all_detail_rows would silently drop that
     target file from scanning entirely, even though its underlying name-key evidence is
-    otherwise valid -- the fix derives from all_summary_rows instead, which always carries
-    one row per (purge_view, target, domain) actually compared regardless of outcome."""
+    otherwise valid. Now covered by the `effective_targets`-based derivation (main()'s own
+    target-file set, established before any per-domain gate runs -- see the second Codex
+    finding on the same block, tests/test_compare_reference.py::
+    test_name_config_collisions_scanned_when_every_domain_blocked_before_per_file_comparison),
+    which supersedes the intermediate all_summary_rows-based fix this test originally
+    verified; kept as a still-valid regression guard for this specific scenario."""
     domain = "arrowheads"  # name-key ELIGIBLE
     segments_root = tmp_path / "segments"
     seg_root = segments_root / "seg_a"

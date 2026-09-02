@@ -1757,6 +1757,7 @@ def assemble_final_outputs(
     reference_file_metadata_rows: Sequence[Dict[str, str]],
     target_file_metadata_rows: Sequence[Dict[str, str]],
     compatibility: Dict[str, Dict[str, object]],
+    effective_targets: Sequence[str],
     reference_segment_root: Optional[Path] = None,
     include_name_overlap: bool = True,
     include_name_config_collisions: bool = True,
@@ -1856,16 +1857,22 @@ def assemble_final_outputs(
     # classify_name_config_collisions() takes exactly ONE target_export_run_id per call
     # (unlike compute_name_overlap_rows(), which reclassifies each all_detail_rows row using
     # that row's own target_export_run_id) -- so a whole-segment target comparison (--target
-    # omitted) requires one call per distinct target file actually compared. Derived from
-    # all_summary_rows, NOT all_detail_rows: a target file whose domain(s) hit
-    # NO_REFERENCE_DEFINED (step_compare.py's own "no reference set exists for this domain at
-    # all" shortcut -- e.g. --domains selects a domain absent from the reference) still gets a
-    # summary/gap row per (view, target, domain) but zero detail rows (see step_compare.py's
-    # own comment: "no detail rows are emitted"), so deriving from all_detail_rows would drop
-    # that target file from name-config-collision scanning entirely even though its
-    # underlying name-key evidence is otherwise valid (Codex review, PR #483). all_summary_rows
-    # always carries one row per (purge_view, target, domain) actually compared, regardless of
-    # comparison outcome -- see _finalize_view()'s own gap_rows -> summary_rows mapping.
+    # omitted) requires one call per distinct target file actually compared. Uses
+    # `effective_targets` (main()'s own already-computed set: every target_file_metadata_rows
+    # export_run_id, minus the reference itself in same-segment mode), NOT anything derived
+    # from all_summary_rows/all_detail_rows -- those are populated only for a domain that
+    # actually reached run_compare_for_domain's own per-file iteration, and several earlier
+    # per-domain gates (compatibility, cross-segment pattern-identity, stale membership
+    # matrix -- see run_comparisons() above) short-circuit BEFORE that point with a single
+    # domain-level blocked placeholder (export_run_id="", one row total, not one per target
+    # file). If every requested domain hits one of those gates for this run, all_summary_rows
+    # would carry no non-blank target_export_run_id at all despite fully valid, readable
+    # per-export records.csv/name_key_results.csv evidence (Codex review, PR #483, second
+    # finding -- the first fix, deriving from all_summary_rows instead of all_detail_rows,
+    # was still incomplete). `effective_targets` has no such dependency: it is the actual set
+    # of files this run is comparing against, established once in main() before any per-domain
+    # gate ever runs, and is already guaranteed non-empty (REASON_NO_COMPARISON_TARGETS blocks
+    # earlier otherwise).
     #
     # This re-loads each side's name-key CSVs once per target file rather than once per run --
     # a real, deliberately-accepted cost for whole-segment mode (a single-file --target run
@@ -1887,11 +1894,7 @@ def assemble_final_outputs(
     if include_name_config_collisions:
         name_config_collision_rows: List[Dict[str, str]] = []
         name_config_collision_config_rows: List[Dict[str, str]] = []
-        target_export_run_ids_for_collisions = sorted({
-            (row.get("target_export_run_id") or "").strip()
-            for row in all_summary_rows
-            if (row.get("target_export_run_id") or "").strip()
-        }) or ([target_export_run_id] if target_export_run_id else [])
+        target_export_run_ids_for_collisions = sorted(set(effective_targets))
         for tgt_export_id in target_export_run_ids_for_collisions:
             rows, config_rows = classify_name_config_collisions(
                 collision_domains,
@@ -2437,6 +2440,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         reference_file_metadata_rows,
         target_file_metadata_rows,
         compatibility,
+        effective_targets,
         reference_segment_root=reference_segment_root,
         include_name_overlap=args.include_name_overlap,
         include_name_config_collisions=args.include_name_config_collisions,
