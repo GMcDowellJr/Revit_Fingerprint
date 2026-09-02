@@ -1,7 +1,10 @@
 # tests/test_compare_reference_name_overlap.py
 #
-# Regression tests for tools/compare_reference.py's Step 1 Part B addition:
-# --include-name-overlap / compute_name_overlap_rows() / reference_comparison_name_overlap.csv.
+# Regression tests for tools/compare_reference.py's Step 1 Part B addition (written by
+# default; --no-name-overlap opts out): compute_name_overlap_rows() /
+# reference_comparison_name_overlap.csv. Also covers the sibling name-config-collision
+# classifier (--no-name-config-collisions opts out) wired in alongside it -- see
+# tools/name_config_collision.py.
 #
 # Unlike compute_semantic_changes_rows() (same-segment-only, string-matched), this
 # classifies the SET relationship between the reference side's and target side's name-key
@@ -331,7 +334,7 @@ def test_split_export_normalization_reused_not_reimplemented(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# End-to-end: --include-name-overlap wired through main() correctly.
+# End-to-end: name-overlap and name-config-collision output wired through main() correctly.
 # ---------------------------------------------------------------------------
 
 
@@ -412,7 +415,6 @@ def test_end_to_end_include_name_overlap_flag_writes_sidecar(tmp_path):
         "--reference", "ref.json",
         "--out-dir", str(out_dir),
         "--purge-view", "all",
-        "--include-name-overlap",
     ]
     rc = cr.main(argv)
     assert rc == 0
@@ -440,8 +442,8 @@ def test_end_to_end_include_name_overlap_flag_writes_sidecar(tmp_path):
     assert manifest["name_overlap_known_gaps"] == [cr.REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED]
 
 
-def test_name_overlap_omitted_by_default(tmp_path):
-    """Opt-in flag: without --include-name-overlap, no sidecar file and no manifest churn."""
+def test_name_overlap_included_by_default(tmp_path):
+    """Default-on: with no flag at all, the sidecar is written and the manifest records it."""
     domain = "object_styles_model"
     segments_root = tmp_path / "segments"
     seg_root = segments_root / "seg_a"
@@ -483,19 +485,250 @@ def test_name_overlap_omitted_by_default(tmp_path):
     ]
     rc = cr.main(argv)
     assert rc == 0
+    assert (out_dir / cr.NAME_OVERLAP_FILENAME).is_file()
+    assert (out_dir / cr.NAME_OVERLAP_NAMES_FILENAME).is_file()
+    manifest = __import__("json").loads((out_dir / cr.MANIFEST_FILENAME).read_text(encoding="utf-8"))
+    assert manifest["name_overlap_included"] is True
+    assert manifest["name_overlap_known_gaps"] == [cr.REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED]
+    # name_config_collisions is also written by default now -- see
+    # test_name_config_collisions_included_by_default below for its own dedicated coverage;
+    # asserted here too since this run already exercises the full default-on end-to-end path.
+    assert (out_dir / cr.NAME_CONFIG_COLLISION_FILENAME).is_file()
+    assert (out_dir / cr.NAME_CONFIG_COLLISION_CONFIGS_FILENAME).is_file()
+    assert manifest["name_config_collisions_included"] is True
+
+
+def test_no_name_overlap_flag_suppresses_output(tmp_path):
+    """Opt-out flag: with --no-name-overlap, no sidecar file and no manifest churn, even
+    though the tool now writes it by default."""
+    domain = "object_styles_model"
+    segments_root = tmp_path / "segments"
+    seg_root = segments_root / "seg_a"
+    corpus_records_dir = tmp_path / "corpus" / "records"
+    registry_file = corpus_records_dir / "run_registry.csv"
+    _write_csv(registry_file, _REGISTRY_FIELDNAMES, [_registry_row("seg_a")])
+    _write_csv(
+        seg_root / "results" / "records" / "file_metadata.csv",
+        ["export_run_id", "central_path", "governance_role", "unit_system"],
+        [{"export_run_id": eid, "central_path": f"/x/{eid}", "governance_role": "Project", "unit_system": "imperial"} for eid in ("ref.json", "target.json")],
+    )
+    _write_csv(
+        seg_root / "results" / "records" / "records.csv",
+        ["export_run_id", "domain", "join_key_schema", "join_key_policy_id", "join_key_policy_version"],
+        [{"export_run_id": eid, "domain": domain, "join_key_schema": f"{domain}.join_key.v1", "join_key_policy_id": "p1", "join_key_policy_version": "1"} for eid in ("ref.json", "target.json")],
+    )
+    presence_rows = [
+        {"analysis_run_id": "run1", "domain": domain, "export_run_id": "ref.json", "pattern_id": "A", "pattern_share_pct": "1.000000"},
+        {"analysis_run_id": "run1", "domain": domain, "export_run_id": "target.json", "pattern_id": "A", "pattern_share_pct": "1.000000"},
+    ]
+    _write_csv(seg_root / "results" / "analysis" / "pattern_presence_file.csv",
+               ["analysis_run_id", "domain", "export_run_id", "pattern_id", "pattern_share_pct"], presence_rows)
+    _write_csv(seg_root / "results" / "analysis" / "corpus_manifest.csv", ["schema_version"], [{"schema_version": "2.1.0"}])
+    membership_rows = [
+        {"analysis_run_id": "run1", "export_run_id": "ref.json", "pattern_id": "A"},
+        {"analysis_run_id": "run1", "export_run_id": "target.json", "pattern_id": "A"},
+    ]
+    for view in ("all", "used"):
+        _write_csv(seg_root / "results" / "bundle_analysis" / view / domain / "membership_matrix.csv",
+                   ["analysis_run_id", "export_run_id", "pattern_id"], membership_rows)
+
+    out_dir = tmp_path / "out"
+    argv = [
+        "--segments-root", str(segments_root),
+        "--registry-file", str(registry_file),
+        "--reference-segment", "seg_a",
+        "--reference", "ref.json",
+        "--out-dir", str(out_dir),
+        "--no-name-overlap",
+    ]
+    rc = cr.main(argv)
+    assert rc == 0
     assert not (out_dir / cr.NAME_OVERLAP_FILENAME).is_file()
     assert not (out_dir / cr.NAME_OVERLAP_NAMES_FILENAME).is_file()
     manifest = __import__("json").loads((out_dir / cr.MANIFEST_FILENAME).read_text(encoding="utf-8"))
     assert manifest["name_overlap_included"] is False
     assert manifest["name_overlap_known_gaps"] == []
+    # name_config_collisions is unaffected by --no-name-overlap -- each flag is independent.
+    assert (out_dir / cr.NAME_CONFIG_COLLISION_FILENAME).is_file()
+    assert manifest["name_config_collisions_included"] is True
+
+
+def test_name_config_collisions_included_by_default(tmp_path):
+    """Default-on: with no flag at all, reference_comparison_name_config_collisions.csv (and
+    its _configs.csv sidecar) is written and the manifest records it."""
+    domain = "arrowheads"  # must be name-key ELIGIBLE
+    segments_root = tmp_path / "segments"
+    seg_root = segments_root / "seg_a"
+    corpus_records_dir = tmp_path / "corpus" / "records"
+    registry_file = corpus_records_dir / "run_registry.csv"
+    _write_csv(registry_file, _REGISTRY_FIELDNAMES, [_registry_row("seg_a")])
+
+    _write_csv(
+        seg_root / "results" / "records" / "file_metadata.csv",
+        ["export_run_id", "central_path", "governance_role", "unit_system"],
+        [
+            {"export_run_id": eid, "central_path": f"/x/{eid}", "governance_role": "Project", "unit_system": "imperial"}
+            for eid in ("ref.json", "target.json")
+        ],
+    )
+    _write_csv(
+        seg_root / "results" / "records" / "records.csv",
+        ["export_run_id", "domain", "join_key_schema", "join_key_policy_id", "join_key_policy_version", "record_id", "join_hash"],
+        [
+            {"export_run_id": eid, "domain": domain, "join_key_schema": f"{domain}.join_key.v1",
+             "join_key_policy_id": "p1", "join_key_policy_version": "1", "record_id": f"rec_{eid}", "join_hash": "A"}
+            for eid in ("ref.json", "target.json")
+        ],
+    )
+    presence_rows = [
+        {"analysis_run_id": "run1", "domain": domain, "export_run_id": "ref.json", "pattern_id": "A", "pattern_share_pct": "1.000000"},
+        {"analysis_run_id": "run1", "domain": domain, "export_run_id": "target.json", "pattern_id": "A", "pattern_share_pct": "1.000000"},
+    ]
+    _write_csv(seg_root / "results" / "analysis" / "pattern_presence_file.csv",
+               ["analysis_run_id", "domain", "export_run_id", "pattern_id", "pattern_share_pct"], presence_rows)
+    _write_csv(seg_root / "results" / "analysis" / "corpus_manifest.csv", ["schema_version"], [{"schema_version": "2.1.0"}])
+    _write_csv(
+        seg_root / "results" / "analysis" / "domain_patterns.csv",
+        ["schema_version", "analysis_run_id", "domain", "pattern_id", "source_cluster_id"],
+        [{"schema_version": "2.1.0", "analysis_run_id": "run1", "domain": domain, "pattern_id": "A", "source_cluster_id": f"{domain}|A"}],
+    )
+    membership_rows = [
+        {"analysis_run_id": "run1", "export_run_id": "ref.json", "pattern_id": "A"},
+        {"analysis_run_id": "run1", "export_run_id": "target.json", "pattern_id": "A"},
+    ]
+    for view in ("all", "used"):
+        _write_csv(seg_root / "results" / "bundle_analysis" / view / domain / "membership_matrix.csv",
+                   ["analysis_run_id", "export_run_id", "pattern_id"], membership_rows)
+    _write_csv(
+        seg_root / "results" / "name_key" / "name_key_results.csv",
+        ["export_file", "domain", "record_id", "label_display", "join_hash", "status"],
+        [
+            {"export_file": "ref.json", "domain": domain, "record_id": "rec_ref.json", "label_display": "Arrow", "join_hash": "N1", "status": "ok"},
+            {"export_file": "target.json", "domain": domain, "record_id": "rec_target.json", "label_display": "Arrow", "join_hash": "N1", "status": "ok"},
+        ],
+    )
+
+    out_dir = tmp_path / "out"
+    argv = [
+        "--segments-root", str(segments_root),
+        "--registry-file", str(registry_file),
+        "--reference-segment", "seg_a",
+        "--reference", "ref.json",
+        "--out-dir", str(out_dir),
+        "--purge-view", "all",
+    ]
+    rc = cr.main(argv)
+    assert rc == 0
+
+    collisions_path = out_dir / cr.NAME_CONFIG_COLLISION_FILENAME
+    assert collisions_path.is_file()
+    rows = _read_csv(collisions_path)
+    assert len(rows) == 1
+    assert rows[0]["name_config_classification"] == "config_sets_identical"
+    assert rows[0]["domain"] == domain
+    assert rows[0]["name_hash"] == "N1"
+    assert "reference_config_hashes" not in rows[0]
+    assert "target_config_hashes" not in rows[0]
+
+    configs_path = out_dir / cr.NAME_CONFIG_COLLISION_CONFIGS_FILENAME
+    assert configs_path.is_file()
+    config_rows = _read_csv(configs_path)
+    assert {(r["side"], r["config_hash"]) for r in config_rows} == {("reference", "A"), ("target", "A")}
+
+    manifest = __import__("json").loads((out_dir / cr.MANIFEST_FILENAME).read_text(encoding="utf-8"))
+    assert manifest["name_config_collisions_included"] is True
+    assert cr.NAME_CONFIG_COLLISION_FILENAME in manifest["output_files"]
+    assert cr.NAME_CONFIG_COLLISION_CONFIGS_FILENAME in manifest["output_files"]
+    assert manifest["name_config_collisions_known_gaps"] == [cr.REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED]
+    # --include-name-overlap's own flag is unaffected -- both are on by default independently.
+    assert manifest["name_overlap_included"] is True
+
+
+def test_no_name_config_collisions_flag_suppresses_output(tmp_path):
+    """Opt-out flag: with --no-name-config-collisions, no sidecar file and no manifest churn,
+    while --no-name-overlap's own default-on output is untouched."""
+    domain = "arrowheads"
+    segments_root = tmp_path / "segments"
+    seg_root = segments_root / "seg_a"
+    corpus_records_dir = tmp_path / "corpus" / "records"
+    registry_file = corpus_records_dir / "run_registry.csv"
+    _write_csv(registry_file, _REGISTRY_FIELDNAMES, [_registry_row("seg_a")])
+    _write_csv(
+        seg_root / "results" / "records" / "file_metadata.csv",
+        ["export_run_id", "central_path", "governance_role", "unit_system"],
+        [
+            {"export_run_id": eid, "central_path": f"/x/{eid}", "governance_role": "Project", "unit_system": "imperial"}
+            for eid in ("ref.json", "target.json")
+        ],
+    )
+    _write_csv(
+        seg_root / "results" / "records" / "records.csv",
+        ["export_run_id", "domain", "join_key_schema", "join_key_policy_id", "join_key_policy_version", "record_id", "join_hash"],
+        [
+            {"export_run_id": eid, "domain": domain, "join_key_schema": f"{domain}.join_key.v1",
+             "join_key_policy_id": "p1", "join_key_policy_version": "1", "record_id": f"rec_{eid}", "join_hash": "A"}
+            for eid in ("ref.json", "target.json")
+        ],
+    )
+    presence_rows = [
+        {"analysis_run_id": "run1", "domain": domain, "export_run_id": "ref.json", "pattern_id": "A", "pattern_share_pct": "1.000000"},
+        {"analysis_run_id": "run1", "domain": domain, "export_run_id": "target.json", "pattern_id": "A", "pattern_share_pct": "1.000000"},
+    ]
+    _write_csv(seg_root / "results" / "analysis" / "pattern_presence_file.csv",
+               ["analysis_run_id", "domain", "export_run_id", "pattern_id", "pattern_share_pct"], presence_rows)
+    _write_csv(seg_root / "results" / "analysis" / "corpus_manifest.csv", ["schema_version"], [{"schema_version": "2.1.0"}])
+    _write_csv(
+        seg_root / "results" / "analysis" / "domain_patterns.csv",
+        ["schema_version", "analysis_run_id", "domain", "pattern_id", "source_cluster_id"],
+        [{"schema_version": "2.1.0", "analysis_run_id": "run1", "domain": domain, "pattern_id": "A", "source_cluster_id": f"{domain}|A"}],
+    )
+    membership_rows = [
+        {"analysis_run_id": "run1", "export_run_id": "ref.json", "pattern_id": "A"},
+        {"analysis_run_id": "run1", "export_run_id": "target.json", "pattern_id": "A"},
+    ]
+    for view in ("all", "used"):
+        _write_csv(seg_root / "results" / "bundle_analysis" / view / domain / "membership_matrix.csv",
+                   ["analysis_run_id", "export_run_id", "pattern_id"], membership_rows)
+    _write_csv(
+        seg_root / "results" / "name_key" / "name_key_results.csv",
+        ["export_file", "domain", "record_id", "label_display", "join_hash", "status"],
+        [
+            {"export_file": "ref.json", "domain": domain, "record_id": "rec_ref.json", "label_display": "Arrow", "join_hash": "N1", "status": "ok"},
+            {"export_file": "target.json", "domain": domain, "record_id": "rec_target.json", "label_display": "Arrow", "join_hash": "N1", "status": "ok"},
+        ],
+    )
+
+    out_dir = tmp_path / "out"
+    argv = [
+        "--segments-root", str(segments_root),
+        "--registry-file", str(registry_file),
+        "--reference-segment", "seg_a",
+        "--reference", "ref.json",
+        "--out-dir", str(out_dir),
+        "--purge-view", "all",
+        "--no-name-config-collisions",
+    ]
+    rc = cr.main(argv)
+    assert rc == 0
+    assert not (out_dir / cr.NAME_CONFIG_COLLISION_FILENAME).is_file()
+    assert not (out_dir / cr.NAME_CONFIG_COLLISION_CONFIGS_FILENAME).is_file()
+    manifest = __import__("json").loads((out_dir / cr.MANIFEST_FILENAME).read_text(encoding="utf-8"))
+    assert manifest["name_config_collisions_included"] is False
+    assert manifest["name_config_collisions_known_gaps"] == []
+    assert cr.NAME_CONFIG_COLLISION_FILENAME not in manifest["output_files"]
+    # --no-name-overlap's own default-on output is unaffected -- each flag is independent.
+    assert (out_dir / cr.NAME_OVERLAP_FILENAME).is_file()
+    assert manifest["name_overlap_included"] is True
 
 
 def test_name_overlap_keys_present_on_preflight_blocked_manifest(tmp_path):
-    """PR #476 review (P2, second round): name_overlap_included/name_overlap_known_gaps must
-    never simply be absent just because the run blocked in pre-flight (segment not found,
-    reference unresolved, etc.) before ever reaching assemble_final_outputs() -- a consumer
-    relying on those keys always being present would otherwise get a KeyError on every
-    blocked run made with --include-name-overlap."""
+    """PR #476 review (P2, second round): name_overlap_included/name_overlap_known_gaps (and,
+    since both flags default on now, name_config_collisions_included/
+    name_config_collisions_known_gaps) must never simply be absent just because the run
+    blocked in pre-flight (segment not found, reference unresolved, etc.) before ever
+    reaching assemble_final_outputs() -- a consumer relying on those keys always being
+    present would otherwise get a KeyError on every blocked run. No flag is passed here at
+    all -- both classifiers are on by default now, exercising that default path."""
     segments_root = tmp_path / "segments"
     registry_file = tmp_path / "corpus" / "records" / "run_registry.csv"
     _write_csv(registry_file, _REGISTRY_FIELDNAMES, [])  # no segments registered at all
@@ -507,13 +740,44 @@ def test_name_overlap_keys_present_on_preflight_blocked_manifest(tmp_path):
         "--reference-segment", "seg_does_not_exist",
         "--reference", "ref.json",
         "--out-dir", str(out_dir),
-        "--include-name-overlap",
     ]
     rc = cr.main(argv)
     assert rc == 2
 
     assert not (out_dir / cr.NAME_OVERLAP_FILENAME).is_file()
+    assert not (out_dir / cr.NAME_CONFIG_COLLISION_FILENAME).is_file()
     manifest = __import__("json").loads((out_dir / cr.MANIFEST_FILENAME).read_text(encoding="utf-8"))
     assert manifest["aggregate_comparison_status"] == "blocked"
     assert manifest["name_overlap_included"] is False
     assert manifest["name_overlap_known_gaps"] == [cr.REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED]
+    assert manifest["name_config_collisions_included"] is False
+    assert manifest["name_config_collisions_known_gaps"] == [cr.REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED]
+
+
+def test_name_overlap_keys_false_included_on_preflight_blocked_when_both_disabled(tmp_path):
+    """Same pre-flight-blocked path, but with both flags explicitly disabled: *_included stays
+    False either way (nothing was produced), while *_known_gaps degrades to empty for each
+    disabled flag -- mirrors write_top_level_blocked()'s documented "was it requested, not
+    was it written" contract for known_gaps specifically."""
+    segments_root = tmp_path / "segments"
+    registry_file = tmp_path / "corpus" / "records" / "run_registry.csv"
+    _write_csv(registry_file, _REGISTRY_FIELDNAMES, [])
+
+    out_dir = tmp_path / "out"
+    argv = [
+        "--segments-root", str(segments_root),
+        "--registry-file", str(registry_file),
+        "--reference-segment", "seg_does_not_exist",
+        "--reference", "ref.json",
+        "--out-dir", str(out_dir),
+        "--no-name-overlap",
+        "--no-name-config-collisions",
+    ]
+    rc = cr.main(argv)
+    assert rc == 2
+
+    manifest = __import__("json").loads((out_dir / cr.MANIFEST_FILENAME).read_text(encoding="utf-8"))
+    assert manifest["name_overlap_included"] is False
+    assert manifest["name_overlap_known_gaps"] == []
+    assert manifest["name_config_collisions_included"] is False
+    assert manifest["name_config_collisions_known_gaps"] == []

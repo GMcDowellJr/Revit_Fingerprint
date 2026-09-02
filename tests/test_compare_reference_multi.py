@@ -354,6 +354,82 @@ def test_classify_combo_status():
     assert crm.classify_combo_status(-1) == crm.COMBO_STATUS_CRASHED
 
 
+# ---------------------------------------------------------------------------
+# --no-name-overlap / --no-name-config-collisions: default-on flip and the
+# inverted append-off-flag-when-disabled logic in _run_combo_worker()'s own
+# child `cmd` construction.
+# ---------------------------------------------------------------------------
+
+
+def test_arg_parser_defaults_both_name_flags_true():
+    args = crm.build_arg_parser().parse_args(
+        [
+            "--segments-root", "sr", "--registry-file", "rf", "--references", "refs.csv",
+            "--target-segments", "t1,t2", "--out-root", "out",
+        ]
+    )
+    assert args.include_name_overlap is True
+    assert args.include_name_config_collisions is True
+
+
+def test_arg_parser_no_flags_set_false():
+    args = crm.build_arg_parser().parse_args(
+        [
+            "--segments-root", "sr", "--registry-file", "rf", "--references", "refs.csv",
+            "--target-segments", "t1,t2", "--out-root", "out",
+            "--no-name-overlap", "--no-name-config-collisions",
+        ]
+    )
+    assert args.include_name_overlap is False
+    assert args.include_name_config_collisions is False
+
+
+def _capture_combo_worker_cmd(monkeypatch, **worker_kwargs):
+    """Run _run_combo_worker() with subprocess.run stubbed out to capture the constructed
+    cmd list without actually invoking compare_reference.py."""
+    captured: Dict[str, List[str]] = {}
+
+    class _FakeResult:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def _fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        return _FakeResult()
+
+    monkeypatch.setattr(crm.subprocess, "run", _fake_run)
+    crm._run_combo_worker(
+        "compare_reference.py", "sr", "rf", "ref_seg", "ref1", "tgt_seg", "out_dir",
+        False, None, "both", repo_root="repo", **worker_kwargs,
+    )
+    return captured["cmd"]
+
+
+def test_run_combo_worker_omits_off_flags_when_both_enabled(monkeypatch):
+    cmd = _capture_combo_worker_cmd(
+        monkeypatch, include_name_overlap=True, include_name_config_collisions=True,
+    )
+    assert "--no-name-overlap" not in cmd
+    assert "--no-name-config-collisions" not in cmd
+
+
+def test_run_combo_worker_appends_off_flags_when_both_disabled(monkeypatch):
+    cmd = _capture_combo_worker_cmd(
+        monkeypatch, include_name_overlap=False, include_name_config_collisions=False,
+    )
+    assert "--no-name-overlap" in cmd
+    assert "--no-name-config-collisions" in cmd
+
+
+def test_run_combo_worker_flags_are_independent(monkeypatch):
+    cmd = _capture_combo_worker_cmd(
+        monkeypatch, include_name_overlap=False, include_name_config_collisions=True,
+    )
+    assert "--no-name-overlap" in cmd
+    assert "--no-name-config-collisions" not in cmd
+
+
 def test_aggregate_summaries_excludes_stale_summary(tmp_path):
     """A reference_comparison_summary.csv left over from an earlier
     invocation into the same --out-root (e.g. a combo that crashed before

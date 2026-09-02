@@ -79,6 +79,7 @@ from bundle_analysis.comparison_status import (  # noqa: E402
 from bundle_analysis.step_compare import run_compare_for_domain, write_blocked_gap_placeholder  # noqa: E402
 from core.name_key_coverage import ELIGIBLE_DOMAINS, exclusion_reason  # noqa: E402
 from name_key_rollup import build_domain_name_hash_facets  # noqa: E402
+from name_config_collision import classify_name_config_collisions  # noqa: E402
 
 MANIFEST_FILENAME = "reference_comparison_report.json"
 SUMMARY_FILENAME = "reference_comparison_summary.csv"
@@ -87,6 +88,8 @@ DIAGNOSTICS_FILENAME = "reference_comparison_diagnostics.json"
 SEMANTIC_CHANGES_FILENAME = "reference_comparison_semantic_changes.csv"
 NAME_OVERLAP_FILENAME = "reference_comparison_name_overlap.csv"
 NAME_OVERLAP_NAMES_FILENAME = "reference_comparison_name_overlap_names.csv"
+NAME_CONFIG_COLLISION_FILENAME = "reference_comparison_name_config_collisions.csv"
+NAME_CONFIG_COLLISION_CONFIGS_FILENAME = "reference_comparison_name_config_collisions_configs.csv"
 
 VALID_PURGE_VIEWS = ("all", "used")
 
@@ -324,6 +327,42 @@ _NAME_OVERLAP_NAMES_FIELDNAMES = [
     "pattern_id",
     "side",
     "name_hash",
+]
+
+# --- Name-config-collision classification (--include-name-config-collisions) ---------------
+#
+# Inverse question to the name-overlap classification above: "given the same name, does the
+# config agree?" (tools/name_config_collision.py::classify_name_config_collisions()). Row
+# grain here is (domain, name_hash) directly -- NOT (purge_view, population_id, pattern_id) --
+# since this classifier enumerates every name-key join_hash observed on either side rather
+# than reclassifying all_detail_rows, and the hazard it detects (the same name resolving to
+# disjoint configs) is inherently view-independent. Mirrors _NAME_OVERLAP_FIELDNAMES's
+# file-metadata-label placement exactly; mirrors _NAME_OVERLAP_NAMES_FIELDNAMES's
+# hash-values-only-in-the-sidecar design for the same Excel-cell-limit reason (PR #476).
+_NAME_CONFIG_COLLISION_FIELDNAMES = [
+    "domain",
+    "reference_export_run_id",
+    *_file_metadata_label_fieldnames("reference"),
+    "target_export_run_id",
+    *_file_metadata_label_fieldnames("target"),
+    "name_hash",
+    "representative_label",
+    "name_config_classification",
+    "exclusion_reason",
+    "reference_name_key_status",
+    "target_name_key_status",
+    "reference_config_hash_count",
+    "target_config_hash_count",
+    "shared_config_hash_count",
+]
+
+_NAME_CONFIG_COLLISION_CONFIGS_FIELDNAMES = [
+    "domain",
+    "reference_export_run_id",
+    "target_export_run_id",
+    "name_hash",
+    "side",
+    "config_hash",
 ]
 
 # Never used as a match key: fallback labels are templated placeholders
@@ -1718,7 +1757,8 @@ def assemble_final_outputs(
     reference_file_metadata_rows: Sequence[Dict[str, str]],
     target_file_metadata_rows: Sequence[Dict[str, str]],
     reference_segment_root: Optional[Path] = None,
-    include_name_overlap: bool = False,
+    include_name_overlap: bool = True,
+    include_name_config_collisions: bool = True,
 ) -> Dict[str, object]:
     all_summary_rows: List[Dict[str, str]] = []
     all_detail_rows: List[Dict[str, str]] = []
@@ -1802,6 +1842,63 @@ def assemble_final_outputs(
         output_files.append(NAME_OVERLAP_FILENAME)
         output_files.append(NAME_OVERLAP_NAMES_FILENAME)
 
+    # Opt-out (--no-name-config-collisions, default on), mirroring the --include-name-overlap
+    # wiring above as closely as classify_name_config_collisions()'s own signature allows.
+    # Step 0 design decision (Greg, PR description): independent load of each side's
+    # name-key evidence, rather than sharing compute_name_overlap_rows()'s already-built
+    # facets -- compute_name_overlap_rows()'s signature is depended on directly by
+    # tests/test_compare_reference_name_overlap.py's unit tests, and
+    # classify_name_config_collisions()'s segment-root-based signature is depended on
+    # directly by tests/test_name_config_collision.py's classification tests; sharing one
+    # load would require changing both signatures and rewriting both test suites.
+    #
+    # classify_name_config_collisions() takes exactly ONE target_export_run_id per call
+    # (unlike compute_name_overlap_rows(), which reclassifies each all_detail_rows row using
+    # that row's own target_export_run_id) -- so a whole-segment target comparison (--target
+    # omitted) requires one call per distinct target file actually compared, derived from
+    # all_detail_rows the same way compute_name_overlap_rows() implicitly scopes per file.
+    # This re-loads each side's name-key CSVs once per target file rather than once per run
+    # -- a real, deliberately-accepted cost for whole-segment mode (a single-file --target
+    # run still pays exactly the one extra load Greg already approved). Not something to
+    # silently special-case away: an empty/aggregate target scope would reintroduce the
+    # exact cross-file name contamination PR #476 fixed for the name-overlap classifier.
+    if include_name_config_collisions:
+        name_config_collision_rows: List[Dict[str, str]] = []
+        name_config_collision_config_rows: List[Dict[str, str]] = []
+        target_export_run_ids_for_collisions = sorted({
+            (row.get("target_export_run_id") or "").strip()
+            for row in all_detail_rows
+            if (row.get("target_export_run_id") or "").strip()
+        }) or ([target_export_run_id] if target_export_run_id else [])
+        for tgt_export_id in target_export_run_ids_for_collisions:
+            rows, config_rows = classify_name_config_collisions(
+                domains,
+                reference_segment_root or segment_root,
+                segment_root,
+                same_segment,
+                str(reference.get("seed_export_run_id", "")),
+                tgt_export_id,
+            )
+            name_config_collision_rows.extend(rows)
+            name_config_collision_config_rows.extend(config_rows)
+        name_config_collision_rows.sort(key=lambda r: (r["domain"], r["target_export_run_id"], r["name_hash"]))
+        name_config_collision_config_rows.sort(
+            key=lambda r: (r["domain"], r["target_export_run_id"], r["name_hash"], r["side"], r["config_hash"])
+        )
+        add_file_metadata_labels(
+            name_config_collision_rows, target_label_lookup, reference_export_run_id, reference_label_lookup
+        )
+        atomic_write_csv(
+            out_dir / NAME_CONFIG_COLLISION_FILENAME, _NAME_CONFIG_COLLISION_FIELDNAMES, name_config_collision_rows
+        )
+        atomic_write_csv(
+            out_dir / NAME_CONFIG_COLLISION_CONFIGS_FILENAME,
+            _NAME_CONFIG_COLLISION_CONFIGS_FIELDNAMES,
+            name_config_collision_config_rows,
+        )
+        output_files.append(NAME_CONFIG_COLLISION_FILENAME)
+        output_files.append(NAME_CONFIG_COLLISION_CONFIGS_FILENAME)
+
     statuses_by_key: Dict[Tuple[str, str], List[str]] = {}
     reasons_by_key: Dict[Tuple[str, str], List[str]] = {}
     for row in all_summary_rows:
@@ -1882,6 +1979,10 @@ def assemble_final_outputs(
         "name_overlap_known_gaps": (
             [REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED] if include_name_overlap else []
         ),
+        "name_config_collisions_included": include_name_config_collisions,
+        "name_config_collisions_known_gaps": (
+            [REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED] if include_name_config_collisions else []
+        ),
     }
     (out_dir / MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return manifest
@@ -1895,7 +1996,8 @@ def write_top_level_blocked(
     target_segment_id: str,
     target_selector: str,
     same_segment: bool,
-    include_name_overlap: bool = False,
+    include_name_overlap: bool = True,
+    include_name_config_collisions: bool = True,
 ) -> Dict[str, object]:
     """Written when a comparison could not even be attempted (segment not
     found, materialization incomplete, reference/target unresolved). Still
@@ -1911,13 +2013,15 @@ def write_top_level_blocked(
     pre-flight path. Cross-segment semantic reporting is supported; the
     top-level comparison failure itself explains why no rows were produced.
 
-    `include_name_overlap` populates `name_overlap_included`/
-    `name_overlap_known_gaps` the same way assemble_final_outputs() does, for the same
-    reason: those two manifest keys must never simply be absent just because this
-    pre-flight path fired instead of reaching assemble_final_outputs() (PR #476 review,
-    second round). `name_overlap_included` is always False here regardless of what was
-    requested -- nothing was actually produced on a blocked run, and that field's contract
-    is "was the file written," not "was it requested."
+    `include_name_overlap`/`include_name_config_collisions` populate
+    `name_overlap_included`/`name_overlap_known_gaps` and
+    `name_config_collisions_included`/`name_config_collisions_known_gaps` the same way
+    assemble_final_outputs() does, for the same reason: those manifest keys must never
+    simply be absent just because this pre-flight path fired instead of reaching
+    assemble_final_outputs() (PR #476 review, second round). Both `*_included` keys are
+    always False here regardless of what was requested -- nothing was actually produced on
+    a blocked run, and that field's contract is "was the file written," not "was it
+    requested."
     """
     atomic_write_csv(out_dir / SUMMARY_FILENAME, _SUMMARY_FIELDNAMES, [])
     atomic_write_csv(out_dir / DETAIL_FILENAME, _DETAIL_FIELDNAMES, [])
@@ -1949,6 +2053,10 @@ def write_top_level_blocked(
         "name_overlap_included": False,
         "name_overlap_known_gaps": (
             [REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED] if include_name_overlap else []
+        ),
+        "name_config_collisions_included": False,
+        "name_config_collisions_known_gaps": (
+            [REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED] if include_name_config_collisions else []
         ),
     }
     (out_dir / MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -2041,16 +2149,31 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--domains", default=None, help="Comma-separated domain list. Default: every domain present in the target segment's pattern_presence_file.csv.")
     ap.add_argument("--purge-view", choices=["all", "used", "both"], default="both", help="Which segment-local bundle-analysis view(s) to compare against. Default: both.")
     ap.add_argument(
-        "--include-name-overlap",
-        action="store_true",
-        help="Also write reference_comparison_name_overlap.csv: for each pattern, classify "
-        "the relationship between the reference side's and target side's name-key join_hash "
-        "sets (name_sets_identical/overlap/disjoint, or name_evidence_excluded/missing). "
-        "Opt-in and fail-soft: a segment missing name-key materialization (see "
-        "tools/apply_name_key_policy.py / the -NameKey runbook switch) still gets its "
-        "ordinary config-identity comparison; only the name-overlap file degrades to "
-        "name_evidence_missing rows for the affected side. See "
+        "--no-name-overlap",
+        dest="include_name_overlap",
+        action="store_false",
+        default=True,
+        help="Skip reference_comparison_name_overlap.csv (written by default): for each "
+        "pattern, classify the relationship between the reference side's and target side's "
+        "name-key join_hash sets (name_sets_identical/overlap/disjoint, or "
+        "name_evidence_excluded/missing). Fail-soft: a segment missing name-key "
+        "materialization (see tools/apply_name_key_policy.py / the -NameKey runbook switch) "
+        "still gets its ordinary config-identity comparison; only the name-overlap file "
+        "degrades to name_evidence_missing rows for the affected side. See "
         "docs/namekey_crosssegment_step0_findings.md.",
+    )
+    ap.add_argument(
+        "--no-name-config-collisions",
+        dest="include_name_config_collisions",
+        action="store_false",
+        default=True,
+        help="Skip reference_comparison_name_config_collisions.csv (written by default): the "
+        "inverse question to --no-name-overlap -- for each name observed on either side, "
+        "classify the relationship between the reference side's and target side's config "
+        "join_hash sets for that name identity (config_sets_identical/overlap/disjoint, or "
+        "name_evidence_excluded/missing/name_ambiguous_within_side). Surfaces the hazard "
+        "where the same name legitimately resolves to two unrelated configs. Fail-soft, same "
+        "as --no-name-overlap. See tools/name_config_collision.py.",
     )
     return ap
 
@@ -2257,6 +2380,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         write_top_level_blocked(
             out_dir, exc.reason_code, str(exc), reference_segment_id, target_segment_id, args.target or "", same_segment,
             include_name_overlap=args.include_name_overlap,
+            include_name_config_collisions=args.include_name_config_collisions,
         )
         print(f"[compare_reference][error] {exc.reason_code}: {exc}", file=sys.stderr)
         return 2
@@ -2292,6 +2416,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         target_file_metadata_rows,
         reference_segment_root=reference_segment_root,
         include_name_overlap=args.include_name_overlap,
+        include_name_config_collisions=args.include_name_config_collisions,
     )
     print(f"[compare_reference] comparison_status={manifest['aggregate_comparison_status']}")
     print(f"[compare_reference] wrote outputs to {out_dir}")

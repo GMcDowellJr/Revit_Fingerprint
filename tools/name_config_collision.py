@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Same-Name-Different-Config Collision Detection -- Step 0/Step 1 prototype.
+"""Same-Name-Different-Config Collision Detection.
 
 tools/name_key_rollup.py::DomainNameHashFacets indexes name evidence config-first:
 `(domain, config_join_hash) -> {name_join_hash: {record_count, label_counts}}`. That answers
@@ -16,7 +16,9 @@ BUILT `DomainNameHashFacets` object produced by that (unmodified, imported) func
 hash values are already present together in `facets.facets`/`facets.facets_by_export` (the
 outer key is `config_join_hash`, the inner key is `name_join_hash`) -- inverting them is a
 pure in-memory transformation, not a second reimplementation of the join. This means:
-  - tools/name_key_rollup.py and tools/compare_reference.py are never modified.
+  - tools/name_key_rollup.py is never modified (tools/compare_reference.py now imports and
+    calls classify_name_config_collisions() below, but its own comparison logic and its
+    compute_name_overlap_rows() function are untouched -- see the wiring note further down).
   - The reverse index can never disagree with the forward index's join/eligibility/status
     semantics, because it is derived from the forward index's own output, not from a second
     pass over raw CSVs.
@@ -28,9 +30,12 @@ the segment-materialization status gate (`name_key_side_status()` below), which 
 side-effect-free path-existence/mtime check -- not comparison logic -- so a local mirror of
 tools/compare_reference.py::_name_key_side_status() carries no drift risk.
 
-Not yet wired into any production output (assemble_final_outputs(), a CLI flag, or a new
-CSV column) -- see tools/diagnose_name_config_collisions.py for the read-only, standalone
-tool that lets a human decide whether the real corpus makes this worth shipping.
+Wired into tools/compare_reference.py's production output contract via
+classify_name_config_collisions() (--no-name-config-collisions to opt out; on by default) --
+see that module's own name_config_collision-related block in assemble_final_outputs() and
+write_top_level_blocked(), and docs/reference_comparison_tool.md. tools/diagnose_name_config_
+collisions.py remains a separate, read-only, single-segment standalone tool built on
+find_within_side_name_ambiguities() below, not on classify_name_config_collisions().
 """
 from __future__ import annotations
 

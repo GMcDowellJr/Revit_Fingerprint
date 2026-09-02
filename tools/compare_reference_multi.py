@@ -317,6 +317,7 @@ def _run_combo_worker(
     domains: Optional[str],
     purge_view: str,
     include_name_overlap: bool,
+    include_name_config_collisions: bool,
     repo_root: str,
 ) -> Dict[str, object]:
     """Run one (reference_segment, reference, target_segment) combo as its
@@ -340,8 +341,14 @@ def _run_combo_worker(
         cmd.append("--overwrite")
     if domains:
         cmd.extend(["--domains", domains])
-    if include_name_overlap:
-        cmd.append("--include-name-overlap")
+    # compare_reference.py writes both name-overlap and name-config-collision sidecars by
+    # default now -- only pass the off-switch through when the caller disabled one, so a
+    # child subprocess never silently reverts to compare_reference.py's own default
+    # regardless of what was requested at this driver's level.
+    if not include_name_overlap:
+        cmd.append("--no-name-overlap")
+    if not include_name_config_collisions:
+        cmd.append("--no-name-config-collisions")
 
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_root)
     stderr_lines = (result.stderr or "").splitlines()
@@ -481,7 +488,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--purge-view", choices=["all", "used", "both"], default="both", help="Passed through to every child compare_reference.py call."
     )
-    ap.add_argument("--include-name-overlap", action="store_true", help="Passed through to every child compare_reference.py call.")
+    ap.add_argument(
+        "--no-name-overlap",
+        dest="include_name_overlap",
+        action="store_false",
+        default=True,
+        help="Passed through to every child compare_reference.py call (which writes "
+        "reference_comparison_name_overlap.csv by default).",
+    )
+    ap.add_argument(
+        "--no-name-config-collisions",
+        dest="include_name_config_collisions",
+        action="store_false",
+        default=True,
+        help="Passed through to every child compare_reference.py call (which writes "
+        "reference_comparison_name_config_collisions.csv by default).",
+    )
     return ap
 
 
@@ -527,6 +549,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 args.domains,
                 args.purge_view,
                 bool(args.include_name_overlap),
+                bool(args.include_name_config_collisions),
                 str(REPO_ROOT),
             ): combo
             for combo in combos
