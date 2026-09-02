@@ -1756,6 +1756,7 @@ def assemble_final_outputs(
     same_segment: bool,
     reference_file_metadata_rows: Sequence[Dict[str, str]],
     target_file_metadata_rows: Sequence[Dict[str, str]],
+    compatibility: Dict[str, Dict[str, object]],
     reference_segment_root: Optional[Path] = None,
     include_name_overlap: bool = True,
     include_name_config_collisions: bool = True,
@@ -1871,6 +1872,18 @@ def assemble_final_outputs(
     # still pays exactly the one extra load Greg already approved). Not something to silently
     # special-case away: an empty/aggregate target scope would reintroduce the exact
     # cross-file name contamination PR #476 fixed for the name-overlap classifier.
+    #
+    # classify_name_config_collisions() reads raw config join_hash values directly off
+    # records.csv -- it has no idea `compatibility` (resolve_cross_segment_compatibility(),
+    # the same gate run_comparisons() already enforced per domain above) exists, so passing
+    # the full requested `domains` list would happily classify a domain whose join_hash
+    # values were never proven comparable between the two sides (MATERIALIZATION_VERSION_
+    # INCOMPATIBLE/_UNPROVEN or CROSS_SEGMENT_JOIN_POLICY_MISMATCH -- e.g. reference and
+    # target segments extracted under different join-key policy versions), producing an
+    # apparently-valid classification built from hashes that aren't actually the same
+    # identity space (Codex review, PR #483). Restrict to domains this run already proved
+    # "ok" -- the same domain set every other classification in this file already respects.
+    collision_domains = [dom for dom in domains if compatibility.get(dom, {}).get("status") == "ok"]
     if include_name_config_collisions:
         name_config_collision_rows: List[Dict[str, str]] = []
         name_config_collision_config_rows: List[Dict[str, str]] = []
@@ -1881,7 +1894,7 @@ def assemble_final_outputs(
         }) or ([target_export_run_id] if target_export_run_id else [])
         for tgt_export_id in target_export_run_ids_for_collisions:
             rows, config_rows = classify_name_config_collisions(
-                domains,
+                collision_domains,
                 reference_segment_root or segment_root,
                 segment_root,
                 same_segment,
@@ -2423,6 +2436,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         same_segment,
         reference_file_metadata_rows,
         target_file_metadata_rows,
+        compatibility,
         reference_segment_root=reference_segment_root,
         include_name_overlap=args.include_name_overlap,
         include_name_config_collisions=args.include_name_config_collisions,
