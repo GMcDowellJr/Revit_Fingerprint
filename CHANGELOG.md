@@ -14,6 +14,35 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Changed (behavior-changing)
+- **`tools/compare_reference.py` now writes `reference_comparison_name_overlap.csv`/
+  `_names.csv` by default, and additionally writes two new sidecars,
+  `reference_comparison_name_config_collisions.csv`/`_configs.csv`, also by default.**
+  `--include-name-overlap` (opt-in, default off) is replaced by `--no-name-overlap`
+  (opt-out, default on) -- a run with no name flags at all now produces both sidecar
+  pairs where it previously produced neither. The new pair promotes
+  `tools/name_config_collision.py::classify_name_config_collisions()` from
+  prototype/test-only to production: for every name-key `join_hash` observed on either
+  side, it classifies the relationship between the reference side's and target side's
+  **config** `join_hash` sets for that name identity (`config_sets_identical`/`overlap`/
+  `disjoint`, or `name_evidence_excluded`/`missing`/`name_ambiguous_within_side`) -- the
+  inverse question to the existing name-overlap classifier, surfacing the hazard where
+  the same name legitimately resolves to two unrelated configs. New manifest keys
+  `name_config_collisions_included`/`name_config_collisions_known_gaps` mirror
+  `name_overlap_included`/`name_overlap_known_gaps` exactly, including on the
+  pre-flight-blocked path (`write_top_level_blocked()`), where both `*_included` keys
+  stay `False` regardless of flag state. `--no-name-config-collisions` is the
+  new classifier's own opt-out. `tools/compare_reference_multi.py` gained the mirrored
+  `--no-name-overlap`/`--no-name-config-collisions` flags and now passes the off-switch
+  through to each child subprocess only when a flag was explicitly disabled (previously
+  it appended the on-flag only when explicitly enabled). Deliberate design choice (not a
+  shared in-memory optimization): the new classifier reloads each side's
+  `records.csv`/`domain_patterns.csv`/`name_key_results.csv` independently rather than
+  reusing `compute_name_overlap_rows()`'s already-built facets, to avoid changing either
+  function's segment-root-based signature (both are depended on directly by existing
+  unit tests) -- and, for a whole-segment target comparison, does so once per distinct
+  target file actually compared (a single-file `--target` run pays exactly one extra
+  load). See `docs/reference_comparison_tool.md` and
+  `tests/test_compare_reference_name_overlap.py`.
 - **`tools/compare_reference.py` rewritten to compare against
   already-materialized segments instead of rematerializing fingerprint JSON
   exports.** The tool previously staged `--reference`/`--target` JSON

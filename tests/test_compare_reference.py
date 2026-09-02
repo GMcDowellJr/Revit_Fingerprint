@@ -965,6 +965,189 @@ def test_cross_segment_differing_join_policy_blocks_only_that_domain(tmp_path):
     assert summary[domain2]["shared_count"] == "1"
 
 
+def test_name_config_collisions_excludes_domain_blocked_by_join_policy_mismatch(tmp_path):
+    """Codex review (PR #483): classify_name_config_collisions() reads raw config join_hash
+    values straight off records.csv -- it has no idea resolve_cross_segment_compatibility()
+    (the CROSS_SEGMENT_JOIN_POLICY_MISMATCH gate) exists. Passing every requested domain to
+    it, unfiltered, would classify a domain whose join_hash values were never proven
+    comparable between the two segments as if they were -- the same hazard
+    CROSS_SEGMENT_JOIN_POLICY_MISMATCH exists to prevent for the ordinary shared/
+    reference_only/target_only comparison. `text_types` here disagrees on join_key_schema
+    between the two segments (blocked); `arrowheads` agrees (ok, and supplies the real
+    target_export_run_id all_summary_rows-derived scanning needs). Both domains have
+    superficially matching name-key join_hash values on both sides -- pre-fix, text_types
+    would wrongly report config_sets_identical; post-fix, it must not appear in the output
+    at all (same "silently absent for a blocked domain" convention name-overlap already
+    has for this exact scenario -- see run_compare_for_domain's own blocked-placeholder
+    path, which never emits shared/reference_only/target_only detail rows either)."""
+    ok_domain = "arrowheads"
+    blocked_domain = "text_types"
+
+    def _records_row(eid, domain, schema, record_id, join_hash):
+        return {
+            "export_run_id": eid, "domain": domain, "join_key_schema": schema,
+            "join_key_policy_id": "p1", "join_key_policy_version": "1",
+            "record_id": record_id, "join_hash": join_hash,
+        }
+
+    def _presence_row(domain, eid, pid):
+        return {"analysis_run_id": RUN_ID, "domain": domain, "export_run_id": eid, "pattern_id": pid, "pattern_share_pct": "1.000000"}
+
+    def _pattern_row(domain, pid):
+        return {"schema_version": "2.1.0", "analysis_run_id": RUN_ID, "domain": domain, "pattern_id": pid, "source_cluster_id": f"{domain}|{pid}"}
+
+    def _name_key_row(domain, export_file, record_id, join_hash):
+        return {"export_file": export_file, "domain": domain, "record_id": record_id, "label_display": "Label", "join_hash": join_hash, "status": "ok"}
+
+    segments_root = tmp_path / "segments"
+    seg_a = segments_root / "seg_a"
+    seg_b = segments_root / "seg_b"
+    registry_file = tmp_path / "corpus" / "records" / "run_registry.csv"
+    _write_csv(registry_file, _REGISTRY_FIELDNAMES, [_registry_row("seg_a"), _registry_row("seg_b")])
+
+    for seg_root, eid, text_types_schema in ((seg_a, "ref.json", "text_types.join_key.v1"), (seg_b, "target.json", "text_types.join_key.v2")):
+        _write_csv(
+            seg_root / "results" / "records" / "file_metadata.csv",
+            ["export_run_id", "central_path", "governance_role", "unit_system"],
+            [{"export_run_id": eid, "central_path": f"/x/{eid}", "governance_role": "Project", "unit_system": "imperial"}],
+        )
+        _write_csv(
+            seg_root / "results" / "records" / "records.csv",
+            ["export_run_id", "domain", "join_key_schema", "join_key_policy_id", "join_key_policy_version", "record_id", "join_hash"],
+            [
+                _records_row(eid, ok_domain, "arrowheads.join_key.v1", f"rec_{ok_domain}_{eid}", "A"),
+                _records_row(eid, blocked_domain, text_types_schema, f"rec_{blocked_domain}_{eid}", "T"),
+            ],
+        )
+        _write_csv(
+            seg_root / "results" / "analysis" / "pattern_presence_file.csv",
+            ["analysis_run_id", "domain", "export_run_id", "pattern_id", "pattern_share_pct"],
+            [_presence_row(ok_domain, eid, "A"), _presence_row(blocked_domain, eid, "T")],
+        )
+        _write_csv(seg_root / "results" / "analysis" / "corpus_manifest.csv", ["schema_version"], [{"schema_version": "2.1.0"}])
+        _write_csv(
+            seg_root / "results" / "analysis" / "domain_patterns.csv",
+            ["schema_version", "analysis_run_id", "domain", "pattern_id", "source_cluster_id"],
+            [_pattern_row(ok_domain, "A"), _pattern_row(blocked_domain, "T")],
+        )
+        for view in ("all", "used"):
+            for domain, pid in ((ok_domain, "A"), (blocked_domain, "T")):
+                _write_csv(
+                    seg_root / "results" / "bundle_analysis" / view / domain / "membership_matrix.csv",
+                    ["analysis_run_id", "export_run_id", "pattern_id"],
+                    [{"analysis_run_id": RUN_ID, "export_run_id": eid, "pattern_id": pid}],
+                )
+        _write_csv(
+            seg_root / "results" / "name_key" / "name_key_results.csv",
+            ["export_file", "domain", "record_id", "label_display", "join_hash", "status"],
+            [
+                _name_key_row(ok_domain, eid, f"rec_{ok_domain}_{eid}", "N1"),
+                _name_key_row(blocked_domain, eid, f"rec_{blocked_domain}_{eid}", "N2"),
+            ],
+        )
+
+    ctx = {"registry_file": registry_file, "segments_root": segments_root}
+    rc, out_dir = _run(
+        tmp_path, ctx, reference_segment="seg_a", target_segment="seg_b",
+        reference="ref.json", target="target.json", purge_view="all",
+        domains=f"{ok_domain},{blocked_domain}",
+    )
+    assert rc == 0
+
+    summary = {r["domain"]: r for r in _read_csv(out_dir / cr.SUMMARY_FILENAME)}
+    assert summary[blocked_domain]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert summary[blocked_domain]["comparison_reason_codes"] == cr.REASON_CROSS_SEGMENT_JOIN_POLICY_MISMATCH
+    assert summary[ok_domain]["comparison_status"] == COMPARISON_STATUS_OK
+
+    collision_rows = _read_csv(out_dir / cr.NAME_CONFIG_COLLISION_FILENAME)
+    domains_in_output = {r["domain"] for r in collision_rows}
+    assert blocked_domain not in domains_in_output
+    assert ok_domain in domains_in_output
+    ok_row = next(r for r in collision_rows if r["domain"] == ok_domain)
+    assert ok_row["name_config_classification"] == "config_sets_identical"
+
+
+def test_name_config_collisions_scanned_when_every_domain_blocked_before_per_file_comparison(tmp_path):
+    """Codex review (PR #483, second finding on the same block): all_summary_rows only carries
+    a target file's export_run_id for a domain that actually reached run_compare_for_domain's
+    own per-file iteration. Several earlier per-domain gates (compatibility,
+    cross-segment-pattern-identity, stale membership matrix -- see run_comparisons()) block a
+    domain BEFORE that point, writing a single domain-level placeholder with export_run_id=""
+    (write_blocked_gap_placeholder, match_any_population=True) rather than one row per target
+    file. If literally every requested domain hits one of those gates for this run (here: the
+    lone domain's only membership_matrix.csv is stale), all_summary_rows carries no non-blank
+    target_export_run_id at all -- deriving the collision-classifier's target set from it would
+    silently scan nothing, despite fully valid, readable records.csv/name_key_results.csv
+    evidence. Fixed by deriving from `effective_targets` (main()'s own target-file set,
+    established before any per-domain gate runs) instead."""
+    domain = "arrowheads"  # name-key ELIGIBLE
+    segments_root = tmp_path / "segments"
+    seg_root = segments_root / "seg_a"
+    registry_file = tmp_path / "corpus" / "records" / "run_registry.csv"
+    _write_csv(registry_file, _REGISTRY_FIELDNAMES, [_registry_row("seg_a")])
+
+    _write_csv(
+        seg_root / "results" / "records" / "file_metadata.csv",
+        ["export_run_id", "central_path", "governance_role", "unit_system"],
+        [{"export_run_id": eid, "central_path": f"/x/{eid}", "governance_role": "Project", "unit_system": "imperial"} for eid in ("ref.json", "target.json")],
+    )
+    _write_csv(
+        seg_root / "results" / "records" / "records.csv",
+        ["export_run_id", "domain", "join_key_schema", "join_key_policy_id", "join_key_policy_version", "record_id", "join_hash"],
+        [
+            {"export_run_id": eid, "domain": domain, "join_key_schema": f"{domain}.join_key.v1",
+             "join_key_policy_id": "p1", "join_key_policy_version": "1", "record_id": f"rec_{eid}", "join_hash": "A"}
+            for eid in ("ref.json", "target.json")
+        ],
+    )
+    _write_csv(
+        seg_root / "results" / "analysis" / "pattern_presence_file.csv",
+        ["analysis_run_id", "domain", "export_run_id", "pattern_id", "pattern_share_pct"],
+        [
+            {"analysis_run_id": RUN_ID, "domain": domain, "export_run_id": eid, "pattern_id": "A", "pattern_share_pct": "1.000000"}
+            for eid in ("ref.json", "target.json")
+        ],
+    )
+    _write_csv(seg_root / "results" / "analysis" / "corpus_manifest.csv", ["schema_version"], [{"schema_version": "2.1.0"}])
+    _write_csv(
+        seg_root / "results" / "analysis" / "domain_patterns.csv",
+        ["schema_version", "analysis_run_id", "domain", "pattern_id", "source_cluster_id"],
+        [{"schema_version": "2.1.0", "analysis_run_id": RUN_ID, "domain": domain, "pattern_id": "A", "source_cluster_id": f"{domain}|A"}],
+    )
+    # Deliberately stale: analysis_run_id doesn't match RUN_ID, so
+    # _membership_matrix_is_current() blocks this domain BEFORE
+    # run_compare_for_domain ever iterates per-target-file -- the only view requested.
+    _write_csv(
+        seg_root / "results" / "bundle_analysis" / "all" / domain / "membership_matrix.csv",
+        ["analysis_run_id", "export_run_id", "pattern_id"],
+        [{"analysis_run_id": "old_run", "export_run_id": "ref.json", "pattern_id": "A"}],
+    )
+    _write_csv(
+        seg_root / "results" / "name_key" / "name_key_results.csv",
+        ["export_file", "domain", "record_id", "label_display", "join_hash", "status"],
+        [
+            {"export_file": "ref.json", "domain": domain, "record_id": "rec_ref.json", "label_display": "Arrow", "join_hash": "N1", "status": "ok"},
+            {"export_file": "target.json", "domain": domain, "record_id": "rec_target.json", "label_display": "Arrow", "join_hash": "N1", "status": "ok"},
+        ],
+    )
+
+    ctx = {"registry_file": registry_file, "segments_root": segments_root}
+    rc, out_dir = _run(tmp_path, ctx, reference_segment="seg_a", reference="ref.json", purge_view="all")
+    assert rc == 0
+
+    summary = _read_csv(out_dir / cr.SUMMARY_FILENAME)
+    assert len(summary) == 1
+    assert summary[0]["comparison_status"] == COMPARISON_STATUS_BLOCKED
+    assert summary[0]["comparison_reason_codes"] == cr.REASON_STALE_MEMBERSHIP_MATRIX
+    assert summary[0]["target_export_run_id"] == ""  # domain-level placeholder, not per-file
+
+    collision_rows = _read_csv(out_dir / cr.NAME_CONFIG_COLLISION_FILENAME)
+    assert len(collision_rows) == 1
+    assert collision_rows[0]["domain"] == domain
+    assert collision_rows[0]["target_export_run_id"] == "target.json"
+    assert collision_rows[0]["name_config_classification"] == "config_sets_identical"
+
+
 def test_cross_segment_differing_extractor_schema_version_blocks_whole_run(tmp_path):
     # Two segments share the same join-key tuple for DOMAIN (so the
     # CROSS_SEGMENT_JOIN_POLICY_MISMATCH gate alone would pass), but were

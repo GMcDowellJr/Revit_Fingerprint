@@ -155,11 +155,11 @@ configuration is approved, required, or compliant.
   bundle-analysis view(s) to compare against. `all`/`used` populations are
   never collapsed into one another; `both` runs and reports each
   separately, distinguished by the `purge_view` column.
-- `--include-name-overlap` (opt-in, default off) — also write
-  `reference_comparison_name_overlap.csv` (Step 1 Part B): for every pattern
-  in `reference_comparison_detail.csv`, classify the relationship between
-  the reference side's and target side's name-key `join_hash` **sets**
-  (never a single "the" name — see
+- `--no-name-overlap` (opt-out; `reference_comparison_name_overlap.csv` is
+  written by default) — skip writing `reference_comparison_name_overlap.csv`
+  (Step 1 Part B): for every pattern in `reference_comparison_detail.csv`,
+  classify the relationship between the reference side's and target side's
+  name-key `join_hash` **sets** (never a single "the" name — see
   `docs/namekey_crosssegment_step0_findings.md`, real corpus data shows
   25–44% of patterns in an eligible domain have more than one distinct
   name-hash). Works in both same-segment and cross-segment mode, unlike
@@ -169,6 +169,18 @@ configuration is approved, required, or compliant.
   `name_evidence_missing` rather than blocking the comparison. See
   **`reference_comparison_name_overlap.csv` columns** below for the full
   classification enum and known gaps.
+- `--no-name-config-collisions` (opt-out;
+  `reference_comparison_name_config_collisions.csv` is written by default) —
+  skip writing `reference_comparison_name_config_collisions.csv`: the
+  inverse question to `--no-name-overlap` — for every name-key `join_hash`
+  observed on either side, classify the relationship between the reference
+  side's and target side's **config** `join_hash` sets for that name
+  identity (`config_sets_identical`/`overlap`/`disjoint`, or
+  `name_evidence_excluded`/`missing`/`name_ambiguous_within_side`). Surfaces
+  the hazard where the same name legitimately resolves to two unrelated
+  configs. Fail-soft, same as `--no-name-overlap`. See
+  `tools/name_config_collision.py` and **`reference_comparison_name_config_collisions.csv`
+  columns** below.
 
 ## Filename resolution
 
@@ -246,8 +258,10 @@ Every run writes exactly these files directly under `--out-dir`:
 | `reference_comparison_diagnostics.json` | Machine-readable status/failure/degradation information |
 | `reference_comparison_report.json` | Run manifest: resolved reference/target identities, target segment (`segment_id`), reference segment (`reference_segment_id`), analysis run id, aggregate status |
 | `reference_comparison_semantic_changes.csv` | Reclassifies `reference_only`/`target_only` rows by resolved pattern name. Same-segment mode retains its existing synthesized-label behavior; cross-segment mode uses file-observed Revit names resolved through each segment's local pattern-to-`join_hash` mapping. |
-| `reference_comparison_name_overlap.csv` | **Opt-in (`--include-name-overlap`), both modes.** Classifies each pattern's reference-vs-target name-key `join_hash` set relationship -- see below. Only written when the flag is passed; the manifest's `name_overlap_included` (bool) and `name_overlap_known_gaps` (list) fields record whether it ran and any known limitations |
-| `reference_comparison_name_overlap_names.csv` | **Opt-in, both modes.** The actual name-key `join_hash` values behind `reference_comparison_name_overlap.csv`'s counts -- one row per `(pattern, side, name_hash)`, never a pipe-joined list column (a pattern can carry thousands of distinct name-hashes; a single CSV cell holding that many overflows Excel's per-cell limit and corrupts the surrounding rows on import). See below |
+| `reference_comparison_name_overlap.csv` | **Written by default (opt-out: `--no-name-overlap`), both modes.** Classifies each pattern's reference-vs-target name-key `join_hash` set relationship -- see below. The manifest's `name_overlap_included` (bool) and `name_overlap_known_gaps` (list) fields record whether it ran and any known limitations |
+| `reference_comparison_name_overlap_names.csv` | **Written by default, both modes.** The actual name-key `join_hash` values behind `reference_comparison_name_overlap.csv`'s counts -- one row per `(pattern, side, name_hash)`, never a pipe-joined list column (a pattern can carry thousands of distinct name-hashes; a single CSV cell holding that many overflows Excel's per-cell limit and corrupts the surrounding rows on import). See below |
+| `reference_comparison_name_config_collisions.csv` | **Written by default (opt-out: `--no-name-config-collisions`), both modes.** Inverse of the name-overlap classifier: for each name-key `join_hash` observed on either side, classifies the reference-vs-target **config** `join_hash` set relationship for that name -- see below. The manifest's `name_config_collisions_included` (bool) and `name_config_collisions_known_gaps` (list) fields record whether it ran and any known limitations |
+| `reference_comparison_name_config_collisions_configs.csv` | **Written by default, both modes.** The actual config `join_hash` values behind `reference_comparison_name_config_collisions.csv`'s counts -- one row per `(domain, name_hash, side, config_hash)`, same one-row-per-value rationale as `reference_comparison_name_overlap_names.csv` |
 
 `--out-dir` also retains the raw intermediate `compare_all/`/`compare_used/`
 directories (`file_gap_report.csv`/`file_gap_detail.csv`, written directly
@@ -347,7 +361,7 @@ Name comparison is exact string match after `.strip()`, case-sensitive.
 `name_match_basis` is `pattern_label_human` in same-segment mode and
 `revit_observed_label_display` in cross-segment mode.
 
-### `reference_comparison_name_overlap.csv` columns (opt-in, `--include-name-overlap`)
+### `reference_comparison_name_overlap.csv` columns (default; opt-out `--no-name-overlap`)
 
 `segment_id, purge_view, reference_bundle_id, reference_governance_role,
 reference_client_label, reference_discipline_label,
@@ -400,7 +414,7 @@ incomparable hashes between segments extracted before/after that edit, with
 no gate to catch it. Deferred to a follow-up PR
 (`REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED`).
 
-### `reference_comparison_name_overlap_names.csv` columns (opt-in, `--include-name-overlap`)
+### `reference_comparison_name_overlap_names.csv` columns (default; opt-out `--no-name-overlap`)
 
 `segment_id, purge_view, reference_bundle_id, analysis_run_id,
 target_export_run_id, domain, population_id, pattern_id, side, name_hash`
@@ -412,6 +426,63 @@ One row per `(pattern, side, name_hash)` -- `side` is `reference` or
 join). Same key columns as `reference_comparison_name_overlap.csv` --
 `(purge_view, domain, population_id, target_export_run_id, pattern_id)` --
 so the two files join directly.
+
+### `reference_comparison_name_config_collisions.csv` columns (default; opt-out `--no-name-config-collisions`)
+
+`domain, reference_export_run_id, reference_governance_role,
+reference_client_label, reference_discipline_label,
+reference_business_center_label, reference_collection_label,
+reference_project_label, target_export_run_id, target_governance_role,
+target_client_label, target_discipline_label, target_business_center_label,
+target_collection_label, target_project_label, name_hash,
+representative_label, name_config_classification, exclusion_reason,
+reference_name_key_status, target_name_key_status,
+reference_config_hash_count, target_config_hash_count,
+shared_config_hash_count`
+
+Inverse of the name-overlap classifier above: one row per `(domain,
+target_export_run_id, name_hash)` observed on either side -- not one row per
+pattern, since this classifier enumerates name-key `join_hash` values
+directly rather than reclassifying `reference_comparison_detail.csv` rows,
+and the hazard it detects (the same name resolving to disjoint configs) is
+inherently `purge_view`-independent. A whole-segment target comparison
+(`--target` omitted) gets one set of rows per distinct target file actually
+compared. The actual config `join_hash` values are, as with the name-overlap
+file, **not** columns here -- join to
+**`reference_comparison_name_config_collisions_configs.csv`** (below) on
+`(domain, target_export_run_id, name_hash)` for the hash list per side.
+`name_config_classification` is one of:
+- `config_sets_identical` -- the reference and target config-hash sets for
+  this name are equal.
+- `config_sets_overlap` -- non-empty intersection, but not equal.
+- `config_sets_disjoint` -- no shared config-hash at all: the hazard this
+  file exists to surface -- the same name legitimately resolving to two
+  completely unrelated configs.
+- `name_ambiguous_within_side` -- one side has no evidence for this name at
+  all, and the side that does maps it to more than one config -- a
+  governance hazard visible without any cross-side comparison.
+- `name_evidence_excluded` -- `domain` is outside `ELIGIBLE_DOMAINS`
+  (`exclusion_reason` explains why).
+- `name_evidence_missing` -- no config evidence resolved for this name on
+  one or both sides (nothing to compare), or that side's name-key data isn't
+  materialized/is stale -- `reference_name_key_status`/
+  `target_name_key_status` disambiguate.
+
+Same known gap as `reference_comparison_name_overlap.csv`
+(`REASON_NAME_KEY_POLICY_VERSIONING_NOT_IMPLEMENTED`) -- both classifiers key
+off the identical name-key `join_hash` values, so the same versioning
+limitation applies to each equally.
+
+### `reference_comparison_name_config_collisions_configs.csv` columns (default; opt-out `--no-name-config-collisions`)
+
+`domain, reference_export_run_id, target_export_run_id, name_hash, side,
+config_hash`
+
+One row per `(domain, name_hash, side, config_hash)` -- `side` is
+`reference` or `target`; a config-hash present on both sides gets two rows,
+one per side. Same key columns as
+`reference_comparison_name_config_collisions.csv` -- `(domain,
+target_export_run_id, name_hash)` -- so the two files join directly.
 
 ## Statuses: `ok` / `degraded` / `blocked`
 
@@ -536,7 +607,8 @@ python tools/compare_reference_multi.py \
     [--overwrite] \
     [--domains DOMAIN1,DOMAIN2,...] \
     [--purge-view all|used|both] \
-    [--include-name-overlap]
+    [--no-name-overlap] \
+    [--no-name-config-collisions]
 ```
 
 - `--segments-root` / `--registry-file` — passed through unchanged to every
@@ -556,9 +628,9 @@ python tools/compare_reference_multi.py \
 - `--workers` — max parallel `compare_reference.py` subprocesses, default
   `auto` (CPU count minus 2, capped at 61 on Windows) — the same convention
   `tools/compare_cross_segment.py`'s own `--workers` uses.
-- `--overwrite`, `--domains`, `--purge-view`, `--include-name-overlap` —
-  passed through identically to every child call in the grid. There is no
-  per-combo override in this version.
+- `--overwrite`, `--domains`, `--purge-view`, `--no-name-overlap`,
+  `--no-name-config-collisions` — passed through identically to every child
+  call in the grid. There is no per-combo override in this version.
 
 ### Example (synthetic fixtures)
 
