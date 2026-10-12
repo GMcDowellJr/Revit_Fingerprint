@@ -29,7 +29,10 @@ from pathlib import Path
 try:
     csv.field_size_limit(2**31 - 1)
 except OverflowError:
-    csv.field_size_limit(2**31 - 1 if sys.maxsize > 2**31 else 2**30)
+    # Windows CPython's C long is 32-bit, so 2**31-1 can overflow; fall back
+    # further rather than retrying the value that just failed. Matches
+    # tools/bundle_analysis/common.py's handling of the same issue.
+    csv.field_size_limit(2**30)
 
 FIELDS = [
     "domain", "n_sources_observed", "n_distinct_states", "state_ratio",
