@@ -1,15 +1,21 @@
 # Discovery sweep runbook
 
-The supported sweep entry points remain the repository-root wrappers below.
-They are the normal way to run discovery across domains; the individual
-`tools/discover_join_policy.py` and `tools/discover_hash_policy.py` commands are
-stage implementations invoked by the sweep, not replacements for its entry
-point.
+The supported sweep entry point is the repository-root `run_discovery_sweep.py`
+below (`tools/run_discovery_sweep.py` is a backward-compatible alias; both delegate
+to `tools/discovery_orchestrator.py`). It is the normal way to run discovery across
+domains; the individual `tools/discover_join_policy.py` and
+`tools/discover_hash_policy.py` commands are stage implementations invoked by the
+sweep, not replacements for its entry point. The same commands work unchanged in
+PowerShell, Command Prompt and bash; run them from the repository root, since a
+relative `--exports-root` resolves against the current directory. Flags can be
+spelled PowerShell-style (`-Run`, `-Domains`, `-WhatIf`, case-insensitive), the same
+way as `tools/corpus_update_runbook.py` and `tools/label_refresh_runbook.py`, or
+`--kebab-case` (`--run`, `--domains`, `--what-if`).
 
 ```powershell
-.\run_discovery_sweep.ps1 -Run
-.\run_discovery_sweep.ps1 -Domains "walls,doors" -Run
-.\run_discovery_sweep.ps1 -WhatIf
+python run_discovery_sweep.py -Run
+python run_discovery_sweep.py -Domains "walls,doors" -Run
+python run_discovery_sweep.py -WhatIf
 ```
 
 ```bash

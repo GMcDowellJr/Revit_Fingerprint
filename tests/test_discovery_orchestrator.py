@@ -11,6 +11,7 @@ from tools.discovery_orchestrator import (
     DISCOVERY_ENGINE_VERSION, SUMMARY_FIELDS, Orchestrator, Config, acceptance_reasons,
     accepted, cache_key, canonical_json, input_fingerprint, stage_cache_eligible,
     all_shape_gates_accepted, sweep_evidence_rows, timestamp_now, build_parser, config_from_args,
+    normalize_powershell_style_argv,
 )
 
 
@@ -116,11 +117,22 @@ def test_force_is_preserved_in_shared_config(tmp_path):
     assert Orchestrator(cfg).cfg.force is True
 
 
-def test_powershell_is_thin_shared_entry_point():
-    text=Path("run_discovery_sweep.ps1").read_text(encoding="utf-8")
-    assert "run_discovery_sweep.py" in text and "discover_join_policy.py" not in text
-    for flag in ("ExportsRoot","RepoRoot","SuggestionsCsv","Domains","SkipJoin","SkipSig","Force","WhatIf","Run","WorkBudget","ParetoFrontierLimit","NoParetoProgress"):
-        assert f"${flag}" in text
+def test_python_entrypoint_is_thin_shared_delegate():
+    for entry in ("tools/run_discovery_sweep.py","run_discovery_sweep.py"):
+        text=Path(entry).read_text(encoding="utf-8")
+        assert "from tools.discovery_orchestrator import main" in text and "discover_join_policy" not in text
+    ns=build_parser().parse_args(["--exports-root","x","--repo-root","y","--suggestions-csv","s.csv","--domains","walls","--skip-join","--skip-sig","--force","--what-if","--run","--workers","2","--work-budget","5","--pareto-frontier-limit","3","--no-pareto-progress"])
+    assert (ns.exports_root,ns.repo_root,ns.suggestions_csv,ns.domains,ns.workers,ns.work_budget,ns.pareto_frontier_limit)==("x","y","s.csv","walls","2",5,3)
+    assert ns.skip_join and ns.skip_sig and ns.force and ns.what_if and ns.run and ns.no_pareto_progress
+
+
+def test_powershell_style_flags_parse_like_kebab_case():
+    parser=build_parser()
+    ps=["-ExportsRoot","x","-RepoRoot","y","-SuggestionsCsv","s.csv","-Domains","walls","-SkipJoin","-SkipSig","-Force","-WhatIf","-Run","-Workers","2","-WorkBudget","5","-ParetoFrontierLimit","3","-NoParetoProgress"]
+    kebab=["--exports-root","x","--repo-root","y","--suggestions-csv","s.csv","--domains","walls","--skip-join","--skip-sig","--force","--what-if","--run","--workers","2","--work-budget","5","--pareto-frontier-limit","3","--no-pareto-progress"]
+    assert normalize_powershell_style_argv(ps,parser)==kebab
+    assert vars(parser.parse_args(normalize_powershell_style_argv(ps,parser)))==vars(parser.parse_args(kebab))
+    assert normalize_powershell_style_argv(["-run","--RUN","-workbudget=7","-h","walls,doors"],parser)==["--run","--run","--work-budget=7","-h","walls,doors"]
 
 
 def test_sweep_entrypoint_overrides_are_wired_into_both_discovery_targets(tmp_path):

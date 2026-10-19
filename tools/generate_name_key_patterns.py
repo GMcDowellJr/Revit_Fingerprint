@@ -369,8 +369,8 @@ def main() -> None:
     --- trace ---
     reads: CLI args --comparison-target (config/name/both, default config),
         --config-patterns-csv, --name-key-csv, --out-root (default
-        "Results_v21/name_key/patterns"). Invoked by tools/corpus_update_runbook.ps1's
-        Run B-NameKey step (l.163, --comparison-target name) and by
+        "Results_v21/name_key/patterns"). Invoked by tools/corpus_update_runbook.py's
+        Run B-NameKey step (--comparison-target name) and by
         tools/run_segment_orchestrator.py's per-segment Step 2b (l.1151/1506, also
         --comparison-target name).
     calls: emit_config_patterns() (if target includes "config"); emit_name_patterns() (if

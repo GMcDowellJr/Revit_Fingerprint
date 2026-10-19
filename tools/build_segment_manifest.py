@@ -1041,8 +1041,8 @@ def main(argv: List[str] | None = None) -> int:
         block).
     returns: int exit code (1 on missing/invalid --metadata-file, missing required
         columns, or any _validate_required_metadata() diagnostic -- in every blocking
-        case, no output file is written; 0 on success). Invoked as **Run C1** (l.186 of
-        tools/corpus_update_runbook.ps1); its three outputs (segment_manifest.csv,
+        case, no output file is written; 0 on success). Invoked as **Run C1** (step C1 of
+        tools/corpus_update_runbook.py); its three outputs (segment_manifest.csv,
         run_registry.csv, segment_membership.csv) are consumed by **Run C2**
         (tools/run_segment_orchestrator.py) and **Run C2.5**
         (tools/build_results_registry.py).

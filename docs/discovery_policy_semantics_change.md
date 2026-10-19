@@ -76,8 +76,8 @@ identity items remain out of scope.
 
 ## Sweep entry point and cache compatibility
 
-The normal entry point remains `python run_discovery_sweep.py --run` (or the
-repository-root PowerShell wrapper). Those wrappers delegate to
+The normal entry point remains `python run_discovery_sweep.py --run` (or
+`-Run`; `tools/run_discovery_sweep.py` is a compatibility alias). Both delegate to
 `tools.discovery_orchestrator`, which continues to invoke the corrected join and
 sig discovery stage tools. Because this change alters discovery evidence, the
 orchestrator engine version is bumped to `discovery-sweep-v3`; cached v2 evidence

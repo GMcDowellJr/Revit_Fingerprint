@@ -5,21 +5,21 @@
 This is Phase-1 stage 2 of the pipeline-doc effort (see `docs/pipeline_doc_topology_findings.md`
 for the corpus-wide topology this stage sits in, and `docs/pipeline/name_key_projection.md` for
 stage 1's sibling trace-block pass). It covers the segment/governance lattice leg of
-`tools/corpus_update_runbook.ps1`'s **Run C**:
+`tools/corpus_update_runbook.py`'s **Run C**:
 
-1. **Run C1** (`tools/build_segment_manifest.py`, invoked at `corpus_update_runbook.ps1:186`)
+1. **Run C1** (`tools/build_segment_manifest.py`, invoked at step C1 of `corpus_update_runbook.py`)
    reads the post-human-edit `file_metadata.csv` and builds the full segmentation lattice —
    every subset of (`unit_system`, `governance_role`, `client_label`, `discipline_label`,
    `business_center_label`) — as `segment_manifest.csv`, classifies each segment into a
    `run_type` (`bundle` / `reference` / `registration` / `skip`), and writes the companion
    `run_registry.csv` and `segment_membership.csv`.
-2. **Run C2** (`tools/run_segment_orchestrator.py`, invoked at `corpus_update_runbook.ps1:245`)
+2. **Run C2** (`tools/run_segment_orchestrator.py`, invoked at step C2 of `corpus_update_runbook.py`)
    reads those three files and, per `bundle`/`reference` segment in level order, runs the
    `patterns` stage (`tools/run_extract_all.py --stages patterns`, segment-scoped) then the
    bundle-mining stage (`tools/bundle_analysis/run_bundle_analysis.py`) for `bundle` segments,
    updating `run_registry.csv` in place after each segment and pre-merging per-domain outputs
    for Power BI.
-3. **Run C2.5** (`tools/build_results_registry.py`, invoked at `corpus_update_runbook.ps1:266`)
+3. **Run C2.5** (`tools/build_results_registry.py`, invoked at step C2.5 of `corpus_update_runbook.py`)
    folds `segment_manifest.csv` and the now-updated `run_registry.csv` into a single
    `results_registry.csv` — one row per segment, meant as a stable BI query surface instead of
    hand-wiring individual segment output folders.
@@ -177,7 +177,7 @@ above is a real, checked column name from the producing script's own module-leve
 - **Reads:** CLI args --metadata-file (required), --out-dir (required), --min-files (default 3), --enable-cross-org-template-bundles, --enable-parent-bundle-runs. Reads file_metadata.csv at --metadata-file; reads any pre-existing run_registry.csv/segment_membership.csv under --out-dir for incremental carry-over.
 - **Calls:** _read_csv() (metadata file, plus existing registry/membership if present); _validate_required_metadata(); _normalize_rows(); _build_segments(); _membership_by_segment(); _build_registry(); _build_membership_rows(); _atomic_write_csv() (x3: segment_manifest.csv, run_registry.csv, segment_membership.csv); _print_summary().
 - **Thresholds:** REQUIRED_COLUMNS (module constant, l.17: header-presence check); REQUIRED_ROW_FIELDS (module constant, l.24, via _validate_required_metadata()); KNOWN_ROLES = {"Project","Template","Container","Generic",""} (l.819 as originally read: unrecognized governance_role values get a [WARN], not a block).
-- **Returns:** int exit code (1 on missing/invalid --metadata-file, missing required columns, or any _validate_required_metadata() diagnostic -- in every blocking case, no output file is written; 0 on success). Invoked as **Run C1** (l.186 of tools/corpus_update_runbook.ps1); its three outputs (segment_manifest.csv, run_registry.csv, segment_membership.csv) are consumed by **Run C2** (tools/run_segment_orchestrator.py) and **Run C2.5** (tools/build_results_registry.py).
+- **Returns:** int exit code (1 on missing/invalid --metadata-file, missing required columns, or any _validate_required_metadata() diagnostic -- in every blocking case, no output file is written; 0 on success). Invoked as **Run C1** (step C1 of tools/corpus_update_runbook.py); its three outputs (segment_manifest.csv, run_registry.csv, segment_membership.csv) are consumed by **Run C2** (tools/run_segment_orchestrator.py) and **Run C2.5** (tools/build_results_registry.py).
 
 ## `../../tools/run_segment_orchestrator.py`
 
@@ -275,53 +275,53 @@ above is a real, checked column name from the producing script's own module-leve
 ### `_filter_name_key_csv_to_segment(name_key_results_csv: Path, out_csv: Path, allowed_ids: set) -> int` — [run_segment_orchestrator.py:L819](../../tools/run_segment_orchestrator.py#L819)
 
 - **Reads:** `name_key_results_csv` -- Path to the corpus-wide name_key_results.csv (tools/apply_name_key_policy.py's output, e.g. from --name-key-results-csv), passed in by _run_one_segment()'s Step 2b; `out_csv` -- this segment's results/name_key/name_key_results.csv Path; `allowed_ids` -- this segment's export_run_ids set.
-- **Calls:** nested _in_segment() (per row); normalize_export_run_id() (tools/bundle_analysis/name_projection_adapter.py, imported at module top), via _in_segment().
+- **Calls:** nested _in_segment() (per row); normalize_export_run_id() (tools/bundle_analysis/name_projection_adapter.py, imported at module top), via _in_segment(); os.utime() (propagates name_key_results_csv's own mtime onto out_csv after writing).
 - **Thresholds:** none named -- membership is tested against `allowed_ids` itself (this segment's real population), not a hardcoded list.
-- **Returns:** int rows written; raises FileNotFoundError if `name_key_results_csv` is missing. Writes `out_csv` with the same fieldnames as the corpus-wide input, filtered to rows whose (normalized-or-raw) export_file is in `allowed_ids`. Consumed by _run_one_segment(), which then invokes tools/generate_name_key_patterns.py --comparison-target name against this filtered file.
+- **Returns:** int rows written; raises FileNotFoundError if `name_key_results_csv` is missing. Writes `out_csv` with the same fieldnames as the corpus-wide input, filtered to rows whose (normalized-or-raw) export_file is in `allowed_ids`, then stamps out_csv's mtime to match the source file's (see above). Consumed by _run_one_segment(), which then invokes tools/generate_name_key_patterns.py --comparison-target name against this filtered file.
 
-### `_filter_name_key_csv_to_segment._in_segment(raw_export_file: str) -> bool` — [run_segment_orchestrator.py:L874](../../tools/run_segment_orchestrator.py#L874)
+### `_filter_name_key_csv_to_segment._in_segment(raw_export_file: str) -> bool` — [run_segment_orchestrator.py:L884](../../tools/run_segment_orchestrator.py#L884)
 
 - **Reads:** `raw_export_file` -- one row's raw `export_file` cell value; closes over `allowed_ids` (the enclosing _filter_name_key_csv_to_segment()'s parameter).
 - **Calls:** normalize_export_run_id() (tools/bundle_analysis/name_projection_adapter.py).
 - **Thresholds:** none.
 - **Returns:** bool; consumed by the enclosing function's row filter (list comprehension).
 
-### `_build_patterns_missing_notes(sid: str, out_root: Path, records_dir: Path, patterns_stderr: str) -> str` — [run_segment_orchestrator.py:L907](../../tools/run_segment_orchestrator.py#L907)
+### `_build_patterns_missing_notes(sid: str, out_root: Path, records_dir: Path, patterns_stderr: str) -> str` — [run_segment_orchestrator.py:L919](../../tools/run_segment_orchestrator.py#L919)
 
 - **Reads:** `sid` -- segment_id, for the message header; `out_root` -- this segment's output root, to locate export_run_ids.txt; `records_dir` -- this segment's results/records/ dir, to locate records.csv/file_metadata.csv; `patterns_stderr` -- the captured stderr/stdout content from the patterns subprocess (run_step_log()'s third return value), passed in by _run_one_segment().
 - **Calls:** none (file reads + csv.reader() only).
 - **Thresholds:** `[WARN extract_all]` (hardcoded literal substring used to filter relevant warning lines out of patterns_stderr); `-10` (last-10-warning-lines slice).
 - **Returns:** str diagnostic message (export_run_ids.txt id count, records.csv/ file_metadata.csv first export_run_id, relevant [WARN] lines); consumed by _run_one_segment() as `failure_notes` when the patterns step exits 0 but pattern_presence_file.csv was never written -- distinguishing a silent zero-records-matched failure from a genuine subprocess error.
 
-### `_active_domains_from_presence_csv(analysis_dir: Path) -> Optional[frozenset]` — [run_segment_orchestrator.py:L984](../../tools/run_segment_orchestrator.py#L984)
+### `_active_domains_from_presence_csv(analysis_dir: Path) -> Optional[frozenset]` — [run_segment_orchestrator.py:L996](../../tools/run_segment_orchestrator.py#L996)
 
 - **Reads:** `analysis_dir` -- this segment's results/analysis/ dir, from _run_one_segment()'s BI-merge step; reads `analysis_dir/pattern_presence_file.csv`'s `domain` column.
 - **Calls:** none (stdlib csv.DictReader).
 - **Thresholds:** none.
 - **Returns:** frozenset[str] of domain names, or None if the file is absent or has no domain rows; consumed by _run_one_segment() as `active_domains`, passed to merge_bi_outputs() to restrict the config-leg BI merge to genuinely active domains (excluding stale per-domain folders from an earlier, larger-population run).
 
-### `_active_domains_from_name_patterns(name_patterns_dir: Path) -> Optional[frozenset]` — [run_segment_orchestrator.py:L1016](../../tools/run_segment_orchestrator.py#L1016)
+### `_active_domains_from_name_patterns(name_patterns_dir: Path) -> Optional[frozenset]` — [run_segment_orchestrator.py:L1028](../../tools/run_segment_orchestrator.py#L1028)
 
 - **Reads:** `name_patterns_dir` -- this segment's results/name_key/patterns/name/ dir, from _run_one_segment()'s name-leg BI-merge step; reads `name_patterns_dir/domain_patterns.csv`'s `domain` column (tools/generate_name_key_patterns.py's output schema).
 - **Calls:** none (stdlib csv.DictReader).
 - **Thresholds:** none.
 - **Returns:** frozenset[str] (possibly empty) if the file exists, or None if it's missing; consumed by _run_one_segment() as `active_domains_name`, passed to merge_bi_outputs() for the name-leg BI merge. The empty-vs-None distinction (see the docstring above) is load-bearing: empty means "exclude every domain folder", None means "file missing, treat as unfiltered".
 
-### `_segment_has_name_leg_output(out_root: Path) -> bool` — [run_segment_orchestrator.py:L1054](../../tools/run_segment_orchestrator.py#L1054)
+### `_segment_has_name_leg_output(out_root: Path, run_type: str) -> bool` — [run_segment_orchestrator.py:L1066](../../tools/run_segment_orchestrator.py#L1066)
 
-- **Reads:** `out_root` -- this segment's output root; checks `out_root/results/bundle_analysis/name_all/bundle_provenance.csv` for existence.
+- **Reads:** `out_root` -- this segment's output root; checks `out_root/results/analysis/pattern_name_fragmentation.csv` AND `..._summary.csv` for existence always (generate_pattern_name_fragmentation.py's main() always writes both together -- see PR #476 review, second round: checking only the detail file let a partial/deleted artifact set still read as satisfied), and (only when `run_type == "bundle"`) also `out_root/results/bundle_analysis/name_all/bundle_provenance.csv`; `run_type` -- caller's own reg_row["run_type"], since the bundle_provenance.csv requirement only applies to a "bundle" segment (a "reference" segment never produces Step 3b output regardless of comparison_target).
 - **Calls:** none (Path.is_file()).
 - **Thresholds:** none.
 - **Returns:** bool; consumed by run_orchestrator() (dry-run and live-run skip-check loops) to decide `already_satisfied` for a segment whose registry status is already "complete" but comparison_target requests the name leg.
 
-### `merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozenset]=None) -> dict` — [run_segment_orchestrator.py:L1081](../../tools/run_segment_orchestrator.py#L1081)
+### `merge_bi_outputs(bundle_analysis_dir: Path, active_domains: Optional[frozenset]=None) -> dict` — [run_segment_orchestrator.py:L1115](../../tools/run_segment_orchestrator.py#L1115)
 
 - **Reads:** `bundle_analysis_dir` -- this segment's results/bundle_analysis/all/ (config leg) or results/bundle_analysis/name_all/ (name leg), from _run_one_segment(); `active_domains` -- Optional[frozenset], from _active_domains_from_presence_csv()/_active_domains_from_name_patterns(); globs `bundle_analysis_dir/*/<filename>` for each name in BI_MERGE_FILES.
 - **Calls:** none (stdlib csv.DictReader/atomic_write_csv() from tools/bundle_analysis/common.py, imported at module top).
 - **Thresholds:** BI_MERGE_FILES (module constant, l.53-64: the 10 per-domain filenames merged into `{stem}_combined.csv`); the "_population_discovery"/ "_population_runs" substring exclusions (hardcoded literals) filtering out non-domain subfolders from the glob.
 - **Returns:** dict[filename, {"files_merged": int, "rows_written": int}]; consumed by _run_one_segment() only to log totals. Deletes a stale `{stem}_combined.csv` when no current candidates exist (rather than leaving it in place), and skips (with a WARN print) any candidate file whose header doesn't match the first file's header.
 
-### `build_run_plan(manifest: Dict[str, dict], registry: List[dict], segment_filter: Optional[str], force: bool) -> List[tuple[dict, dict]]` — [run_segment_orchestrator.py:L1171](../../tools/run_segment_orchestrator.py#L1171)
+### `build_run_plan(manifest: Dict[str, dict], registry: List[dict], segment_filter: Optional[str], force: bool) -> List[tuple[dict, dict]]` — [run_segment_orchestrator.py:L1205](../../tools/run_segment_orchestrator.py#L1205)
 
 - **Reads:** `manifest` -- load_manifest()'s return value; `registry` -- load_registry()'s return value, reads each row's run_type/segment_id; `segment_filter` -- unused by this function's own body (the --segment CLI filter is applied later, by run_orchestrator() itself, not here); `force` -- also unused by this function's own body (also applied later by run_orchestrator()).
 - **Calls:** nested sort_key() (via list.sort()).
@@ -329,55 +329,55 @@ above is a real, checked column name from the producing script's own module-leve
 - **Returns:** List[(registry_row, manifest_row)] tuples, ordered by (segment_level asc, segment_id asc); consumed by run_orchestrator() as `plan`, then filtered again by --segment/--force/status before being split into `plan_to_run` vs. skipped.
 - **Notes:** `segment_filter`/`force` are accepted parameters this function's own body never reads -- both are applied later downstream (run_orchestrator()'s per-row loop), so a reader relying only on this function's signature would wrongly assume filtering happens here.
 
-### `build_run_plan.sort_key(row: dict) -> tuple` — [run_segment_orchestrator.py:L1202](../../tools/run_segment_orchestrator.py#L1202)
+### `build_run_plan.sort_key(row: dict) -> tuple` — [run_segment_orchestrator.py:L1236](../../tools/run_segment_orchestrator.py#L1236)
 
 - **Reads:** `row` -- one registry row; closes over `manifest` (the enclosing build_run_plan()'s parameter) to look up the matching manifest row's segment_level.
 - **Calls:** none.
 - **Thresholds:** `0` -- the fallback segment_level on ValueError/TypeError (hardcoded literal).
 - **Returns:** (int, str) tuple; consumed by `run_rows.sort(key=sort_key)`.
 
-### `validate_membership_against_manifest(plan: List[tuple[dict, dict]], membership: Dict[str, List[str]]) -> List[str]` — [run_segment_orchestrator.py:L1233](../../tools/run_segment_orchestrator.py#L1233)
+### `validate_membership_against_manifest(plan: List[tuple[dict, dict]], membership: Dict[str, List[str]]) -> List[str]` — [run_segment_orchestrator.py:L1267](../../tools/run_segment_orchestrator.py#L1267)
 
 - **Reads:** `plan` -- build_run_plan()'s return value, from run_orchestrator(); reads each manifest_row's file_count/population_hash; `membership` -- load_membership()'s return value, reads each segment_id's export_run_id list.
 - **Calls:** hashlib.sha1() (stdlib, to recompute population_hash for comparison).
 - **Thresholds:** none named -- the comparison is a direct equality check against the manifest row's own file_count/population_hash values (not a separate constant table).
 - **Returns:** list[str] error messages (empty if everything agrees); consumed by run_orchestrator(), which aborts the entire run (prints to stderr, returns 1) before any segment is processed if this list is non-empty -- refusing to run against a stale/mismatched segment_membership.csv.
 
-### `_clear_stale_name_all_before_run(out_root: Path, run_type: str, comparison_target: str, log) -> None` — [run_segment_orchestrator.py:L1285](../../tools/run_segment_orchestrator.py#L1285)
+### `_clear_stale_name_all_before_run(out_root: Path, run_type: str, comparison_target: str, log) -> None` — [run_segment_orchestrator.py:L1319](../../tools/run_segment_orchestrator.py#L1319)
 
 - **Reads:** `out_root` -- this segment's output root; `run_type` -- from the registry row ("bundle"/"reference"/etc.); `comparison_target` -- from run_orchestrator()'s args.comparison_target ("config"/"name"/"both"); `log` -- the per-segment log closure from _run_one_segment().
 - **Calls:** retry_fs_op() (tools/bundle_analysis/common.py, imported at module top), wrapping shutil.rmtree().
 - **Thresholds:** `run_type == "bundle" and comparison_target in ("name", "both")` -- inline condition, not a named constant; the target path `out_root/results/bundle_analysis/name_all` is a hardcoded relative path.
 - **Returns:** None; deletes `name_all/` if present and the condition holds. Called once at the very start of _run_one_segment(), before Step 1, specifically so a failure in step 2b or step 3 (which would otherwise skip step 3b's own upfront clear entirely) still leaves this segment's stale name-leg BI output removed rather than silently stale.
 
-### `_run_one_segment(idx: int, total: int, reg_row: dict, mrow: dict, membership: Dict[str, List[str]], records_dir: Path, exports_dir: Path, segments_root: Path, repo_root: Path, join_policy: Path, skip_bi_merge: bool, registry: List[dict], reg_index: Dict[str, int], registry_file: Path, manifest_file: Path, results_registry_file: Path, registry_lock: threading.Lock, counters: Dict[str, object], counters_lock: threading.Lock, worker_id: int, bundle_workers: int, comparison_target: str='config', name_key_results_csv: Optional[Path]=None) -> Dict` — [run_segment_orchestrator.py:L1322](../../tools/run_segment_orchestrator.py#L1322)
+### `_run_one_segment(idx: int, total: int, reg_row: dict, mrow: dict, membership: Dict[str, List[str]], records_dir: Path, exports_dir: Path, segments_root: Path, repo_root: Path, join_policy: Path, skip_bi_merge: bool, registry: List[dict], reg_index: Dict[str, int], registry_file: Path, manifest_file: Path, results_registry_file: Path, registry_lock: threading.Lock, counters: Dict[str, object], counters_lock: threading.Lock, worker_id: int, bundle_workers: int, comparison_target: str='config', name_key_results_csv: Optional[Path]=None) -> Dict` — [run_segment_orchestrator.py:L1356](../../tools/run_segment_orchestrator.py#L1356)
 
 - **Reads:** `reg_row` -- one run_registry.csv row (segment_id/output_folder/run_type), from build_run_plan()'s plan; `mrow` -- the matching segment_manifest.csv row (segment_level); `membership` -- load_membership()'s Dict, indexed by sid for export_run_ids; `records_dir`/`exports_dir`/`segments_root`/`repo_root`/ `join_policy` -- Paths, from run_orchestrator()'s args, passed through unchanged; `skip_bi_merge` -- from args.skip_bi_merge; `registry`/`reg_index`/ `registry_file`/`manifest_file`/`results_registry_file` -- shared state for the registry-update block; `registry_lock`/`counters`/`counters_lock` -- threading.Lock/dict shared across every worker in the ThreadPoolExecutor; `worker_id`/`bundle_workers` -- for logging and the bundle subprocess's --workers flag; `comparison_target`/`name_key_results_csv` -- from args.comparison_target/args.name_key_results_csv.
-- **Calls:** _clear_stale_name_all_before_run(); _write_segment_records(); run_step_log() (x4: patterns, bundle, and -- gated on comparison_target -- name patterns, name bundle); _filter_name_key_csv_to_segment(); _build_patterns_missing_notes(); _active_domains_from_presence_csv(); _active_domains_from_name_patterns(); merge_bi_outputs(); annotate_name_target_combined_files() (tools/bundle_analysis/name_projection_adapter.py); retry_fs_op() (via shutil.rmtree, for the name-bundle stale-output clear); utc_now_iso(); write_registry_atomic(); write_results_registry() (tools/build_results_registry.py, imported at module top); nested log().
+- **Calls:** _clear_stale_name_all_before_run(); _write_segment_records(); run_step_log() (x5: patterns, bundle, and -- gated on comparison_target -- name patterns, name-fragmentation (Step 1 Part A), name bundle); _filter_name_key_csv_to_segment(); _build_patterns_missing_notes(); _active_domains_from_presence_csv(); _active_domains_from_name_patterns(); merge_bi_outputs(); annotate_name_target_combined_files() (tools/bundle_analysis/name_projection_adapter.py); retry_fs_op() (via shutil.rmtree, for the name-bundle stale-output clear); utc_now_iso(); write_registry_atomic(); write_results_registry() (tools/build_results_registry.py, imported at module top); nested log().
 - **Thresholds:** none named beyond the module-level VALID_COMPARISON_TARGETS check (enforced earlier, in main()) -- this function's own step gating is `run_type == "bundle"` / `comparison_target in ("name", "both")` inline conditions, not named constants.
 - **Returns:** dict (segment_id/status/files/level/prepare_s/patterns_s/bundle_s/ bi_merge_s/total_s/worker_id/patterns_top5/failure_note); consumed by run_orchestrator()'s ThreadPoolExecutor future-collection loop, appended to `segment_results` (feeds _write_run_summary()) and used to update `counters`. Also has the side effect (under registry_lock) of mutating the shared `registry` list in place and persisting it via write_registry_atomic()/ write_results_registry() before returning -- so run_registry.csv/ results_registry.csv reflect this segment's outcome immediately, not only after the whole run completes.
-- **Notes:** (mechanical-extraction risk) `step_failed`/`failure_notes` accumulate through 7 sequential try/except-guarded steps (clear_stale_name_all, prepare, patterns, patterns_name, bundle, bundle_name, bi_merge/bi_merge_name), each gated on `step_failed is None` from the previous step -- sequential-control-flow-as-policy: which steps actually execute for a given segment depends on run_type and comparison_target, evaluated fresh at each gate, not declared as a single up-front plan. `registry` (the list) and `counters` (the dict) are both caller-owned mutable state shared across every concurrent worker thread and mutated in place under their respective locks -- a per-function reader would need to also read run_orchestrator() to know these mutations are thread-safe only because of that locking discipline.
+- **Notes:** (mechanical-extraction risk) `step_failed`/`failure_notes` accumulate through 8 sequential try/except-guarded steps (clear_stale_name_all, prepare, patterns, patterns_name, patterns_name_fragmentation, bundle, bundle_name, bi_merge/bi_merge_name), each gated on `step_failed is None` from the previous step -- sequential-control-flow-as-policy: which steps actually execute for a given segment depends on run_type and comparison_target, evaluated fresh at each gate, not declared as a single up-front plan. `registry` (the list) and `counters` (the dict) are both caller-owned mutable state shared across every concurrent worker thread and mutated in place under their respective locks -- a per-function reader would need to also read run_orchestrator() to know these mutations are thread-safe only because of that locking discipline.
 
-### `_run_one_segment.log(msg: str) -> None` — [run_segment_orchestrator.py:L1444](../../tools/run_segment_orchestrator.py#L1444)
+### `_run_one_segment.log(msg: str) -> None` — [run_segment_orchestrator.py:L1479](../../tools/run_segment_orchestrator.py#L1479)
 
 - **Reads:** `msg` -- caller-supplied string; closes over `log_f` (the enclosing _run_one_segment()'s open file handle for out_root/run.log).
 - **Calls:** none (file write + flush).
 - **Thresholds:** none.
 - **Returns:** None; used throughout _run_one_segment() as the per-step logging call (separate from the `print()` calls that go to console).
 
-### `run_orchestrator(args: argparse.Namespace) -> int` — [run_segment_orchestrator.py:L1809](../../tools/run_segment_orchestrator.py#L1809)
+### `run_orchestrator(args: argparse.Namespace) -> int` — [run_segment_orchestrator.py:L1869](../../tools/run_segment_orchestrator.py#L1869)
 
 - **Reads:** `args` -- argparse.Namespace from main() (--manifest-file, --registry-file, --results-registry-file, --membership-file, --records-dir, --exports-dir, --segments-root, --repo-root, --join-policy, --segment, --force, --dry-run, --skip-bi-merge, --workers/--bundle-workers/--workers-auto, --no-preshard, --force-preshard, --comparison-target, --name-key-results-csv).
 - **Calls:** load_manifest(); load_registry(); load_membership(); build_run_plan(); validate_membership_against_manifest(); _segment_has_name_leg_output() (skip-check, dry-run and live); _preshard_corpus_records() (gated on marker/force state); ThreadPoolExecutor/_run_one_segment() (live run, once per segment in plan_to_run); write_results_registry(); _write_run_summary().
 - **Thresholds:** `_CORPUS_PRESHARD_MARKER = ".preshard_complete_corpus"` (module constant, l.51: gates whether preshard re-runs); the preshard skip condition itself (`preshard_marker.is_file() and not _has_pending`) is inline control flow built from that marker plus a freshly-computed `_has_pending` flag, not a single named constant.
 - **Returns:** int exit code (1 if segment_membership.csv disagrees with segment_manifest.csv -- via validate_membership_against_manifest() -- or if any segment failed or results_registry write failed; 0 otherwise). In --dry-run mode, returns 0 unconditionally after printing the full plan without executing anything. Writes run_registry.csv (incrementally, per segment, and once more at the end via write_results_registry()) and segments_root/run_summary.txt. Called by main() as `run_orchestrator(args)`.
 
-### `main() -> None` — [run_segment_orchestrator.py:L2214](../../tools/run_segment_orchestrator.py#L2214)
+### `main() -> None` — [run_segment_orchestrator.py:L2285](../../tools/run_segment_orchestrator.py#L2285)
 
 - **Reads:** CLI args (see the module-level argparse block for the full list: --manifest-file, --registry-file, --results-registry-file, --membership-file, --records-dir, --exports-dir, --segments-root, --repo-root, --join-policy, --segment, --force, --dry-run, --skip-bi-merge, --workers, --no-preshard, --force-preshard, --comparison-target, --name-key-results-csv).
 - **Calls:** compute_worker_split() (when --workers is "auto", or to derive bundle_workers from an explicit --workers N); run_orchestrator().
 - **Thresholds:** VALID_COMPARISON_TARGETS = {"config", "name", "both"} (module constant, l.44, enforced via argparse choices); default --workers=4; the --name-key-results-csv-required-when-name/both check (ap.error(), inline, not a named constant).
-- **Returns:** None; calls sys.exit(run_orchestrator(args)) -- this is **Run C2** (l.245 of tools/corpus_update_runbook.ps1), invoked per segment_manifest.csv/ run_registry.csv (Run C1's output) after the mandatory file_metadata.csv human-edit pause, and its own output (run_registry.csv, updated in place; results_registry.csv) is consumed by **Run C2.5** (tools/build_results_registry.py).
+- **Returns:** None; calls sys.exit(run_orchestrator(args)) -- this is **Run C2** (step C2 of tools/corpus_update_runbook.py), invoked per segment_manifest.csv/ run_registry.csv (Run C1's output) after the mandatory file_metadata.csv human-edit pause, and its own output (run_registry.csv, updated in place; results_registry.csv) is consumed by **Run C2.5** (tools/build_results_registry.py).
 
 ## `../../tools/build_results_registry.py`
 
@@ -421,7 +421,7 @@ above is a real, checked column name from the producing script's own module-leve
 - **Reads:** CLI args --manifest-file, --registry-file, --output-file (all required).
 - **Calls:** write_results_registry().
 - **Thresholds:** none.
-- **Returns:** int exit code (1 if --manifest-file/--registry-file is missing, else 0); prints a row-count summary to stdout. Invoked as **Run C2.5** (l.266 of tools/corpus_update_runbook.ps1) after tools/run_segment_orchestrator.py's Run C2 completes.
+- **Returns:** int exit code (1 if --manifest-file/--registry-file is missing, else 0); prints a row-count summary to stdout. Invoked as **Run C2.5** (step C2.5 of tools/corpus_update_runbook.py) after tools/run_segment_orchestrator.py's Run C2 completes.
 
 ## `../../tools/extract_segment_subtree.py`
 

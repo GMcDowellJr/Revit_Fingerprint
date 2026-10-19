@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Corrected port of label_refresh_runbook.ps1.
+"""Corrected port of the former PowerShell label refresh runbook (removed, D-051).
 
-The .ps1 derived results/segments under Fingerprint_Data\\exports\\; this port
+The PowerShell runbook derived results/segments under Fingerprint_Data\\exports\\; this port
 uses the corpus_update_runbook layout (results = exports_root, segments =
 exports_root/segments) per the 2026-07 move. Not a faithful port.
 
@@ -15,10 +15,10 @@ tools/corpus_update_runbook.py):
   lookup   = results/label_synthesis/identity_items_by_joinhash.csv
   dp_csv   = results/analysis/domain_patterns.csv
 
-Steps L1-L4 are otherwise preserved from the .ps1: same CLIs, same flags,
+Steps L1-L4 are otherwise preserved from the PowerShell runbook: same CLIs, same flags,
 same L2 domain list, stop on the first failed L1/L1b/L2/L3/L4 command.
 
-L1b (new, not in the .ps1): rebuild the corpus-level
+L1b (new, not in the PowerShell runbook): rebuild the corpus-level
 label_synthesis/{domain}.joinhash_label_population.csv files from
 records/records.csv via build_label_population.py before L2. L2's
 synthesize_fragmented_labels.py reads them from --analysis-dir and, when one
@@ -29,7 +29,7 @@ writes them per segment. Without L1b, a default Run A -> Run C -> label refresh
 sequence would skip synthesis for every domain and still report success (or use
 stale files left by an older Run B).
 
-L2 filter mode (resolved): the .ps1 passed --filter-mode bundles with
+L2 filter mode (resolved): the PowerShell runbook passed --filter-mode bundles with
 --segments-root/--registry-file and carried an "until union mode is
 confirmed, use --filter-mode candidates" note. Union mode IS implemented in
 tools/label_synthesis/synthesize_fragmented_labels.py
@@ -43,7 +43,7 @@ candidates fallback is not needed.
 does not prompt for OPENROUTER_API_KEY, write os.environ, or chdir. Reads
 (run_registry.csv, bundles.csv discovery for L4) still execute.
 
-NOTES (carried over from the .ps1)
+NOTES (carried over from the PowerShell runbook)
 
 When to run:
   After corpus_update_runbook Run C completes and the corpus is stable.
@@ -124,7 +124,7 @@ def normalize_powershell_style_argv(argv: Sequence[str]) -> list[str]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Label refresh runbook (L1-L4); corrected port of label_refresh_runbook.ps1.",
+        description="Label refresh runbook (L1-L4); corrected port of the former PowerShell runbook.",
         allow_abbrev=False,
     )
     parser.add_argument("--exports-root", dest="exports_root", default="./Fingerprint_Data")
@@ -209,7 +209,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     registry_csv = records / "run_registry.csv"
     active: list[dict] = []
     if not observed(registry_csv).exists():
-        # .ps1: Import-Csv on a missing file is a terminating error.
+        # Former PowerShell runbook: Import-Csv on a missing file was a terminating error.
         if dry_run:
             print(f"DRYRUN: guard would fail: {registry_csv} not found")
         else:

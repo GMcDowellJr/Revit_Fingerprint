@@ -2866,3 +2866,62 @@ removed, and no downstream consumer's read logic changed as a result
   relative value in the `cascade` dict, but remain unrendered/unwritten to
   any CSV — this fix has no visible effect on them until a future change
   renders them.
+
+## D-051 — Deprecate PowerShell runbooks in favor of Python ports
+
+### Status
+Accepted (2026-10-19)
+
+### Context
+Four PowerShell scripts orchestrated the analysis pipeline:
+`tools/corpus_update_runbook.ps1`, `tools/label_refresh_runbook.ps1`,
+`run_discovery_sweep.ps1` (repository root) and `tools/run_discovery_sweep.ps1`
+(a backward-compatible wrapper around the root script). Each was a thin
+wrapper: it built a command line and called `python` on a tool in `tools/`,
+with no analysis logic of its own. Running a `.ps1` file on a default Windows
+install requires relaxing PowerShell's execution policy (for example
+`Set-ExecutionPolicy` or `-ExecutionPolicy Bypass`). That is a machine- or
+session-level security change made only to launch orchestration wrappers.
+
+Python equivalents already existed or were added in
+GMcDowellJr/Revit_Fingerprint#486:
+- `tools/corpus_update_runbook.py` (port of the corpus update runbook; accepts
+  the same PowerShell-style flag spelling, e.g. `python tools/corpus_update_runbook.py -Run A`).
+- `tools/label_refresh_runbook.py` (corrected port of the label refresh runbook, added in #486).
+- `run_discovery_sweep.py` (repository root) and `tools/run_discovery_sweep.py`,
+  both delegating to `tools.discovery_orchestrator.main`.
+
+### Decision
+Delete the four PowerShell runbooks outright and make the Python ports the only
+supported entry points. Stub `.ps1` files that print a deprecation message are
+not kept: a stub would still require the execution-policy change just to
+display its message.
+
+What replaced each file:
+- `tools/corpus_update_runbook.ps1` → `tools/corpus_update_runbook.py`.
+- `tools/label_refresh_runbook.ps1` → `tools/label_refresh_runbook.py`.
+- `run_discovery_sweep.ps1` → `run_discovery_sweep.py` (same directory).
+- `tools/run_discovery_sweep.ps1` → `tools/run_discovery_sweep.py`.
+
+### Consequences
+- Operators run the runbooks with `python` from any shell; no execution-policy
+  change is needed.
+- `tools/label_refresh_runbook.py` is a corrected port, not a faithful one: it
+  uses the corpus update runbook's results layout (`results = exports_root`,
+  `segments = exports_root/segments`) instead of the PowerShell script's
+  `Fingerprint_Data/exports/{results,segments}`, keeps L2's union bundle
+  filter mode, and adds step L1b (rebuild the corpus label population before
+  L2). See the CHANGELOG entry and GMcDowellJr/Revit_Fingerprint#486.
+- Parity evidence between each PowerShell runbook and its Python port (command
+  plans from `--dry-run`, side by side with the PowerShell commands) is recorded
+  in the body of GMcDowellJr/Revit_Fingerprint#486.
+- All three Python runbooks accept the PowerShell-style flag spelling the
+  deleted wrappers exposed (`-Run A`, `-Domains walls`, `-WhatIf`,
+  case-insensitive) as well as `--kebab-case`; `tools/discovery_orchestrator.py`
+  gained the same normalization the corpus and label runbooks already had.
+  The discovery wrapper also changed into the repository root before running,
+  so a relative `--exports-root` now resolves against the current directory;
+  run the sweep from the repository root.
+- Earlier DECISIONS.md entries, CHANGELOG entries, audit_results/ files and
+  dated findings documents that cite `.ps1` paths or line numbers are left as
+  written; they record what was true when they were written.

@@ -727,10 +727,22 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def normalize_powershell_style_argv(argv: list[str], parser: argparse.ArgumentParser) -> list[str]:
+    """Accept PowerShell-style flag spelling (-ExportsRoot, -Run, -WhatIf, ...), case-insensitively,
+    alongside --kebab-case, matching tools/corpus_update_runbook.py and tools/label_refresh_runbook.py."""
+    canon={o.lstrip("-").replace("-","").lower():o for a in parser._actions for o in a.option_strings if o.startswith("--")}
+    out=[]
+    for tok in argv:
+        name,sep,val=tok.partition("=");key=name.lstrip("-").replace("-","").lower()
+        out.append(canon[key]+sep+val if tok.startswith("-") and key in canon else tok)
+    return out
+
+
 def config_from_args(ns: argparse.Namespace) -> Config:
     exports=Path(ns.exports_root).resolve(); return Config(exports,Path(ns.repo_root).resolve(),Path(ns.suggestions_csv).resolve() if ns.suggestions_csv else exports/"diagnostics/discovery_param_suggestions.csv",[x.strip() for x in ns.domains.split(",") if x.strip()] if ns.domains else None,ns.skip_join,ns.skip_sig,ns.force,ns.what_if,ns.run,workers=resolve_worker_count(ns.workers),work_budget=ns.work_budget,pareto_frontier_limit=ns.pareto_frontier_limit,pareto_progress=not ns.no_pareto_progress)
 
 
 def main(argv: list[str] | None=None) -> int:
-    try: Orchestrator(config_from_args(build_parser().parse_args(argv))).run_sweep();return 0
+    parser=build_parser();raw=sys.argv[1:] if argv is None else argv
+    try: Orchestrator(config_from_args(parser.parse_args(normalize_powershell_style_argv(raw,parser)))).run_sweep();return 0
     except Exception as exc: print(f"ERROR: {exc}",file=sys.stderr);return 1

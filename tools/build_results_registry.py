@@ -185,8 +185,8 @@ def main(argv: List[str] | None = None) -> int:
     calls: write_results_registry().
     thresholds: none.
     returns: int exit code (1 if --manifest-file/--registry-file is missing, else 0);
-        prints a row-count summary to stdout. Invoked as **Run C2.5** (l.266 of
-        tools/corpus_update_runbook.ps1) after tools/run_segment_orchestrator.py's
+        prints a row-count summary to stdout. Invoked as **Run C2.5** (step C2.5 of
+        tools/corpus_update_runbook.py) after tools/run_segment_orchestrator.py's
         Run C2 completes.
     """
     parser = argparse.ArgumentParser(
