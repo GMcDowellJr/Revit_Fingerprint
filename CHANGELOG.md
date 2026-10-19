@@ -24,7 +24,12 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `--filter-mode bundles --segments-root --registry-file`: union bundle discovery is
   implemented in `synthesize_fragmented_labels.py` (`_collect_union_bundle_join_hashes()`),
   so the `.ps1`'s "until confirmed, use candidates" fallback is resolved as not needed.
-  Steps L1-L4 are otherwise unchanged. `--dry-run` (`-DryRun`) on both Python runbooks
+  New step L1b (not in the `.ps1`): rebuild the corpus-level
+  `label_synthesis/{domain}.joinhash_label_population.csv` files from `records/records.csv`
+  via `build_label_population.py` before L2. L2 reads them and, if one is missing, exits 0
+  without synthesizing; by default nothing else writes them at corpus level (only Run B
+  `-RunAuthorityPatterns`, opt-in), so the `.ps1` silently skipped synthesis after a default
+  Run A -> Run C. Steps L1-L4 are otherwise unchanged. `--dry-run` (`-DryRun`) on both Python runbooks
   prints one `DRYRUN: <command>` line per would-be subprocess and gates deletions/chdir/
   env writes; guards still read the filesystem and report `DRYRUN: guard would fail: ...`
   instead of exiting. No behavior change to `corpus_update_runbook.py` when `--dry-run` is

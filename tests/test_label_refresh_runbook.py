@@ -64,25 +64,28 @@ def test_dry_run_plan_l1_to_l4(exports_root, capsys):
     assert "OPENROUTER_API_KEY" not in os.environ
 
     cmds = [l for l in dry if "would " not in l and "OPENROUTER" not in l]
-    # L1 + 6 x L2 + L3 + 2 x L4 (seg_ok all/used).
-    assert len(cmds) == 10
+    # L1 + L1b + 6 x L2 + L3 + 2 x L4 (seg_ok all/used).
+    assert len(cmds) == 11
     assert "build_identity_items_lookup.py" in cmds[0]
-    l2 = cmds[1:7]
+    assert "build_label_population.py" in cmds[1]
+    assert f"--records-dir {_q(str(exports_root / 'records'))}" in cmds[1]
+    assert f"--label-synth-dir {_q(str(exports_root / 'label_synthesis'))}" in cmds[1]
+    l2 = cmds[2:8]
     assert [c.split("--domain ")[1].split()[0] for c in l2] == list(runbook.L2_DOMAINS)
     for c in l2:
         assert "-m tools.label_synthesis.synthesize_fragmented_labels" in c
         assert "--filter-mode bundles" in c
         assert f"--segments-root {_q(str(exports_root / 'segments'))}" in c
         assert f"--registry-file {_q(str(exports_root / 'records' / 'run_registry.csv'))}" in c
-    assert "patch_all_domain_patterns.py" in cmds[7]
-    assert f"--results-root {_q(str(exports_root))} " in cmds[7]
-    l4 = cmds[8:]
+    assert "patch_all_domain_patterns.py" in cmds[8]
+    assert f"--results-root {_q(str(exports_root))} " in cmds[8]
+    l4 = cmds[9:]
     assert all("export_bundle_pattern_detail.py" in c and "--output-folder seg_ok" in c for c in l4)
     assert "--purge-view all" in l4[0] and "--purge-view used" in l4[1]
     assert "seg_failed" not in out
 
     # Step markers in order.
-    markers = ["--- L1:", "--- L2:", "--- L3:", "--- L4:", "=== LABEL REFRESH COMPLETE ==="]
+    markers = ["--- L1:", "--- L1b:", "--- L2:", "--- L3:", "--- L4:", "=== LABEL REFRESH COMPLETE ==="]
     positions = [out.index(m) for m in markers]
     assert positions == sorted(positions)
 
@@ -112,3 +115,26 @@ def test_missing_registry_reported_in_dry_run(exports_root, capsys):
     assert rc == 0
     assert "DRYRUN: guard would fail:" in out
     assert "export_bundle_pattern_detail.py" not in out
+
+
+def test_l1b_failure_stops_before_l2(exports_root, capsys, monkeypatch):
+    # Live mode with subprocess stubbed: L1 succeeds, L1b fails -> exit 1, L2 never runs.
+    corpus_runbook.DRY_RUN = False
+    monkeypatch.setattr(runbook.os, "chdir", lambda *_: None)
+    calls = []
+
+    class _Done:
+        def __init__(self, rc):
+            self.returncode = rc
+
+    def fake_run(cmd, check=False):
+        calls.append(cmd)
+        return _Done(1 if "build_label_population.py" in " ".join(cmd) else 0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(SystemExit) as exc:
+        runbook.main(["--exports-root", str(exports_root)])
+    assert exc.value.code == 1
+    assert len(calls) == 2
+    assert "build_label_population.py" in " ".join(calls[1])
+    assert "L1b corpus label population failed with exit code 1" in capsys.readouterr().out

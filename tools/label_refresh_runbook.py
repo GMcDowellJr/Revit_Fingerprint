@@ -16,7 +16,18 @@ tools/corpus_update_runbook.py):
   dp_csv   = results/analysis/domain_patterns.csv
 
 Steps L1-L4 are otherwise preserved from the .ps1: same CLIs, same flags,
-same L2 domain list, stop on the first failed L1/L2/L3/L4 command.
+same L2 domain list, stop on the first failed L1/L1b/L2/L3/L4 command.
+
+L1b (new, not in the .ps1): rebuild the corpus-level
+label_synthesis/{domain}.joinhash_label_population.csv files from
+records/records.csv via build_label_population.py before L2. L2's
+synthesize_fragmented_labels.py reads them from --analysis-dir and, when one
+is missing, prints an error but exits 0. Nothing else writes them at corpus
+level by default: run_extract_all.py builds them only in the authority/patterns
+stage (corpus_update_runbook Run B with -RunAuthorityPatterns, opt-in), and Run C
+writes them per segment. Without L1b, a default Run A -> Run C -> label refresh
+sequence would skip synthesis for every domain and still report success (or use
+stale files left by an older Run B).
 
 L2 filter mode (resolved): the .ps1 passed --filter-mode bundles with
 --segments-root/--registry-file and carried an "until union mode is
@@ -42,6 +53,7 @@ When to run:
 
 Incremental behaviour:
   L1 (lookup)    - always rebuild, fast ~2 min
+  L1b (population) - always rebuild from records.csv, fast, no API calls
   L2 (synthesis) - skips join_hashes already in cache; only new patterns cost tokens
                    stops immediately on any failed domain synthesis command
   L3 (patch)     - skips rows with authoritative sources (curator/synopsis/modal)
@@ -152,6 +164,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         python, "tools/label_synthesis/build_identity_items_lookup.py",
         "--records-dir", records,
         "--out-dir", results / "label_synthesis",
+    ], checked=False))
+
+    print(cyan("--- L1b: corpus label population (always rebuild; feeds L2) ---"))
+    assert_native_success("L1b corpus label population", run_external([
+        python, "tools/label_synthesis/build_label_population.py",
+        "--out-root", results,
+        "--records-dir", records,
+        "--label-synth-dir", results / "label_synthesis",
     ], checked=False))
 
     if not os.environ.get("OPENROUTER_API_KEY"):
