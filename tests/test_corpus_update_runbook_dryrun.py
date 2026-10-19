@@ -135,3 +135,11 @@ def test_name_key_guards_report_and_continue_in_dry_run(exports_root, capsys, mo
 def test_dry_run_flag_spellings_normalize():
     for spelling in ("-DryRun", "-dryrun", "--dryrun", "--dry-run"):
         assert runbook.normalize_powershell_style_argv([spelling]) == ["--dry-run"]
+
+
+def test_render_command_uses_native_quoting(monkeypatch):
+    cmd = ["C:\\Python\\python.exe", "tools/x.py", "--out", "C:\\My Data\\out"]
+    monkeypatch.setattr(runbook.os, "name", "nt")
+    assert runbook.render_command(cmd) == 'C:\\Python\\python.exe tools/x.py --out "C:\\My Data\\out"'
+    monkeypatch.setattr(runbook.os, "name", "posix")
+    assert runbook.render_command(cmd) == "'C:\\Python\\python.exe' tools/x.py --out 'C:\\My Data\\out'"

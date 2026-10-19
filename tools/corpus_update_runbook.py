@@ -51,12 +51,19 @@ def invoke_checked(step_name: str, returncode: int) -> None:
         raise SystemExit(1)
 
 
+def render_command(cmd: Sequence[str]) -> str:
+    """Quote a command for display in the platform's native shell style."""
+    if os.name == "nt":
+        return subprocess.list2cmdline(cmd)
+    return shlex.join(cmd)
+
+
 def run_external(command: Sequence[object], step_name: str | None = None,
                  checked: bool = True) -> int:
     """Run an external process without a shell and optionally enforce success."""
     cmd = [str(part) for part in command]
     if DRY_RUN:
-        print("DRYRUN: " + shlex.join(cmd))
+        print("DRYRUN: " + render_command(cmd))
         return 0
     try:
         completed = subprocess.run(cmd, check=False)
