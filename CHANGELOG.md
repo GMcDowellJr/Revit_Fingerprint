@@ -14,6 +14,14 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Changed (behavior-changing)
+- **PowerShell runbooks removed (D-051).** Deleted `tools/corpus_update_runbook.ps1`,
+  `tools/label_refresh_runbook.ps1`, `run_discovery_sweep.ps1` and
+  `tools/run_discovery_sweep.ps1`. Use `tools/corpus_update_runbook.py`,
+  `tools/label_refresh_runbook.py`, `run_discovery_sweep.py` and
+  `tools/run_discovery_sweep.py` instead; running a `.ps1` required relaxing PowerShell's
+  execution policy. `run_discovery_sweep.py` takes `--kebab-case` flags (`--run`, not
+  `-Run`) and resolves a relative `--exports-root` against the current directory, so run
+  it from the repository root. No hash, identity or analysis-output change.
 - **New `tools/label_refresh_runbook.py` -- a corrected (not faithful) port of
   `tools/label_refresh_runbook.ps1`; `tools/corpus_update_runbook.py` gains `--dry-run`.**
   Declared layout change vs the `.ps1`: the `.ps1` derived `results`/`segments` under

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Per-export-file change-detection cache for Run A (corpus_update_runbook.ps1's
+"""Per-export-file change-detection cache for Run A (corpus_update_runbook.py's
 ``sig_hash,flatten,apply,placeholders`` stage set).
 
 Scope and rationale (see audit_results/audit_17_abc_reprocessing_scope_investigation.md

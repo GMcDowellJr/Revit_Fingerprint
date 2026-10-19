@@ -116,11 +116,13 @@ def test_force_is_preserved_in_shared_config(tmp_path):
     assert Orchestrator(cfg).cfg.force is True
 
 
-def test_powershell_is_thin_shared_entry_point():
-    text=Path("run_discovery_sweep.ps1").read_text(encoding="utf-8")
-    assert "run_discovery_sweep.py" in text and "discover_join_policy.py" not in text
-    for flag in ("ExportsRoot","RepoRoot","SuggestionsCsv","Domains","SkipJoin","SkipSig","Force","WhatIf","Run","WorkBudget","ParetoFrontierLimit","NoParetoProgress"):
-        assert f"${flag}" in text
+def test_python_entrypoint_is_thin_shared_delegate():
+    for entry in ("tools/run_discovery_sweep.py","run_discovery_sweep.py"):
+        text=Path(entry).read_text(encoding="utf-8")
+        assert "from tools.discovery_orchestrator import main" in text and "discover_join_policy" not in text
+    ns=build_parser().parse_args(["--exports-root","x","--repo-root","y","--suggestions-csv","s.csv","--domains","walls","--skip-join","--skip-sig","--force","--what-if","--run","--workers","2","--work-budget","5","--pareto-frontier-limit","3","--no-pareto-progress"])
+    assert (ns.exports_root,ns.repo_root,ns.suggestions_csv,ns.domains,ns.workers,ns.work_budget,ns.pareto_frontier_limit)==("x","y","s.csv","walls","2",5,3)
+    assert ns.skip_join and ns.skip_sig and ns.force and ns.what_if and ns.run and ns.no_pareto_progress
 
 
 def test_sweep_entrypoint_overrides_are_wired_into_both_discovery_targets(tmp_path):

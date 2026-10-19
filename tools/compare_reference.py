@@ -1556,7 +1556,7 @@ def _name_key_side_status(segment_root: Path) -> Tuple[str, Optional[Path], Opti
     e.g. -NameKey / --comparison-target name|both was never run for this segment; see
     docs/namekey_crosssegment_step0_findings.md A.1/A.2), or NAME_KEY_STATUS_STALE
     (name_key_results.csv exists but is older than this segment's own records.csv --
-    mirrors tools/corpus_update_runbook.ps1's own Run-C staleness guard, lines 291-301).
+    mirrors tools/corpus_update_runbook.py's own Run-C2 -NameKey staleness guard).
     B2 design decision: this is a fail-soft per-domain/per-pattern signal, never a hard
     failure of the whole comparison -- a segment missing name-key materialization still
     gets its ordinary config-identity comparison; only the name-overlap columns degrade.

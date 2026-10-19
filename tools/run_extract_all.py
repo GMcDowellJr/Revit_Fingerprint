@@ -470,7 +470,7 @@ def _check_governance_field_completeness(meta_rows: List[Dict[str, str]]) -> Non
             "[FATAL extract_all] governance-field completeness gate failed: "
             f"{len(offenders)} row(s) in file_metadata.csv have a blank or N/A "
             "client_label/business_center_label. Fill in real values for these "
-            "rows (see corpus_update_runbook.ps1's manual-pause instructions) "
+            "rows (see corpus_update_runbook.py's manual-pause instructions) "
             "before re-running Run B.\n" + detail_lines
         )
 
@@ -777,7 +777,7 @@ def _run_main(progress_reporters: List[Any]) -> None:
         help="Treat --out-root itself as the results root: records/, analysis/, policies/, "
              "label_synthesis/, etc. land directly under it instead of under {out-root}/results/. "
              "Use this when --out-root already names a dedicated results directory (e.g. "
-             "corpus_update_runbook.ps1's $RESULTS, sibling to exports/ and segments/). Leave "
+             "corpus_update_runbook.py's results root, sibling to exports/ and segments/). Leave "
              "unset for per-segment callers (run_segment_orchestrator.py) that want results/ "
              "nested under --out-root to stay separate from segment-level log files."
     )
@@ -890,11 +890,11 @@ def _run_main(progress_reporters: List[Any]) -> None:
     #    wants results/ nested under it, to separate this script's output from the
     #    segment-level run.log/patterns.log/bundle.log/export_run_ids.txt siblings
     #    it writes itself (default behaviour here, --out-root-is-results-root unset).
-    #  - corpus_update_runbook.ps1 passes its corpus-level $RESULTS root (itself
+    #  - corpus_update_runbook.py passes its corpus-level results root (itself
     #    already a dedicated results directory, sibling to exports/ and segments/)
     #    and wants records/analysis/policies/etc. directly under it -- no extra
     #    nesting -- matching patch_all_domain_patterns.py's --results-root and the
-    #    runbook's $RECORDS ($RESULTS\records, not $RESULTS\results\records).
+    #    runbook's records dir (<results>/records, not <results>/results/records).
     #    Pass --out-root-is-results-root to select this layout.
     v21_root = out_root if args.out_root_is_results_root else out_root / "results"
     v21_phase0_dir = v21_root / "records"

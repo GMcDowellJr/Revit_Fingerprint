@@ -8,8 +8,8 @@ it passes that path to `runner.extraction_context.build_extraction_context()`.
 
 There is no repo-tracked entry point that launches `runner/run_dynamo.py` -- it
 runs from a pasted Dynamo CPython3 node (`runner/thin_runner.py`) invoked via a
-pyRevit "BatchExtract" button, outside any `.ps1`/`.py` script committed here.
-`tools/corpus_update_runbook.ps1` and friends only orchestrate *post-export*
+pyRevit "BatchExtract" button, outside any script committed here.
+`tools/corpus_update_runbook.py` and friends only orchestrate *post-export*
 analysis (`run_extract_all.py`, `build_segment_manifest.py`, etc.) against
 already-exported JSON, so setting this env var there has no effect on
 extraction. Set it one of two ways instead:

@@ -34,12 +34,12 @@ from already-exported `*.details.json` files, with no re-extraction through
 
 ## Runbook invocation points
 
-- **Run A-NameKey** — `tools/corpus_update_runbook.ps1` (l.120, `Invoke-Checked -StepName
-  "Run A-NameKey: apply_name_key_policy.py"`) runs `apply_name_key_policy.py
+- **Run A-NameKey** — `tools/corpus_update_runbook.py` (step A-NameKey, `run_external(...,
+  "Run A-NameKey: apply_name_key_policy.py")`) runs `apply_name_key_policy.py
   --export-dir ... --out $NAME_KEY_CSV` once per corpus, as an opt-in (`-NameKey`) step of
   Run A, right after flatten/apply/placeholders.
-- **Run B-NameKey** — `tools/corpus_update_runbook.ps1` (l.163, `Invoke-Checked -StepName
-  "Run B-NameKey: generate_name_key_patterns.py"`) runs
+- **Run B-NameKey** — `tools/corpus_update_runbook.py` (step B-NameKey, `run_external(...,
+  "Run B-NameKey: generate_name_key_patterns.py")`) runs
   `generate_name_key_patterns.py --comparison-target name --name-key-csv $NAME_KEY_CSV`
   as an opt-in step of Run B, explicitly marked "not required before Run C — Run C
   re-clusters per segment."
@@ -146,7 +146,7 @@ these traces but is extraction-adjacent and intentionally not annotated in this 
 
 ### `main() -> None` — [generate_name_key_patterns.py:L365](../../tools/generate_name_key_patterns.py#L365)
 
-- **Reads:** CLI args --comparison-target (config/name/both, default config), --config-patterns-csv, --name-key-csv, --out-root (default "Results_v21/name_key/patterns"). Invoked by tools/corpus_update_runbook.ps1's Run B-NameKey step (l.163, --comparison-target name) and by tools/run_segment_orchestrator.py's per-segment Step 2b (l.1151/1506, also --comparison-target name).
+- **Reads:** CLI args --comparison-target (config/name/both, default config), --config-patterns-csv, --name-key-csv, --out-root (default "Results_v21/name_key/patterns"). Invoked by tools/corpus_update_runbook.py's Run B-NameKey step (--comparison-target name) and by tools/run_segment_orchestrator.py's per-segment Step 2b (l.1151/1506, also --comparison-target name).
 - **Calls:** emit_config_patterns() (if target includes "config"); emit_name_patterns() (if target includes "name"); _assert_no_pattern_id_collision() (only if target=="both").
 - **Thresholds:** default --out-root literal; --comparison-target choices list ["config","name","both"]. NOTE: `targets` is built as a runtime list (`["config","name"] if ... else [args.comparison_target]`) and dispatch is by `if "config" in targets` / `if "name" in targets` membership tests rather than a literal per-value branch -- still statically traceable (both call sites are lexically present), but a naive "grep for the CLI value next to the call" scan would need to follow this list construction rather than matching a direct string.
 - **Returns:** writes CSV outputs under `out_root/config/` and/or `out_root/name/`; prints each written path to stdout. Downstream consumers: tools/compare_cross_segment.py's schema conventions (not wired in this PR -- see build_name_patterns()'s source_cluster_id comment) and tools/run_segment_orchestrator.py's per-segment results tree.

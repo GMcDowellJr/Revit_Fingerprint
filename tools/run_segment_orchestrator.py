@@ -854,7 +854,7 @@ def _filter_name_key_csv_to_segment(
     (os.utime()), not "now" -- a plain write would stamp the segment-local copy fresh on
     every Step 2b run regardless of whether the corpus-wide source itself is stale, silently
     defeating any downstream staleness check (e.g. tools/compare_reference.py's
-    default-on name-overlap freshness gate, or corpus_update_runbook.ps1's own Run-C guard)
+    default-on name-overlap freshness gate, or corpus_update_runbook.py's own Run-C guard)
     that compares this file's mtime against records.csv's: the copy would always read as
     "just refreshed" even when fed a name_key_results.csv that predates new exports added to
     records.csv (PR #476 review, second round).
@@ -2300,7 +2300,7 @@ def main() -> None:
         --name-key-results-csv-required-when-name/both check (ap.error(), inline, not
         a named constant).
     returns: None; calls sys.exit(run_orchestrator(args)) -- this is **Run C2**
-        (l.245 of tools/corpus_update_runbook.ps1), invoked per segment_manifest.csv/
+        (step C2 of tools/corpus_update_runbook.py), invoked per segment_manifest.csv/
         run_registry.csv (Run C1's output) after the mandatory file_metadata.csv
         human-edit pause, and its own output (run_registry.csv, updated in place;
         results_registry.csv) is consumed by **Run C2.5**

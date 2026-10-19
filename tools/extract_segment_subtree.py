@@ -26,7 +26,7 @@ Standalone diagnostic tool, not part of the automated runbook chain: no in-repo 
 invokes this module (confirmed by a repo-wide grep for its filename/module path). It runs
 downstream of tools/compare_cross_segment.py's output by convention (it reads
 segment_manifest.csv plus that tool's cross_segment_*.csv/comparison_registry.csv files),
-but nothing in tools/corpus_update_runbook.ps1, tools/label_refresh_runbook.ps1, or any
+but nothing in tools/corpus_update_runbook.py, tools/label_refresh_runbook.py, or any
 other in-scope script invokes it -- an operator runs it manually, by hand, against an
 already-produced cross-segment output directory.
 """

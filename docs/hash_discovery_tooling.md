@@ -79,7 +79,7 @@ For `loaded_family_types`, discovery is partitioned by `shape_gate.category`; ca
 
 ## `--stratify-by` (both `tools/discover_join_policy.py` and `tools/discover_hash_policy.py`)
 
-`_stratified_sample()` lives in `tools/discover_join_policy.py` (imported by `discover_hash_policy.py`, which shares most of its I/O/sampling/candidate-selection primitives with it — see that module's own import block). Without it, sampling pools every record for a domain and draws an unweighted sample from the pool, which a few high-volume groups can dominate (e.g. a handful of Template/Container files, which this project's own governance model expects to carry a much larger configured vocabulary than typical Project files — see `corpus_update_runbook.ps1`'s "All view = full configured vocabulary" framing). `--stratify-by` gives every unique value of the chosen key roughly equal representation in the sample instead.
+`_stratified_sample()` lives in `tools/discover_join_policy.py` (imported by `discover_hash_policy.py`, which shares most of its I/O/sampling/candidate-selection primitives with it — see that module's own import block). Without it, sampling pools every record for a domain and draws an unweighted sample from the pool, which a few high-volume groups can dominate (e.g. a handful of Template/Container files, which this project's own governance model expects to carry a much larger configured vocabulary than typical Project files — see `corpus_update_runbook.py`'s Run C "All view = full configured vocabulary" framing). `--stratify-by` gives every unique value of the chosen key roughly equal representation in the sample instead.
 
 Two kinds of stratify key are supported:
 - `file_id` (or `record_id`): read directly off `records.csv` — use this for per-file balance.

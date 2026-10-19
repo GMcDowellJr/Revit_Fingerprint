@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Python port of corpus_update_runbook.ps1.
+"""Python port of the former PowerShell corpus update runbook (removed, D-051).
 
 Preserves the PowerShell runbook's A/B/C workflow, validation, subprocess
 failure semantics, NameKey behavior, freshness guard, ForceAll cache clearing,
