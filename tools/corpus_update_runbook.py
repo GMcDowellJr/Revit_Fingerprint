@@ -10,10 +10,16 @@ from __future__ import annotations
 import argparse
 import time
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
 from typing import Sequence
+
+# Set from --dry-run in main(). When True, run_external() and every other
+# side-effecting helper prints what it would do ("DRYRUN: ...") instead of
+# acting. Module-level so tools/label_refresh_runbook.py can share it.
+DRY_RUN = False
 
 
 def color(text: str, ansi: str) -> str:
@@ -45,10 +51,20 @@ def invoke_checked(step_name: str, returncode: int) -> None:
         raise SystemExit(1)
 
 
+def render_command(cmd: Sequence[str]) -> str:
+    """Quote a command for display in the platform's native shell style."""
+    if os.name == "nt":
+        return subprocess.list2cmdline(cmd)
+    return shlex.join(cmd)
+
+
 def run_external(command: Sequence[object], step_name: str | None = None,
                  checked: bool = True) -> int:
     """Run an external process without a shell and optionally enforce success."""
     cmd = [str(part) for part in command]
+    if DRY_RUN:
+        print("DRYRUN: " + render_command(cmd))
+        return 0
     try:
         completed = subprocess.run(cmd, check=False)
         returncode = completed.returncode
@@ -62,6 +78,13 @@ def run_external(command: Sequence[object], step_name: str | None = None,
 
 def remove_latent_purgeable_files(segments: Path, records: Path) -> None:
     """Equivalent to Get-ChildItem -Recurse plus Remove-Item -Force."""
+    if DRY_RUN:
+        if segments.exists():
+            for path in sorted(segments.rglob("latent_purgeable.csv")):
+                print(f"DRYRUN: would remove {path}")
+        if (records / "latent_purgeable.csv").exists():
+            print(f"DRYRUN: would remove {records / 'latent_purgeable.csv'}")
+        return
     if segments.exists():
         for path in segments.rglob("latent_purgeable.csv"):
             try:
@@ -156,6 +179,9 @@ def normalize_powershell_style_argv(argv: Sequence[str]) -> list[str]:
         "--progress-interval-seconds": "--progress-interval-seconds",
         "-quietprogress": "--quiet-progress",
         "--quiet-progress": "--quiet-progress",
+        "-dryrun": "--dry-run",
+        "--dryrun": "--dry-run",
+        "--dry-run": "--dry-run",
         "-h": "--help",
         "--help": "--help",
     }
@@ -181,6 +207,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--exports-root", dest="exports_root", default="./Fingerprint_Data")
     parser.add_argument("--progress-interval-seconds", type=float, default=10.0)
     parser.add_argument("--quiet-progress", action="store_true")
+    parser.add_argument("--dry-run", dest="dry_run", action="store_true")
     parser.add_argument("--help", action="store_true")
     return parser
 
@@ -201,7 +228,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     name_key_pol = repo / "policies" / "domain_name_key_policies.json"
     name_key_csv = results / "name_key" / "name_key_results.csv"
 
-    os.chdir(repo)
+    global DRY_RUN
+    DRY_RUN = args.dry_run
+
+    def observed(path: Path) -> Path:
+        # Live mode has chdir'd to repo, so relative paths already resolve
+        # there; dry-run skips the chdir, so resolve observations explicitly.
+        return repo / path if DRY_RUN else path
+
+    if DRY_RUN:
+        print(f"DRYRUN: would chdir {repo}")
+    else:
+        os.chdir(repo)
     python = sys.executable
 
     if args.help or args.run == "":
@@ -294,7 +332,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         if args.name_key:
             print(cyan("--- B-NameKey (OPTIONAL; not required before Run C -- Run C re-clusters per segment) ---"))
-            if not name_key_csv.exists():
+            if not observed(name_key_csv).exists():
                 print(yellow(f"  SKIPPED: {name_key_csv} not found -- run 'python tools/corpus_update_runbook.py -Run A -NameKey' first."))
             else:
                 run_external([
@@ -331,7 +369,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         if args.force_all:
             print(cyan("--- C1.5: clear stale latent_purgeable.csv (-ForceAll) ---"))
-            remove_latent_purgeable_files(segments, records)
+            remove_latent_purgeable_files(observed(segments), observed(records))
         else:
             print(cyan("--- C1.5: skipped (pass -ForceAll to clear cached latent_purgeable.csv) ---"))
 
@@ -340,15 +378,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         name_key_args: list[object] = []
 
         if args.name_key:
-            if not name_key_csv.exists():
-                print(red(f"ERROR: -NameKey requires {name_key_csv} to exist -- run 'python tools/corpus_update_runbook.py -Run A -NameKey' first."))
-                return 1
+            if not observed(name_key_csv).exists():
+                if DRY_RUN:
+                    print(f"DRYRUN: guard would fail: -NameKey requires {name_key_csv} to exist -- run 'python tools/corpus_update_runbook.py -Run A -NameKey' first.")
+                else:
+                    print(red(f"ERROR: -NameKey requires {name_key_csv} to exist -- run 'python tools/corpus_update_runbook.py -Run A -NameKey' first."))
+                    return 1
 
             records_csv = records / "records.csv"
-            if records_csv.exists():
-                name_key_age = name_key_csv.stat().st_mtime
-                records_age = records_csv.stat().st_mtime
-                if name_key_age < records_age:
+            # Dry-run continues past a missing name_key_csv, so skip the age compare then.
+            if observed(records_csv).exists() and (not DRY_RUN or observed(name_key_csv).exists()):
+                name_key_age = observed(name_key_csv).stat().st_mtime
+                records_age = observed(records_csv).stat().st_mtime
+                if name_key_age < records_age and DRY_RUN:
+                    print(f"DRYRUN: guard would fail: {name_key_csv} is older than {records_csv} (stale name_key_results.csv; re-run -Run A -NameKey)")
+                elif name_key_age < records_age:
                     name_key_utc = __import__('datetime').datetime.fromtimestamp(name_key_age, __import__('datetime').timezone.utc)
                     records_utc = __import__('datetime').datetime.fromtimestamp(records_age, __import__('datetime').timezone.utc)
                     print(red(f"ERROR: {name_key_csv} ({name_key_utc} UTC) is older than {records_csv} ({records_utc} UTC)."))
