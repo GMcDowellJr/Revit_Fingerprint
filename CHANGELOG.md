@@ -19,9 +19,11 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
   `tools/run_discovery_sweep.ps1`. Use `tools/corpus_update_runbook.py`,
   `tools/label_refresh_runbook.py`, `run_discovery_sweep.py` and
   `tools/run_discovery_sweep.py` instead; running a `.ps1` required relaxing PowerShell's
-  execution policy. `run_discovery_sweep.py` takes `--kebab-case` flags (`--run`, not
-  `-Run`) and resolves a relative `--exports-root` against the current directory, so run
-  it from the repository root. No hash, identity or analysis-output change.
+  execution policy. `run_discovery_sweep.py` / `tools/run_discovery_sweep.py` now also accept
+  PowerShell-style flag spelling (`-Run`, `-Domains`, `-WhatIf`, case-insensitive) alongside
+  `--kebab-case`, like the corpus and label runbooks; they resolve a relative `--exports-root`
+  against the current directory, so run them from the repository root. No hash, identity or
+  analysis-output change.
 - **New `tools/label_refresh_runbook.py` -- a corrected (not faithful) port of
   `tools/label_refresh_runbook.ps1`; `tools/corpus_update_runbook.py` gains `--dry-run`.**
   Declared layout change vs the `.ps1`: the `.ps1` derived `results`/`segments` under

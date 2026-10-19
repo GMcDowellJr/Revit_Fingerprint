@@ -149,7 +149,7 @@ Layer 3 — Runner (run_dynamo.py, 1301 lines)
 
 ### Operational Knowledge
 
-**Maintained as shared orchestration with thin entry points.** `run_discovery_sweep.ps1` and `run_discovery_sweep.py` are the checked-in entry points; both delegate to `tools/discovery_orchestrator.py`. Compatibility wrappers remain under `tools/`. Workstation-specific command transcripts have been removed.
+**Maintained as shared orchestration with thin entry points.** `run_discovery_sweep.py` is the checked-in entry point and delegates to `tools/discovery_orchestrator.py`; `tools/run_discovery_sweep.py` remains as a compatibility wrapper. The PowerShell runbooks were removed (DECISIONS.md D-051). Workstation-specific command transcripts have been removed.
 
 ### Probe-Driven Development
 

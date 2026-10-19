@@ -2915,11 +2915,13 @@ What replaced each file:
 - Parity evidence between each PowerShell runbook and its Python port (command
   plans from `--dry-run`, side by side with the PowerShell commands) is recorded
   in the body of GMcDowellJr/Revit_Fingerprint#486.
-- `run_discovery_sweep.py` takes `--kebab-case` flags (`--run`, `--domains`,
-  `--what-if`); it does not accept the PowerShell-style `-Run` spelling the
-  deleted wrapper exposed. The wrapper also changed into the repository root
-  before running, so a relative `--exports-root` now resolves against the
-  current directory; run the sweep from the repository root.
+- All three Python runbooks accept the PowerShell-style flag spelling the
+  deleted wrappers exposed (`-Run A`, `-Domains walls`, `-WhatIf`,
+  case-insensitive) as well as `--kebab-case`; `tools/discovery_orchestrator.py`
+  gained the same normalization the corpus and label runbooks already had.
+  The discovery wrapper also changed into the repository root before running,
+  so a relative `--exports-root` now resolves against the current directory;
+  run the sweep from the repository root.
 - Earlier DECISIONS.md entries, CHANGELOG entries, audit_results/ files and
   dated findings documents that cite `.ps1` paths or line numbers are left as
   written; they record what was true when they were written.
