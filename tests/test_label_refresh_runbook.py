@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -67,10 +68,10 @@ def test_dry_run_plan_l1_to_l4(exports_root, capsys):
     for c in l2:
         assert "-m tools.label_synthesis.synthesize_fragmented_labels" in c
         assert "--filter-mode bundles" in c
-        assert f"--segments-root {exports_root / 'segments'}" in c
-        assert f"--registry-file {exports_root / 'records' / 'run_registry.csv'}" in c
+        assert f"--segments-root {shlex.quote(str(exports_root / 'segments'))}" in c
+        assert f"--registry-file {shlex.quote(str(exports_root / 'records' / 'run_registry.csv'))}" in c
     assert "patch_all_domain_patterns.py" in cmds[7]
-    assert f"--results-root {exports_root} " in cmds[7]
+    assert f"--results-root {shlex.quote(str(exports_root))} " in cmds[7]
     l4 = cmds[8:]
     assert all("export_bundle_pattern_detail.py" in c and "--output-folder seg_ok" in c for c in l4)
     assert "--purge-view all" in l4[0] and "--purge-view used" in l4[1]
@@ -87,8 +88,8 @@ def test_corrected_layout(exports_root, capsys):
     out = capsys.readouterr().out
     # results == exports_root, not exports_root/exports/results.
     assert str(exports_root / "exports" / "results") not in out
-    assert f"--records-dir {exports_root / 'records'}" in out
-    assert f"--exports-dir {exports_root / 'exports'}" in out
+    assert f"--records-dir {shlex.quote(str(exports_root / 'records'))}" in out
+    assert f"--exports-dir {shlex.quote(str(exports_root / 'exports'))}" in out
 
 
 def test_l4_skips_view_without_bundles(exports_root, capsys):
