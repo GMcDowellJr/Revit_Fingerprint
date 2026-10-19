@@ -233,7 +233,7 @@ Layer 3 — Runner (run_dynamo.py, 1301 lines)
 
 **Risk:** The parameterized discovery-sweep script improves repeatability, but operational knowledge outside that workflow remains incompletely documented and could still be lost.
 
-**Evidence:** The former command transcript contained real project paths and was removed. The root discovery runbooks now provide parameterized PowerShell and Python workflows over one shared engine.
+**Evidence:** The former command transcript contained real project paths and was removed. The root discovery runbook (`run_discovery_sweep.py`) now provides a parameterized Python workflow over one shared engine; the PowerShell runbooks were removed (DECISIONS.md D-051).
 
 ---
 
