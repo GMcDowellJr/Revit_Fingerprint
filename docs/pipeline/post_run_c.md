@@ -10,11 +10,15 @@ Re-check a tool's `--help` if an argument is rejected.
 
 ## When to run this
 
-Re-run from step 2 whenever Run C rebuilt one or more segments (the run
-summary shows `complete: N` with N > 0). Run C only rebuilds segments whose
-file population or run type changed (see `tools/build_segment_manifest.py`
-`_build_registry()`), so cross-segment outputs go stale as soon as any segment
-is rebuilt.
+Run steps 1–4 after every successful Run C. Either of these makes the
+cross-segment outputs stale:
+
+- Run C rebuilt one or more segments (the run summary shows `complete: N` with
+  N > 0). Run C only rebuilds segments whose file population or run type
+  changed (see `tools/build_segment_manifest.py` `_build_registry()`).
+- Run C's step C3 re-patched `pattern_label_human` from a refreshed label
+  cache, even with `complete: 0`. `compare_cross_segment.py` reads those labels
+  into its governance-state, delta and union-inventory outputs.
 
 ## Variables
 
@@ -31,12 +35,7 @@ $GovOut   = "$Data\governance"
 Set-Location $Repo
 ```
 
-## 1. Refresh Power BI
-
-Open `Fingerprint_Segmented_Bundles.pbix` and hit Refresh to pick up Run C's
-per-segment output.
-
-## 2. Cross-segment comparison
+## 1. Cross-segment comparison
 
 ```powershell
 python tools\compare_cross_segment.py --segments-root $Segments --records-dir $Records --out-dir $XSeg
@@ -53,7 +52,7 @@ python tools\compare_cross_segment.py --segments-root $Segments --records-dir $R
   into `$XSeg`.
 - Methodology: `docs/cross_segment_comparison.md`.
 
-## 3. Governance populations
+## 2. Governance populations
 
 Disjoint populations (Enterprise / business center / client / project /
 Generic) built directly from `file_metadata.csv`, independent of the segment
@@ -69,9 +68,9 @@ python tools\governance_relationships.py       --file-meta "$Records\file_metada
   `governance_membership.csv`.
 - `compare_governance_populations.py` writes `cross_governance_comparison.csv`.
 - `governance_relationships.py` writes `governance_bc_client_matrix.csv` and
-  `governance_client_bc_matrix.csv`, which step 4 reads.
+  `governance_client_bc_matrix.csv`, which step 3 reads.
 
-## 4. Governance narrative and evidence package
+## 3. Governance narrative and evidence package
 
 ```powershell
 python tools\generate_governance_narrative.py `
@@ -104,9 +103,15 @@ python tools\generate_governance_narrative.py `
   static interpretation docs from `docs/governance/`.
 - Details: `docs/governance_evidence_package.md`.
 
+## 4. Refresh Power BI
+
+Open `Fingerprint_Segmented_Bundles.pbix` and hit Refresh. Do this last: if the
+report reads cross-segment files from `$XSeg`, refreshing before steps 1–3
+would load the previous run's files.
+
 ## Optional follow-ups
 
-- `tools\analyze_promotion_candidates.py` — reads step 2's
+- `tools\analyze_promotion_candidates.py` — reads step 1's
   `cross_segment_governance_states.csv` and `pattern_reuse_distribution.csv`;
   flags patterns reused more broadly than the scope at which they're already
   governed. See `--help`.
