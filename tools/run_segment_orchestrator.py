@@ -438,7 +438,8 @@ def run_step_log(
         `log_path` -- Path, one of
         out_root/{patterns,name_patterns,bundle,bundle_name}.log; `cwd` --
         Optional[str], always str(repo_root) at every call site in this file.
-    calls: subprocess.run() (stdlib, stdout+stderr merged to `log_path`).
+    calls: subprocess.run() (stdlib, stdout+stderr merged to `log_path`, child env
+        gets PYTHONUNBUFFERED=1 so output survives a killed run).
     thresholds: `-20` (last-20-lines tail, hardcoded literal).
     returns: (returncode, tail (last 20 lines of the combined log), full log content);
         consumed by _run_one_segment() to decide step_failed/failure_notes for each of
@@ -446,10 +447,15 @@ def run_step_log(
         after the patterns step.
     """
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    # PYTHONUNBUFFERED: the child (and any worker processes it spawns, which inherit
+    # the environment) writes each print straight to log_path, so a killed or
+    # force-closed run keeps everything logged up to that point instead of losing
+    # the block-buffered tail.
+    env = {**os.environ, "PYTHONUNBUFFERED": "1"}
     with log_path.open("w", encoding="utf-8", errors="replace") as log_f:
         result = subprocess.run(
             cmd, stdout=log_f, stderr=subprocess.STDOUT,
-            text=True, cwd=cwd,
+            text=True, cwd=cwd, env=env,
         )
     with log_path.open("r", encoding="utf-8", errors="replace") as f:
         content = f.read()
