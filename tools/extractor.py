@@ -677,7 +677,9 @@ def _process_one_domain(
     dominant_files_by_pattern: Dict[str, int] = defaultdict(int)
     dominant_files_with_valid_pattern = 0
     files_with_tied_dominant = 0
+    _t_nd = time.perf_counter()
     near_dup_merge_map = find_near_duplicate_merges(sorted_clusters)
+    _t_nd = time.perf_counter() - _t_nd
     resolved_labels: Dict[str, Tuple[str, str]] = {}
 
     for rank, cluster in enumerate(sorted_clusters, start=1):
@@ -934,7 +936,7 @@ def _process_one_domain(
         flush=True,
     )
     _t_dom_elapsed = time.perf_counter() - _t_dom_start
-    _t_residual = max(0.0, _t_dom_elapsed - _t_ii - _t_lr - _t_cl - _t_file_loop - _t_sort - _t_csv)
+    _t_residual = max(0.0, _t_dom_elapsed - _t_ii - _t_lr - _t_cl - _t_nd - _t_file_loop - _t_sort - _t_csv)
     return {
         "domain_patterns": domain_patterns_local,
         "authority_rows": authority_rows_local,
@@ -949,6 +951,7 @@ def _process_one_domain(
             "identity_items": _t_ii,
             "label_inputs": _t_lr,
             "cluster_loop": _t_cl,
+            "near_dup": _t_nd,
             "file_loop": _t_file_loop,
             "sort": _t_sort,
             "csv_write": _t_csv,
@@ -1490,6 +1493,7 @@ def emit_analysis(
             f"identity_items={_dt['identity_items']:.2f}s "
             f"label_inputs={_dt['label_inputs']:.2f}s "
             f"cluster_loop={_dt['cluster_loop']:.2f}s "
+            f"near_dup={_dt['near_dup']:.2f}s "
             f"file_loop={_dt['file_loop']:.2f}s "
             f"sort={_dt['sort']:.2f}s "
             f"csv_write={_dt['csv_write']:.2f}s "

@@ -152,33 +152,47 @@ def find_near_duplicate_merges(
         - Numeric values within NEAR_DUP_REL_TOL relative tolerance
         - Smaller cluster is >= NEAR_DUP_MIN_SIZE_RATIO * larger cluster size
           (prevents absorbing real outlier variants)
+
+    Performance: kv dicts are parsed once, and clusters are bucketed by
+    (key, is_numeric, non-numeric value) signature. Pairs in different buckets
+    can never satisfy _are_near_duplicates, so only same-bucket pairs are
+    compared. The outer loop walks the global order and each bucket preserves
+    it, so merge_map is identical to the original all-pairs scan.
     """
     merge_map: Dict[str, str] = {}
     n = len(cluster_rows)
 
+    kvs = [_extract_kv_typed(c.get("identity_items") or []) for c in cluster_rows]
+    buckets: Dict[Tuple[Any, ...], List[int]] = {}
+    bucket_of: List[Optional[Tuple[Any, ...]]] = [None] * n
+    pos_in_bucket: List[int] = [-1] * n
+    for idx, kv in enumerate(kvs):
+        if not kv:
+            continue
+        sig = tuple(sorted(
+            (k, is_num, (None if is_num else v)) for k, (v, is_num) in kv.items()
+        ))
+        members = buckets.setdefault(sig, [])
+        pos_in_bucket[idx] = len(members)
+        bucket_of[idx] = sig
+        members.append(idx)
+
     for i in range(n):
+        kv_i = kvs[i]
+        if not kv_i:
+            continue
         ci = cluster_rows[i]
         jh_i = ci.get("join_hash", "")
         if jh_i in merge_map:
             continue
-
-        items_i = ci.get("identity_items") or []
         files_i = int(ci.get("files_present", 0))
-        kv_i = _extract_kv_typed(items_i)
-        if not kv_i:
-            continue
 
-        for j in range(i + 1, n):
+        for j in buckets[bucket_of[i]][pos_in_bucket[i] + 1:]:
             cj = cluster_rows[j]
             jh_j = cj.get("join_hash", "")
             if jh_j in merge_map:
                 continue
-
-            items_j = cj.get("identity_items") or []
             files_j = int(cj.get("files_present", 0))
-            kv_j = _extract_kv_typed(items_j)
-            if not kv_j:
-                continue
 
             # Size ratio guard
             larger = max(files_i, files_j)
@@ -186,7 +200,7 @@ def find_near_duplicate_merges(
             if larger > 0 and (smaller / larger) < NEAR_DUP_MIN_SIZE_RATIO:
                 continue
 
-            if _are_near_duplicates(kv_i, kv_j):
+            if _are_near_duplicates(kv_i, kvs[j]):
                 merge_map[jh_j] = jh_i   # j merges into i (i is larger/earlier)
 
     return merge_map
