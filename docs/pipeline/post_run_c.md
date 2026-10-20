@@ -32,15 +32,24 @@ $Records  = "$Data\records"
 $Segments = "$Data\segments"
 $XSeg     = "$Data\cross_segment"   # reuse your previous out-dir if Power BI points at it
 $GovOut   = "$Data\governance"
+
+# Enterprise identity: the client_label your corpus uses for internal/enterprise
+# work (business center 0000). Without it every tool falls back to the
+# checked-in default "InternalEnterprise", and enterprise files are classified
+# as an ordinary client. Alternatively pass --enterprise-policy <json>.
+$EnterpriseLabel = "InternalEnterprise"
+$Ent = @("--enterprise-label", $EnterpriseLabel)
 Set-Location $Repo
 ```
 
 ## 1. Cross-segment comparison
 
 ```powershell
-python tools\compare_cross_segment.py --segments-root $Segments --records-dir $Records --out-dir $XSeg
+python tools\compare_cross_segment.py --segments-root $Segments --records-dir $Records --out-dir $XSeg @Ent
 ```
 
+- `@Ent` passes the enterprise label (see Variables); it drives scope
+  classification (enterprise / business center / client) and pair discovery.
 - With no mode flag, all modes run (within-segment, sibling, parent-sibling,
   within-project, governance chain).
 - `--dry-run` prints the segment pairs without computing anything.
@@ -59,14 +68,15 @@ Generic) built directly from `file_metadata.csv`, independent of the segment
 lattice.
 
 ```powershell
-python tools\governance_manifest.py            --records-dir $Records --out-dir $Records
+python tools\governance_manifest.py            --records-dir $Records --out-dir $Records @Ent
 python tools\compare_governance_populations.py --records-dir $Records --out-dir $Records
-python tools\governance_relationships.py       --file-meta "$Records\file_metadata.csv" --out-dir $XSeg
+python tools\governance_relationships.py       --file-meta "$Records\file_metadata.csv" --out-dir $XSeg @Ent
 ```
 
 - `governance_manifest.py` writes `governance_manifest.csv` and
   `governance_membership.csv`.
-- `compare_governance_populations.py` writes `cross_governance_comparison.csv`.
+- `compare_governance_populations.py` takes no enterprise flag; it reads the
+  scope levels `governance_manifest.py` already assigned. It writes `cross_governance_comparison.csv`.
 - `governance_relationships.py` writes `governance_bc_client_matrix.csv` and
   `governance_client_bc_matrix.csv`, which step 3 reads.
 
@@ -91,7 +101,7 @@ python tools\generate_governance_narrative.py `
   --project-fragmentation-diagnostic  "$XSeg\project_fragmentation_diagnostic.csv" `
   --governance-bc-client-matrix       "$XSeg\governance_bc_client_matrix.csv" `
   --governance-client-bc-matrix       "$XSeg\governance_client_bc_matrix.csv" `
-  --out "$GovOut\governance_narrative_context.md"
+  --out "$GovOut\governance_narrative_context.md" @Ent
 ```
 
 - Only `--summary` and `--pooled` are required. Every other input is optional
@@ -114,7 +124,7 @@ would load the previous run's files.
 - `tools\analyze_promotion_candidates.py` — reads step 1's
   `cross_segment_governance_states.csv` and `pattern_reuse_distribution.csv`;
   flags patterns reused more broadly than the scope at which they're already
-  governed. See `--help`.
+  governed. Pass `@Ent` here too. See `--help`.
 - `tools\compare_reference.py` — reference-vs-target comparison inside one
   already-materialized segment. See `docs/reference_comparison_tool.md`.
 - `tools\export_bundle_pattern_detail.py` — bundle → pattern → identity-item
