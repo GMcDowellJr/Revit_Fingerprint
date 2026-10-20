@@ -77,29 +77,27 @@ def build_dag_for_domain(out_dir: Path, domain: str) -> Dict[str, int]:
                     edges.add((scope_key, child, parent))
 
     reduced_edges: Set[Tuple[str, str, str]] = set()
-    for scope_key in sorted({e[0] for e in edges}):
-        scope_edges = {(c, p) for s, c, p in edges if s == scope_key}
-        adjacency: Dict[str, Set[str]] = defaultdict(set)
-        for child, parent in scope_edges:
-            adjacency[child].add(parent)
-
-        for child, parent in sorted(scope_edges):
-            tmp_adj = {k: set(v) for k, v in adjacency.items()}
-            tmp_adj[child].discard(parent)
-            queue = deque([child])
-            seen: Set[str] = set()
-            reachable = False
-            while queue:
-                node = queue.popleft()
-                if node == parent:
-                    reachable = True
-                    break
-                for nxt in tmp_adj.get(node, set()):
-                    if nxt not in seen:
-                        seen.add(nxt)
-                        queue.append(nxt)
-            if not reachable:
+    # Transitive reduction. The edge relation above is strict-subset within a scope,
+    # so it is transitive (already transitively closed) and acyclic. In a transitively
+    # closed DAG, edge child->parent is redundant iff some other direct parent `mid` of
+    # `child` also has `parent` as a direct parent. This is exactly equivalent to the
+    # previous per-edge "remove edge, BFS for alternate path" check, without copying the
+    # adjacency map per edge (was O(E*(V+E)); see Run C stall 2026-10-20).
+    # Parents are visited largest-ancestor-set first (if mid->p then
+    # len(adj[mid]) > len(adj[p])), so every redundant p is already in `implied` via a
+    # direct parent when reached; only direct parents' adjacency is unioned.
+    adjacency_by_scope: Dict[str, Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
+    for scope_key, child, parent in edges:
+        adjacency_by_scope[scope_key][child].add(parent)
+    for scope_key in sorted(adjacency_by_scope):
+        adjacency = adjacency_by_scope[scope_key]
+        for child, parents in adjacency.items():
+            implied: Set[str] = set()
+            for parent in sorted(parents, key=lambda n: (-len(adjacency.get(n, ())), n)):
+                if parent in implied:
+                    continue
                 reduced_edges.add((scope_key, child, parent))
+                implied |= adjacency.get(parent, set())
 
     # cycle guard
     safe_edges: Set[Tuple[str, str, str]] = set()
