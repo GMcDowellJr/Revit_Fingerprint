@@ -14,6 +14,17 @@ Pure refactors, moves, renames, formatting, and perf tweaks do **not** belong he
 ## [Unreleased]
 
 ### Changed (behavior-changing)
+- **`compare_cross_segment.py` removes outputs it produced no rows for.** Most outputs
+  (`cross_segment_summary.csv`, `_file_pairs.csv`, `_governance_states.csv` /
+  `_governance_state_summary.csv`, `_delta.csv`, `_pooled.csv`, `_union_inventory.csv`,
+  `pattern_reuse_*.csv`, the `project_*_matrix.csv` files, `project_fragmentation_diagnostic.csv`,
+  `matrix_output_manifest.csv`) were only written when they had rows, so a rerun into the same
+  `--out-dir` that produced none of a category left the previous run's file in place, and
+  `generate_governance_narrative.py` / Power BI consumed it as current. Each such file is now
+  deleted when this run has no rows for it, matching the tool's documented full-snapshot-per-run
+  semantics (already true of `comparison_registry.csv` and `population_containment_thresholds.csv`).
+  Consequence: `--no-delta` now also removes an earlier run's `cross_segment_delta.csv`. No hash,
+  identity or row-content change.
 - **PowerShell runbooks removed (D-051).** Deleted `tools/corpus_update_runbook.ps1`,
   `tools/label_refresh_runbook.ps1`, `run_discovery_sweep.ps1` and
   `tools/run_discovery_sweep.ps1`. Use `tools/corpus_update_runbook.py`,

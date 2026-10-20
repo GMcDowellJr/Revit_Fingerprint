@@ -769,6 +769,31 @@ def validate_membership_against_manifest(
 
 ComparisonRegistryKey = Tuple[str, str, str, str]  # (seg_a, seg_b, comparison_type, domain)
 
+# Every per-matrix file build_explicit_matrix_outputs() can emit. A run that
+# produces none of a given matrix must remove that file's previous copy, so the
+# set is fixed here rather than read back from matrix_outputs.
+MATRIX_OUTPUT_FILENAMES = (
+    "project_density_similarity_matrix.csv",
+    "project_mean_file_pair_jaccard_matrix.csv",
+    "project_pool_containment_similarity_matrix.csv",
+    "project_union_jaccard_matrix.csv",
+)
+
+
+def remove_stale_output(out_dir: Path, filename: str) -> None:
+    """Delete a previous run's copy of an output this run produced no rows for.
+
+    Every output is a full snapshot of this invocation (see the block comment
+    above). Outputs are only written when they have rows, so without this a
+    category that produced rows last run but none this run would leave the old
+    file in --out-dir, and downstream readers (generate_governance_narrative.py,
+    Power BI) would consume it as current.
+    """
+    path = out_dir / filename
+    if path.exists():
+        path.unlink()
+        print(f"[compare] removed stale {path} (no rows this run)")
+
 
 def load_comparison_registry(out_dir: Path) -> Dict[ComparisonRegistryKey, Dict[str, str]]:
     path = out_dir / "comparison_registry.csv"
@@ -5242,6 +5267,8 @@ def main() -> int:
         out_dir.mkdir(parents=True, exist_ok=True)
         atomic_write_csv(out_dir / "cross_segment_summary.csv", SUMMARY_FIELDS, summary_rows)
         print(f"[compare] wrote {len(summary_rows)} rows → {out_dir / 'cross_segment_summary.csv'}")
+    else:
+        remove_stale_output(out_dir, "cross_segment_summary.csv")
 
     # Publish the streamed cross_segment_file_pairs.csv here, alongside the other
     # outputs, so a failure anywhere above (pooled/union/reuse/matrix computation)
@@ -5257,6 +5284,7 @@ def main() -> int:
         )
     else:
         pair_detail_tmp_path.unlink(missing_ok=True)
+        remove_stale_output(out_dir, "cross_segment_file_pairs.csv")
 
     if governance_state_rows:
         governance_state_rows.sort(key=lambda r: (
@@ -5296,6 +5324,9 @@ def main() -> int:
             f"[compare] wrote {len(governance_state_summary_rows)} rows → "
             f"{out_dir / 'cross_segment_governance_state_summary.csv'}"
         )
+    else:
+        remove_stale_output(out_dir, "cross_segment_governance_states.csv")
+        remove_stale_output(out_dir, "cross_segment_governance_state_summary.csv")
 
     if delta_rows:
         delta_rows.sort(key=lambda r: (
@@ -5313,11 +5344,15 @@ def main() -> int:
             f"{delta_combo_count} domain/pair combinations"
         )
         print(f"[compare] wrote {len(delta_rows)} rows → {out_dir / 'cross_segment_delta.csv'}")
+    else:
+        remove_stale_output(out_dir, "cross_segment_delta.csv")
 
     if pooled_rows:
         out_dir.mkdir(parents=True, exist_ok=True)
         atomic_write_csv(out_dir / "cross_segment_pooled.csv", POOLED_FIELDS, pooled_rows)
         print(f"[compare] wrote {len(pooled_rows)} rows → {out_dir / 'cross_segment_pooled.csv'}")
+    else:
+        remove_stale_output(out_dir, "cross_segment_pooled.csv")
 
     if union_inventory_rows:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -5330,6 +5365,8 @@ def main() -> int:
             f"[compare] wrote {len(union_inventory_rows)} rows → "
             f"{out_dir / 'cross_segment_union_inventory.csv'}"
         )
+    else:
+        remove_stale_output(out_dir, "cross_segment_union_inventory.csv")
 
     if reuse_distribution_rows:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -5352,6 +5389,10 @@ def main() -> int:
             f"[compare] wrote {len(reuse_distribution_rows)} rows → "
             f"{out_dir / 'pattern_reuse_distribution.csv'}"
         )
+    else:
+        remove_stale_output(out_dir, "pattern_reuse_distribution.csv")
+        remove_stale_output(out_dir, "pattern_reuse_summary_by_domain.csv")
+        remove_stale_output(out_dir, "pattern_reuse_summary_by_client.csv")
 
     if matrix_outputs or fragmentation_rows or matrix_manifest_rows:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -5369,6 +5410,12 @@ def main() -> int:
             matrix_manifest_rows,
         )
         print(f"[compare] wrote {len(matrix_manifest_rows)} rows → {out_dir / 'matrix_output_manifest.csv'}")
+    else:
+        remove_stale_output(out_dir, "project_fragmentation_diagnostic.csv")
+        remove_stale_output(out_dir, "matrix_output_manifest.csv")
+    for filename in MATRIX_OUTPUT_FILENAMES:
+        if filename not in matrix_outputs:
+            remove_stale_output(out_dir, filename)
 
     if not summary_rows and not pooled_rows and not governance_state_rows and not union_inventory_rows:
         print("[compare] no comparison rows produced — check segment data and min-patterns threshold")
