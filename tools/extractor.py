@@ -681,6 +681,10 @@ def _process_one_domain(
     near_dup_merge_map = find_near_duplicate_merges(sorted_clusters)
     _t_nd = time.perf_counter() - _t_nd
     resolved_labels: Dict[str, Tuple[str, str]] = {}
+    _shares_dom = [int(c["records_count"]) / total_dom_records for c in sorted_clusters] if total_dom_records else []
+    _legacy_hhi_dom = compute_hhi_from_shares(_shares_dom)
+    _hhi_dom = _legacy_hhi_dom if _legacy_hhi_dom is not None else 0.0
+    _eff_dom = compute_effective_clusters(_legacy_hhi_dom) or 0.0
 
     for rank, cluster in enumerate(sorted_clusters, start=1):
         schema = str(cluster["schema"])
@@ -754,10 +758,8 @@ def _process_one_domain(
                 "membership_reason_code": "join_hash_exact",
             })
 
-        shares = [int(c["records_count"]) / total_dom_records for c in sorted_clusters] if total_dom_records else []
-        legacy_hhi = compute_hhi_from_shares(shares)
-        hhi = legacy_hhi if legacy_hhi is not None else 0.0
-        eff = compute_effective_clusters(legacy_hhi) or 0.0
+        hhi = _hhi_dom
+        eff = _eff_dom
         authority_rows_local.append({
             "schema_version": SCHEMA_VERSION,
             "analysis_run_id": analysis_run_id,
