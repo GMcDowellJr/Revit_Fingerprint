@@ -63,6 +63,16 @@ every intra-segment pair with its _jaccard_sets() -- imported, not copied -- so
 every statistic is scoped to exactly one segment and a file pair is counted at
 most once per segment.
 
+Domain coverage follows compare_cross_segment.py's --min-patterns gate: a
+segment's domain whose all-view join_hash union across its files is below
+--min-patterns (default 3, compare's default) is skipped and counted in
+segment_decomposition_run.json's domains_below_min_patterns, exactly as
+run_pair() drops it from every comparison involving that segment. Without the
+gate, single-record-per-file domains (identity, units_doc) would enter the
+recomputed means but never the summary values they sit beside. Pass the same
+--min-patterns value compare was run with; a different value shows up as
+reconciliation mismatches or no_reference rows.
+
 Reconciliation gate: the recomputed within-project mean must equal
 compare_cross_segment.py's within_project summary value for every
 (segment, view, domain) within drift_tolerance. A mismatch (or a summary value
@@ -115,7 +125,7 @@ Usage:
         --segments-root segments \\
         [--out-dir DIR] [--view-scope used|all] [--split-dimension discipline_label] \\
         [--governance-role Project] [--parent-segment SEGMENT_ID] [--client CLIENT_LABEL] \\
-        [--policy policies/domain_functional_categories.json]
+        [--min-patterns 3] [--policy policies/domain_functional_categories.json]
 """
 from __future__ import annotations
 
@@ -408,17 +418,29 @@ def recompute_segment(
     segments_root: Path,
     registry: Dict[str, Dict[str, str]],
     file_metadata: Dict[str, Dict[str, str]],
-) -> Tuple[Dict[str, DomainStats], Set[str]]:
+    min_patterns: int,
+) -> Tuple[Dict[str, DomainStats], Set[str], List[str]]:
     """Score every intra-segment file pair per domain for one view, using
-    compare_cross_segment.py's own membership reader and Jaccard. Also returns
-    the union of export_run_ids seen in this view across domains."""
+    compare_cross_segment.py's own membership reader and Jaccard.
+
+    A domain whose all-view join_hash union across the segment's files is below
+    min_patterns is skipped, mirroring the per-side gate run_pair() applies to
+    every comparison involving this segment, so the recompute covers the same
+    domains as the summary values it is set beside.
+
+    Returns (stats by domain, export_run_ids seen in this view across the
+    included domains, domains skipped below min_patterns)."""
     out: Dict[str, DomainStats] = {}
     seen: Set[str] = set()
+    below: List[str] = []
     try:
         for domain in sorted(ccs.discover_domains_for_segment(segments_root, registry, segment_id)):
-            files = ccs.load_file_join_hashes(segments_root, registry, segment_id, domain, view)
-            all_files = files if view == "all" else ccs.load_file_join_hashes(
-                segments_root, registry, segment_id, domain, "all")
+            all_files = ccs.load_file_join_hashes(segments_root, registry, segment_id, domain, "all")
+            if len(set().union(*all_files.values())) < min_patterns:
+                below.append(domain)
+                continue
+            files = all_files if view == "all" else ccs.load_file_join_hashes(
+                segments_root, registry, segment_id, domain, view)
             stats = DomainStats()
             stats.n_files = len(files)
             stats.n_files_all = len(all_files)
@@ -464,7 +486,7 @@ def recompute_segment(
         # compare_cross_segment.py's join_hash cache grows without bound across
         # segments; nothing here re-reads a finished segment.
         ccs._jh_cache.clear()
-    return out, seen
+    return out, seen, below
 
 
 # ---------------------------------------------------------------------------
@@ -784,6 +806,10 @@ def _build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--parent-segment", default=None,
                     help="Restrict to this parent segment_id and its split children")
     ap.add_argument("--client", default=None, help="Restrict to segments with this client_label")
+    ap.add_argument("--min-patterns", type=int, default=3, metavar="INT",
+                    help="Skip a segment's domain when its all-view join_hash union is below this "
+                         "(default 3, matching compare_cross_segment.py --min-patterns; pass the same "
+                         "value compare was run with)")
     ap.add_argument("--policy", type=Path, default=DEFAULT_POLICY_PATH)
     return ap
 
@@ -829,13 +855,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     # --- Recompute (analysis A internal + analysis C) ----------------------
     stats_by_seg: Dict[str, Dict[str, DomainStats]] = {}
     eids_by_seg: Dict[str, Set[str]] = {}
+    below_min_patterns: Counter = Counter()
     no_membership: List[str] = []
     for i, sid in enumerate(sorted(segments), 1):
         t0 = time.perf_counter()
-        stats_by_seg[sid], eids_by_seg[sid] = recompute_segment(
-            sid, view, args.segments_root, registry, file_metadata)
+        stats_by_seg[sid], eids_by_seg[sid], below = recompute_segment(
+            sid, view, args.segments_root, registry, file_metadata, args.min_patterns)
+        for domain in below:
+            below_min_patterns[domain] += 1
+            skips["recompute:domain_below_min_patterns"] += 1
         n_pairs = sum(s.seg_n for s in stats_by_seg[sid].values())
-        if not stats_by_seg[sid]:
+        if not stats_by_seg[sid] and not below:
             no_membership.append(sid)
             skips["segment:no_membership_inventory"] += 1
         print(f"[decomp] {i}/{len(segments)} {sid}: domains={len(stats_by_seg[sid])} pairs={n_pairs} "
@@ -987,6 +1017,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         "outputs_written": status == "ok",
         "skip_counts": dict(sorted(skips.items())),
         "unmapped_domains": unmapped,
+        "domains_below_min_patterns": {
+            "min_patterns": args.min_patterns,
+            "segments_skipped_by_domain": dict(sorted(below_min_patterns.items())),
+        },
         "reconciliation": {
             "tolerance": tolerance, "checked": n_checked, "matched": n_matched,
             "no_reference": n_no_reference, "mismatches": mismatches,

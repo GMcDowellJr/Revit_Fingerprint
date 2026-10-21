@@ -409,7 +409,7 @@ tests/                  pytest test suite (70+ test files)
   test_analyze_promotion_candidates.py  Synthetic-fixture coverage for tools/analyze_promotion_candidates.py
                                        (scope-gap routing, ordinal ranking, no-bare-score invariant)
   test_segment_decomposition.py        tools/segment_decomposition.py: end-to-end against real compare_cross_segment.py
-                                       output (reconciliation gate, matrix drift guard), plus hand-computed lift/LOO
+                                       output (reconciliation gate, matrix drift guard), plus hand-computed lift/LOO and the --min-patterns domain gate
                                        Coverage for the newer segment/governance/archetype tooling
   revit/                              Revit integration harness (requires Revit)
   golden/                             Golden file comparisons

@@ -4,6 +4,7 @@
   "categories": {
     "browser_organization": "Core Environment",
     "units": "Core Environment",
+    "units_doc": "Core Environment",
     "phases": "Core Environment",
     "phase_filters": "Core Environment",
 

@@ -37,7 +37,10 @@ UNITS = {
     "e1": {"j1", "j2", "j5"}, "e2": {"j5", "j6"}, "e3": {"j5", "j6", "j7"},
     "u1": {"j1", "j6"},
 }
-ODD = {"a1": {"k1"}, "a2": {"k1", "k2"}, "e1": {"k2"}, "e2": {"k1"}, "e3": {"k1", "k2"}}
+ODD = {"a1": {"k1", "k3"}, "a2": {"k1", "k2"}, "e1": {"k2"}, "e2": {"k1", "k3"}, "e3": {"k1", "k2"}}
+# One shared pattern per file (identity-like): below --min-patterns 3 in every
+# segment, so compare_cross_segment.py drops it and so must the recompute.
+TINY = {e: {"t1"} for e in ("a1", "a2", "a3", "e1", "e2", "e3", "u1")}
 # used view drops a3 from "units" entirely (all its patterns purgeable-only).
 USED_DROP = {"units": {"a3"}}
 
@@ -68,7 +71,7 @@ def _manifest_row(sid, level, parent, disc, label, files):
 def _write_segment(root: Path, folder: str, files):
     base = root / folder / "results"
     dp, all_mm, used_mm = [], {}, {}
-    for domain, inv in (("units", UNITS), ("odd_domain", ODD)):
+    for domain, inv in (("units", UNITS), ("odd_domain", ODD), ("tiny_domain", TINY)):
         jhs = sorted({jh for e in files if e in inv for jh in inv[e]})
         pid = {jh: f"{folder}_{domain}_{jh}" for jh in jhs}
         dp += [{"domain": domain, "pattern_id": pid[jh], "source_cluster_id": f"src|{jh}",
@@ -107,7 +110,7 @@ def corpus(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "argv", [
         "compare_cross_segment.py", "--segments-root", str(segments_root), "--records-dir", str(records),
         "--out-dir", str(cross), "--within-project", "--sibling-segments",
-        "--min-patterns", "1", "--workers", "1", "--no-delta",
+        "--min-patterns", "3", "--workers", "1", "--no-delta",
     ])
     assert compare_main() == 0
     return records, segments_root, cross
@@ -169,6 +172,25 @@ def test_used_view_missing_pairs_are_blank_not_zero(corpus):
     assert float(arch["segment_wide_mean"]) == pytest.approx(2 / 3, abs=1e-6)
     assert arch["between_mean"] == "" and arch["project_effect"] == ""
     assert arch["row_status"] == "unavailable"
+
+
+def test_domain_below_min_patterns_is_skipped_like_compare(corpus):
+    records, segments_root, cross = corpus
+    summary_domains = {r["domain"] for r in _read_csv(cross / "cross_segment_summary.csv")}
+    assert "tiny_domain" not in summary_domains  # compare's own gate dropped it
+    _rc, out, run = _run(corpus, "--view-scope", "all")
+    assert run["domains_below_min_patterns"] == {
+        "min_patterns": 3, "segments_skipped_by_domain": {"tiny_domain": 3}}
+    assert run["reconciliation"]["no_reference"] == 0
+    assert run["skip_counts"]["recompute:domain_below_min_patterns"] == 3
+    assert "tiny_domain" not in run["unmapped_domains"]
+    for name in ("effect_domain", "loo"):
+        assert all(r["domain"] != "tiny_domain" for r in _read_csv(out / sd.OUTPUT_FILES[name]))
+    # A lower threshold than compare used brings it back, with no compare reference.
+    _rc, _out, run = _run(corpus, "--view-scope", "all", "--min-patterns", "1")
+    assert run["domains_below_min_patterns"]["segments_skipped_by_domain"] == {}
+    assert "tiny_domain" in run["unmapped_domains"]
+    assert run["reconciliation"]["no_reference"] > 0
 
 
 def test_unmapped_domain_is_surfaced(corpus):
@@ -367,7 +389,9 @@ def test_policy_file_loads_and_validates(tmp_path):
     policy = sd.load_policy(sd.DEFAULT_POLICY_PATH)
     cats = policy["categories"]
     assert cats["wall_types"] == "Model Content"
-    assert len(cats) == 37 and policy["drift_tolerance"] == 1e-6
+    assert cats["units_doc"] == "Core Environment"
+    assert "identity" not in cats
+    assert len(cats) == 38 and policy["drift_tolerance"] == 1e-6
     bad = dict(json.loads(sd.DEFAULT_POLICY_PATH.read_text()))
     bad["categories"] = {"units": sd.UNMAPPED}
     p = tmp_path / "bad.json"

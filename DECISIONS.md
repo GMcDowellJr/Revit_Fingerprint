@@ -2980,6 +2980,13 @@ Generalizing them over every segment showed that the existing
 3. **Every statistic is scoped to one segment.** File-pair rows are never pooled
    across segments, so a pair is counted at most once per segment however deeply
    the segments nest.
+   **Domain coverage gate:** a segment's domain whose all-view join_hash union
+   is below `--min-patterns` (default 3, matching `compare_cross_segment.py`) is
+   skipped and counted per domain in the run summary, as `run_pair()` skips it.
+   Without this gate, the first real-corpus run included 3 domains that compare
+   never scores (`identity`, `units_doc`, `wall_types`, all below the threshold
+   in 41 segments) in the recomputed means but not in the sibling values beside
+   them, and produced 176 within-project values with no compare reference.
 4. **Missing is blank, never zero.** A used-view pair where either file is
    absent from the used vocabulary is excluded from every used-view mean and
    counted in `n_pairs_missing_view`. This deliberately does not reproduce
@@ -3003,10 +3010,11 @@ Generalizing them over every segment showed that the existing
    emitted as `row_status=unavailable`, `skip_reason=no_sibling_comparison`;
    nothing is computed to fill the gap.
 7. **Functional-category taxonomy.** `policies/domain_functional_categories.json`
-   (schema `domain_functional_categories.v1`) maps 37 domains to Core
-   Environment, Graphic Standards, Annotation, Model Content (including
-   `wall_types`), View Governance, or Worksharing. This covers all 36 domains in
-   the 2026-10 cross-segment outputs plus `wall_types`. A domain absent from the
+   (schema `domain_functional_categories.v1`) maps 38 domains to Core
+   Environment (including `units_doc`), Graphic Standards, Annotation, Model
+   Content (including `wall_types`), View Governance, or Worksharing. This covers
+   all 36 domains in the 2026-10 cross-segment outputs plus `wall_types` and
+   `units_doc`. `identity` is deliberately left unmapped for now. A domain absent from the
    map is emitted with category `UNMAPPED` and listed by name in the run
    summary; it is never dropped. The same file holds the drift tolerance and
    the descriptive presentation-band edges. Those bands are labeled as
