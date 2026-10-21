@@ -148,8 +148,16 @@ def peak_memory_mb() -> Optional[float]:
 
             pmc = PMC()
             pmc.cb = ctypes.sizeof(PMC)
-            handle = ctypes.windll.kernel32.GetCurrentProcess()
-            if ctypes.windll.psapi.GetProcessMemoryInfo(handle, ctypes.byref(pmc), pmc.cb):
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            # HANDLE is pointer-sized; without explicit restype/argtypes ctypes
+            # passes the pseudo-handle as a 32-bit int and the call fails on x64.
+            kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+            get_info = getattr(kernel32, "K32GetProcessMemoryInfo", None)
+            if get_info is None:
+                get_info = ctypes.WinDLL("psapi", use_last_error=True).GetProcessMemoryInfo
+            get_info.argtypes = [wintypes.HANDLE, ctypes.POINTER(PMC), wintypes.DWORD]
+            get_info.restype = wintypes.BOOL
+            if get_info(kernel32.GetCurrentProcess(), ctypes.byref(pmc), pmc.cb):
                 return pmc.PeakWorkingSetSize / (1024.0 * 1024.0)
         except Exception:
             return None
