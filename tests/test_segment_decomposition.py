@@ -321,6 +321,21 @@ def test_drift_guard_skips_synthetic_and_records_drift_without_failing():
     assert skips["loo:drift_guard_not_applicable:synthetic_self_comparison"] == 1
 
 
+def test_matrix_population_ignores_label_collisions_outside_runnable_role(tmp_path):
+    manifest = {
+        "u|Project|A": {"segment_label": "A practice", "governance_role": "Project", "run_type": "bundle"},
+        "u|Template|A": {"segment_label": "A practice", "governance_role": "Template", "run_type": "bundle"},
+        "u|Project|A|x": {"segment_label": "A practice", "governance_role": "Project", "run_type": "registration"},
+    }
+    path = tmp_path / "m.csv"
+    _write_csv(path, [{"row_id": "A practice", "column_id": "A practice", "view_scope": "used",
+                       "domain": "ALL_DOMAINS", "value": "0.5", "value_status": "ok"}])
+    diagonal, ambiguous = sd.read_matrix_diagonal(path, "used", sd.matrix_population(manifest, "Project"))
+    assert diagonal == {"u|Project|A": ("ok", 0.5)} and ambiguous == []
+    # Against the whole manifest the same row would have been discarded as ambiguous.
+    assert sd.read_matrix_diagonal(path, "used", manifest)[1] == ["A practice"]
+
+
 def test_read_matrix_diagonal_label_and_id_keys(tmp_path):
     manifest = {
         "u|P|A": {"segment_label": "A projects"},                 # label-keyed

@@ -350,7 +350,9 @@ def section_file_pairs(
                 n_cross_used_blank += 1
         if sa in scoped and sb in scoped:
             key = (ea, eb, dom) if ea <= eb else (eb, ea, dom)
-            segpair = (sa, sb)
+            # Orientation-free: the same symmetric pair can be emitted as (A, B)
+            # and (B, A) under different comparison types; that is one carrier.
+            segpair = (sa, sb) if sa <= sb else (sb, sa)
             prev = first_seen.get(key)
             if prev is None:
                 first_seen[key] = segpair

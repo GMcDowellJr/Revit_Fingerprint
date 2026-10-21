@@ -551,16 +551,32 @@ def read_summary(
     return within_ref, sibling, conflicts, skips
 
 
+def matrix_population(
+    manifest: Dict[str, Dict[str, str]], governance_role: str
+) -> Dict[str, Dict[str, str]]:
+    """Manifest rows that can appear as a project-matrix row_id/column_id:
+    runnable segments of the analysed governance role. Labels are resolved only
+    within this population, so a Template or registration/skip row that happens
+    to share a label cannot make a real matrix row ambiguous; genuine collisions
+    inside the population (e.g. across unit_system) still are."""
+    return {
+        sid: row for sid, row in manifest.items()
+        if row.get("governance_role", "").strip().lower() == governance_role.lower()
+        and row.get("run_type", "").strip().lower() in RUNNABLE_RUN_TYPES
+    }
+
+
 def read_matrix_diagonal(
     path: Path,
     view: str,
-    manifest: Dict[str, Dict[str, str]],
+    population: Dict[str, Dict[str, str]],
 ) -> Tuple[Dict[str, Tuple[str, Optional[float]]], List[str]]:
     """ALL_DOMAINS self cells keyed by resolved segment_id -> (status, value).
-    row_id is segment_label when present, else segment_id; resolved through the
-    manifest, never by splitting the id. Ambiguous ids are returned separately."""
+    row_id is segment_label when present, else segment_id; resolved against
+    `population` (see matrix_population()), never by splitting the id.
+    Ambiguous ids are returned separately."""
     by_label: Dict[str, List[str]] = defaultdict(list)
-    for sid, row in manifest.items():
+    for sid, row in population.items():
         label = row.get("segment_label", "")
         if label:
             by_label[label].append(sid)
@@ -575,7 +591,7 @@ def read_matrix_diagonal(
         if rid != row.get("column_id", ""):
             continue
         candidates = set(by_label.get(rid, []))
-        if rid in manifest:
+        if rid in population:
             candidates.add(rid)
         if len(candidates) != 1:
             ambiguous.add(rid)
@@ -915,7 +931,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         families, segments, args.split_dimension, view, seg_wide, seg_pairs,
         within_by_seg, sibling, bands["split_lift"], skips)
 
-    diagonal, ambiguous_labels = read_matrix_diagonal(matrix_path, view, manifest)
+    diagonal, ambiguous_labels = read_matrix_diagonal(
+        matrix_path, view, matrix_population(manifest, args.governance_role))
     findings: List[Dict[str, object]] = []
     seg_pairs_by_domain = {(s, d): st.seg_n for s, ds in stats_by_seg.items() for d, st in ds.items()}
     loo_rows = build_loo_rows("segment_wide", view, segments, seg_wide, seg_pairs_by_domain,
