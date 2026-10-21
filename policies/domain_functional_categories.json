@@ -1,0 +1,70 @@
+{
+  "schema": "domain_functional_categories.v1",
+  "description": "Functional-category taxonomy and presentation settings consumed by tools/segment_decomposition.py (D-052). Categories group domains for descriptive project-effect rollups only; they carry no governance weight and are not read by assign_tier(). A domain missing from 'categories' is emitted with category 'UNMAPPED' and listed by name in segment_decomposition_run.json, never dropped.",
+  "categories": {
+    "browser_organization": "Core Environment",
+    "units": "Core Environment",
+    "units_doc": "Core Environment",
+    "phases": "Core Environment",
+    "phase_filters": "Core Environment",
+
+    "line_patterns": "Graphic Standards",
+    "line_styles": "Graphic Standards",
+    "fill_patterns_drafting": "Graphic Standards",
+    "fill_patterns_model": "Graphic Standards",
+    "object_styles_analytical": "Graphic Standards",
+    "object_styles_annotation": "Graphic Standards",
+    "object_styles_model": "Graphic Standards",
+
+    "arrowheads": "Annotation",
+    "text_types": "Annotation",
+    "dimension_types_angular": "Annotation",
+    "dimension_types_diameter": "Annotation",
+    "dimension_types_linear": "Annotation",
+    "dimension_types_radial": "Annotation",
+    "dimension_types_spot_coordinate": "Annotation",
+    "dimension_types_spot_elevation": "Annotation",
+    "dimension_types_spot_slope": "Annotation",
+
+    "loaded_family_types": "Model Content",
+    "materials": "Model Content",
+    "ceiling_types": "Model Content",
+    "floor_types": "Model Content",
+    "roof_types": "Model Content",
+    "wall_types": "Model Content",
+
+    "view_category_overrides_annotation": "View Governance",
+    "view_category_overrides_model": "View Governance",
+    "view_filter_applications_view_templates": "View Governance",
+    "view_filter_definitions": "View Governance",
+    "view_templates_ceiling_plans": "View Governance",
+    "view_templates_elevations_sections_detail": "View Governance",
+    "view_templates_floor_structural_area_plans": "View Governance",
+    "view_templates_renderings_drafting": "View Governance",
+    "view_templates_schedules": "View Governance",
+
+    "worksets": "Worksharing",
+    "worksets_doc": "Worksharing"
+  },
+  "drift_tolerance": 1e-6,
+  "presentation_bands": {
+    "note": "Descriptive presentation bands only -- NOT governance thresholds. They label a signed difference for readability and never gate, suppress, or classify anything. Each band covers lower <= value < upper; null means unbounded. Values that fall in no band get a blank band.",
+    "split_lift": [
+      {"label": "child_less_internally_consistent_than_siblings", "lower": null, "upper": -0.05},
+      {"label": "small_difference", "lower": -0.05, "upper": 0.05},
+      {"label": "moderate_lift", "lower": 0.05, "upper": 0.15},
+      {"label": "large_lift", "lower": 0.15, "upper": null}
+    ],
+    "project_effect": [
+      {"label": "between_project_higher", "lower": null, "upper": -0.05},
+      {"label": "small_difference", "lower": -0.05, "upper": 0.05},
+      {"label": "moderate_project_effect", "lower": 0.05, "upper": 0.15},
+      {"label": "large_project_effect", "lower": 0.15, "upper": null}
+    ],
+    "domain_loo_impact": [
+      {"label": "domain_pulls_mean_down", "lower": null, "upper": -0.02},
+      {"label": "small_impact", "lower": -0.02, "upper": 0.02},
+      {"label": "domain_pulls_mean_up", "lower": 0.02, "upper": null}
+    ]
+  }
+}

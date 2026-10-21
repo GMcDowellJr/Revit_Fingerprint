@@ -2925,3 +2925,115 @@ What replaced each file:
 - Earlier DECISIONS.md entries, CHANGELOG entries, audit_results/ files and
   dated findings documents that cite `.ps1` paths or line numbers are left as
   written; they record what was true when they were written.
+
+## D-052 — `segment_decomposition.py`: recompute path for segment-wide and project-effect file-pair similarity; functional-category taxonomy; placement outside `assign_tier()`
+
+### Status
+Accepted (2026-10-21)
+
+### Context
+Three governance-narrative questions (split lift, domain leave-one-out impact,
+project effect) had been answered for one client with ad-hoc scripts.
+Generalizing them over every segment showed that the existing
+`compare_cross_segment.py` outputs cannot answer two of them as they stand:
+
+1. **The matrix diagonal is not segment-wide consistency.** The only
+   same-segment comparison `compare_cross_segment.py` emits is `within_project`,
+   which averages only file pairs that share a `project_label`
+   (`discover_within_project()`, `run_pair()`'s `within_project` branch). The
+   observed diagonal of `project_mean_file_pair_jaccard_matrix.csv` is therefore
+   a within-project mean. Segments with no project of >= 2 files get a
+   `synthetic_self_comparison` 1.0 (1 of 42 Project segments per view in the
+   2026-10 corpus).
+2. **There are no between-project pairs inside a segment.** No symmetric
+   (seg, seg) comparison exists, so `cross_segment_file_pairs.csv`
+   (42,811,187 rows, 16.0 GiB in the 2026-10 corpus) carries no same-segment
+   between-project pairs, and a project-effect statistic cannot be built from it.
+3. **Pooling file-pair rows across nested segments double counts.** For one
+   client, 240,571 of 2,154,962 distinct (file pair, domain) keys (11.2%) appear
+   under more than one segment pair. In 214,728 of them a parent's
+   `within_project` pair is also a cross-discipline `sibling_projects` row; in
+   25,843 a parent's `within_project` pair is also a child's `within_project`
+   pair.
+
+### Decision
+1. **Recompute from `membership_matrix.csv`, one segment at a time.**
+   `tools/segment_decomposition.py` reads each runnable segment's
+   `bundle_analysis/{all,used}/<domain>/membership_matrix.csv` through
+   `compare_cross_segment.py`'s own `load_file_join_hashes()` /
+   `discover_domains_for_segment()` and scores pairs with its `_jaccard_sets()`.
+   These functions are imported, never copied. For each (segment, view, domain)
+   it computes:
+   - the segment-wide mean over **all** intra-segment file pairs (split-lift
+     internal consistency);
+   - the within-project and between-project means (project effect).
+
+   The 2026-10 workload is 9,030,445 pairs per view (846,556 within-project,
+   8,183,889 between-project) across 42 segments and 1,629 matrices.
+2. **Reconciliation gate.** The recomputed within-project mean must equal
+   `compare_cross_segment.py`'s `within_project` summary value per
+   (segment, view, domain) within the policy tolerance (1e-6). A mismatch is a
+   hard failure: it is listed in `segment_decomposition_run.json`, no CSV is
+   written (stale copies are removed), and the exit code is 1. This binds the
+   recompute to the production definition rather than letting a parallel one
+   drift.
+3. **Every statistic is scoped to one segment.** File-pair rows are never pooled
+   across segments, so a pair is counted at most once per segment however deeply
+   the segments nest.
+   **Domain coverage gate:** a segment's domain whose all-view join_hash union
+   is below `--min-patterns` (default 3, matching `compare_cross_segment.py`) is
+   skipped and counted per domain in the run summary, as `run_pair()` skips it.
+   Without this gate, the first real-corpus run included 3 domains that compare
+   never scores (`identity`, `units_doc`, `wall_types`, all below the threshold
+   in 41 segments) in the recomputed means but not in the sibling values beside
+   them, and produced 176 within-project values with no compare reference.
+4. **Missing is blank, never zero.** A used-view pair where either file is
+   absent from the used vocabulary is excluded from every used-view mean and
+   counted in `n_pairs_missing_view`. This deliberately does not reproduce
+   `run_pair()`'s `within_project` 0.0 default, which is latent in the 2026-10
+   corpus: every file in a segment/domain's all-view matrix is also in its
+   used-view matrix.
+5. **Unlabeled files.** Pairs involving a file whose `project_label` is blank
+   or N/A (`na_token.is_blank_or_na`) are excluded from both project-effect
+   buckets and counted per segment. They still count toward the segment-wide
+   mean. `compare_cross_segment.py` instead treats each unlabeled file as its
+   own project; the 2026-10 corpus has no such files.
+6. **Split-lift and leave-one-out inputs come from `cross_segment_summary.csv`,
+   keyed by `segment_id`.** `project_mean_file_pair_jaccard_matrix.csv` is read
+   only for leave-one-out's drift guard (published vs recalculated ALL_DOMAINS
+   beyond tolerance is a named finding, never a failure). Its
+   `row_id`/`column_id` are `segment_label`s, which are not unique across
+   `unit_system` (7 collisions in the 2026-10 manifest, none yet among runnable
+   Project segments), and they are resolved through the manifest. Children of a
+   parent are identified by dimension-column equality, never by parsing
+   `segment_id`. Sibling pairs `compare_cross_segment.py` never compared are
+   emitted as `row_status=unavailable`, `skip_reason=no_sibling_comparison`;
+   nothing is computed to fill the gap.
+7. **Functional-category taxonomy.** `policies/domain_functional_categories.json`
+   (schema `domain_functional_categories.v1`) maps 38 domains to Core
+   Environment (including `units_doc`), Graphic Standards, Annotation, Model
+   Content (including `wall_types`), View Governance, or Worksharing. This covers
+   all 36 domains in the 2026-10 cross-segment outputs plus `wall_types` and
+   `units_doc`. `identity` is deliberately left unmapped for now. A domain absent from the
+   map is emitted with category `UNMAPPED` and listed by name in the run
+   summary; it is never dropped. The same file holds the drift tolerance and
+   the descriptive presentation-band edges. Those bands are labeled as
+   presentation only and are not governance thresholds.
+8. **Placement.** All outputs sit outside `assign_tier()` and
+   `governance_domain_summary.csv`, alongside the guardrail on the narrative's
+   Project Portfolio section (`render_project_portfolio_section()`). They are
+   segment/portfolio diagnostics and never override a domain tier. Wiring them
+   into the narrative or the evidence package is a separate change.
+
+### Known limitation
+Within-project similarity is partly mechanical: files of one project share
+copied and linked content. A high within-project mean, a positive project
+effect, or a positive split lift does not by itself indicate governance
+quality.
+
+### Consequences
+- `membership_matrix.csv` gains a second reader for file-pair Jaccard. The
+  reconciliation gate and the import of the comparison tool's own functions
+  keep it bounded.
+- No hash, identity, or existing output changes; `compare_cross_segment.py` is
+  untouched.
