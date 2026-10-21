@@ -140,6 +140,9 @@ policies/               Join-key, sig-hash, and governance-classification polici
                                        policy file; runner loads it into ctx["name_key_policies"]; analysis-side
                                        consumers are core/name_key_builder.py / tools/apply_name_key_policy.py
   cross_domain_alignment_keys.json  Domain family registry and alignment key definitions
+  domain_functional_categories.json Functional-category taxonomy (domain -> category), drift tolerance, and descriptive
+                                       presentation-band edges for tools/segment_decomposition.py (D-052); bands are
+                                       presentation only, not governance thresholds
   governance_role_path_patterns.json  Ordered path-substring rules that infer governance_role
                                        (Template/Container/Project/Generic) from central_path_norm
   placeholder_known_defaults.json   Per-domain known-default/placeholder name patterns used by the `placeholders` stage
@@ -303,6 +306,18 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                                   docs/tools_DEPRECATED.md for the specific correctness bugs that motivated this)
   compare_governance_populations.py   Same containment/Jaccard mechanics as compare_cross_segment.py, applied to
                                   governance_manifest.py's disjoint populations (imports rather than reimplements)
+  segment_decomposition.py      Downstream of compare_cross_segment.py (D-052): split lift (child internal vs
+                                  sibling consistency for one --split-dimension), per-domain leave-one-out
+                                  impact, and within- vs between-project effect, per runnable segment of one
+                                  governance role. Recomputes segment-wide and within/between-project file-pair
+                                  Jaccard from each segment's membership_matrix.csv via compare_cross_segment.py's
+                                  own imported readers (never reads cross_segment_file_pairs.csv, never pools rows
+                                  across nested segments); hard-fails if the recomputed within-project means
+                                  disagree with compare's within_project summary rows. Writes segment_*.csv +
+                                  segment_decomposition_run.json under <cross-segment-dir>/segment_decomposition/.
+                                  Not runbook-wired, not rendered by generate_governance_narrative.py, no
+                                  assign_tier() interaction. tools/dev/segment_decomposition_step0_probe.py is its
+                                  read-only real-corpus Step-0 probe.
   generate_governance_narrative.py    Deterministic (no-LLM) governance_narrative_context.md renderer from the
                                   compare_cross_segment.py / bundle pipeline CSV outputs; also emits a governance
                                   evidence-package layer (governance_package_manifest.json/_health.json/
@@ -393,6 +408,8 @@ tests/                  pytest test suite (70+ test files)
   test_discover_hash_policy.py, test_discover_vfd_edges.py, test_na_token.py, test_probe_inventory_builder.py,
   test_analyze_promotion_candidates.py  Synthetic-fixture coverage for tools/analyze_promotion_candidates.py
                                        (scope-gap routing, ordinal ranking, no-bare-score invariant)
+  test_segment_decomposition.py        tools/segment_decomposition.py: end-to-end against real compare_cross_segment.py
+                                       output (reconciliation gate, matrix drift guard), plus hand-computed lift/LOO
                                        Coverage for the newer segment/governance/archetype tooling
   revit/                              Revit integration harness (requires Revit)
   golden/                             Golden file comparisons
