@@ -189,7 +189,7 @@ Escalation:
 
 ---
 
-## Question route: Which clients need onboarding attention or show low internal coherence?
+## Question route: Which clients need onboarding attention or show low within-project coherence?
 
 Status:
 - candidate
@@ -628,6 +628,119 @@ Common traps:
 
 Escalation:
 - None beyond this CSV for this package type today.
+
+---
+
+## Question route: Does splitting a segment by discipline produce more internally consistent children?
+
+Status:
+- candidate
+
+Question forms:
+- Are a client's disciplines internally consistent but different from each other?
+- Does splitting by `discipline_label` separate genuinely different populations?
+
+Intent:
+- Compare each child segment's segment-wide consistency with its consistency
+  with its siblings (split lift), without reading it as a governance verdict.
+
+Primary artifacts:
+1. `governance_narrative_context.md`'s "Segment Decomposition (D-052)" section --
+   split-family table and highest/lowest child lift.
+2. `segment_split_lift.csv` (per view) for every child row.
+
+Secondary artifacts:
+1. `segment_decomposition_run.json` -- `status`, reconciliation counts,
+   `skip_counts`, `domains_below_min_patterns`.
+
+Relevant fields:
+- `internal_mean_*`, `sibling_mean_*`, `lift_equal_weighted`,
+  `lift_file_weighted`, `weighting_difference`, `row_status`, `skip_reason`.
+
+Suggested first check:
+- That the view's run summary `status` is `ok`; then the parent row for the
+  family in question.
+
+Evidence type:
+- direct
+
+Supported conclusion types:
+- whether children of one parent are more consistent internally than with
+  their siblings, equal- and file-weighted
+
+Unsupported conclusion types:
+- governance quality of any child or discipline
+- split dimensions other than the one recorded in `split_dimension`
+
+Comparability requirements:
+- Same view (used vs all are separate runs) and same weighting.
+
+Common traps:
+- Reading `within_project_only_mean` as the child's internal consistency.
+- Treating `large_lift` as a threshold result -- bands are descriptive.
+- Treating `no_sibling_comparison` rows as zero lift.
+
+Escalation:
+- `segment_project_effect_by_domain.csv` for which domains drive a child's
+  internal mean.
+
+---
+
+## Question route: How much of a segment's similarity is within-project versus between-project, and which domains drive it?
+
+Status:
+- candidate
+
+Question forms:
+- Is a segment's similarity mostly files of the same project resembling each other?
+- Which domain moves a segment's mean the most?
+
+Intent:
+- Separate within-project from between-project file-pair similarity per
+  segment, and locate the domains with the largest leave-one-out impact.
+
+Primary artifacts:
+1. `governance_narrative_context.md`'s "Segment Decomposition (D-052)" section --
+   per-segment project-effect table and leave-one-out lists.
+2. `segment_project_effect_by_segment.csv`, `_by_category.csv`,
+   `_by_domain.csv`; `segment_domain_loo_impact.csv`.
+
+Secondary artifacts:
+1. `segment_decomposition_run.json` -- reconciliation, drift findings
+   (`findings`), `unmapped_domains`.
+
+Relevant fields:
+- `within_mean`, `between_mean`, `project_effect` (and the equal-domain /
+  comparison-weighted rollup variants), `n_within_pairs`, `n_between_pairs`,
+  `n_pairs_excluded_unlabeled`; `impact`, `mean_all`, `mean_without`, `basis`.
+
+Suggested first check:
+- The segment's row in the project-effect table, then its by-category rows.
+
+Evidence type:
+- direct
+
+Supported conclusion types:
+- how much more alike files of one project are than files of different
+  projects in the same segment
+- which domains raise or lower a segment's equal-domain mean
+
+Unsupported conclusion types:
+- that a large project effect, or a high within-project mean, reflects good
+  or bad governance -- within-project similarity is partly mechanical
+- segment-wide consistency from the `within_project_only` basis
+
+Comparability requirements:
+- Same view and same weighting variant; segments with few projects or pairs
+  (`n_projects`, pair counts) carry less weight.
+
+Common traps:
+- Reading `presentation_band_descriptive` as a threshold.
+- Comparing an equal-domain effect with a comparison-weighted one.
+
+Escalation:
+- Per-domain rows in `segment_project_effect_by_domain.csv`; the producer's
+  recompute path is described in `tools/segment_decomposition.py`'s docstring.
 
 ---
 

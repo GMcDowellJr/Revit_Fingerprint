@@ -75,10 +75,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import shutil
 import statistics
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date
 from pathlib import Path
 from typing import Optional
@@ -107,6 +108,10 @@ from governance_evidence_package import (
     FINDING_FIDELITY_EXACT,
     FINDING_STATUS_SUPPORTED,
     FINDING_STATUS_QUESTION_NOT_CLAIM,
+    SEGMENT_DECOMPOSITION_FILES,
+    SEGMENT_DECOMPOSITION_RUN_FILE,
+    SEGMENT_DECOMPOSITION_SCHEMA_VERSION,
+    SEGMENT_DECOMPOSITION_VIEWS,
     build_evidence_map,
     build_file_inventory_document,
     build_findings_document,
@@ -114,6 +119,7 @@ from governance_evidence_package import (
     build_package_manifest,
     comparison_type_coverage as _comparison_type_coverage,
     inventory_export_directory_files,
+    segment_decomposition_sibling_paths,
     write_json,
 )
 
@@ -3775,7 +3781,9 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
     # segment self-compared for internal consistency is a real, common case
     # here (unlike wp_by_client in build_client_summary(), which gates to
     # governance_role_a == "Project" and simply excludes non-Project rows,
-    # this section is meant to show discipline coherence from ALL of them).
+    # this section is meant to show discipline within-project coherence from
+    # ALL of them). Within-project rows average only file pairs sharing a
+    # project_label -- not discipline-wide consistency (D-052/D-053).
     # PRIMARY is therefore picked PER ROW by role: used-view union for Project
     # rows (active practice, per _recommended_primary_view()), all-view union
     # for every other role (used-view is not meaningful/primary outside
@@ -3863,7 +3871,7 @@ def render_discipline_section(cascade: dict, summary_rows: list[dict]) -> str:
         lines.append(
             f"Files in corpus: **{n_files}**. "
             f"{'Discipline-specific templates exist. ' if has_template else 'No discipline-specific templates — coordination files are the primary governance source. '}"
-            f"Mean within-population coherence ({coherence_label}): **{pct(overall)}**"
+            f"Mean within-project coherence, file pairs sharing a project only ({coherence_label}): **{pct(overall)}**"
             f"{f' (all-view/configured: {pct(overall_all)})' if overall_all is not None else ''}.\n"
         )
 
@@ -4005,7 +4013,7 @@ def render_client_section(client_rows: list[dict]) -> str:
         "High scores indicate practice convergence; low scores indicate client-specific divergence.\n"
     )
 
-    lines.append("| Client | Files | Alignment | Cross-Client Similarity | Internal Coherence | Confidence |")
+    lines.append("| Client | Files | Alignment | Cross-Client Similarity | Within-Project Coherence | Confidence |")
     lines.append("|---|---|---|---|---|---|")
     for r in client_rows:
         lines.append(
@@ -4031,7 +4039,7 @@ def render_client_section(client_rows: list[dict]) -> str:
             f"**{r['n_files']} project files.** "
             f"Alignment tier: {r['tier']}. "
             f"Cross-client similarity: {fmt(r['xc_mean'])}. "
-            f"Internal coherence: {fmt(r['wp_mean'])}.\n"
+            f"Within-project coherence (file pairs sharing a project only): {fmt(r['wp_mean'])}.\n"
         )
         if r["strongest"]:
             strong_str = ", ".join(
@@ -4941,6 +4949,345 @@ def render_project_portfolio_section(
     return "\n".join(lines)
 
 
+# ── Segment Decomposition (D-052 outputs, D-053 presentation) ─────────────────
+# Renders tools/segment_decomposition.py's outputs. Presentation only: every
+# number shown is read verbatim from the decomposition CSVs / run summary and
+# only selected and sorted here -- no metric is recomputed, and nothing here
+# feeds assign_tier(), governance_domain_summary.csv or governance_findings.json
+# (same placement guardrail as render_project_portfolio_section()).
+
+SEGMENT_DECOMPOSITION_NOT_PROVIDED = (
+    "Segment decomposition outputs (D-052) were not provided for this run; split lift, "
+    "domain leave-one-out impact and project effect are unavailable."
+)
+_SEGMENT_DECOMPOSITION_DEFAULT_LIMITATION = (
+    "Within-project similarity is partly mechanical (shared/copied content within a "
+    "project) and does not by itself indicate governance quality."
+)
+_SEGMENT_DECOMPOSITION_TOP_N = 5
+_SEGMENT_DECOMPOSITION_PARENT_CAP = 20
+
+
+def load_segment_decomposition(dirs: list) -> list:
+    """Load each segment_decomposition.py output folder into a bundle dict.
+
+    state is one of: "not_provided" (no run summary in the folder), "unreadable"
+    (run summary not parseable JSON), "schema" (unexpected schema_version),
+    "status" (run status other than "ok" -- e.g. failed_reconciliation, whose
+    CSVs segment_decomposition.py deliberately does not write), or "ok". CSVs
+    are loaded only for "ok"; a missing CSV in an ok folder is None, and its
+    paragraph degrades to a not-provided line. Bundles come back ordered by
+    view (SEGMENT_DECOMPOSITION_VIEWS order, unknown views last); a second
+    folder claiming an already-seen view is skipped with a warning.
+    """
+    bundles = []
+    seen_views = set()
+    for d in dirs:
+        d = Path(d)
+        run_path = d / SEGMENT_DECOMPOSITION_RUN_FILE
+        bundle = {"dir": d, "state": "not_provided", "view": None, "run": None, "rows": {}}
+        if run_path.is_file():
+            try:
+                run = json.loads(run_path.read_text(encoding="utf-8"))
+                if not isinstance(run, dict):
+                    raise ValueError("run summary is not a JSON object")
+            except (OSError, ValueError) as e:
+                print(f"[warn] {run_path}: could not parse ({e}); segment decomposition "
+                      f"not rendered for this folder.", file=sys.stderr)
+                bundle["state"] = "unreadable"
+            else:
+                bundle["run"] = run
+                args_block = run.get("args") if isinstance(run.get("args"), dict) else {}
+                bundle["view"] = args_block.get("view_scope") or None
+                if run.get("schema_version") != SEGMENT_DECOMPOSITION_SCHEMA_VERSION:
+                    bundle["state"] = "schema"
+                elif run.get("status") != "ok":
+                    bundle["state"] = "status"
+                else:
+                    bundle["state"] = "ok"
+                    for key, name in SEGMENT_DECOMPOSITION_FILES.items():
+                        path = d / name
+                        bundle["rows"][key] = read_csv(path) if path.is_file() else None
+        if bundle["view"] is not None:
+            if bundle["view"] in seen_views:
+                print(f"[warn] {d}: a segment decomposition folder for view "
+                      f"'{bundle['view']}' was already supplied; skipping this one.",
+                      file=sys.stderr)
+                continue
+            seen_views.add(bundle["view"])
+        bundles.append(bundle)
+    order = {v: i for i, v in enumerate(SEGMENT_DECOMPOSITION_VIEWS)}
+    return sorted(bundles, key=lambda b: order.get(b["view"], len(order)))
+
+
+def segment_decomposition_view_dirs(bundles: list) -> dict:
+    """view_scope -> folder, for every bundle whose run summary named its view."""
+    return {b["view"]: b["dir"] for b in bundles if b["view"] in SEGMENT_DECOMPOSITION_VIEWS}
+
+
+def _seg_display(label: str, segment_id: str) -> str:
+    label = label or ""
+    segment_id = segment_id or ""
+    if not label:
+        return f"`{segment_id}`"
+    if not segment_id or label == segment_id:
+        return label
+    return f"{label} (`{segment_id}`)"
+
+
+def _md_cell(text: str) -> str:
+    # segment_id/segment_label values contain '|' (e.g. imperial|Project|acme),
+    # which would split a Markdown table cell.
+    return str(text).replace("|", "\\|")
+
+
+def _desc_key(value_key: str, *tie_keys: str):
+    # Rows with a value first (descending), then by tie keys; None sorts last.
+    def key(r):
+        v = pf(r.get(value_key))
+        return (v is None, -(v or 0.0)) + tuple(r.get(k, "") for k in tie_keys)
+    return key
+
+
+def _top_bottom(rows: list, value_key: str, n: int, *tie_keys: str) -> tuple:
+    """Top-n and bottom-n rows by value_key among rows that carry a value.
+    Bottom excludes rows already shown in top, so a short list is not repeated."""
+    valued = [r for r in rows if pf(r.get(value_key)) is not None]
+    top = sorted(valued, key=_desc_key(value_key, *tie_keys))[:n]
+    top_ids = {id(r) for r in top}
+    bottom = [
+        r for r in sorted(valued, key=lambda r: (pf(r.get(value_key)),) + tuple(r.get(k, "") for k in tie_keys))
+        if id(r) not in top_ids
+    ][:n]
+    return top, bottom
+
+
+def _segment_decomposition_caveat(limitation: str) -> str:
+    return (
+        f"> *{limitation}* Presentation bands (`presentation_band_descriptive`) are "
+        "descriptive labels, not governance thresholds; they gate, suppress and classify "
+        "nothing.\n"
+    )
+
+
+def _render_decomp_provenance(run: dict) -> list:
+    rec = run.get("reconciliation") or {}
+    below = run.get("domains_below_min_patterns") or {}
+    skipped = below.get("segments_skipped_by_domain") or {}
+    skipped_str = ", ".join(f"{d} ({n} segment{'s' if n != 1 else ''})" for d, n in sorted(skipped.items())) or "none"
+    unmapped = run.get("unmapped_domains") or []
+    return [
+        f"Run status `ok`. Segments processed: {run.get('segments_processed', '—')}; "
+        f"split families: {run.get('split_families', '—')}; "
+        f"file pairs scored: {run.get('file_pairs_scored', '—')}. Reconciliation against "
+        f"`compare_cross_segment.py`'s within_project values: {rec.get('checked', '—')} checked, "
+        f"{rec.get('matched', '—')} matched, {rec.get('no_reference', '—')} with no compare "
+        f"reference. Leave-one-out drift findings: {len(run.get('findings') or [])}. "
+        f"Summary conflicts: {len(run.get('summary_conflicts') or [])}. "
+        f"Unmapped domains: {', '.join(unmapped) if unmapped else 'none'}. "
+        f"Domains skipped below min_patterns={below.get('min_patterns', '—')}: {skipped_str}.\n"
+    ]
+
+
+def _render_decomp_split_lift(rows: Optional[list], limitation: str) -> list:
+    name = SEGMENT_DECOMPOSITION_FILES["split_lift"]
+    lines = ["#### Split lift\n"]
+    if rows is None:
+        lines.append(f"`{name}` not provided; split lift unavailable for this view.\n")
+        return lines
+    parents = [r for r in rows if r.get("row_grain") == "parent"]
+    children = [r for r in rows if r.get("row_grain") == "child"]
+    split_dims = sorted({r.get("split_dimension", "") for r in rows if r.get("split_dimension")})
+    lines.append(
+        f"From `{name}`. For each parent segment split on "
+        f"{', '.join(f'`{d}`' for d in split_dims) or 'its split dimension'}, a child's "
+        "internal consistency (mean over **all** of its file pairs) is compared with its "
+        "consistency with its siblings; lift = internal - sibling. Positive lift means the "
+        "children are more consistent internally than with each other. The band is assigned "
+        "from the equal-weighted lift; the file-weighted lift is shown beside it. "
+        "`within_project_only_mean` in the same file averages only file pairs sharing a "
+        "project and is not segment-wide consistency.\n"
+    )
+    if not parents:
+        lines.append("No split families in this view.\n")
+    else:
+        ordered = sorted(parents, key=_desc_key("lift_equal_weighted", "parent_segment_label", "parent_segment_id"))
+        lines.append(f"**Split families ({len(parents)}), by equal-weighted lift**\n")
+        lines.append("| Parent | Children | Internal (equal / file-wt) | Sibling (equal / file-wt) "
+                     "| Lift (equal / file-wt) | Band | Status |")
+        lines.append("|---|---|---|---|---|---|---|")
+        for r in ordered[:_SEGMENT_DECOMPOSITION_PARENT_CAP]:
+            status = r.get("row_status", "")
+            if r.get("skip_reason"):
+                status = f"{status} ({r['skip_reason']})"
+            lines.append(
+                f"| {_md_cell(_seg_display(r.get('parent_segment_label'), r.get('parent_segment_id')))} "
+                f"| {r.get('n_children', '')} "
+                f"| {fmt(pf(r.get('internal_mean_equal_weighted')))} / {fmt(pf(r.get('internal_mean_file_weighted')))} "
+                f"| {fmt(pf(r.get('sibling_mean_equal_weighted')))} / {fmt(pf(r.get('sibling_mean_file_weighted')))} "
+                f"| {fmt(pf(r.get('lift_equal_weighted')))} / {fmt(pf(r.get('lift_file_weighted')))} "
+                f"| {r.get('presentation_band_descriptive') or '—'} | {_md_cell(status)} |"
+            )
+        if len(ordered) > _SEGMENT_DECOMPOSITION_PARENT_CAP:
+            lines.append(f"\n_...and {len(ordered) - _SEGMENT_DECOMPOSITION_PARENT_CAP} more "
+                         f"families -- see `{name}`._")
+        lines.append("")
+    top, bottom = _top_bottom(children, "lift_equal_weighted", _SEGMENT_DECOMPOSITION_TOP_N,
+                              "segment_label", "segment_id")
+    for heading, sel in (("Highest child lift", top), ("Lowest child lift", bottom)):
+        if not sel:
+            continue
+        lines.append(f"**{heading} ({len(sel)})**")
+        for r in sel:
+            lines.append(
+                f"- {_seg_display(r.get('segment_label'), r.get('segment_id'))}, parent "
+                f"{_seg_display(r.get('parent_segment_label'), r.get('parent_segment_id'))}: "
+                f"lift {fmt(pf(r.get('lift_equal_weighted')))} equal / "
+                f"{fmt(pf(r.get('lift_file_weighted')))} file-weighted "
+                f"({r.get('presentation_band_descriptive') or 'no band'})"
+            )
+        lines.append("")
+    unavailable = Counter(r.get("skip_reason") or "unspecified" for r in children
+                          if pf(r.get("lift_equal_weighted")) is None)
+    if unavailable:
+        lines.append("Children with no lift value: " + ", ".join(
+            f"{n} `{reason}`" for reason, n in sorted(unavailable.items())) + ".\n")
+    lines.append(_segment_decomposition_caveat(limitation))
+    return lines
+
+
+def _render_decomp_project_effect(seg_rows: Optional[list], limitation: str) -> list:
+    name = SEGMENT_DECOMPOSITION_FILES["effect_segment"]
+    lines = ["#### Project effect\n"]
+    if seg_rows is None:
+        lines.append(f"`{name}` not provided; project effect unavailable for this view.\n")
+        return lines
+    lines.append(
+        f"From `{name}`. Per segment, the mean Jaccard of file pairs **within** the same "
+        "project vs **between** different projects (effect = within - between), over the "
+        "domains that have both values. Equal-domain and comparison-weighted variants are "
+        "both shown; the band is assigned from the equal-domain effect. Per-category and "
+        f"per-domain detail: `{SEGMENT_DECOMPOSITION_FILES['effect_category']}`, "
+        f"`{SEGMENT_DECOMPOSITION_FILES['effect_domain']}`.\n"
+    )
+    if not seg_rows:
+        lines.append("No segment rows in this view.\n")
+    else:
+        lines.append("| Segment | Files | Projects | Within (eq.) | Between (eq.) | Effect (eq.) "
+                     "| Effect (cmp.-wt) | Within pairs | Between pairs | Band | Status |")
+        lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
+        for r in sorted(seg_rows, key=lambda r: (r.get("segment_label", ""), r.get("segment_id", ""))):
+            status = r.get("row_status", "")
+            if r.get("skip_reason"):
+                status = f"{status} ({r['skip_reason']})"
+            lines.append(
+                f"| {_md_cell(_seg_display(r.get('segment_label'), r.get('segment_id')))} "
+                f"| {r.get('n_files', '')} | {r.get('n_projects', '')} "
+                f"| {fmt(pf(r.get('equal_domain_within_mean')))} "
+                f"| {fmt(pf(r.get('equal_domain_between_mean')))} "
+                f"| {fmt(pf(r.get('equal_domain_effect')))} "
+                f"| {fmt(pf(r.get('comparison_weighted_effect')))} "
+                f"| {r.get('n_within_pairs', '')} | {r.get('n_between_pairs', '')} "
+                f"| {r.get('presentation_band_descriptive') or '—'} | {_md_cell(status)} |"
+            )
+        lines.append("")
+    lines.append(_segment_decomposition_caveat(limitation))
+    return lines
+
+
+def _render_decomp_loo(rows: Optional[list], limitation: str) -> list:
+    name = SEGMENT_DECOMPOSITION_FILES["loo"]
+    lines = ["#### Domain leave-one-out impact\n"]
+    if rows is None:
+        lines.append(f"`{name}` not provided; domain leave-one-out impact unavailable for this view.\n")
+        return lines
+    seg_wide = [r for r in rows if r.get("basis") == "segment_wide"]
+    lines.append(
+        f"From `{name}`, `segment_wide` basis: impact = segment mean over all domains minus "
+        "the mean without that domain, so a positive impact means the domain pulls the "
+        "segment's mean up. The file's `within_project_only` basis rows repeat this on "
+        "compare_cross_segment.py's within_project values (the same quantity the "
+        "`project_mean_file_pair_jaccard_matrix.csv` diagonal publishes) and are not "
+        "segment-wide consistency.\n"
+    )
+    ties = ("segment_label", "segment_id", "domain")
+    up = sorted((r for r in seg_wide if (pf(r.get("impact")) or 0.0) > 0),
+                key=_desc_key("impact", *ties))[:_SEGMENT_DECOMPOSITION_TOP_N]
+    down = sorted((r for r in seg_wide if (pf(r.get("impact")) or 0.0) < 0),
+                  key=lambda r: (pf(r.get("impact")),) + tuple(r.get(k, "") for k in ties)
+                  )[:_SEGMENT_DECOMPOSITION_TOP_N]
+    if not up and not down:
+        lines.append("No segment_wide rows with a non-zero impact value in this view.\n")
+    for heading, sel in (("Domains pulling a segment mean up most", up),
+                         ("Domains pulling a segment mean down most", down)):
+        if not sel:
+            continue
+        lines.append(f"**{heading} ({len(sel)})**")
+        for r in sel:
+            lines.append(
+                f"- {_seg_display(r.get('segment_label'), r.get('segment_id'))}: "
+                f"{DOMAIN_LABELS.get(r.get('domain', ''), r.get('domain', ''))} impact "
+                f"{fmt(pf(r.get('impact')))} (mean {fmt(pf(r.get('mean_all')))} -> "
+                f"{fmt(pf(r.get('mean_without')))} without it; "
+                f"{r.get('presentation_band_descriptive') or 'no band'})"
+            )
+        lines.append("")
+    lines.append(_segment_decomposition_caveat(limitation))
+    return lines
+
+
+def render_segment_decomposition_section(bundles: list) -> str:
+    """Segment Decomposition section (D-053) over load_segment_decomposition() bundles.
+
+    Always returns a section. No folder with a run summary -> heading plus the
+    one-line not-provided note. A run whose status is not "ok" (e.g.
+    failed_reconciliation) -> one line naming the status and no numbers.
+    """
+    lines = ["## Segment Decomposition (D-052)\n"]
+    if not any(b["state"] != "not_provided" for b in bundles):
+        lines.append(SEGMENT_DECOMPOSITION_NOT_PROVIDED)
+        return "\n".join(lines)
+    lines.append(
+        "Segment-level diagnostics from `tools/segment_decomposition.py`: split lift, "
+        "within- vs between-project effect, and domain leave-one-out impact. Like the "
+        "Project Portfolio section, this section is kept outside `assign_tier()`, "
+        "`governance_domain_summary.csv` and `governance_findings.json` and never "
+        "overrides a domain tier. Every value is read from the decomposition outputs and "
+        "only selected and sorted here. Used-view and all-view results come from "
+        "separate runs and are separate measurements.\n"
+    )
+    for b in bundles:
+        view = b["view"]
+        if b["state"] == "not_provided":
+            lines.append(f"Segment decomposition outputs not provided at `{b['dir']}`.\n")
+            continue
+        if b["state"] == "unreadable":
+            lines.append(f"`{SEGMENT_DECOMPOSITION_RUN_FILE}` at `{b['dir']}` could not be "
+                         "parsed; no decomposition numbers are rendered for it.\n")
+            continue
+        view_label = f"{view}-view" if view else "unknown view"
+        if b["state"] == "schema":
+            lines.append(
+                f"Segment decomposition ({view_label}): `{SEGMENT_DECOMPOSITION_RUN_FILE}` has "
+                f"schema_version `{b['run'].get('schema_version')}` (expected "
+                f"`{SEGMENT_DECOMPOSITION_SCHEMA_VERSION}`); not rendered.\n")
+            continue
+        if b["state"] == "status":
+            lines.append(
+                f"Segment decomposition ({view_label}) status `{b['run'].get('status')}`: "
+                "outputs were not written and no decomposition numbers are rendered for this "
+                f"view. See `{SEGMENT_DECOMPOSITION_RUN_FILE}`.\n")
+            continue
+        run = b["run"]
+        limitation = run.get("known_limitation") or _SEGMENT_DECOMPOSITION_DEFAULT_LIMITATION
+        lines.append(f"### {view_label.capitalize()}\n")
+        lines += _render_decomp_provenance(run)
+        lines += _render_decomp_split_lift(b["rows"].get("split_lift"), limitation)
+        lines += _render_decomp_project_effect(b["rows"].get("effect_segment"), limitation)
+        lines += _render_decomp_loo(b["rows"].get("loo"), limitation)
+    return "\n".join(lines).rstrip() + "\n"
+
+
 # ── Business Center Composition / Business Center Distribution ──────────────
 # Relationship/topology layer, Deliverables 4-5. These render governance_bc_
 # client_matrix.csv / governance_client_bc_matrix.csv (tools/governance_
@@ -5509,7 +5856,7 @@ def render_findings_and_recommendations(
 
     if low_coherence:
         lines.append(
-            f"**Some clients show high within-client variation ({', '.join(low_coherence)}).** "
+            f"**Some clients show low within-project coherence, measured over file pairs sharing a project only ({', '.join(low_coherence)}).** "
             "Where file counts are small, treat this as a signal for further sampling rather than a definitive client judgement.\n"
         )
 
@@ -5891,7 +6238,7 @@ def render_governance_brief(
         key=lambda f: f["subject"]["id"],
     )
     if low_coherence:
-        lines.append(f"\n## Clients with low internal coherence ({len(low_coherence)})\n")
+        lines.append(f"\n## Clients with low within-project coherence ({len(low_coherence)})\n")
         for f in low_coherence[:15]:
             lines.append(f"- **{f['subject']['id']}** -- {f['summary']}")
         if len(low_coherence) > 15:
@@ -5979,6 +6326,15 @@ def main():
                              "(also covers project_mean_file_pair_jaccard_matrix.csv's "
                              "signal via this file's own exact_identity_overlap column, "
                              "rather than consuming that matrix standalone).")
+    parser.add_argument("--segment-decomposition-dir", action="append", default=None,
+                        metavar="DIR",
+                        help="Folder written by tools/segment_decomposition.py (D-052), holding "
+                             "segment_decomposition_run.json and its CSVs. Repeatable: pass once "
+                             "per view (e.g. the default used-view folder and an all-view "
+                             "--out-dir); each folder's view is read from its run summary. "
+                             "Default: <--summary's folder>/segment_decomposition. Feeds the "
+                             "Segment Decomposition section and evidence-map entries only "
+                             "(presentation; never assign_tier()) -- D-053.")
     parser.add_argument("--governance-bc-client-matrix",
                         help="governance_bc_client_matrix.csv (optional, from "
                              "tools/governance_relationships.py). Feeds the Business Center "
@@ -6135,6 +6491,16 @@ def main():
     if args.project_fragmentation_diagnostic:
         print(f"Loading {args.project_fragmentation_diagnostic}...")
         project_fragmentation_rows = read_csv(Path(args.project_fragmentation_diagnostic))
+
+    segment_decomposition_dirs = (
+        [Path(d) for d in args.segment_decomposition_dir] if args.segment_decomposition_dir
+        else [Path(args.summary).parent / "segment_decomposition"]
+    )
+    segment_decomposition_bundles = load_segment_decomposition(segment_decomposition_dirs)
+    for _b in segment_decomposition_bundles:
+        if _b["state"] != "not_provided":
+            print(f"Loaded segment decomposition {_b['view'] or '?'}-view from {_b['dir']} "
+                  f"(state={_b['state']})")
 
     governance_bc_client_rows = []
     if args.governance_bc_client_matrix:
@@ -6460,6 +6826,7 @@ def main():
     )
     if portfolio_section:
         sections.append(portfolio_section)
+    sections.append(render_segment_decomposition_section(segment_decomposition_bundles))
     bc_composition_section = render_bc_composition_section(governance_bc_client_rows)
     if bc_composition_section:
         sections.append(bc_composition_section)
@@ -6772,6 +7139,10 @@ def main():
             "reading_order": READING_ORDER_PATH,
             "classification_rules": CLASSIFICATION_RULES_PATH,
             "governance_relationships": _relationships_anchor.parent / "governance_relationships.csv",
+            # D-053: segment_decomposition.py outputs, one fixed key set per view
+            # whose folder named its view in its run summary.
+            **segment_decomposition_sibling_paths(
+                segment_decomposition_view_dirs(segment_decomposition_bundles)),
         }
         sibling_present = {k: v.exists() for k, v in sibling_paths.items()}
 

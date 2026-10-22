@@ -241,6 +241,14 @@ docstring), evaluated per domain:
 
 ---
 
+## Not inputs to these functions
+
+`tools/segment_decomposition.py`'s outputs (D-052) -- split lift, domain
+leave-one-out impact, project effect and their `presentation_band_descriptive`
+labels -- feed none of the functions documented here. The narrative renders
+them in a separate Segment Decomposition section (D-053); their band edges are
+descriptive, not thresholds.
+
 ## Known limitation
 
 This document is hand-maintained and not mechanically checked against the

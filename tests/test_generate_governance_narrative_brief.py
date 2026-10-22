@@ -106,7 +106,7 @@ def test_brief_lists_leadership_questions_as_numbered_list_not_findings():
 def test_brief_includes_low_client_coherence_section():
     findings = [_finding("low_client_coherence", subject_id="Acme", subject_type="client")]
     md = render_governance_brief(findings, _HEALTH_OK, _CORPUS, "1.0")
-    assert "## Clients with low internal coherence (1)" in md
+    assert "## Clients with low within-project coherence (1)" in md
     assert "Acme" in md
 
 

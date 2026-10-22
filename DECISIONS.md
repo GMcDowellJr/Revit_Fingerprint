@@ -3037,3 +3037,84 @@ quality.
   keep it bounded.
 - No hash, identity, or existing output changes; `compare_cross_segment.py` is
   untouched.
+
+## D-053 — Surface `segment_decomposition.py` (D-052) outputs in the governance narrative and evidence package (presentation only)
+
+### Status
+Proposed (2026-10-22) -- pending the acceptance run on the 2026-10 corpus
+(both views; domain tiers compared against a run without the folders).
+
+### Context
+D-052 §8 placed `tools/segment_decomposition.py`'s outputs outside
+`assign_tier()` and `governance_domain_summary.csv` and left wiring them into
+the narrative and the evidence package to a separate change. Nothing read them.
+Two facts shaped the wiring:
+
+1. One `segment_decomposition.py` run covers one `--view-scope`. The default
+   output folder is `<cross-segment dir>/segment_decomposition`; a second view
+   needs `--out-dir`, so its folder has no fixed location, and both folders use
+   the same file names.
+2. The D-023 file inventory scans `*.csv` without descending into subfolders,
+   so the decomposition files were invisible to the package.
+
+The Step-0 review also found existing narrative wording that presented
+`within_project` values -- which average only file pairs sharing a
+`project_label`, the same quantity the
+`project_mean_file_pair_jaccard_matrix.csv` diagonal publishes -- as client- or
+discipline-wide coherence ("Internal Coherence", "within-population
+coherence", "high within-client variation", "Clients with low internal
+coherence").
+
+### Decision
+1. **Narrative.** `generate_governance_narrative.py` always emits a
+   "Segment Decomposition (D-052)" section, right after Project Portfolio. It
+   reads `segment_decomposition_run.json` and the five CSVs and only selects
+   and sorts rows; no metric is recomputed. Per view it renders a provenance
+   line (status, counts, reconciliation, drift findings, unmapped and
+   below-min-patterns domains), the split-family table and highest/lowest child
+   lift, a per-segment project-effect table, and the domains with the largest
+   positive and negative `segment_wide` leave-one-out impact. Sorting follows
+   the equal-weighted value each band is assigned from; the file- or
+   comparison-weighted value is shown beside it. Every paragraph carries the
+   run summary's `known_limitation` and states that presentation bands are
+   descriptive, not governance thresholds.
+2. **Degradation.** No folder with a run summary: the heading and one
+   not-provided line. Run summary `status` other than `ok` (e.g.
+   `failed_reconciliation`), unparseable, or with an unexpected
+   `schema_version`: one line naming the condition, and no numbers -- even if
+   stale CSVs sit beside it. An `ok` run missing one CSV degrades only that
+   paragraph.
+3. **Inputs.** A repeatable `--segment-decomposition-dir`, defaulting to
+   `<--summary's folder>/segment_decomposition`. Each folder's view comes from
+   its run summary's `args.view_scope`, never from the folder name; a second
+   folder claiming an already-seen view is skipped with a warning.
+4. **Evidence map.** Six fixed entries per view (`used`, `all`):
+   `segment_decomposition_run_<view>` as provenance, plus
+   `segment_split_lift_<view>`, `segment_domain_loo_impact_<view>` and
+   `segment_project_effect_by_{domain,category,segment}_<view>`. All are
+   `required_before_conclusions: false`; an unsupplied view has
+   `path: null, present: false`, so the count is 49 on every run (was 37).
+5. **Placement unchanged from D-052 §8.** Nothing feeds `assign_tier()`,
+   `governance_domain_summary.csv` or `governance_findings.json`. A test
+   asserts `assign_tier()`'s inputs and outputs, `governance_domain_summary.csv`
+   and the findings are byte-identical with and without the folders.
+6. **Wording.** The narrative's client and discipline coherence labels, the
+   brief's low-coherence heading and the matching question-route title now say
+   "within-project coherence (file pairs sharing a project only)". The
+   `within_project_coherence` column, the `low_client_coherence` finding type,
+   the finding's summary text and the `onboarding_internal_read` column
+   ("Stable/Mixed internal portfolio") are unchanged; the onboarding text is a
+   follow-up.
+
+### Known limitation
+Within-project similarity is partly mechanical (shared/copied content within a
+project) and does not by itself indicate governance quality. The narrative
+shows top/bottom rows and a per-segment table only; per-category and
+per-domain detail stays in the CSVs.
+
+### Consequences
+- No hash, identity, threshold, tier or metric change; `segment_decomposition.py`,
+  `compare_cross_segment.py` and `assign_tier()` are untouched.
+- `governance_evidence_map.json` grows from 37 to 49 artifacts.
+- `governance_narrative_context.md` and `governance_brief.md` wording changes
+  as listed in Decision 6.
