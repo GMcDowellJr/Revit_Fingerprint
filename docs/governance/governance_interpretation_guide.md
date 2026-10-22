@@ -245,6 +245,41 @@ these answer different questions and do not fail or succeed together.
 Revisit if a genuine multi-business-center client appears in a future
 corpus.
  
+### Segment decomposition fields (Segment Decomposition section, D-052/D-053)
+
+Read from `tools/segment_decomposition.py`'s outputs
+(`segment_decomposition_run.json` plus five CSVs, one folder per view
+supplied via `--segment-decomposition-dir`, default
+`<cross-segment dir>/segment_decomposition`). Like the Project Portfolio
+fields above, these sit **outside** `assign_tier()`,
+`governance_domain_summary.csv` and `governance_findings.json` and never
+override a domain's `governance_tier`. The narrative selects and sorts rows;
+it computes nothing. No number is rendered for a view whose run summary
+`status` is not `ok` (e.g. `failed_reconciliation`, where the producer
+deliberately writes no CSVs).
+
+| Field | Source | Meaning |
+|---|---|---|
+| `internal_mean_equal_weighted` / `_file_weighted` | `segment_split_lift.csv` | Segment-wide consistency of a child segment: mean Jaccard over **all** of its file pairs, recomputed from `membership_matrix.csv`. |
+| `sibling_mean_equal_weighted` / `_file_weighted` | `segment_split_lift.csv` | The child's consistency with its siblings (children of the same parent on one `split_dimension`), from `cross_segment_summary.csv`. |
+| `lift_equal_weighted` / `lift_file_weighted` | `segment_split_lift.csv` | internal - sibling. Positive: children are more consistent internally than with each other. The band is assigned from the equal-weighted lift. |
+| `within_project_only_mean` | `segment_split_lift.csv` | `compare_cross_segment.py`'s `within_project` value: file pairs sharing a `project_label` only. **Not** segment-wide consistency. |
+| `impact` (`basis=segment_wide`) | `segment_domain_loo_impact.csv` | Segment mean over all domains minus the mean without this domain. Positive: the domain pulls the segment's mean up. |
+| `impact` (`basis=within_project_only`) | `segment_domain_loo_impact.csv` | The same on `within_project` values -- the quantity the `project_mean_file_pair_jaccard_matrix.csv` diagonal publishes. Not segment-wide. |
+| `within_mean` / `between_mean` / `project_effect` | `segment_project_effect_by_{domain,category,segment}.csv` | Mean Jaccard of file pairs inside one project vs across different projects in the same segment; effect = within - between. Rollups give equal-domain and comparison-weighted variants. |
+| `presentation_band_descriptive` | all five CSVs | A descriptive label from `policies/domain_functional_categories.json`'s band edges. Not a governance threshold. |
+
+**Permissible interpretation:** a large project effect says files of one
+project resemble each other more than files of different projects in the
+same segment; a positive split lift says the split dimension separates
+populations that differ from each other.
+
+**Prohibited interpretation:** none of these says a segment, project or
+discipline is well or badly governed. Within-project similarity is partly
+mechanical -- files of one project share copied and linked content -- so a
+high within-project mean, a positive project effect, or a positive split
+lift does not by itself indicate governance quality.
+
 ### Adoption breadth (reuse-by-client cut, `pattern_reuse_summary_by_client.csv`)
  
 An **additive** breadth signal alongside the existing distinct-pattern reuse
@@ -293,6 +328,12 @@ above it) for whether the adoption is substantial or marginal.
   but their scores are excluded from aggregate/cross-domain framing because
   they are structurally anomalous in the current corpus — do not silently
   fold them into an "average governance health" claim.
+- **Segment decomposition views and weightings.** Each
+  `segment_decomposition.py` run covers one view; a used-view and an
+  all-view folder are separate runs and separate measurements. Within one
+  file, equal-weighted and file-weighted (or comparison-weighted) means are
+  different measurements too -- `weighting_difference` exists because they
+  can disagree. Compare like with like.
 - **Small samples.** `governance_client_summary.csv`'s `confidence_note`
   and `policies/governance/governance_thresholds.json`'s
   `client_confidence_low_max_files`/`client_confidence_moderate_max_files`
@@ -322,6 +363,14 @@ above it) for whether the adoption is substantial or marginal.
   `authority_level: convenience_summary` — they are suggested review
   prompts, never observed results. Do not present a leadership question as
   a finding.
+
+- **Segment decomposition blanks are unavailable, never 0.** A blank value
+  in a `segment_*` CSV means the value could not be computed (e.g. a sibling
+  pair `compare_cross_segment.py` never compared, `skip_reason=
+  no_sibling_comparison`; or a used-view pair with a file absent from the
+  used vocabulary, counted in `n_pairs_missing_view`). `row_status`/
+  `skip_reason` say why. A missing `segment_decomposition` folder means the
+  decomposition was not provided, not that it found nothing.
 
 ## Authority ordering
 
@@ -376,6 +425,21 @@ surfacing to a human, not silently resolved in the LLM's favor.
 - Do not treat a Project Portfolio pair's low `union_jaccard` as evidence of
   noncompliance -- it is a footprint-overlap diagnostic, not a governance
   verdict, and this section is deliberately excluded from `assign_tier()`.
+- Do not read a high within-project mean, a positive project effect, or a
+  positive split lift (Segment Decomposition section) as evidence of good
+  governance -- within-project similarity is partly mechanical, because files
+  of one project share copied and linked content.
+- Do not treat `presentation_band_descriptive` labels (e.g. `large_lift`,
+  `large_project_effect`) as governance thresholds or verdicts -- they are
+  descriptive bands and gate, suppress and classify nothing.
+- Do not treat `within_project_only_mean`, the `within_project_only` basis of
+  `segment_domain_loo_impact.csv`, or the diagonal of
+  `project_mean_file_pair_jaccard_matrix.csv` as segment-wide consistency --
+  they average only file pairs that share a `project_label`. Segment-wide
+  consistency is `segment_split_lift.csv`'s `internal_mean_*`. The same
+  applies to `governance_client_summary.csv`'s `within_project_coherence` and
+  the narrative's "within-project coherence" figures: they are not
+  client-wide or discipline-wide consistency.
 - Do not treat 100% (or near-100%) adoption breadth in the reuse-by-client
   cut as proof of deep convergence -- the underlying bar (one corpus-wide
   pattern) is easy to clear and can saturate across all clients while actual

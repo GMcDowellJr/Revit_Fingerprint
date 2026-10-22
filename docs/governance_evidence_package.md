@@ -229,9 +229,11 @@ The evidence map's own artifact count has grown across later phases beyond
 the figure above (the relationship layer added three artifacts; D-023 below
 adds a 33rd, `governance_file_inventory`; D-024 adds two more —
 `pattern_reuse_summary_by_domain` and `project_mean_file_pair_jaccard_matrix`
-— bringing the total to 35) — the code (`build_evidence_map()` in
-`tools/governance_evidence_package.py`) is the current source of truth for
-the exact count and list; see `test_evidence_map_has_thirty_five_unique_artifacts`
+— bringing the total to 35; D-030/D-029 add two static-doc entries, 37;
+D-053 adds six segment-decomposition entries per view, 49) — the code
+(`build_evidence_map()` in `tools/governance_evidence_package.py`) is the
+current source of truth for the exact count and list; see
+`test_evidence_map_has_forty_nine_unique_artifacts`
 in `tests/test_governance_evidence_package.py` for the up-to-date total.
 
 ### `governance_file_inventory.json` (D-023)
@@ -313,6 +315,23 @@ steps: step 1 ("name which large source file is needed") can now cite the
 real column names and row count straight from `governance_evidence_map.json`
 before writing the filtered extraction script step 2 calls for, instead of
 guessing at an unopened file's shape from its filename alone.
+
+### Segment decomposition artifacts (D-053)
+
+`tools/segment_decomposition.py` (D-052) writes, per view, a run summary and
+five CSVs. The evidence map carries six fixed entries per view in
+`SEGMENT_DECOMPOSITION_VIEWS` (`used`, `all`) -- `segment_decomposition_run_<view>`
+(provenance: status, reconciliation, findings) and
+`segment_split_lift_<view>`, `segment_domain_loo_impact_<view>`,
+`segment_project_effect_by_{domain,category,segment}_<view>` -- so the count is
+the same on every run; a view not supplied has `path: null`, `present: false`.
+All are `required_before_conclusions: false` and `authoritative_deterministic_evidence`;
+present CSVs get `columns`/`row_count` from the same `_sibling_scan_fields()`
+scan D-024 uses. Folders come from `--segment-decomposition-dir` (repeatable;
+default `<--summary's folder>/segment_decomposition`), and each folder's view is
+read from its run summary's `args.view_scope`, never from the folder name. The
+D-023 inventory scan does not descend into subfolders, so these files never
+appear there.
 
 ## Documented-but-not-fixed limitations
 
@@ -502,6 +521,9 @@ and `docs/governance/governance_question_routes.md`.
 --summary CROSS_SEGMENT_SUMMARY_CSV      (required, unchanged)
 --pooled CROSS_SEGMENT_POOLED_CSV        (required, unchanged)
 ... (all existing optional flags, unchanged) ...
+--segment-decomposition-dir DIR          optional, repeatable (one per view); default
+                                          <--summary's folder>/segment_decomposition
+                                          (D-053; presentation only)
 --policy-dir DIR                         optional; default policies/governance/
                                           (see "Policy profiles" above)
 --package-schema-version VERSION         optional; default 1.0

@@ -315,8 +315,8 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                                   across nested segments); hard-fails if the recomputed within-project means
                                   disagree with compare's within_project summary rows. Writes segment_*.csv +
                                   segment_decomposition_run.json under <cross-segment-dir>/segment_decomposition/.
-                                  Not runbook-wired, not rendered by generate_governance_narrative.py, no
-                                  assign_tier() interaction. tools/dev/segment_decomposition_step0_probe.py is its
+                                  Not runbook-wired; rendered (presentation only) by generate_governance_narrative.py's
+                                  Segment Decomposition section (D-053); no assign_tier() interaction. tools/dev/segment_decomposition_step0_probe.py is its
                                   read-only real-corpus Step-0 probe.
   generate_governance_narrative.py    Deterministic (no-LLM) governance_narrative_context.md renderer from the
                                   compare_cross_segment.py / bundle pipeline CSV outputs; also emits a governance
@@ -332,6 +332,10 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                                   inferred dtype, row count only -- never sample rows/cell values), so an escalating
                                   reader can discover a drill-down file exists before writing an extraction script
                                   against it.
+                                  Also renders a "Segment Decomposition (D-052)" section and six evidence-map
+                                  entries per view from tools/segment_decomposition.py's outputs (D-053;
+                                  repeatable --segment-decomposition-dir, default <--summary dir>/segment_decomposition).
+                                  Presentation only -- never feeds assign_tier()/governance_domain_summary.csv.
   governance_evidence_package.py    Package manifest/health/evidence-map/findings/file-inventory builders for the
                                   governance narrative evidence package (see docs/governance_evidence_package.md).
                                   Design-reference-only relationship to the external
@@ -408,6 +412,8 @@ tests/                  pytest test suite (70+ test files)
   test_discover_hash_policy.py, test_discover_vfd_edges.py, test_na_token.py, test_probe_inventory_builder.py,
   test_analyze_promotion_candidates.py  Synthetic-fixture coverage for tools/analyze_promotion_candidates.py
                                        (scope-gap routing, ordinal ranking, no-bare-score invariant)
+  test_governance_narrative_segment_decomposition.py  D-053 narrative/evidence-map wiring of segment_decomposition
+                                       outputs, incl. the assign_tier()/domain-summary byte-identity guardrail
   test_segment_decomposition.py        tools/segment_decomposition.py: end-to-end against real compare_cross_segment.py
                                        output (reconciliation gate, matrix drift guard), plus hand-computed lift/LOO and the --min-patterns domain gate
                                        Coverage for the newer segment/governance/archetype tooling

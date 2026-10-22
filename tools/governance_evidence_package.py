@@ -536,6 +536,206 @@ def _sibling_scan_fields(path, present: bool) -> dict:
     return fields
 
 
+# ── D-053: segment decomposition (D-052) outputs ──────────────────────────────
+# File names and schema written by tools/segment_decomposition.py (OUTPUT_FILES /
+# RUN_SUMMARY_FILE / SCHEMA_VERSION there). Kept as literals rather than imported:
+# segment_decomposition.py raises csv.field_size_limit() process-wide at import,
+# a side effect this stdlib-only module should not carry.
+# tests/test_governance_narrative_segment_decomposition.py asserts they agree.
+SEGMENT_DECOMPOSITION_SCHEMA_VERSION = "segment_decomposition.v1"
+SEGMENT_DECOMPOSITION_RUN_FILE = "segment_decomposition_run.json"
+SEGMENT_DECOMPOSITION_FILES = {
+    "split_lift": "segment_split_lift.csv",
+    "loo": "segment_domain_loo_impact.csv",
+    "effect_domain": "segment_project_effect_by_domain.csv",
+    "effect_category": "segment_project_effect_by_category.csv",
+    "effect_segment": "segment_project_effect_by_segment.csv",
+}
+# One run of segment_decomposition.py covers one --view-scope; every view gets
+# its own fixed set of evidence-map entries (present=False when not supplied),
+# so the artifact count does not vary run to run.
+SEGMENT_DECOMPOSITION_VIEWS = ("used", "all")
+SEGMENT_DECOMPOSITION_ARTIFACT_IDS = {
+    "run": "segment_decomposition_run",
+    "split_lift": "segment_split_lift",
+    "loo": "segment_domain_loo_impact",
+    "effect_domain": "segment_project_effect_by_domain",
+    "effect_category": "segment_project_effect_by_category",
+    "effect_segment": "segment_project_effect_by_segment",
+}
+
+
+def segment_decomposition_sibling_key(output_key: str, view: str) -> str:
+    """sibling_paths/evidence-map artifact_id for one decomposition output and view."""
+    return f"{SEGMENT_DECOMPOSITION_ARTIFACT_IDS[output_key]}_{view}"
+
+
+def segment_decomposition_sibling_paths(view_dirs: dict) -> dict:
+    """{sibling_key: Path} for every output of every view whose folder is known.
+
+    view_dirs maps view_scope -> the folder segment_decomposition.py wrote that
+    view to. A view with no known folder contributes no keys; its evidence-map
+    entries then carry path=None, present=False.
+    """
+    paths = {}
+    for view, d in view_dirs.items():
+        if view not in SEGMENT_DECOMPOSITION_VIEWS or d is None:
+            continue
+        d = Path(d)
+        paths[segment_decomposition_sibling_key("run", view)] = d / SEGMENT_DECOMPOSITION_RUN_FILE
+        for key, name in SEGMENT_DECOMPOSITION_FILES.items():
+            paths[segment_decomposition_sibling_key(key, view)] = d / name
+    return paths
+
+
+_SEGMENT_DECOMPOSITION_COMMON_LIMITS = [
+    "Within-project similarity is partly mechanical -- files of one project share "
+    "copied and linked content -- so a high within-project mean, a positive project "
+    "effect, or a positive split lift does not by itself indicate governance quality.",
+    "presentation_band_descriptive is a descriptive presentation band (edges in "
+    "policies/domain_functional_categories.json), not a governance threshold; it "
+    "gates, suppresses and classifies nothing.",
+    "Outside assign_tier()/governance_domain_summary.csv/governance_findings.json "
+    "by design (D-052/D-053) -- a segment/portfolio diagnostic that never overrides "
+    "a domain tier.",
+    "One segment_decomposition.py run covers one view_scope; used-view and all-view "
+    "files come from separate runs and are not one measurement.",
+    "Written only when segment_decomposition_run.json's status is 'ok' (reconciliation "
+    "gate passed); a failed run removes these files rather than leaving stale numbers.",
+]
+
+_SEGMENT_DECOMPOSITION_NULL_SEMANTICS = {
+    "*": (
+        "Blank string ('') means unavailable, never 0 -- e.g. a used-view pair with a "
+        "file absent from the used vocabulary, or a sibling pair compare_cross_segment.py "
+        "never compared. row_status/skip_reason name why a row has no value."
+    ),
+}
+
+# (output_key, context_role, grain, key_fields, can_answer, cannot_answer, extra limits)
+_SEGMENT_DECOMPOSITION_SPECS = [
+    (
+        "split_lift",
+        "D-052 analysis A -- rendered (selected/sorted only) by the narrative's "
+        "Segment Decomposition section",
+        "one row per (row_grain, view_scope, split_dimension, parent_segment_id, "
+        "segment_id); row_grain is 'child' or 'parent' (family aggregate)",
+        ["row_grain", "view_scope", "split_dimension", "parent_segment_id", "segment_id"],
+        ["whether children of a parent segment split on one dimension are more "
+         "internally consistent (segment-wide mean over all of a child's file pairs) "
+         "than consistent with their siblings, equal- and file-weighted"],
+        ["consistency for any split dimension other than the one recorded in "
+         "split_dimension",
+         "segment-wide consistency from within_project_only_mean -- that column "
+         "averages only file pairs sharing a project_label"],
+        ["Sibling pairs compare_cross_segment.py never compared are row_status="
+         "unavailable, skip_reason=no_sibling_comparison; nothing fills that gap.",
+         "presentation_band_descriptive is computed from lift_equal_weighted only."],
+    ),
+    (
+        "loo",
+        "D-052 analysis B -- rendered (segment_wide basis, top/bottom rows) by the "
+        "narrative's Segment Decomposition section",
+        "one row per (basis, view_scope, segment_id, domain)",
+        ["basis", "view_scope", "segment_id", "domain"],
+        ["how much one domain moves a segment's equal-domain mean (mean_all - "
+         "mean_without)"],
+        ["segment-wide consistency from the within_project_only basis -- those "
+         "values are compare_cross_segment.py's within_project summary values, the "
+         "same quantity the project_mean_file_pair_jaccard_matrix.csv diagonal "
+         "publishes"],
+        ["A published-vs-recalculated ALL_DOMAINS difference beyond tolerance is a "
+         "named finding in segment_decomposition_run.json, never a failure."],
+    ),
+    (
+        "effect_domain",
+        "D-052 analysis C (per domain) -- named as a drill-down by the narrative, "
+        "not rendered row by row",
+        "one row per (view_scope, segment_id, domain)",
+        ["view_scope", "segment_id", "domain"],
+        ["mean Jaccard of file pairs within the same project_label vs between "
+         "different project_labels, per segment and domain, with pair counts"],
+        ["whether a difference reflects governance practice rather than shared "
+         "project content"],
+        ["Files with a blank/N/A project_label are excluded from both buckets "
+         "(n_pairs_excluded_unlabeled) but still count toward segment_wide_mean."],
+    ),
+    (
+        "effect_category",
+        "D-052 analysis C (functional-category rollup) -- named as a drill-down by "
+        "the narrative, not rendered row by row",
+        "one row per (view_scope, segment_id, functional_category)",
+        ["view_scope", "segment_id", "functional_category"],
+        ["project effect rolled up by functional category, equal-domain and "
+         "comparison-weighted"],
+        ["any governance weighting of categories -- the taxonomy is descriptive"],
+        ["Rollups cover only domains with both a within and a between value; a "
+         "domain missing from the taxonomy rolls up under UNMAPPED."],
+    ),
+    (
+        "effect_segment",
+        "D-052 analysis C (segment rollup) -- rendered as the narrative's "
+        "per-segment project-effect table",
+        "one row per (view_scope, segment_id)",
+        ["view_scope", "segment_id"],
+        ["per-segment within- vs between-project means and effect, equal-domain "
+         "and comparison-weighted, with pair counts"],
+        ["segment-wide consistency -- see segment_split_lift.csv's internal_mean_* "
+         "columns for that"],
+        ["Rollups cover only domains with both a within and a between value; "
+         "presentation_band_descriptive is computed from equal_domain_effect only."],
+    ),
+]
+
+
+def segment_decomposition_artifacts(sibling_paths: dict, sibling_present: dict) -> list:
+    """Evidence-map entries for segment_decomposition.py's outputs (D-053): six
+    per view in SEGMENT_DECOMPOSITION_VIEWS -- the run summary as provenance plus
+    one per CSV -- all required_before_conclusions=False."""
+    artifacts = []
+    for view in SEGMENT_DECOMPOSITION_VIEWS:
+        run_key = segment_decomposition_sibling_key("run", view)
+        run_path = sibling_paths.get(run_key)
+        run_present = bool(sibling_present.get(run_key, False))
+        csv_ids = [segment_decomposition_sibling_key(k, view) for k in SEGMENT_DECOMPOSITION_FILES]
+        artifacts.append(_artifact(
+            run_key, str(run_path) if run_path else None, "json", False, run_present,
+            "segment_decomposition.py", AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+            f"provenance for the {view}-view segment decomposition outputs -- status "
+            "(ok/failed_reconciliation), reconciliation counts, drift findings, "
+            "unmapped/below-min-patterns domains, known_limitation; the narrative "
+            "renders no decomposition number unless status is 'ok'",
+            "one JSON document per segment_decomposition.py run (one view_scope)",
+            ["status", "schema_version", "args.view_scope"], [], [],
+            ["whether this view's decomposition passed its reconciliation gate against "
+             "compare_cross_segment.py's within_project values, and what was skipped"],
+            ["any decomposition metric -- see the CSV entries"],
+            _SEGMENT_DECOMPOSITION_COMMON_LIMITS + [
+                "executed_utc/runtime_seconds/peak_memory_mb make this file differ "
+                "between otherwise identical runs."],
+            {"*": "Absent file means the decomposition was not provided for this view."},
+            csv_ids,
+            required_before_conclusions=False,
+            schema_version=SEGMENT_DECOMPOSITION_SCHEMA_VERSION,
+        ))
+        for output_key, role, grain, keys, can, cannot, extra in _SEGMENT_DECOMPOSITION_SPECS:
+            sid = segment_decomposition_sibling_key(output_key, view)
+            path = sibling_paths.get(sid)
+            present = bool(sibling_present.get(sid, False))
+            artifacts.append(_artifact(
+                sid, str(path) if path else None, "csv", False, present,
+                "segment_decomposition.py", AUTHORITY_AUTHORITATIVE_DETERMINISTIC_EVIDENCE,
+                f"{view}-view {role}", grain, keys, ["segment_id"],
+                ["segment_id (join to build_segment_manifest.py's segment_id)"],
+                can, cannot, _SEGMENT_DECOMPOSITION_COMMON_LIMITS + extra,
+                _SEGMENT_DECOMPOSITION_NULL_SEMANTICS,
+                [run_key, "project_mean_file_pair_jaccard_matrix", "cross_segment_summary"],
+                required_before_conclusions=False,
+            ))
+            artifacts[-1].update(_sibling_scan_fields(path, present))
+    return artifacts
+
+
 def build_evidence_map(
     *,
     schema_version: str,
@@ -1107,6 +1307,8 @@ def build_evidence_map(
         sibling_paths.get("project_mean_file_pair_jaccard_matrix"),
         sibling_present.get("project_mean_file_pair_jaccard_matrix", False),
     ))
+
+    artifacts.extend(segment_decomposition_artifacts(sibling_paths, sibling_present))
 
     artifacts.append(_artifact(
         "governance_domain_summary", p(output_paths, "governance_domain_summary"), "csv", True, True,

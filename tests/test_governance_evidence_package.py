@@ -359,14 +359,15 @@ def _evidence_map(**overrides):
     return build_evidence_map(**kwargs)
 
 
-def test_evidence_map_has_thirty_seven_unique_artifacts():
+def test_evidence_map_has_forty_nine_unique_artifacts():
     # 29 (pre-relationship-layer) + governance_bc_client_matrix +
     # governance_client_bc_matrix + governance_relationships + governance_file_inventory
     # + pattern_reuse_summary_by_domain + project_mean_file_pair_jaccard_matrix (D-024)
     # + governance_reading_order (D-030) + governance_classification_rules (D-029).
+    # + 6 segment decomposition entries per view x 2 views (D-053).
     em = _evidence_map()
     ids = [a["artifact_id"] for a in em["artifacts"]]
-    assert len(ids) == 37
+    assert len(ids) == 49
     assert "governance_findings" in ids
     assert "segment_manifest" in ids
     assert "governance_bc_client_matrix" in ids
