@@ -315,8 +315,8 @@ tools/                  Analysis & comparison utilities (no Revit dependency; st
                                   across nested segments); hard-fails if the recomputed within-project means
                                   disagree with compare's within_project summary rows. Writes segment_*.csv +
                                   segment_decomposition_run.json under <cross-segment-dir>/segment_decomposition/.
-                                  Not runbook-wired, not rendered by generate_governance_narrative.py, no
-                                  assign_tier() interaction. tools/dev/segment_decomposition_step0_probe.py is its
+                                  Not runbook-wired; rendered (presentation only) by generate_governance_narrative.py's
+                                  Segment Decomposition section (D-053); no assign_tier() interaction. tools/dev/segment_decomposition_step0_probe.py is its
                                   read-only real-corpus Step-0 probe.
   generate_governance_narrative.py    Deterministic (no-LLM) governance_narrative_context.md renderer from the
                                   compare_cross_segment.py / bundle pipeline CSV outputs; also emits a governance
