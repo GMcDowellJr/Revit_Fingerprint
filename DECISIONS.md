@@ -3041,8 +3041,16 @@ quality.
 ## D-053 — Surface `segment_decomposition.py` (D-052) outputs in the governance narrative and evidence package (presentation only)
 
 ### Status
-Proposed (2026-10-22) -- pending the acceptance run on the 2026-10 corpus
-(both views; domain tiers compared against a run without the folders).
+Accepted (2026-10-22). Acceptance run on the 2026-10 corpus with both views
+(used-view at the default `<cross-segment dir>/segment_decomposition`, all-view
+via `--out-dir`): `governance_domain_summary.csv` byte-identical to a run
+without the folders; both views rendered with status `ok` (42 segments, 7 split
+families, 8,283,852 file pairs scored, reconciliation 1,397 checked / 1,397
+matched / 17 with no compare reference, 0 drift findings, 0 summary
+conflicts, no unmapped domains). For `imperial|Project|Micron|4001` (all-view):
+split-lift family of 13 children, lift 0.063 equal / 0.056 file-weighted
+(`moderate_lift`); project effect 0.032 equal-domain over 382 files and 20
+projects (`small_difference`).
 
 ### Context
 D-052 §8 placed `tools/segment_decomposition.py`'s outputs outside
